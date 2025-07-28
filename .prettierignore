@@ -1,0 +1,44 @@
+# Prettier ignore patterns for Legal MCP Server
+
+# Build outputs
+dist/
+build/
+coverage/
+test-output/
+
+# Dependencies
+node_modules/
+.pnp.*
+
+# Generated files
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package managers
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Docker
+.dockerignore
+
+# Wrangler
+.wrangler/
+
+# Git
+.git/

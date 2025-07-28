@@ -1,0 +1,139 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚀 Launch MCP Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/index.js",
+      "preLaunchTask": "build",
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "outputCapture": "std"
+    },
+    {
+      "name": "🏢 Launch Enterprise Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/enterprise-server.js",
+      "preLaunchTask": "build",
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug",
+        "SECURITY_AUTHENTICATION_ENABLED": "true",
+        "AUDIT_ENABLED": "true"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "outputCapture": "std"
+    },
+    {
+      "name": "🧪 Debug Unit Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/test/runners/run-unit-tests.js",
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "🔍 Debug Current Test File",
+      "type": "node",
+      "request": "launch",
+      "program": "${file}",
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "🔧 Debug MCP Inspector",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/dev/inspect.js",
+      "args": ["local"],
+      "preLaunchTask": "build",
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "📊 Debug Performance Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/test/performance/test-performance.js",
+      "env": {
+        "NODE_ENV": "test",
+        "LOG_LEVEL": "info"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "🐛 Attach to Running MCP Server",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "skipFiles": ["<node_internals>/**"],
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "🔍 Debug with TypeScript Source Maps",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/index.js",
+      "preLaunchTask": "build",
+      "sourceMaps": true,
+      "smartStep": true,
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🚀 Launch MCP + Health Server",
+      "configurations": ["🚀 Launch MCP Server"],
+      "stopAll": true
+    },
+    {
+      "name": "🔧 Debug MCP with Inspector",
+      "configurations": ["🚀 Launch MCP Server", "🔧 Debug MCP Inspector"],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "MCP Development",
+        "order": 1
+      }
+    },
+    {
+      "name": "🏢 Enterprise Debug Suite",
+      "configurations": ["🏢 Launch Enterprise Server", "📊 Debug Performance Tests"],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "Enterprise",
+        "order": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "legal-mcp-local": {
+      "command": "node",
+      "args": ["dist/worker.js"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "legal-mcp-remote": {
+      "type": "sse",
+      "url": "https://courtlistener-mcp.blakeopowell.workers.dev/sse"
+    }
+  }
+}

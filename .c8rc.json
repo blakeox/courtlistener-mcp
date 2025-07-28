@@ -1,0 +1,37 @@
+{
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "test/**",
+    "dist/**",
+    "scripts/**",
+    "coverage/**",
+    "node_modules/**",
+    "*.config.js",
+    "*.config.ts"
+  ],
+  "extension": [
+    ".ts",
+    ".js"
+  ],
+  "reporter": [
+    "text",
+    "html",
+    "json-summary",
+    "lcov"
+  ],
+  "check-coverage": true,
+  "lines": 80,
+  "functions": 80,
+  "branches": 75,
+  "statements": 80,
+  "per-file": true,
+  "skip-full": false,
+  "all": true,
+  "cache": false,
+  "clean": true,
+  "temp-directory": "./coverage/.tmp",
+  "reports-dir": "./coverage"
+}

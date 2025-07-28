@@ -1,0 +1,113 @@
+# Legal MCP Server - Enterprise Edition
+# Docker configuration with enterprise features enabled
+
+FROM node:22-alpine3.20 AS base
+
+# Install security updates and dependencies
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+    curl \
+    jq \
+    tini \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S legal-mcp -u 1001
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm install -g pnpm && \
+    pnpm install --frozen-lockfile
+
+# Development stage
+FROM base AS development
+ENV NODE_ENV=development
+COPY . .
+RUN pnpm build
+EXPOSE 3001
+USER legal-mcp
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["npm", "start"]
+
+# Production stage
+FROM base AS production
+
+# Set production environment
+ENV NODE_ENV=production
+
+# Copy source code
+COPY src ./src
+COPY scripts ./scripts
+
+# Build application
+RUN pnpm build && \
+    pnpm prune --production
+
+# Copy built application
+FROM node:22-alpine3.20 AS runtime
+
+# Install runtime dependencies with security updates
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+    tini \
+    curl \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S legal-mcp -u 1001
+
+# Copy built application and dependencies
+COPY --from=production /app/dist ./dist
+COPY --from=production /app/node_modules ./node_modules
+COPY --from=production /app/package.json ./
+
+# Enterprise environment configuration
+ENV NODE_ENV=production
+ENV LOG_LEVEL=info
+ENV METRICS_ENABLED=true
+ENV METRICS_PORT=3001
+ENV HEALTH_ENABLED=true
+
+# Enterprise features (disabled by default, enable via env vars)
+ENV SECURITY_AUTHENTICATION_ENABLED=false
+ENV SECURITY_SANITIZATION_ENABLED=false
+ENV AUDIT_ENABLED=false
+ENV COMPRESSION_ENABLED=false
+ENV CIRCUIT_BREAKER_ENABLED=false
+ENV GRACEFUL_SHUTDOWN_ENABLED=true
+
+# Expose ports
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Switch to non-root user
+USER legal-mcp
+
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/index.js"]
+
+# Labels for container metadata
+LABEL org.opencontainers.image.title="Legal MCP Server Enterprise"
+LABEL org.opencontainers.image.description="Enterprise-grade Legal Model Context Protocol Server"
+LABEL org.opencontainers.image.source="https://github.com/blakeox/courtlistener-mcp"
+LABEL org.opencontainers.image.version="1.1.0"
+LABEL org.opencontainers.image.authors="Legal MCP Contributors"
+LABEL maintainer="legal-mcp@example.com"

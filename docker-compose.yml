@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  legal-mcp:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - CACHE_ENABLED=true
+      - CACHE_TTL=600
+      - CACHE_MAX_SIZE=5000
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - LOGGING_ENABLED=true
+      - METRICS_ENABLED=true
+      - METRICS_PORT=3001
+      - COURTLISTENER_BASE_URL=https://www.courtlistener.com/api/rest/v4
+      - COURTLISTENER_TIMEOUT=30000
+      - COURTLISTENER_RETRY_ATTEMPTS=3
+      - COURTLISTENER_RATE_LIMIT=100
+      # - COURTLISTENER_TOKEN=${COURTLISTENER_TOKEN}  # Set in .env file
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./logs:/app/logs:rw
+    networks:
+      - legal-mcp-network
+
+networks:
+  legal-mcp-network:
+    driver: bridge

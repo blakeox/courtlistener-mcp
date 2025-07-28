@@ -1,0 +1,181 @@
+{
+  "MCP Tool Definition": {
+    "prefix": "mcp-tool",
+    "body": [
+      "export const ${1:toolName}Tool: Tool = {",
+      "  name: '${1:toolName}',",
+      "  description: '${2:Tool description}',",
+      "  inputSchema: {",
+      "    type: 'object',",
+      "    properties: {",
+      "      ${3:paramName}: {",
+      "        type: '${4:string}',",
+      "        description: '${5:Parameter description}'",
+      "      }",
+      "    },",
+      "    required: ['${3:paramName}']",
+      "  }",
+      "};"
+    ],
+    "description": "Create a new MCP tool definition"
+  },
+  
+  "MCP Tool Handler": {
+    "prefix": "mcp-handler",
+    "body": [
+      "async handle${1/(.*)/${1:/pascalcase}/}(args: any): Promise<any> {",
+      "  try {",
+      "    this.logger.info('Executing ${1:toolName}', { args });",
+      "    this.metrics.recordRequest('${1:toolName}', true);",
+      "    ",
+      "    // Validate input",
+      "    if (!args.${2:paramName}) {",
+      "      throw new McpError(",
+      "        ErrorCode.InvalidParams,",
+      "        '${2:paramName} is required'",
+      "      );",
+      "    }",
+      "    ",
+      "    // Implementation",
+      "    const result = await this.${3:implementationMethod}(args.${2:paramName});",
+      "    ",
+      "    this.logger.info('${1/(.*)/${1:/pascalcase}/} completed successfully');",
+      "    return {",
+      "      content: [{",
+      "        type: 'text',",
+      "        text: JSON.stringify(result, null, 2)",
+      "      }]",
+      "    };",
+      "    ",
+      "  } catch (error) {",
+      "    this.logger.error('${1/(.*)/${1:/pascalcase}/} failed', { error, args });",
+      "    this.metrics.recordRequest('${1:toolName}', false);",
+      "    ",
+      "    if (error instanceof McpError) {",
+      "      throw error;",
+      "    }",
+      "    ",
+      "    throw new McpError(",
+      "      ErrorCode.InternalError,",
+      "      `${1/(.*)/${1:/pascalcase}/} failed: ${error.message}`",
+      "    );",
+      "  }",
+      "}"
+    ],
+    "description": "Create a new MCP tool handler method"
+  },
+  
+  "MCP Server Test": {
+    "prefix": "mcp-test",
+    "body": [
+      "describe('${1:TestSuite}', () => {",
+      "  let server: ${2:ServerClass};",
+      "  let mockLogger: any;",
+      "  ",
+      "  beforeEach(() => {",
+      "    mockLogger = {",
+      "      info: () => {},",
+      "      error: () => {},",
+      "      warn: () => {},",
+      "      debug: () => {}",
+      "    };",
+      "    ",
+      "    server = new ${2:ServerClass}(mockLogger);",
+      "  });",
+      "  ",
+      "  it('should ${3:test description}', async () => {",
+      "    // Arrange",
+      "    const ${4:inputData} = {",
+      "      ${5:property}: '${6:value}'",
+      "    };",
+      "    ",
+      "    // Act",
+      "    const result = await server.${7:methodName}(${4:inputData});",
+      "    ",
+      "    // Assert",
+      "    assert.ok(result);",
+      "    assert.strictEqual(result.${8:property}, '${9:expectedValue}');",
+      "  });",
+      "});"
+    ],
+    "description": "Create a new MCP test suite"
+  },
+  
+  "Enterprise Middleware": {
+    "prefix": "mcp-middleware",
+    "body": [
+      "export class ${1:MiddlewareName}Middleware {",
+      "  private config: any;",
+      "  private logger: any;",
+      "  ",
+      "  constructor(config: any, logger: any) {",
+      "    this.config = config;",
+      "    this.logger = logger;",
+      "  }",
+      "  ",
+      "  async process(request: any, context: any): Promise<any> {",
+      "    try {",
+      "      this.logger.debug('${1:MiddlewareName} processing request', {",
+      "        requestId: context.requestId",
+      "      });",
+      "      ",
+      "      // Middleware logic here",
+      "      ${2:// TODO: Implement middleware logic}",
+      "      ",
+      "      return {",
+      "        allowed: true,",
+      "        request: request",
+      "      };",
+      "      ",
+      "    } catch (error) {",
+      "      this.logger.error('${1:MiddlewareName} middleware error', {",
+      "        error: error.message,",
+      "        requestId: context.requestId",
+      "      });",
+      "      ",
+      "      return {",
+      "        allowed: false,",
+      "        error: error.message",
+      "      };",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Create a new enterprise middleware class"
+  },
+  
+  "Logger Statement": {
+    "prefix": "log",
+    "body": [
+      "this.logger.${1|info,error,warn,debug|}('${2:message}', { ${3:context} });"
+    ],
+    "description": "Add a logger statement"
+  },
+  
+  "Metrics Recording": {
+    "prefix": "metrics",
+    "body": [
+      "this.metrics.record${1|Request,CacheHit,CacheMiss,Failure|}('${2:operation}', ${3:success});"
+    ],
+    "description": "Add metrics recording"
+  },
+  
+  "Cache Operation": {
+    "prefix": "cache",
+    "body": [
+      "const cacheKey = this.cache.generateKey('${1:operation}', ${2:params});",
+      "let result = await this.cache.get(cacheKey);",
+      "",
+      "if (!result) {",
+      "  result = await ${3:actualOperation}(${2:params});",
+      "  await this.cache.set(cacheKey, result);",
+      "  this.metrics.recordCacheMiss('${1:operation}');",
+      "} else {",
+      "  this.metrics.recordCacheHit('${1:operation}');",
+      "}",
+      "",
+      "return result;"
+    ],
+    "description": "Add cache operation with metrics"
+  }
+}

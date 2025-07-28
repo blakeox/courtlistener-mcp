@@ -1,0 +1,134 @@
+{
+  "summary": {
+    "timestamp": "2025-07-28T00:34:08.506Z",
+    "total_duration_ms": 8,
+    "total_test_suites": 8,
+    "successful_suites": 0,
+    "failed_suites": 0,
+    "crashed_suites": 8,
+    "total_tests": 0,
+    "total_passed": 0,
+    "total_failed": 0,
+    "success_rate": "0%"
+  },
+  "coverage": null,
+  "test_suites": [
+    {
+      "name": "Infrastructure Tests",
+      "description": "Core infrastructure components validation (Week 1)",
+      "command": "node test/unit/test-cache.js",
+      "status": "CRASH",
+      "duration": 1,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Configuration Tests",
+      "description": "Configuration management and validation",
+      "command": "node test/unit/test-config.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Logging Tests",
+      "description": "Logging system and audit trail validation",
+      "command": "node test/unit/test-logger.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Metrics Tests",
+      "description": "Performance metrics and monitoring",
+      "command": "node test/unit/test-metrics.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Circuit Breaker Tests",
+      "description": "Resilience patterns and failure handling",
+      "command": "node test/unit/test-circuit-breaker.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "API Integration Tests",
+      "description": "CourtListener API integration and error handling (Week 2)",
+      "command": "node test/unit/test-courtlistener.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Server Integration Tests",
+      "description": "Health server and endpoint validation (Week 3)",
+      "command": "node test/unit/test-server-integration.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    },
+    {
+      "name": "Enterprise Server Tests",
+      "description": "MCP protocol compliance and enterprise features (Week 3)",
+      "command": "node test/unit/test-enterprise-server.js",
+      "status": "CRASH",
+      "duration": 0,
+      "tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "output": "",
+      "error": "Cannot access 'process' before initialization"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "CRITICAL",
+      "message": "8 test suite(s) failed. Review and fix failing tests before deployment.",
+      "suites": [
+        "Infrastructure Tests",
+        "Configuration Tests",
+        "Logging Tests",
+        "Metrics Tests",
+        "Circuit Breaker Tests",
+        "API Integration Tests",
+        "Server Integration Tests",
+        "Enterprise Server Tests"
+      ]
+    },
+    {
+      "type": "CRITICAL",
+      "message": "No tests were executed successfully",
+      "suggestion": "Verify test files exist and are properly configured"
+    }
+  ]
+}

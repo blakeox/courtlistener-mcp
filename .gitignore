@@ -1,0 +1,104 @@
+# .gitignore for legal-mcp
+# Node modules and dependencies
+node_modules/
+clients/javascript/node_modules/
+
+# Build output
+dist/
+
+# Python virtual environments and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+clients/python/.venv/
+clients/python/venv/
+
+# Logs
+*.log
+remote-mcp-*.log
+legal-mcp-error.log
+legal-mcp-combined.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+*.env
+.env.local
+.env.development
+.env.production
+.env.test
+*.secret
+*.secrets
+secrets.*
+secrets/
+config/secrets/
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+*.jks
+*.keystore
+auth.json
+credentials.json
+service-account.json
+*.credential
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# API Keys and tokens
+api-keys.txt
+tokens.txt
+*.token
+*.api-key
+
+# Ignore local config
+claude_desktop_config.json
+config.local.json
+local.json
+
+# Ignore test output
+coverage/
+.coverage
+.nyc_output/
+junit.xml
+test-results/
+
+# Enhanced MCP Inspector test artifacts
+test-output/
+*.log
+enhanced-mcp-inspector-report.*
+ci-mcp-inspector-report.*
+visual-tests/
+performance-data/
+inspector-*.png
+inspector-*.csv
+inspector-*.txt
+
+# Ignore Docker artifacts
+*.pid
+docker-compose.override.yml
+
+# Ignore wrangler secrets
+wrangler.toml.local
+.wrangler/
+wrangler.toml.backup
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# IDE/Editor files with potential secrets
+.vscode/settings.json
+.idea/
+
+# Backup files
+*.backup
+*.bak

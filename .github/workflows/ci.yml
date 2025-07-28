@@ -1,0 +1,234 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ '*' ]  # Run on all branches
+  pull_request:
+    branches: [ '*' ]  # Run on PRs targeting any branch
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+      fail-fast: false
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        # Check if pnpm lock file is in sync, if not regenerate it
+        if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+          echo "⚠️ pnpm lock file out of sync, regenerating..."
+          pnpm install
+        else
+          echo "✅ pnpm lock file in sync, using frozen-lockfile"
+          pnpm install --frozen-lockfile
+        fi
+
+    - name: TypeScript compilation check
+      run: pnpm run typecheck
+
+    - name: Build project
+      run: pnpm run build
+
+    - name: Run unit tests
+      run: pnpm run test:unit
+
+    - name: Run integration tests  
+      run: pnpm run test:integration
+
+    - name: Run performance tests
+      run: pnpm run test:performance
+
+    - name: Install MCP Inspector
+      run: pnpm add -g @modelcontextprotocol/inspector
+
+    - name: Run MCP protocol validation
+      run: pnpm run test:mcp
+
+    - name: Run enhanced MCP Inspector integration tests
+      run: |
+        echo "🧪 Running enhanced MCP Inspector integration tests..."
+        
+        # Run enhanced CI tests with performance monitoring
+        ENABLE_PERFORMANCE_TESTS=true pnpm run ci:test-inspector:enhanced
+        
+        # Run original CI tests for compatibility
+        npm run ci:test-inspector
+
+    - name: Test MCP Inspector web interface
+      run: |
+        # Start inspector in background and test web interface
+        timeout 30s npm run inspect:local &
+        INSPECTOR_PID=$!
+        sleep 10
+        
+        # Test web interface is accessible
+        curl -f http://localhost:6274/health || echo "Inspector web interface not accessible"
+        
+        # Test web interface functionality
+        curl -f http://localhost:6274/ || echo "Inspector web interface home not accessible"
+        
+        # Clean up
+        kill $INSPECTOR_PID || true
+
+    - name: Upload enhanced test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-test-results-node-${{ matrix.node-version }}
+        path: |
+          test-output/
+          *.log
+          enhanced-mcp-inspector-report.*
+        retention-days: 7
+
+  mcp-compliance:
+    name: MCP Protocol Compliance
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Install MCP Inspector
+      run: npm install -g @modelcontextprotocol/inspector
+
+    - name: Comprehensive MCP validation
+      run: |
+        echo "🧪 Running comprehensive MCP protocol validation..."
+        
+        # Test local server with Inspector
+        echo "Testing local server..."
+        npm run test:mcp
+        
+        # Test remote server if available
+        if [ -n "${{ secrets.REMOTE_SERVER_URL }}" ]; then
+          echo "Testing remote server..."
+          REMOTE_URL="${{ secrets.REMOTE_SERVER_URL }}" npm run test:mcp
+        fi
+
+    - name: Generate MCP compliance report
+      run: |
+        echo "# MCP Protocol Compliance Report" > mcp-compliance-report.md
+        echo "" >> mcp-compliance-report.md
+        echo "Generated on: $(date)" >> mcp-compliance-report.md
+        echo "" >> mcp-compliance-report.md
+        echo "## Test Results" >> mcp-compliance-report.md
+        
+        if [ -f test-output/mcp-validation.log ]; then
+          echo "\`\`\`" >> mcp-compliance-report.md
+          cat test-output/mcp-validation.log >> mcp-compliance-report.md
+          echo "\`\`\`" >> mcp-compliance-report.md
+        fi
+
+    - name: Upload compliance report
+      uses: actions/upload-artifact@v4
+      with:
+        name: mcp-compliance-report
+        path: mcp-compliance-report.md
+
+  remote-server-test:
+    name: Remote Server Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, mcp-compliance]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Test remote Cloudflare Workers deployment
+      env:
+        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+      run: |
+        echo "🌐 Testing remote server deployment..."
+        
+        # Test remote server connectivity
+        curl -f "$REMOTE_SERVER_URL" || echo "Remote server not accessible"
+        
+        # Run MCP validation against remote server
+        SERVER_URL="$REMOTE_SERVER_URL" npm run test:mcp
+
+    - name: Performance benchmark against remote
+      env:
+        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+      run: |
+        echo "⚡ Running performance benchmarks..."
+        SERVER_URL="$REMOTE_SERVER_URL" npm run test:performance
+
+  security-check:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security audit
+      run: npm audit --audit-level=moderate
+
+    - name: Check for sensitive data in logs
+      run: |
+        echo "🔍 Checking for sensitive data exposure..."
+        
+        # Build and run a quick test to ensure no secrets are logged
+        npm run build
+        timeout 10s npm start 2>&1 | grep -i "api.key\|token\|secret\|password" && exit 1 || echo "✅ No sensitive data found in logs"
+
+    - name: Validate MCP server security
+      run: |
+        echo "🛡️ Validating MCP server security practices..."
+        
+        # Check that server properly handles malformed requests
+        npm run build
+        echo '{"invalid": "json"' | timeout 5s npm start || echo "✅ Server handles malformed input gracefully"

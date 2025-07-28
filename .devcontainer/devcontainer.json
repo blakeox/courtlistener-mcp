@@ -1,0 +1,69 @@
+{
+  "name": "Legal MCP Server Development",
+  "dockerFile": "Dockerfile",
+  "context": "..",
+  
+  // Development ports
+  "forwardPorts": [3001, 6274, 9229],
+  "portsAttributes": {
+    "3001": {
+      "label": "MCP Server",
+      "protocol": "http"
+    },
+    "6274": {
+      "label": "MCP Inspector",
+      "protocol": "http"
+    },
+    "9229": {
+      "label": "Node Debug",
+      "protocol": "http"
+    }
+  },
+  
+  // VS Code configuration
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.node-debug2",
+        "hbenl.vscode-test-explorer",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "humao.rest-client",
+        "yzhang.markdown-all-in-one",
+        "ms-vscode.dotenv"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "typescript.preferences.includePackageJsonAutoImports": "auto",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  },
+  
+  // Post-creation commands
+  "postCreateCommand": "npm install && npm run build",
+  
+  // Features
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  // Mount the source code
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  
+  // Run as root for development
+  "remoteUser": "root",
+  
+  // Environment variables
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "LOG_LEVEL": "debug"
+  }
+}
