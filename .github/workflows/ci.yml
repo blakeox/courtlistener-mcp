@@ -136,7 +136,14 @@ jobs:
         # Test remote server if available
         if [ -n "${{ secrets.REMOTE_SERVER_URL }}" ]; then
           echo "Testing remote server..."
-          REMOTE_URL="${{ secrets.REMOTE_SERVER_URL }}" npm run test:mcp
+          # Use SSE endpoint for MCP protocol tests
+          REMOTE_SSE_URL="${{ secrets.REMOTE_SERVER_URL }}"
+          if [[ "$REMOTE_SSE_URL" == *"/health" ]]; then
+            REMOTE_SSE_URL="${REMOTE_SSE_URL%/health}/sse"
+          elif [[ "$REMOTE_SSE_URL" != *"/sse" ]]; then
+            REMOTE_SSE_URL="${REMOTE_SSE_URL}/sse"
+          fi
+          REMOTE_URL="$REMOTE_SSE_URL" npm run test:mcp
         fi
 
     - name: Generate MCP compliance report
@@ -180,22 +187,25 @@ jobs:
 
     - name: Test remote Cloudflare Workers deployment
       env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
       run: |
         echo "🌐 Testing remote server deployment..."
         
-        # Test remote server connectivity
+        # Test remote server connectivity (health check)
         curl -f "$REMOTE_SERVER_URL" || echo "Remote server not accessible"
         
-        # Run MCP validation against remote server
-        SERVER_URL="$REMOTE_SERVER_URL" npm run test:mcp
+        # Run MCP validation against remote server (use SSE endpoint for MCP)
+        MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
+        SERVER_URL="$MCP_ENDPOINT" npm run test:mcp
 
     - name: Performance benchmark against remote
       env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
       run: |
         echo "⚡ Running performance benchmarks..."
-        SERVER_URL="$REMOTE_SERVER_URL" npm run test:performance
+        # Use SSE endpoint for performance tests
+        MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
+        SERVER_URL="$MCP_ENDPOINT" npm run test:performance
 
   security-check:
     name: Security & Code Quality
