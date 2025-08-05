@@ -65,7 +65,7 @@ jobs:
         echo "🧪 Testing Inspector ${{ matrix.inspector-version }} with Node ${{ matrix.node-version }}"
         
         # Run basic compatibility tests
-        node scripts/ci-test-mcp-inspector.js
+        node test/runners/ci-test-mcp-inspector.js
         
         # Test web interface compatibility
         timeout 30s npm run inspect:local &

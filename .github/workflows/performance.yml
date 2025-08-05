@@ -105,7 +105,7 @@ jobs:
         
         ## Performance Alerts
         
-        $(node scripts/analyze-performance.js performance-data/ || echo "No performance issues detected ✅")
+        $(node scripts/performance/analyze-performance.js performance-data/ || echo "No performance issues detected ✅")
         
         EOF
 
@@ -118,7 +118,7 @@ jobs:
           curl -s "${{ secrets.PERFORMANCE_BASELINE_URL }}" > baseline.txt || echo "No baseline available"
           
           if [ -f baseline.txt ] && [ -f performance-data/*.txt ]; then
-            node scripts/compare-performance.js baseline.txt performance-data/*.txt || echo "Performance comparison completed"
+            node scripts/performance/compare-performance.js baseline.txt performance-data/*.txt || echo "Performance comparison completed"
           fi
         fi
 

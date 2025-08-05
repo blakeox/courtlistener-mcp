@@ -210,8 +210,8 @@ jobs:
     - name: 🔍 Performance Analysis
       run: |
         echo "🔍 Analyzing performance..."
-        if [ -f scripts/analyze-performance.js ]; then
-          node scripts/analyze-performance.js || echo "ℹ️ Performance analysis completed"
+        if [ -f scripts/performance/analyze-performance.js ]; then
+          node scripts/performance/analyze-performance.js || echo "ℹ️ Performance analysis completed"
         else
           echo "ℹ️ No performance analysis script found"
         fi
