@@ -5,7 +5,7 @@
  * Tests caching behavior, TTL expiration, LRU eviction, and statistics
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 
 class MockLogger {
@@ -34,6 +34,13 @@ describe('Cache Manager', () => {
     };
     
     cache = new CacheManager(config, mockLogger);
+  });
+
+  afterEach(() => {
+    // Clean up cache instances to prevent hanging intervals
+    if (cache && typeof cache.destroy === 'function') {
+      cache.destroy();
+    }
   });
   
   describe('Basic Caching', () => {
@@ -83,19 +90,23 @@ describe('Cache Manager', () => {
       };
       const shortTtlCache = new CacheManager(shortTtlConfig, mockLogger);
       
-      const testData = { result: 'expires soon' };
-      shortTtlCache.set('endpoint', { param: 'value' }, testData);
-      
-      // Should be available immediately
-      let retrieved = shortTtlCache.get('endpoint', { param: 'value' });
-      assert.deepStrictEqual(retrieved, testData);
-      
-      // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Should be expired
-      retrieved = shortTtlCache.get('endpoint', { param: 'value' });
-      assert.strictEqual(retrieved, null);
+      try {
+        const testData = { result: 'expires soon' };
+        shortTtlCache.set('endpoint', { param: 'value' }, testData);
+        
+        // Should be available immediately
+        let retrieved = shortTtlCache.get('endpoint', { param: 'value' });
+        assert.deepStrictEqual(retrieved, testData);
+        
+        // Wait for expiration
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // Should be expired
+        retrieved = shortTtlCache.get('endpoint', { param: 'value' });
+        assert.strictEqual(retrieved, null);
+      } finally {
+        shortTtlCache.destroy();
+      }
     });
 
     it('should support custom TTL', () => {
@@ -181,18 +192,22 @@ describe('Cache Manager', () => {
       };
       const shortTtlCache = new CacheManager(shortTtlConfig, mockLogger);
       
-      // Add items
-      shortTtlCache.set('endpoint1', { id: 1 }, { data: 'test1' });
-      shortTtlCache.set('endpoint2', { id: 2 }, { data: 'test2' });
-      
-      // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      const stats = shortTtlCache.getStats();
-      
-      assert.strictEqual(stats.totalEntries, 2);
-      assert.strictEqual(stats.validEntries, 0);
-      assert.strictEqual(stats.expiredEntries, 2);
+      try {
+        // Add items
+        shortTtlCache.set('endpoint1', { id: 1 }, { data: 'test1' });
+        shortTtlCache.set('endpoint2', { id: 2 }, { data: 'test2' });
+        
+        // Wait for expiration
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        const stats = shortTtlCache.getStats();
+        
+        assert.strictEqual(stats.totalEntries, 2);
+        assert.strictEqual(stats.validEntries, 0);
+        assert.strictEqual(stats.expiredEntries, 2);
+      } finally {
+        shortTtlCache.destroy();
+      }
     });
   });
 
@@ -229,15 +244,19 @@ describe('Cache Manager', () => {
       };
       const disabledCache = new CacheManager(disabledConfig, mockLogger);
       
-      // Try to set value
-      disabledCache.set('endpoint', { param: 'value' }, { data: 'test' });
-      
-      // Should return null (caching disabled)
-      const result = disabledCache.get('endpoint', { param: 'value' });
-      assert.strictEqual(result, null);
-      
-      // Should report disabled in stats
-      assert.strictEqual(disabledCache.isEnabled(), false);
+      try {
+        // Try to set value
+        disabledCache.set('endpoint', { param: 'value' }, { data: 'test' });
+        
+        // Should return null (caching disabled)
+        const result = disabledCache.get('endpoint', { param: 'value' });
+        assert.strictEqual(result, null);
+        
+        // Should report disabled in stats
+        assert.strictEqual(disabledCache.isEnabled(), false);
+      } finally {
+        disabledCache.destroy();
+      }
     });
   });
 
@@ -280,19 +299,23 @@ describe('Cache Manager', () => {
       };
       const shortTtlCache = new CacheManager(shortTtlConfig, mockLogger);
       
-      // Add item
-      shortTtlCache.set('endpoint', { id: 1 }, { data: 'test' });
-      
-      // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Access should trigger cleanup
-      const result = shortTtlCache.get('endpoint', { id: 1 });
-      assert.strictEqual(result, null);
-      
-      // Cache should be empty after cleanup
-      const stats = shortTtlCache.getStats();
-      assert.strictEqual(stats.totalEntries, 0);
+      try {
+        // Add item
+        shortTtlCache.set('endpoint', { id: 1 }, { data: 'test' });
+        
+        // Wait for expiration
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // Access should trigger cleanup
+        const result = shortTtlCache.get('endpoint', { id: 1 });
+        assert.strictEqual(result, null);
+        
+        // Cache should be empty after cleanup
+        const stats = shortTtlCache.getStats();
+        assert.strictEqual(stats.totalEntries, 0);
+      } finally {
+        shortTtlCache.destroy();
+      }
     });
   });
 
@@ -306,23 +329,28 @@ describe('Cache Manager', () => {
       };
       const largeCache = new CacheManager(largeConfig, mockLogger);
       
-      const startTime = Date.now();
-      
-      // Add many items
-      for (let i = 0; i < 500; i++) {
-        largeCache.set('endpoint', { id: i }, { data: `item${i}` });
+      try {
+        const startTime = Date.now();
+        
+        // Add many items
+        for (let i = 0; i < 500; i++) {
+          largeCache.set('endpoint', { id: i }, { data: `item${i}` });
+        }
+        
+        // Retrieve many items
+        for (let i = 0; i < 500; i++) {
+          const retrieved = largeCache.get('endpoint', { id: i });
+          assert.deepStrictEqual(retrieved, { data: `item${i}` });
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        // Should complete quickly (under 1 second)
+        assert.ok(duration < 1000, `Cache operations took too long: ${duration}ms`);
+      } finally {
+        // Always clean up the large cache instance
+        largeCache.destroy();
       }
-      
-      // Retrieve many items
-      for (let i = 0; i < 500; i++) {
-        const retrieved = largeCache.get('endpoint', { id: i });
-        assert.deepStrictEqual(retrieved, { data: `item${i}` });
-      }
-      
-      const duration = Date.now() - startTime;
-      
-      // Should complete quickly (under 1 second)
-      assert.ok(duration < 1000, `Cache operations took too long: ${duration}ms`);
     });
   });
 });
