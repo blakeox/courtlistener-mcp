@@ -120,6 +120,11 @@ describe('🏢 Enterprise MCP Server Testing', () => {
     if (mockTransport) {
       mockTransport.close();
     }
+    
+    // Clean up MCP server to prevent hanging intervals
+    if (mcpServer && typeof mcpServer.destroy === 'function') {
+      mcpServer.destroy();
+    }
   });
 
   describe('🔧 MCP Protocol Compliance', () => {

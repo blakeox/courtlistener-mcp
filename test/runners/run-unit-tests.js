@@ -44,7 +44,7 @@ class UnitTestRunner {
       })
       .filter(file => {
         // Skip known problematic tests that hang due to Node.js test runner issues
-        const problematicTests = ['test-enterprise-server.js']; // Removed test-cache.js - now fixed!
+        const problematicTests = []; // Removed test-enterprise-server.js - now fixed!
         if (problematicTests.includes(file)) {
           console.log(`⏭️  Skipping ${file} (known to hang with Node.js test runner)`);
           return false;
