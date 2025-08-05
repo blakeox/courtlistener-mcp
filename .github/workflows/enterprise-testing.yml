@@ -65,7 +65,7 @@ jobs:
     - name: 🏢 Run Server Integration Tests (Week 3)
       run: |
         echo "🏢 Testing Server Integration..."
-        node test/unit/test-server-integration.js
+        node test/integration/test-server-integration.js
         node test/unit/test-enterprise-server.js
         echo "✅ Server integration tests completed"
 
