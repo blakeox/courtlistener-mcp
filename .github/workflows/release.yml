@@ -78,8 +78,6 @@ jobs:
         fi
 
     - name: Test against multiple environments
-      env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
       run: |
         echo "🌍 Testing against multiple environments..."
         
