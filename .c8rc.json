@@ -1,8 +1,5 @@
 {
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.js"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.js"],
   "exclude": [
     "test/**",
     "dist/**",
@@ -12,16 +9,8 @@
     "*.config.js",
     "*.config.ts"
   ],
-  "extension": [
-    ".ts",
-    ".js"
-  ],
-  "reporter": [
-    "text",
-    "html",
-    "json-summary",
-    "lcov"
-  ],
+  "extension": [".ts", ".js"],
+  "reporter": ["text", "html", "json-summary", "lcov"],
   "check-coverage": false,
   "lines": 80,
   "functions": 80,

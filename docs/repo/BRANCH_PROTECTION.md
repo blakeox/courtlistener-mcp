@@ -1,6 +1,7 @@
 # Branch Protection Guidelines
 
-These steps help keep `main` stable and require the right signals before merging.
+These steps help keep `main` stable and require the right signals before
+merging.
 
 ## Required status checks
 
@@ -33,28 +34,40 @@ Once coverage mapping is reliable, enable CI threshold enforcement:
 
 ## Environments (optional)
 
-Create `staging` and `production` environments under Settings → Environments and then gate jobs that deploy or test against those environments.
+Create `staging` and `production` environments under Settings → Environments and
+then gate jobs that deploy or test against those environments.
 
 - Add required reviewers for environment deployments
 - Add environment secrets and use them in workflows
 
 ## Solo developer setup (no other reviewers)
 
-If you're the only committer, you still get strong protections without blocking yourself:
+If you're the only committer, you still get strong protections without blocking
+yourself:
 
 - Recommended: Status checks only
-   - In Branch protection: Do NOT enable “Require pull request reviews”.
-   - Enable “Require status checks to pass before merging” and choose at least:
-      - `required-checks-gate` (our CI gate)
-      - Optionally `codeql-analysis` for security
-   - Enable “Require branches to be up to date before merging”.
-   - Result: PRs must be green on CI, but no review is required.
+
+  - In Branch protection: Do NOT enable “Require pull request reviews”.
+  - Enable “Require status checks to pass before merging” and choose at least:
+    - `required-checks-gate` (our CI gate)
+    - Optionally `codeql-analysis` for security
+  - Enable “Require branches to be up to date before merging”.
+  - Result: PRs must be green on CI, but no review is required.
 
 - Keep PR flow but allow bypass (advanced)
-   - Option A (simple): In the rule, uncheck “Include administrators”. As a repo admin, you can merge without a review if necessary. Note: this also lets you bypass failed checks—use with care.
-   - Option B (granular, where available): Use Repository Rulesets (Settings → Rules → Rulesets) to require status checks, and add yourself under “Bypass pull request requirements” so you can merge without a reviewer, while others (future collaborators) cannot.
+
+  - Option A (simple): In the rule, uncheck “Include administrators”. As a repo
+    admin, you can merge without a review if necessary. Note: this also lets you
+    bypass failed checks—use with care.
+  - Option B (granular, where available): Use Repository Rulesets (Settings →
+    Rules → Rulesets) to require status checks, and add yourself under “Bypass
+    pull request requirements” so you can merge without a reviewer, while others
+    (future collaborators) cannot.
 
 - Avoid: Bot auto-approval
-   - While possible to wire up a bot/user to auto-approve, this is brittle and not recommended for security/compliance. Prefer status-check-only protection.
+  - While possible to wire up a bot/user to auto-approve, this is brittle and
+    not recommended for security/compliance. Prefer status-check-only
+    protection.
 
-Tip: Even solo, open PRs from feature branches and let CI run. This maintains history and keeps a clean main.
+Tip: Even solo, open PRs from feature branches and let CI run. This maintains
+history and keeps a clean main.
