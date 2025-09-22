@@ -43,6 +43,9 @@ jobs:
           pnpm install --frozen-lockfile
         fi
 
+    - name: Version consistency check
+      run: pnpm run ci:version-check
+
     - name: TypeScript compilation check
       run: pnpm run typecheck
 
