@@ -274,3 +274,23 @@ jobs:
         # Check that server properly handles malformed requests
         pnpm run build
         echo '{"invalid": "json"' | timeout 5s pnpm start || echo "✅ Server handles malformed input gracefully"
+
+  required-checks-gate:
+    name: Required Checks Gate
+    runs-on: ubuntu-latest
+    needs: [test, mcp-compliance, security-check]
+    if: always()
+    steps:
+    - name: Summarize upstream job results
+      run: |
+        echo "Test Suite result: ${{ needs.test.result }}"
+        echo "MCP Compliance result: ${{ needs['mcp-compliance'].result }}"
+        echo "Security & Code Quality result: ${{ needs['security-check'].result }}"
+    - name: Fail if any required check failed
+      if: ${{ needs.test.result != 'success' || needs['mcp-compliance'].result != 'success' || needs['security-check'].result != 'success' }}
+      run: |
+        echo "❌ One or more required checks failed" >&2
+        exit 1
+    - name: All required checks passed ✅
+      if: ${{ needs.test.result == 'success' && needs['mcp-compliance'].result == 'success' && needs['security-check'].result == 'success' }}
+      run: echo "All required checks passed"
