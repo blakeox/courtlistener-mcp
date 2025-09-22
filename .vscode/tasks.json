@@ -4,8 +4,8 @@
     {
       "label": "build",
       "type": "shell",
-  "command": "pnpm",
-  "args": ["run", "build"],
+      "command": "pnpm",
+      "args": ["run", "build"],
       "group": {
         "kind": "build",
         "isDefault": false
