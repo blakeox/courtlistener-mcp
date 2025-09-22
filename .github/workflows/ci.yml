@@ -58,7 +58,7 @@ jobs:
     - name: Run integration tests  
       run: pnpm run test:integration
 
-    - name: Run coverage (thresholds enforced)
+    - name: Run coverage (generate reports)
       run: pnpm run coverage
 
     - name: Upload coverage artifacts
@@ -70,6 +70,27 @@ jobs:
           coverage/
           coverage/lcov.info
         retention-days: 7
+
+    - name: Append coverage summary
+      if: always()
+      run: |
+        if [ -f coverage/coverage-summary.json ]; then
+          BRANCH=$(jq '.total.branches.pct' coverage/coverage-summary.json || echo 0)
+          LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json || echo 0)
+          FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json || echo 0)
+          STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json || echo 0)
+          echo "## Coverage Summary (Node ${{ matrix.node-version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- Lines: ${LINES}%" >> $GITHUB_STEP_SUMMARY
+          echo "- Statements: ${STMTS}%" >> $GITHUB_STEP_SUMMARY
+          echo "- Functions: ${FUNCS}%" >> $GITHUB_STEP_SUMMARY
+          echo "- Branches: ${BRANCH}%" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No coverage summary JSON found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    # Optional: enforce minimum coverage in CI (uncomment when ready)
+    # - name: Enforce coverage thresholds
+    #   run: pnpm run coverage:check
 
     - name: Run performance tests
       run: pnpm run test:performance

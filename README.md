@@ -243,6 +243,7 @@ When metrics are enabled, the server provides HTTP endpoints for monitoring:
 - **Cache Stats**: `GET http://localhost:3001/cache`
 
 Example health check response:
+
 ```json
 {
   "status": "healthy",
@@ -431,7 +432,8 @@ Quick start for local development and CI simulation:
   - Unit: `pnpm run test:unit`
   - Integration: `pnpm run test:integration`
   - All tests: `pnpm test`
-  - Coverage with thresholds: `pnpm run coverage`
+  - Coverage reports: `pnpm run coverage`
+  - Enforce coverage thresholds: `pnpm run coverage:check`
 
 Run GitHub Actions locally with act (optional):
 
@@ -550,9 +552,5 @@ This is a focused MCP server implementation following official guidelines. Contr
 ### License
 
 MIT License - see LICENSE file for details.
-
-**Note**: This is a pure MCP server focused on legal research capabilities. It integrates with chat applications through the MCP protocol only.
-
----
 
 **Note**: This is a pure MCP server focused on legal research capabilities. It integrates with chat applications through the MCP protocol only.

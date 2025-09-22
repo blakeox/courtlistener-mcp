@@ -1,0 +1,19 @@
+# Deprecated: Not used by current workflows
+#
+# This file was used by third-party auto-assign actions that read
+# configuration from .github/auto_assign.yml. The repository now uses a
+# first-party approach with actions/github-script in
+# `.github/workflows/auto-assign.yml` and does not read this config.
+#
+# Keeping this file to avoid confusion for any forks referencing it.
+# You can delete it safely if you are not using the old action.
+
+# Previous configuration (no longer in effect):
+# addReviewers: true
+# addAssignees: false
+# reviewers:
+#   - blakeox
+# numberOfReviewers: 1
+# skipKeywords:
+#   - wip
+#   - draft
