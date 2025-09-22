@@ -58,6 +58,19 @@ jobs:
     - name: Run integration tests  
       run: pnpm run test:integration
 
+    - name: Run coverage (thresholds enforced)
+      run: pnpm run coverage
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-node-${{ matrix.node-version }}
+        path: |
+          coverage/
+          coverage/lcov.info
+        retention-days: 7
+
     - name: Run performance tests
       run: pnpm run test:performance
 
