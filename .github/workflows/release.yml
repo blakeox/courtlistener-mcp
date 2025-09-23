@@ -41,7 +41,7 @@ jobs:
         fi
 
     - name: Verify version consistency
-      run: node scripts/version-check.js
+      run: node scripts/build/version-check.js
 
     - name: Build for production
       run: pnpm run build
@@ -59,7 +59,7 @@ jobs:
         echo "🔍 Running extended MCP Inspector validation..."
         
         # Run comprehensive Inspector CLI tests
-        node scripts/ci-test-mcp-inspector.js --extended
+        node test/runners/ci-test-mcp-inspector.js --extended
         
         # Test all available tools
         pnpm run test:mcp:tool list_courts
@@ -74,12 +74,10 @@ jobs:
         # Compare with baseline if available
         if [ -f performance-baseline.txt ]; then
           echo "Comparing with performance baseline..."
-          node scripts/compare-performance.js performance-baseline.txt performance-results.txt
+          node scripts/performance/compare-performance.js performance-baseline.txt performance-results.txt
         fi
 
     - name: Test against multiple environments
-      env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
       run: |
         echo "🌍 Testing against multiple environments..."
         

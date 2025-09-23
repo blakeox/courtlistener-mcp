@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Resolve repository root (scripts/build -> repo root)
+const repoRoot = path.resolve(__dirname, '..', '..');
 
 console.log('🔍 Checking version consistency...\n');
 
@@ -46,7 +48,7 @@ function getPackageVersion(filePath) {
  * Check package.json
  */
 console.log('📦 Checking package.json...');
-const packagePath = path.join(__dirname, '..', 'package.json');
+const packagePath = path.join(repoRoot, 'package.json');
 
 if (!fs.existsSync(packagePath)) {
   errors.push('package.json not found');
@@ -64,7 +66,7 @@ if (!fs.existsSync(packagePath)) {
  * Check package-lock.json
  */
 console.log('\n🔒 Checking package-lock.json...');
-const lockPath = path.join(__dirname, '..', 'package-lock.json');
+const lockPath = path.join(repoRoot, 'package-lock.json');
 
 if (!fs.existsSync(lockPath)) {
   console.log('   ⚠️  package-lock.json not found (this is okay for pnpm projects)');
@@ -88,7 +90,7 @@ if (!fs.existsSync(lockPath)) {
  * Check pnpm-lock.yaml (if present)
  */
 console.log('\n📌 Checking pnpm-lock.yaml...');
-const pnpmLockPath = path.join(__dirname, '..', 'pnpm-lock.yaml');
+const pnpmLockPath = path.join(repoRoot, 'pnpm-lock.yaml');
 
 if (fs.existsSync(pnpmLockPath)) {
   console.log('   ✅ pnpm-lock.yaml found');
@@ -153,7 +155,7 @@ const workspaceIndicators = [
 
 let isWorkspace = false;
 workspaceIndicators.forEach(indicator => {
-  const indicatorPath = path.join(__dirname, '..', indicator);
+  const indicatorPath = path.join(repoRoot, indicator);
   if (fs.existsSync(indicatorPath)) {
     console.log(`   ✅ Workspace configuration found: ${indicator}`);
     isWorkspace = true;
@@ -168,7 +170,7 @@ if (!isWorkspace) {
  * Validate TypeScript configuration
  */
 console.log('\n📝 Checking TypeScript configuration...');
-const tsconfigPath = path.join(__dirname, '..', 'tsconfig.json');
+const tsconfigPath = path.join(repoRoot, 'tsconfig.json');
 
 if (fs.existsSync(tsconfigPath)) {
   try {
@@ -197,7 +199,7 @@ if (fs.existsSync(tsconfigPath)) {
  * Check CI/CD configuration
  */
 console.log('\n🔄 Checking CI/CD configuration...');
-const githubWorkflowsPath = path.join(__dirname, '..', '.github', 'workflows');
+const githubWorkflowsPath = path.join(repoRoot, '.github', 'workflows');
 
 if (fs.existsSync(githubWorkflowsPath)) {
   const workflows = fs.readdirSync(githubWorkflowsPath).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));

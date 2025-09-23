@@ -64,6 +64,8 @@
     "ci:analyze-performance": "node scripts/performance/analyze-performance.js",
     "ci:compare-performance": "node scripts/performance/compare-performance.js",
     "test:coverage": "node test/analysis/analyze-test-coverage.js",
+    "coverage": "c8 --config .c8rc.json npm test",
+    "coverage:check": "c8 --config .c8rc.json --check-coverage --branches=50 --functions=50 --lines=50 --statements=50 npm test",
     "test:analysis": "node test/analysis/analyze-untested-code.js"
   },
   "keywords": [
@@ -87,7 +89,7 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.16.2",
+    "@modelcontextprotocol/inspector": "^0.16.6",
     "@types/node": "^22.16.5",
     "typescript": "^5.8.3",
     "c8": "^8.0.1",

@@ -88,7 +88,7 @@
     {
       "name": "Server Integration Tests",
       "description": "Health server and endpoint validation (Week 3)",
-      "command": "node test/unit/test-server-integration.js",
+      "command": "node test/integration/test-server-integration.js",
       "status": "CRASH",
       "duration": 0,
       "tests": 0,

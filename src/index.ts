@@ -2045,6 +2045,25 @@ export class LegalMCPServer {
       throw error;
     }
   }
+
+  /**
+   * Cleanup method to properly dispose of resources
+   */
+  destroy(): void {
+    // Cleanup cache intervals to prevent hanging processes
+    if (this.cache && typeof this.cache.destroy === 'function') {
+      this.cache.destroy();
+    }
+
+    // Stop health server if running
+    if (this.healthServer && typeof this.healthServer.stop === 'function') {
+      this.healthServer.stop().catch(() => {
+        // Ignore errors during cleanup
+      });
+    }
+
+    this.logger.info('LegalMCPServer cleanup completed');
+  }
 }
 
 // Main execution
