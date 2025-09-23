@@ -19,7 +19,7 @@ class MockLogger {
 }
 
 // Import the actual MetricsCollector
-const { MetricsCollector } = await import('../../dist/metrics.js');
+const { MetricsCollector } = await import('../../dist/infrastructure/metrics.js');
 
 describe('Metrics Collector', () => {
   let metrics;

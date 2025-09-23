@@ -34,7 +34,7 @@ describe('Configuration Management', () => {
       process.env.COURTLISTENER_RATE_LIMIT = '150';
       
       // Import config after setting env vars
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       assert.strictEqual(config.cache.enabled, true);
@@ -57,7 +57,7 @@ describe('Configuration Management', () => {
       delete process.env.CACHE_MAX_SIZE;
       
       // Use timestamp to force fresh import
-      const { getConfig } = await import(`../../dist/config.js?t=${Date.now()}`);
+      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
       const config = getConfig();
       
       // Use actual defaults from config.ts: TTL=300, not 600
@@ -74,7 +74,7 @@ describe('Configuration Management', () => {
       process.env.METRICS_ENABLED = 'true'; // === 'true' = true  
       process.env.LOGGING_ENABLED = 'false'; // !== 'false' = false (should stay false)
       
-      const { getConfig } = await import(`../../dist/config.js?t=${Date.now()}`);
+      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
       const config = getConfig();
       
       assert.strictEqual(config.cache.enabled, false);
@@ -94,7 +94,7 @@ describe('Configuration Management', () => {
       process.env.COURTLISTENER_TIMEOUT = '60000';
       
       // Use timestamp to force fresh import instead of require.cache
-      const { getConfig } = await import(`../../dist/config.js?t=${Date.now()}`);
+      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
       const config = getConfig();
       
       assert.strictEqual(config.cache.ttl, 900);
@@ -114,7 +114,7 @@ describe('Configuration Management', () => {
     it('should validate log levels', async () => {
       process.env.LOG_LEVEL = 'invalid';
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       
       // Should either throw error or fallback to default
       assert.doesNotThrow(() => {
@@ -128,7 +128,7 @@ describe('Configuration Management', () => {
       process.env.CACHE_TTL = '-100'; // Invalid negative TTL
       process.env.METRICS_PORT = '99999'; // Invalid port range
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       
       assert.doesNotThrow(() => {
         const config = getConfig();
@@ -141,7 +141,7 @@ describe('Configuration Management', () => {
     it('should validate required string fields', async () => {
       process.env.COURTLISTENER_BASE_URL = '';
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       // Should have a valid default URL
@@ -156,7 +156,7 @@ describe('Configuration Management', () => {
       // Clear LOG_LEVEL to ensure we get default
       delete process.env.LOG_LEVEL;
       
-      const { getConfig } = await import(`../../dist/config.js?t=${Date.now()}`);
+      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
       const config = getConfig();
       
       // These are the actual defaults regardless of environment
@@ -172,7 +172,7 @@ describe('Configuration Management', () => {
       // Explicitly set log level since config doesn't auto-adjust for environment
       process.env.LOG_LEVEL = 'warn';
       
-      const { getConfig } = await import(`../../dist/config.js?t=${Date.now()}`);
+      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
       const config = getConfig();
       
       assert.strictEqual(config.logging.level, 'warn');
@@ -185,7 +185,7 @@ describe('Configuration Management', () => {
     it('should handle test environment', async () => {
       process.env.NODE_ENV = 'test';
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       // Test environment should be configured appropriately
@@ -196,7 +196,7 @@ describe('Configuration Management', () => {
 
   describe('Configuration Structure', () => {
     it('should have all required configuration sections', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       // Verify main sections exist
@@ -207,7 +207,7 @@ describe('Configuration Management', () => {
     });
 
     it('should have correct cache configuration structure', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       assert.ok(typeof config.cache.enabled === 'boolean');
@@ -218,7 +218,7 @@ describe('Configuration Management', () => {
     });
 
     it('should have correct logging configuration structure', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       assert.ok(typeof config.logging.enabled === 'boolean');
@@ -229,7 +229,7 @@ describe('Configuration Management', () => {
     });
 
     it('should have correct metrics configuration structure', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       assert.ok(typeof config.metrics.enabled === 'boolean');
@@ -240,7 +240,7 @@ describe('Configuration Management', () => {
     });
 
     it('should have correct CourtListener configuration structure', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       assert.ok(typeof config.courtListener.baseUrl === 'string');
@@ -257,7 +257,7 @@ describe('Configuration Management', () => {
 
   describe('Configuration Immutability', () => {
     it('should return consistent configuration on multiple calls', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       
       const config1 = getConfig();
       const config2 = getConfig();
@@ -266,7 +266,7 @@ describe('Configuration Management', () => {
     });
 
     it('should not allow modification of returned config object', async () => {
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       const originalTtl = config.cache.ttl;
@@ -296,7 +296,7 @@ describe('Configuration Management', () => {
       process.env.METRICS_PORT = 'invalid-port';
       process.env.CACHE_ENABLED = 'maybe';
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       
       assert.doesNotThrow(() => {
         const config = getConfig();
@@ -312,7 +312,7 @@ describe('Configuration Management', () => {
       // This test depends on implementation - some configs might be critical
       process.env.COURTLISTENER_BASE_URL = 'not-a-url';
       
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       
       // Should either fix the URL or provide a meaningful error
       assert.doesNotThrow(() => {
@@ -325,7 +325,7 @@ describe('Configuration Management', () => {
   describe('Configuration Documentation', () => {
     it('should provide configuration help or documentation', async () => {
       // This test assumes there might be a help function or documentation
-      const { getConfig } = await import('../../dist/config.js');
+      const { getConfig } = await import('../../dist/infrastructure/config.js');
       const config = getConfig();
       
       // Basic validation that config is well-structured and documented
