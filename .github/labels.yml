@@ -1,0 +1,33 @@
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to documentation
+- name: ci
+  color: 5319e7
+  description: CI/CD related changes
+- name: test
+  color: 04d1b2
+  description: Testing related changes
+- name: performance
+  color: ffffff
+  description: Performance improvements
+- name: security
+  color: 000000
+  description: Security-related changes
+- name: area/docs
+  color: 0e8a16
+  description: Docs files changed
+- name: area/tests
+  color: c2e0c6
+  description: Test files changed
+- name: area/build
+  color: fbca04
+  description: Build/infra files changed
+- name: area/code
+  color: 0052cc
+  description: Source code files changed

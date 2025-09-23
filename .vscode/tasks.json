@@ -4,7 +4,7 @@
     {
       "label": "build",
       "type": "shell",
-      "command": "npm",
+      "command": "pnpm",
       "args": ["run", "build"],
       "group": {
         "kind": "build",
@@ -21,10 +21,39 @@
       "problemMatcher": "$tsc"
     },
     {
+      "label": "🧪 act: CI Test Job",
+      "type": "shell",
+      "command": "act",
+      "args": ["-j", "test"],
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "🔍 act: Inspector Compatibility",
+      "type": "shell",
+      "command": "act",
+      "args": ["-j", "inspector-compatibility"],
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "🌐 act: Remote Server Test",
+      "type": "shell",
+      "command": "act",
+      "args": ["-j", "remote-server-test"],
+      "options": {
+        "env": {
+          "REMOTE_SERVER_URL": "${env:REMOTE_SERVER_URL}"
+        }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" }
+  },
+  {
       "label": "🔨 Build TypeScript",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
+    "command": "pnpm",
+    "args": ["run", "build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -42,8 +71,8 @@
     {
       "label": "👀 Watch TypeScript",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "dev"],
+    "command": "pnpm",
+    "args": ["run", "dev"],
       "group": "build",
       "isBackground": true,
       "presentation": {
@@ -79,8 +108,8 @@
     {
       "label": "🧪 Run All Tests",
       "type": "shell",
-      "command": "npm",
-      "args": ["test"],
+    "command": "pnpm",
+    "args": ["test"],
       "group": {
         "kind": "test",
         "isDefault": true
@@ -98,8 +127,8 @@
     {
       "label": "🧪 Run Unit Tests",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:unit"],
+  "command": "pnpm",
+  "args": ["run", "test:unit"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -113,8 +142,8 @@
     {
       "label": "🏢 Run Enterprise Tests",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:enterprise:comprehensive"],
+  "command": "pnpm",
+  "args": ["run", "test:enterprise:comprehensive"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -128,8 +157,8 @@
     {
       "label": "🔍 MCP Inspector (Local)",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "inspect:local"],
+  "command": "pnpm",
+  "args": ["run", "inspect:local"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -146,8 +175,8 @@
     {
       "label": "🌐 MCP Inspector (Remote)",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "inspect:remote"],
+  "command": "pnpm",
+  "args": ["run", "inspect:remote"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -163,8 +192,8 @@
     {
       "label": "🚀 Start MCP Server",
       "type": "shell",
-      "command": "npm",
-      "args": ["start"],
+  "command": "pnpm",
+  "args": ["start"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -181,8 +210,8 @@
     {
       "label": "🏢 Start Enterprise Server",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "start:enterprise"],
+  "command": "pnpm",
+  "args": ["run", "start:enterprise"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -199,8 +228,8 @@
     {
       "label": "🧹 Clean Build",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "clean"],
+  "command": "pnpm",
+  "args": ["run", "clean"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -214,8 +243,8 @@
     {
       "label": "🔍 Type Check",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "typecheck"],
+  "command": "pnpm",
+  "args": ["run", "typecheck"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -230,8 +259,8 @@
     {
       "label": "📊 Analyze Test Coverage",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:coverage"],
+  "command": "pnpm",
+  "args": ["run", "test:coverage"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -245,8 +274,8 @@
     {
       "label": "🐳 Build Docker (Enterprise)",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "docker:enterprise"],
+  "command": "pnpm",
+  "args": ["run", "docker:enterprise"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -260,8 +289,8 @@
     {
       "label": "⚡ Performance Tests",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:enterprise:performance"],
+  "command": "pnpm",
+  "args": ["run", "test:enterprise:performance"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -275,8 +304,8 @@
     {
       "label": "🔄 Setup Environment",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "enterprise:setup"],
+  "command": "pnpm",
+  "args": ["run", "enterprise:setup"],
       "group": "build",
       "presentation": {
         "echo": true,
