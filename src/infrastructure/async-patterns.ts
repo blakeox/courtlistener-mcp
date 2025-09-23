@@ -420,7 +420,7 @@ export class RequestQueue {
 
       const duration = Date.now() - startTime;
       this.logger.debug('Request completed', {
-        requestId: request.id,
+        id: request.id,
         duration,
         attempts: request.attempts
       });
@@ -432,7 +432,7 @@ export class RequestQueue {
       
       if (request.attempts < this.options.retryAttempts) {
         this.logger.warn('Request failed, retrying', {
-          requestId: request.id,
+          id: request.id,
           attempt: request.attempts,
           error: (error as Error).message,
           duration
@@ -445,10 +445,9 @@ export class RequestQueue {
         }, this.options.retryDelay * request.attempts);
 
       } else {
-        this.logger.error('Request failed after all retries', {
-          requestId: request.id,
+        this.logger.error('Request failed after all retries', error as Error, {
+          id: request.id,
           attempts: request.attempts,
-          error: (error as Error).message,
           duration
         });
 
