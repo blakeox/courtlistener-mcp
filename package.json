@@ -63,6 +63,8 @@
     "enterprise:setup": "./scripts/build/setup-enterprise.sh",
     "enterprise:demo": "node enterprise-demo.js",
     "enterprise:benchmark": "node scripts/performance/benchmark-enterprise.js",
+    "demo:documentation": "node api-documentation-demo.js",
+    "docs:serve": "node api-documentation-demo.js",
     "docker:enterprise": "docker build -f Dockerfile.enterprise -t legal-mcp:enterprise .",
     "ci:test-inspector": "node test/runners/ci-test-mcp-inspector.js",
     "ci:test-inspector:extended": "node test/runners/ci-test-mcp-inspector.js --extended",

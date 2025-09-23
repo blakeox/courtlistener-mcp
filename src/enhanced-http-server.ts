@@ -11,12 +11,14 @@ import { CacheManager } from './infrastructure/cache.js';
 import { CourtListenerAPI } from './courtlistener.js';
 import { HealthCheckManager } from './infrastructure/health-check.js';
 import { HealthEndpoints } from './endpoints/health.js';
+import { DocumentationService } from './endpoints/documentation.js';
 
 export class EnhancedHttpServer {
   private app: Application;
   private server: http.Server;
   private healthChecker: HealthCheckManager;
   private healthEndpoints: HealthEndpoints;
+  private documentationService: DocumentationService;
 
   constructor(
     private port: number,
@@ -41,6 +43,9 @@ export class EnhancedHttpServer {
       this.logger
     );
 
+    // Initialize documentation service
+    this.documentationService = new DocumentationService(this.logger);
+
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -49,6 +54,21 @@ export class EnhancedHttpServer {
     // Basic middleware
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
+
+    // Special handling for documentation endpoints - allow unsafe-inline for CSS
+    this.app.use('/api/docs', (req, res, next) => {
+      res.removeHeader('X-Content-Type-Options');
+      res.removeHeader('X-Frame-Options');
+      res.header('Content-Security-Policy', 
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.redoc.ly; " +
+        "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "img-src 'self' data:; " +
+        "connect-src 'self';"
+      );
+      next();
+    });
 
     // CORS middleware
     this.app.use((req, res, next) => {
@@ -97,6 +117,9 @@ export class EnhancedHttpServer {
     this.app.get('/metrics', this.healthEndpoints.metrics.bind(this.healthEndpoints));
     this.app.get('/status', this.healthEndpoints.status.bind(this.healthEndpoints));
 
+    // API Documentation endpoints
+    this.app.use('/api/docs', this.documentationService.getRouter());
+
     // Legacy endpoints for backward compatibility
     this.setupLegacyEndpoints();
 
@@ -112,6 +135,9 @@ export class EnhancedHttpServer {
           'GET /health/live',
           'GET /metrics',
           'GET /status',
+          'GET /api/docs - API Documentation',
+          'GET /api/docs/docs - Swagger UI',
+          'GET /api/docs/openapi.json - OpenAPI Spec',
           'GET /cache',
           'GET /config'
         ]
