@@ -3,7 +3,7 @@
  * Provides performance tracking and health monitoring
  */
 
-import { Metrics } from './types.js';
+import { Metrics } from '../types.js';
 import { Logger } from './logger.js';
 
 export class MetricsCollector {

@@ -14,9 +14,9 @@ import {
   SearchParams,
   AdvancedSearchParams 
 } from './types.js';
-import { CacheManager } from './cache.js';
-import { Logger } from './logger.js';
-import { MetricsCollector } from './metrics.js';
+import { CacheManager } from './infrastructure/cache.js';
+import { Logger } from './infrastructure/logger.js';
+import { MetricsCollector } from './infrastructure/metrics.js';
 
 export class CourtListenerAPI {
   private rateLimitQueue: Array<() => void> = [];

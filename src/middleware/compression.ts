@@ -3,7 +3,7 @@
  * Provides gzip compression for large JSON responses
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../infrastructure/logger.js';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
 
