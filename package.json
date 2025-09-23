@@ -7,15 +7,24 @@
   "main": "dist/index.js",
   "bin": {
     "legal-mcp": "dist/index.js",
-    "legal-mcp-enterprise": "dist/enterprise-server.js"
+    "legal-mcp-enterprise": "dist/enterprise-server.js",
+    "legal-mcp-refactored": "dist/index-refactored.js",
+    "legal-mcp-optimized": "dist/main-optimized.js",
+    "legal-mcp-full-architecture": "dist/full-architecture-server.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "start": "node dist/index.js",
     "start:enterprise": "node dist/enterprise-server.js",
+    "start:refactored": "node dist/index-refactored.js",
+    "start:optimized": "node dist/main-optimized.js",
+    "start:full-architecture": "node dist/full-architecture-server.js",
     "mcp": "node dist/index.js",
     "mcp:enterprise": "node dist/enterprise-server.js",
+    "mcp:refactored": "node dist/index-refactored.js",
+    "mcp:optimized": "node dist/main-optimized.js",
+    "mcp:full-architecture": "node dist/full-architecture-server.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:all": "npm run test:unit && npm run test:integration",
     "test:unit": "node test/runners/run-unit-tests.js",

@@ -18,7 +18,7 @@ class MockLogger {
 }
 
 // Import the actual CacheManager
-const { CacheManager } = await import('../../dist/cache.js');
+const { CacheManager } = await import('../../dist/infrastructure/cache.js');
 
 describe('Cache Manager', () => {
   let cache;

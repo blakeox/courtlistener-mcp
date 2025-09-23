@@ -9,7 +9,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 
 // Import the actual Logger
-const { Logger } = await import('../../dist/logger.js');
+const { Logger, createLogger } = await import('../../dist/infrastructure/logger.js');
 
 describe('Logger', () => {
   let logger;
