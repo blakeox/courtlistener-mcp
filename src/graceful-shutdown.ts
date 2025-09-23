@@ -3,7 +3,7 @@
  * Manages cleanup of all server components and connections
  */
 
-import { Logger } from './logger.js';
+import { Logger } from './infrastructure/logger.js';
 
 export interface ShutdownConfig {
   enabled: boolean;

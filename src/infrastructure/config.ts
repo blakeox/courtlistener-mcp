@@ -3,7 +3,7 @@
  * Provides environment-based configuration with validation for all components
  */
 
-import { ServerConfig } from './types.js';
+import { ServerConfig } from '../types.js';
 
 const defaultConfig: ServerConfig = {
   courtListener: {

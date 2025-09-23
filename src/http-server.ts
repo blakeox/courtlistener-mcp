@@ -4,11 +4,11 @@
  */
 
 import http from 'http';
-import { Logger } from './logger.js';
-import { MetricsCollector } from './metrics.js';
-import { CacheManager } from './cache.js';
-import { getConfigSummary } from './config.js';
-import { CircuitBreakerManager } from './circuit-breaker.js';
+import { Logger } from './infrastructure/logger.js';
+import { MetricsCollector } from './infrastructure/metrics.js';
+import { CacheManager } from './infrastructure/cache.js';
+import { getConfigSummary } from './infrastructure/config.js';
+import { CircuitBreakerManager } from './infrastructure/circuit-breaker.js';
 
 export class HealthServer {
   private server: http.Server;

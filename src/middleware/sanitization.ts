@@ -3,7 +3,7 @@
  * Provides protection against injection attacks and malformed input
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../infrastructure/logger.js';
 
 export interface SanitizationConfig {
   enabled: boolean;

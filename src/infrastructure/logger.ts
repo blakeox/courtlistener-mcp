@@ -3,7 +3,7 @@
  * Provides consistent, configurable logging with structured output
  */
 
-import { LogConfig } from './types.js';
+import { LogConfig } from '../types.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 

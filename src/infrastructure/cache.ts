@@ -3,8 +3,8 @@
  * Provides intelligent caching with TTL and LRU eviction
  */
 
-import { CacheEntry, CacheConfig } from './types.js';
-import { Logger } from './logger';
+import { CacheEntry, CacheConfig } from '../types.js';
+import { Logger } from './logger.js';
 
 export class CacheManager {
   private cache = new Map<string, CacheEntry>();
