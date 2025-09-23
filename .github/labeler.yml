@@ -1,0 +1,9 @@
+area/docs:
+  - 'docs/**'
+area/tests:
+  - 'test/**'
+area/build:
+  - '.github/workflows/**'
+  - 'Dockerfile*'
+area/code:
+  - 'src/**'

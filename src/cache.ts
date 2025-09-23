@@ -11,13 +11,14 @@ export class CacheManager {
   private accessOrder = new Map<string, number>();
   private accessCounter = 0;
   private logger: Logger;
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor(private config: CacheConfig, logger: Logger) {
     this.logger = logger;
     
     if (this.config.enabled) {
       // Cleanup expired entries every minute
-      setInterval(() => this.cleanup(), 60000);
+      this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
       this.logger.info('Cache manager initialized', {
         ttl: this.config.ttl,
         maxSize: this.config.maxSize
@@ -190,5 +191,18 @@ export class CacheManager {
    */
   isEnabled(): boolean {
     return this.config.enabled;
+  }
+
+  /**
+   * Destroy the cache manager and clean up resources
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+    this.cache.clear();
+    this.accessOrder.clear();
+    this.logger.info('Cache manager destroyed');
   }
 }

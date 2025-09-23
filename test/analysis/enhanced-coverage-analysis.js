@@ -28,7 +28,7 @@ class CoverageAnalyzer {
       'test/unit/test-metrics.js',
       'test/unit/test-circuit-breaker.js',
       'test/unit/test-courtlistener.js',
-      'test/unit/test-server-integration.js',
+      'test/integration/test-server-integration.js',
       'test/unit/test-enterprise-server.js'
     ];
 
