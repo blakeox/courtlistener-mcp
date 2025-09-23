@@ -3,7 +3,7 @@
  * Provides sophisticated rate limiting with client identification
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../infrastructure/logger.js';
 
 export interface RateLimitConfig {
   enabled: boolean;

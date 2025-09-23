@@ -3,7 +3,7 @@
  * Provides request tracking and compliance audit trails
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../infrastructure/logger.js';
 import { AuthContext } from './authentication.js';
 
 export interface CorrelationConfig {

@@ -3,7 +3,7 @@
  * Provides optional API key authentication for enhanced security
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../infrastructure/logger.js';
 
 export interface AuthConfig {
   enabled: boolean;

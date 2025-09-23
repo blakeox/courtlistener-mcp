@@ -22,10 +22,10 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Import our enhanced modules
-import { getConfig } from './config.js';
-import { createLogger } from './logger.js';
-import { CacheManager } from './cache.js';
-import { MetricsCollector } from './metrics.js';
+import { getConfig } from './infrastructure/config.js';
+import { createLogger } from './infrastructure/logger.js';
+import { CacheManager } from './infrastructure/cache.js';
+import { MetricsCollector } from './infrastructure/metrics.js';
 import { CourtListenerAPI } from './courtlistener.js';
 import { getEnhancedToolDefinitions } from './tool-definitions.js';
 import { HealthServer } from './http-server.js';
