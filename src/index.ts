@@ -46,9 +46,11 @@ export type LegacyLegalMCPServer = BestPracticeLegalMCPServer & {
   run(): Promise<void>;
   listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;
   handleToolCall(
-    input: CallToolRequest | {
-      name: string;
-      arguments?: Record<string, unknown>;
-    }
+    input:
+      | CallToolRequest
+      | {
+          name: string;
+          arguments?: Record<string, unknown>;
+        }
   ): Promise<CallToolResult>;
 };

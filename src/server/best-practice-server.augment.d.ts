@@ -1,5 +1,5 @@
 import type { CallToolRequest, CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
-import type { BestPracticeLegalMCPServer } from './best-practice-server.js';
+import './best-practice-server.js';
 
 declare module './best-practice-server.js' {
   interface BestPracticeLegalMCPServer {
@@ -11,10 +11,12 @@ declare module './best-practice-server.js' {
       };
     }>;
     handleToolCall(
-      input: CallToolRequest | {
-        name: string;
-        arguments?: Record<string, unknown>;
-      }
+      input:
+        | CallToolRequest
+        | {
+            name: string;
+            arguments?: Record<string, unknown>;
+          }
     ): Promise<CallToolResult>;
   }
 }
