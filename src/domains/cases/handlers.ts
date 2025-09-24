@@ -18,11 +18,20 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
 
   validate(input: any): Result<any, Error> {
     try {
-      const schema = z.object({
-        id: z.union([z.string(), z.number()]).transform(String)
-      });
-      
-      const validated = schema.parse(input);
+      const schema = z
+        .object({
+          cluster_id: z.union([z.string(), z.number()]).optional(),
+          id: z.union([z.string(), z.number()]).optional(),
+        })
+        .refine(data => data.cluster_id !== undefined || data.id !== undefined, {
+          message: 'cluster_id (or legacy id) is required',
+          path: ['cluster_id'],
+        })
+        .transform(data => ({
+          cluster_id: String(data.cluster_id ?? data.id),
+        }));
+
+      const validated = schema.parse(input ?? {});
       return { success: true, data: validated };
     } catch (error) {
       return { success: false, error: error as Error };
@@ -33,34 +42,41 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
     return {
       type: 'object',
       properties: {
+        cluster_id: {
+          type: ['string', 'number'],
+          description: 'Case cluster ID (preferred). Use search_cases to discover IDs.'
+        },
         id: {
           type: ['string', 'number'],
-          description: 'Case ID to retrieve details for'
+          description: 'Legacy case ID alias (deprecated).'
         }
       },
-      required: ['id']
+      anyOf: [{ required: ['cluster_id'] }, { required: ['id'] }],
+      additionalProperties: false
     };
   }
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
       context.logger.info('Getting case details', {
-        caseId: input.id,
+        clusterId: input.cluster_id,
         requestId: context.requestId
       });
 
-      const response = await this.apiClient.getCaseDetails(input.id);
+      const response = await this.apiClient.getCaseDetails({
+        clusterId: Number(input.cluster_id),
+      });
 
       return this.success({
-        summary: `Retrieved details for case ${input.id}`,
+        summary: `Retrieved details for case ${input.cluster_id}`,
         case: response
       });
     } catch (error) {
       context.logger.error('Failed to get case details', error as Error, {
-        caseId: input.id,
+        clusterId: input.cluster_id,
         requestId: context.requestId
       });
-      return this.error((error as Error).message, { caseId: input.id });
+      return this.error((error as Error).message, { clusterId: input.cluster_id });
     }
   }
 }
@@ -79,12 +95,23 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
 
   validate(input: any): Result<any, Error> {
     try {
-      const schema = z.object({
-        case_id: z.union([z.string(), z.number()]).transform(String),
-        limit: z.number().optional().default(10)
-      });
-      
-      const validated = schema.parse(input);
+      const schema = z
+        .object({
+          opinion_id: z.union([z.string(), z.number()]).optional(),
+          cluster_id: z.union([z.string(), z.number()]).optional(),
+          case_id: z.union([z.string(), z.number()]).optional(),
+          limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+        })
+        .refine(data => data.opinion_id ?? data.cluster_id ?? data.case_id, {
+          message: 'opinion_id or cluster_id is required to look up related cases',
+          path: ['opinion_id'],
+        })
+        .transform(data => ({
+          opinion_id: Number(data.opinion_id ?? data.cluster_id ?? data.case_id),
+          limit: data.limit,
+        }));
+
+      const validated = schema.parse(input ?? {});
       return { success: true, data: validated };
     } catch (error) {
       return { success: false, error: error as Error };
@@ -95,9 +122,17 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
     return {
       type: 'object',
       properties: {
+        opinion_id: {
+          type: ['string', 'number'],
+          description: 'Opinion ID to find related opinions/cases for'
+        },
+        cluster_id: {
+          type: ['string', 'number'],
+          description: 'Case cluster ID (alias for opinion-based lookups)'
+        },
         case_id: {
           type: ['string', 'number'],
-          description: 'Case ID to find related cases for'
+          description: 'Legacy case identifier (treated like cluster_id)'
         },
         limit: {
           type: 'number',
@@ -105,29 +140,30 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
           default: 10
         }
       },
-      required: ['case_id']
+      anyOf: [{ required: ['opinion_id'] }, { required: ['cluster_id'] }, { required: ['case_id'] }],
+      additionalProperties: false
     };
   }
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
       context.logger.info('Getting related cases', {
-        caseId: input.case_id,
+        opinionId: input.opinion_id,
         requestId: context.requestId
       });
 
-      const response = await this.apiClient.getRelatedCases(input);
+      const response = await this.apiClient.getRelatedCases(input.opinion_id);
 
       return this.success({
-        summary: `Found ${response.length || 0} related cases`,
-        relatedCases: response
+        summary: `Found ${response.length || 0} related cases/opinions`,
+        relatedCases: Array.isArray(response) ? response.slice(0, input.limit) : response
       });
     } catch (error) {
       context.logger.error('Failed to get related cases', error as Error, {
-        caseId: input.case_id,
+        opinionId: input.opinion_id,
         requestId: context.requestId
       });
-      return this.error((error as Error).message, { caseId: input.case_id });
+      return this.error((error as Error).message, { opinionId: input.opinion_id });
     }
   }
 }

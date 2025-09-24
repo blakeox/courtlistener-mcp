@@ -11,6 +11,10 @@ import assert from 'node:assert';
 
 // Import server components
 const { LegalMCPServer } = await import('../../dist/index.js');
+const { bootstrapServices } = await import('../../dist/infrastructure/bootstrap.js');
+const { container } = await import('../../dist/infrastructure/container.js');
+
+process.env.GRACEFUL_SHUTDOWN_ENABLED = 'false';
 
 /**
  * 🎭 MCP Protocol Message Templates
@@ -108,6 +112,8 @@ describe('🏢 Enterprise MCP Server Testing', () => {
   beforeEach(async () => {
     // Initialize mock transport
     mockTransport = new MockTransport();
+    container.clear();
+    bootstrapServices();
     
     // Initialize MCP server
     mcpServer = new LegalMCPServer();
@@ -125,12 +131,23 @@ describe('🏢 Enterprise MCP Server Testing', () => {
     if (mcpServer && typeof mcpServer.destroy === 'function') {
       mcpServer.destroy();
     }
+
+    const cache = container.has('cache') ? container.get('cache') : null;
+    if (cache && typeof cache.destroy === 'function') {
+      cache.destroy();
+    }
+
+    container.clear();
   });
 
   describe('🔧 MCP Protocol Compliance', () => {
     it('should be instantiable without errors', () => {
       assert.ok(mcpServer);
-      assert.ok(mcpServer.constructor.name === 'LegalMCPServer');
+      const constructorName = mcpServer.constructor.name;
+      assert.ok(
+        constructorName === 'LegalMCPServer' || constructorName === 'BestPracticeLegalMCPServer',
+        `Unexpected server constructor: ${constructorName}`
+      );
       
       console.log('✓ MCP Server instantiated successfully');
     });

@@ -14,6 +14,7 @@ import { MetricsCollector } from '../infrastructure/metrics.js';
 import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
+import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
 
 // Import all domain handlers
 import {
@@ -42,7 +43,17 @@ import {
   LookupCitationHandler,
 } from '../domains/opinions/handlers.js';
 import { GetOralArgumentHandler, GetOralArgumentsHandler } from '../domains/oral-arguments/handlers.js';
-import { SearchCasesHandler, SearchOpinionsHandler } from '../domains/search/handlers.js';
+import { AdvancedSearchHandler, SearchCasesHandler, SearchOpinionsHandler } from '../domains/search/handlers.js';
+import {
+  GetVisualizationDataHandler,
+  GetBulkDataHandler,
+  GetBankruptcyDataHandler,
+  GetComprehensiveJudgeProfileHandler,
+  GetComprehensiveCaseAnalysisHandler,
+  GetFinancialDisclosureDetailsHandler,
+  ValidateCitationsHandler,
+  GetEnhancedRECAPDataHandler,
+} from '../domains/enhanced/handlers.js';
 
 export function bootstrapServices(): void {
   // Register configuration with validation
@@ -98,6 +109,13 @@ export function bootstrapServices(): void {
     singleton: true,
   });
 
+  // Register circuit breaker manager
+  container.register('circuitBreakerManager', {
+    factory: logger => new CircuitBreakerManager(logger),
+    dependencies: ['logger'],
+    singleton: true,
+  });
+
   // Register CourtListener API client
   container.register('courtListenerApi', {
     factory: (config, apiClientFactory) => {
@@ -124,6 +142,7 @@ function registerToolHandlers(): void {
   // Register search handlers
   toolRegistry.register(new SearchOpinionsHandler(courtListenerApi));
   toolRegistry.register(new SearchCasesHandler(courtListenerApi));
+  toolRegistry.register(new AdvancedSearchHandler(courtListenerApi));
 
   // Register case handlers
   toolRegistry.register(new GetCaseDetailsHandler(courtListenerApi));
@@ -157,6 +176,16 @@ function registerToolHandlers(): void {
   // Register oral argument handlers
   toolRegistry.register(new GetOralArgumentsHandler(courtListenerApi));
   toolRegistry.register(new GetOralArgumentHandler(courtListenerApi));
+
+  // Register enhanced analytics handlers
+  toolRegistry.register(new GetVisualizationDataHandler(courtListenerApi));
+  toolRegistry.register(new GetBulkDataHandler(courtListenerApi));
+  toolRegistry.register(new GetBankruptcyDataHandler(courtListenerApi));
+  toolRegistry.register(new GetComprehensiveJudgeProfileHandler(courtListenerApi));
+  toolRegistry.register(new GetComprehensiveCaseAnalysisHandler(courtListenerApi));
+  toolRegistry.register(new GetFinancialDisclosureDetailsHandler(courtListenerApi));
+  toolRegistry.register(new ValidateCitationsHandler(courtListenerApi));
+  toolRegistry.register(new GetEnhancedRECAPDataHandler(courtListenerApi));
 }
 
 export function getServiceContainer() {

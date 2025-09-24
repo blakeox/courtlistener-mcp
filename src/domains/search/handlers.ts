@@ -19,47 +19,84 @@ export class SearchOpinionsHandler extends BaseToolHandler {
   }
 
   validate(input: any): Result<any, Error> {
-    if (!input || typeof input !== 'object') {
-      return failure(new Error('Input must be an object'));
+    try {
+      const schema = z.object({
+        query: z.string().optional(),
+        q: z.string().optional(),
+        court: z.string().optional(),
+        judge: z.string().optional(),
+        dateAfter: z.string().optional(),
+        dateBefore: z.string().optional(),
+        date_filed_after: z.string().optional(),
+        date_filed_before: z.string().optional(),
+        orderBy: z.string().optional(),
+        order_by: z.string().optional(),
+        page: z.coerce.number().int().min(1).optional(),
+        page_size: z.coerce.number().int().min(1).max(100).optional(),
+        pageSize: z.coerce.number().int().min(1).max(100).optional(),
+      });
+
+      const parsed = schema.parse(input ?? {});
+      const normalized = {
+        query: parsed.query ?? parsed.q,
+        court: parsed.court,
+        judge: parsed.judge,
+        date_filed_after: parsed.date_filed_after ?? parsed.dateAfter,
+        date_filed_before: parsed.date_filed_before ?? parsed.dateBefore,
+        order_by: parsed.order_by ?? parsed.orderBy ?? 'relevance',
+        page: parsed.page ?? 1,
+        page_size: parsed.page_size ?? parsed.pageSize ?? 20,
+      };
+
+      return success(normalized);
+    } catch (error) {
+      return failure(error as Error);
     }
-
-    // Validate required or common parameters
-    const validatedInput = {
-      q: input.q || '',
-      page: Math.max(1, parseInt(input.page) || 1),
-      pageSize: Math.min(100, Math.max(1, parseInt(input.pageSize) || 20)),
-      court: input.court || undefined,
-      judge: input.judge || undefined,
-      dateAfter: input.dateAfter || undefined,
-      dateBefore: input.dateBefore || undefined,
-      orderBy: input.orderBy || 'relevance',
-    };
-
-    return success(validatedInput);
   }
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
       context.logger.info('Searching opinions', {
-        query: input.q,
+        query: input.query,
         page: input.page,
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.searchOpinions(input);
+      const searchParams: Record<string, unknown> = {
+        page: input.page,
+        page_size: input.page_size,
+        order_by: input.order_by,
+      };
+
+      if (input.query) searchParams.q = input.query;
+      if (input.court) searchParams.court = input.court;
+      if (input.judge) searchParams.judge = input.judge;
+      if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
+      if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
+
+      const response = await this.apiClient.searchOpinions(searchParams);
 
       return this.success({
         summary: `Found ${response.count ?? 0} opinions`,
         results: response.results,
         pagination: {
           page: input.page,
-          totalPages: Math.ceil((response.count ?? 0) / input.pageSize),
+          totalPages: Math.ceil((response.count ?? 0) / input.page_size),
           totalCount: response.count ?? 0,
+          pageSize: input.page_size,
+        },
+        search_parameters: {
+          query: input.query,
+          court: input.court,
+          judge: input.judge,
+          date_filed_after: input.date_filed_after,
+          date_filed_before: input.date_filed_before,
+          order_by: input.order_by,
         },
       });
     } catch (error) {
       context.logger.error('Opinion search failed', error as Error, {
-        query: input.q,
+        query: input.query,
         requestId: context.requestId,
       });
 
@@ -327,41 +364,88 @@ export class SearchCasesHandler extends BaseToolHandler {
   }
 
   validate(input: any): Result<any, Error> {
-    if (!input || typeof input !== 'object') {
-      return failure(new Error('Input must be an object'));
-    }
+    try {
+      const schema = z.object({
+        query: z.string().optional(),
+        q: z.string().optional(),
+        court: z.string().optional(),
+        judge: z.string().optional(),
+        case_name: z.string().optional(),
+        citation: z.string().optional(),
+        date_filed_after: z.string().optional(),
+        date_filed_before: z.string().optional(),
+        precedential_status: z.string().optional(),
+        page: z.coerce.number().int().min(1).optional(),
+        page_size: z.coerce.number().int().min(1).max(100).optional(),
+        pageSize: z.coerce.number().int().min(1).max(100).optional(),
+      });
 
-    return success({
-      q: input.q || '',
-      page: Math.max(1, parseInt(input.page) || 1),
-      pageSize: Math.min(100, Math.max(1, parseInt(input.pageSize) || 20)),
-      court: input.court || undefined,
-      dateAfter: input.dateAfter || undefined,
-      dateBefore: input.dateBefore || undefined,
-    });
+      const parsed = schema.parse(input ?? {});
+      const normalized = {
+        query: parsed.query ?? parsed.q,
+        court: parsed.court,
+        judge: parsed.judge,
+        case_name: parsed.case_name,
+        citation: parsed.citation,
+        date_filed_after: parsed.date_filed_after,
+        date_filed_before: parsed.date_filed_before,
+        precedential_status: parsed.precedential_status,
+        page: parsed.page ?? 1,
+        page_size: parsed.page_size ?? parsed.pageSize ?? 20,
+      };
+
+      return success(normalized);
+    } catch (error) {
+      return failure(error as Error);
+    }
   }
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
       context.logger.info('Searching cases', {
-        query: input.q,
+        query: input.query,
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.searchCases(input);
+      const searchParams: Record<string, unknown> = {
+        page: input.page,
+        page_size: input.page_size,
+      };
+
+      if (input.query) searchParams.q = input.query;
+      if (input.court) searchParams.court = input.court;
+      if (input.judge) searchParams.judge = input.judge;
+      if (input.case_name) searchParams.case_name = input.case_name;
+      if (input.citation) searchParams.citation = input.citation;
+      if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
+      if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
+      if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
+
+      const response = await this.apiClient.searchCases(searchParams);
 
       return this.success({
         summary: `Found ${response.count ?? 0} cases`,
         results: response.results,
         pagination: {
           page: input.page,
-          totalPages: Math.ceil((response.count ?? 0) / input.pageSize),
+          totalPages: Math.ceil((response.count ?? 0) / input.page_size),
           totalCount: response.count ?? 0,
+          pageSize: input.page_size,
+        },
+        search_parameters: {
+          query: input.query,
+          court: input.court,
+          judge: input.judge,
+          case_name: input.case_name,
+          citation: input.citation,
+          date_filed_after: input.date_filed_after,
+          date_filed_before: input.date_filed_before,
+          precedential_status: input.precedential_status,
         },
       });
     } catch (error) {
       context.logger.error('Case search failed', error as Error, {
-        query: input.q,
+        query: input.query,
         requestId: context.requestId,
       });
 
