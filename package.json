@@ -56,6 +56,7 @@
     "inspect": "node scripts/dev/inspect.js",
     "inspect:local": "node scripts/dev/inspect.js local",
     "inspect:remote": "node scripts/dev/inspect.js remote",
+  "mcp:remote": "node scripts/dev/mcp-remote.js",
     "dev": "tsc --watch --preserveWatchOutput",
     "lint": "tslint src/**/*.ts",
     "clean": "rm -rf dist",
