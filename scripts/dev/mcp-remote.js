@@ -14,14 +14,10 @@ import { spawn } from 'node:child_process';
 const DEFAULT_URL = 'https://courtlistener-mcp.blakeoxford.workers.dev/sse';
 const url = process.env.MCP_REMOTE_URL || DEFAULT_URL;
 
-const child = spawn(
-  'npx',
-  ['@modelcontextprotocol/inspector', 'mcp-remote', url],
-  {
-    stdio: 'inherit',
-    env: process.env,
-  }
-);
+const child = spawn('npx', ['@modelcontextprotocol/inspector', 'mcp-remote', url], {
+  stdio: 'inherit',
+  env: process.env,
+});
 
 child.on('exit', code => {
   process.exit(code ?? 0);
