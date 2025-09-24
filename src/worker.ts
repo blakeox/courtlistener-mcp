@@ -81,7 +81,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
   if (request.method === 'POST') {
     try {
       const message = await request.json();
-      const server = new LegalMCPServer();
+  const server: any = new LegalMCPServer();
       
       let response: any;
       
@@ -251,7 +251,7 @@ export default {
 
       // List tools endpoint
       if (url.pathname === '/tools' && request.method === 'GET') {
-        const server = new LegalMCPServer();
+  const server: any = new LegalMCPServer();
         const tools = await server.listTools();
         
         return new Response(JSON.stringify({
@@ -303,7 +303,7 @@ export default {
 
         // Execute the tool
         try {
-          const server = new LegalMCPServer();
+          const server: any = new LegalMCPServer();
           const result = await server.handleToolCall({
             name: toolName,
             arguments: arguments_
@@ -360,8 +360,8 @@ export default {
 
 // Keep the original MCP stdio functionality for local usage
 async function main() {
-  const server = new LegalMCPServer();
-  await server.run();
+  const server: any = new LegalMCPServer();
+  await server.start();
 }
 
 // Only run stdio server if called directly (not in Workers environment)

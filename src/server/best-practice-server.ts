@@ -75,6 +75,13 @@ export class BestPracticeLegalMCPServer {
   }
 
   /**
+   * Backwards-compatible alias for start() used by legacy demos/tests
+   */
+  async run(): Promise<void> {
+    await this.start();
+  }
+
+  /**
    * Start the MCP server using stdio transport and optional health server
    */
   async start(): Promise<void> {
@@ -133,6 +140,73 @@ export class BestPracticeLegalMCPServer {
     }
 
     this.logger.info('Legal MCP Server stopped');
+  }
+
+  /**
+   * Provide direct access to tool catalog for lightweight integrations
+   */
+  async listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }> {
+    const timer = this.logger.startTimer('list_tools_direct');
+
+    try {
+      const tools = this.buildToolDefinitions();
+      const duration = timer.end(true, { toolCount: tools.length });
+      this.metrics.recordRequest(duration, false);
+
+      return {
+        tools,
+        metadata: {
+          categories: this.toolRegistry.getCategories(),
+        },
+      };
+    } catch (error) {
+      const duration = timer.endWithError(error as Error);
+      this.metrics.recordFailure(duration);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute a tool call outside of the transport layer for worker/demo usage
+   */
+  async handleToolCall(
+    input:
+      | CallToolRequest
+      | {
+          name: string;
+          arguments?: Record<string, unknown>;
+        }
+  ): Promise<CallToolResult> {
+    if (this.isShuttingDown) {
+      throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
+    }
+
+    const request =
+      'params' in input
+        ? input
+        : {
+            method: 'tools/call',
+            params: {
+              name: input.name,
+              arguments: input.arguments ?? {},
+            },
+          };
+
+    const validation = CallToolRequestSchema.safeParse(request);
+    if (!validation.success) {
+      throw new McpError(ErrorCode.InvalidParams, 'Invalid tool call arguments');
+    }
+
+    const requestId = generateId();
+    this.activeRequests.add(requestId);
+
+    try {
+      return await this.executeToolWithMiddleware(validation.data, requestId);
+    } catch (error) {
+      throw error;
+    } finally {
+      this.activeRequests.delete(requestId);
+    }
   }
 
   /**

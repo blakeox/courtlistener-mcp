@@ -7,6 +7,8 @@
  * `BestPracticeLegalMCPServer`, providing a clean, production-ready runtime.
  */
 
+import type { CallToolRequest, CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+
 import { bootstrapServices } from './infrastructure/bootstrap.js';
 import { container } from './infrastructure/container.js';
 import { Logger } from './infrastructure/logger.js';
@@ -39,4 +41,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { BestPracticeLegalMCPServer };
-export const LegalMCPServer = BestPracticeLegalMCPServer;
+export class LegalMCPServer extends BestPracticeLegalMCPServer {}
+export type LegacyLegalMCPServer = BestPracticeLegalMCPServer & {
+  run(): Promise<void>;
+  listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;
+  handleToolCall(
+    input: CallToolRequest | {
+      name: string;
+      arguments?: Record<string, unknown>;
+    }
+  ): Promise<CallToolResult>;
+};

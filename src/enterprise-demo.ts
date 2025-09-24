@@ -97,9 +97,9 @@ function startEnterpriseServer() {
   }
   
   // Import and start the standard server (enterprise features are configured via env vars)
-  import('./index.js').then(async ({ LegalMCPServer }) => {
-    const server = new LegalMCPServer();
-    await server.run();
+  import('./index.js').then(async (module: typeof import('./index.js')) => {
+    const server = new module.LegalMCPServer();
+    await server.start();
   }).catch(error => {
     console.error('Failed to start Legal MCP Server:', error);
     process.exit(1);
