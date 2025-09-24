@@ -14,6 +14,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
+  CallToolRequest,
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
@@ -29,6 +30,56 @@ import { MetricsCollector } from './infrastructure/metrics.js';
 import { CourtListenerAPI } from './courtlistener.js';
 import { getEnhancedToolDefinitions } from './tool-definitions.js';
 import { HealthServer } from './http-server.js';
+import { ToolHandlerRegistry, ToolContext } from './server/tool-handler.js';
+import { generateId } from './common/utils.js';
+import {
+  SearchOpinionsHandler,
+  SearchCasesHandler,
+  AdvancedSearchHandler
+} from './domains/search/handlers.js';
+import {
+  GetCaseDetailsHandler,
+  GetRelatedCasesHandler,
+  AnalyzeCaseAuthoritiesHandler
+} from './domains/cases/handlers.js';
+import {
+  GetOpinionTextHandler,
+  AnalyzeLegalArgumentHandler,
+  GetCitationNetworkHandler,
+  LookupCitationHandler
+} from './domains/opinions/handlers.js';
+import {
+  ListCourtsHandler,
+  GetJudgesHandler,
+  GetJudgeHandler
+} from './domains/courts/handlers.js';
+import {
+  GetDocketsHandler,
+  GetDocketHandler,
+  GetRecapDocumentsHandler,
+  GetRecapDocumentHandler,
+  GetDocketEntriesHandler
+} from './domains/dockets/handlers.js';
+import {
+  GetFinancialDisclosuresHandler,
+  GetFinancialDisclosureHandler,
+  GetPartiesAndAttorneysHandler,
+  ManageAlertsHandler
+} from './domains/miscellaneous/handlers.js';
+import {
+  GetOralArgumentsHandler,
+  GetOralArgumentHandler
+} from './domains/oral-arguments/handlers.js';
+import {
+  GetVisualizationDataHandler,
+  GetBulkDataHandler,
+  GetBankruptcyDataHandler,
+  GetComprehensiveJudgeProfileHandler,
+  GetComprehensiveCaseAnalysisHandler,
+  GetFinancialDisclosureDetailsHandler,
+  ValidateCitationsHandler,
+  GetEnhancedRECAPDataHandler
+} from './domains/enhanced/handlers.js';
 
 /**
  * Enhanced Legal MCP Server with best practice implementation
@@ -41,6 +92,7 @@ export class LegalMCPServer {
   private metrics: MetricsCollector;
   private courtListener: CourtListenerAPI;
   private healthServer?: HealthServer;
+  private toolRegistry: ToolHandlerRegistry;
 
   constructor() {
     // Initialize configuration
@@ -73,6 +125,10 @@ export class LegalMCPServer {
       );
     }
 
+    // Initialize tool handler registry
+    this.toolRegistry = new ToolHandlerRegistry();
+    this.registerToolHandlers();
+
     // Initialize MCP server
     this.server = new Server(
       {
@@ -93,24 +149,85 @@ export class LegalMCPServer {
     });
   }
 
+  private registerToolHandlers(): void {
+    const handlers = [
+      // Search domain
+      new SearchCasesHandler(this.courtListener),
+      new SearchOpinionsHandler(this.courtListener),
+      new AdvancedSearchHandler(this.courtListener),
+
+      // Cases domain
+      new GetCaseDetailsHandler(this.courtListener),
+      new GetRelatedCasesHandler(this.courtListener),
+      new AnalyzeCaseAuthoritiesHandler(this.courtListener),
+
+      // Opinions domain
+      new GetOpinionTextHandler(this.courtListener),
+      new AnalyzeLegalArgumentHandler(this.courtListener),
+      new GetCitationNetworkHandler(this.courtListener),
+      new LookupCitationHandler(this.courtListener),
+
+      // Courts domain
+      new ListCourtsHandler(this.courtListener),
+      new GetJudgesHandler(this.courtListener),
+      new GetJudgeHandler(this.courtListener),
+
+      // Dockets domain
+      new GetDocketsHandler(this.courtListener),
+      new GetDocketHandler(this.courtListener),
+      new GetRecapDocumentsHandler(this.courtListener),
+      new GetRecapDocumentHandler(this.courtListener),
+      new GetDocketEntriesHandler(this.courtListener),
+
+      // Miscellaneous domain
+      new GetFinancialDisclosuresHandler(this.courtListener),
+      new GetFinancialDisclosureHandler(this.courtListener),
+      new GetPartiesAndAttorneysHandler(this.courtListener),
+      new ManageAlertsHandler(this.courtListener),
+
+      // Oral arguments domain
+      new GetOralArgumentsHandler(this.courtListener),
+      new GetOralArgumentHandler(this.courtListener),
+
+      // Enhanced domain
+      new GetVisualizationDataHandler(this.courtListener),
+      new GetBulkDataHandler(this.courtListener),
+      new GetBankruptcyDataHandler(this.courtListener),
+      new GetComprehensiveJudgeProfileHandler(this.courtListener),
+      new GetComprehensiveCaseAnalysisHandler(this.courtListener),
+      new GetFinancialDisclosureDetailsHandler(this.courtListener),
+      new ValidateCitationsHandler(this.courtListener),
+      new GetEnhancedRECAPDataHandler(this.courtListener)
+    ];
+
+    handlers.forEach(handler => this.toolRegistry.register(handler));
+  }
+
+  private getRegisteredTools(): Tool[] {
+    const enhancedTools = getEnhancedToolDefinitions();
+    const enhancedLookup = new Map(enhancedTools.map(tool => [tool.name, tool]));
+    const registryTools = this.toolRegistry.getToolDefinitions();
+
+    return registryTools.map((tool) => {
+      const enhanced = enhancedLookup.get(tool.name);
+      return {
+        name: tool.name,
+        description: enhanced?.description ?? tool.description,
+        inputSchema: enhanced?.inputSchema ?? tool.inputSchema
+      };
+    });
+  }
+
   private setupServer() {
-    // List tools handler
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const timer = this.logger.startTimer('list_tools');
-      
+
       try {
-        const enhancedTools = getEnhancedToolDefinitions();
-        
-        // Convert enhanced tools to MCP tool format
-        const tools: Tool[] = enhancedTools.map(tool => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema
-        }));
+        const tools = this.getRegisteredTools();
 
         const duration = timer.end();
         this.metrics.recordRequest(duration, false);
-        
+
         return { tools };
       } catch (error) {
         timer.endWithError(error as Error);
@@ -118,142 +235,50 @@ export class LegalMCPServer {
       }
     });
 
-    // Call tool handler
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest) => {
       const { name, arguments: args } = request.params;
       const timer = this.logger.startTimer(`tool_${name}`);
-      
+
       try {
         this.logger.info('Tool execution started', {
           toolName: name,
           arguments: args
         });
 
-        let result;
-        
-        // Route to appropriate handler
-        switch (name) {
-          case 'search_cases':
-            result = await this.handleSearchCases(args);
-            break;
-          case 'get_case_details':
-            result = await this.handleGetCaseDetails(args);
-            break;
-          case 'get_opinion_text':
-            result = await this.handleGetOpinionText(args);
-            break;
-          case 'lookup_citation':
-            result = await this.handleLookupCitation(args);
-            break;
-          case 'get_related_cases':
-            result = await this.handleGetRelatedCases(args);
-            break;
-          case 'list_courts':
-            result = await this.handleListCourts(args);
-            break;
-          case 'analyze_legal_argument':
-            result = await this.handleAnalyzeLegalArgument(args);
-            break;
-          case 'get_financial_disclosures':
-            result = await this.handleGetFinancialDisclosures(args);
-            break;
-          case 'get_financial_disclosure':
-            result = await this.handleGetFinancialDisclosure(args);
-            break;
-          case 'get_parties_and_attorneys':
-            result = await this.handleGetPartiesAndAttorneys(args);
-            break;
-          case 'get_recap_documents':
-            result = await this.handleGetRECAPDocuments(args);
-            break;
-          case 'get_recap_document':
-            result = await this.handleGetRECAPDocument(args);
-            break;
-          case 'manage_alerts':
-            result = await this.handleManageAlerts(args);
-            break;
-          case 'get_citation_network':
-            result = await this.handleGetCitationNetwork(args);
-            break;
-          case 'analyze_case_authorities':
-            result = await this.handleAnalyzeCaseAuthorities(args);
-            break;
-          case 'get_dockets':
-            result = await this.handleGetDockets(args);
-            break;
-          case 'get_docket':
-            result = await this.handleGetDocket(args);
-            break;
-          case 'get_judges':
-            result = await this.handleGetJudges(args);
-            break;
-          case 'get_judge':
-            result = await this.handleGetJudge(args);
-            break;
-          case 'get_oral_arguments':
-            result = await this.handleGetOralArguments(args);
-            break;
-          case 'get_oral_argument':
-            result = await this.handleGetOralArgument(args);
-            break;
-          case 'advanced_search':
-            result = await this.handleAdvancedSearch(args);
-            break;
-          case 'get_visualization_data':
-            result = await this.handleGetVisualizationData(args);
-            break;
-          case 'get_bulk_data':
-            result = await this.handleGetBulkData(args);
-            break;
-          case 'get_bankruptcy_data':
-            result = await this.handleGetBankruptcyData(args);
-            break;
-          case 'get_docket_entries':
-            result = await this.handleGetDocketEntries(args);
-            break;
-          case 'get_comprehensive_judge_profile':
-            result = await this.handleGetComprehensiveJudgeProfile(args);
-            break;
-          case 'get_comprehensive_case_analysis':
-            result = await this.handleGetComprehensiveCaseAnalysis(args);
-            break;
-          case 'get_financial_disclosure_details':
-            result = await this.handleGetFinancialDisclosureDetails(args);
-            break;
-          case 'validate_citations':
-            result = await this.handleValidateCitations(args);
-            break;
-          case 'get_enhanced_recap_data':
-            result = await this.handleGetEnhancedRECAPData(args);
-            break;
-          default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${name}`
-            );
-        }
+        const requestId = `tool_${name}_${generateId()}`;
+        const context: ToolContext = {
+          logger: this.logger,
+          requestId,
+          cache: this.cache,
+          metrics: this.metrics
+        };
+
+        const result = await this.toolRegistry.execute(request, context);
 
         const duration = timer.end(true);
         this.metrics.recordRequest(duration, false);
-        
+
         this.logger.toolExecution(name, duration, true, {
           argumentCount: Object.keys(args || {}).length
         });
 
         return result;
-        
       } catch (error) {
         const duration = timer.endWithError(error as Error);
         this.metrics.recordFailure(duration);
-        
+
         this.logger.toolExecution(name, duration, false, {
           error: error instanceof Error ? error.message : String(error)
         });
-        
+
         if (error instanceof McpError) {
           throw error;
         }
-        
+
+        if (error instanceof Error && error.message.startsWith('Unknown tool')) {
+          throw new McpError(ErrorCode.MethodNotFound, error.message);
+        }
+
         throw new McpError(
           ErrorCode.InternalError,
           `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`
@@ -1878,7 +1903,7 @@ export class LegalMCPServer {
     this.logger.info('Legal MCP Server started', {
       version: '1.0.0',
       transport: 'stdio',
-      tools_count: getEnhancedToolDefinitions().length,
+      tools_count: this.toolRegistry.getToolDefinitions().length,
       cache_enabled: this.cache.isEnabled(),
       metrics_enabled: this.config.metrics.enabled,
       health_server_port: this.config.metrics.port
@@ -1901,14 +1926,7 @@ export class LegalMCPServer {
     const timer = this.logger.startTimer('list_tools');
     
     try {
-      const enhancedTools = getEnhancedToolDefinitions();
-      
-      // Convert enhanced tools to MCP tool format
-      const tools: Tool[] = enhancedTools.map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema
-      }));
+      const tools = this.getRegisteredTools();
 
       const duration = timer.end();
       this.metrics.recordRequest(duration, false);
@@ -1935,100 +1953,29 @@ export class LegalMCPServer {
         arguments: args
       });
 
-      let result;
-      
-      // Route to appropriate handler (same as main handler for consistency)
-      switch (name) {
-        case 'search_cases':
-          result = await this.handleSearchCases(args);
-          break;
-        case 'get_case_details':
-          result = await this.handleGetCaseDetails(args);
-          break;
-        case 'get_opinion_text':
-          result = await this.handleGetOpinionText(args);
-          break;
-        case 'lookup_citation':
-          result = await this.handleLookupCitation(args);
-          break;
-        case 'get_related_cases':
-          result = await this.handleGetRelatedCases(args);
-          break;
-        case 'list_courts':
-          result = await this.handleListCourts(args);
-          break;
-        case 'analyze_legal_argument':
-          result = await this.handleAnalyzeLegalArgument(args);
-          break;
-        case 'get_financial_disclosures':
-          result = await this.handleGetFinancialDisclosures(args);
-          break;
-        case 'get_financial_disclosure':
-          result = await this.handleGetFinancialDisclosure(args);
-          break;
-        case 'get_parties_and_attorneys':
-          result = await this.handleGetPartiesAndAttorneys(args);
-          break;
-        case 'get_recap_documents':
-          result = await this.handleGetRECAPDocuments(args);
-          break;
-        case 'get_recap_document':
-          result = await this.handleGetRECAPDocument(args);
-          break;
-        case 'manage_alerts':
-          result = await this.handleManageAlerts(args);
-          break;
-        case 'get_citation_network':
-          result = await this.handleGetCitationNetwork(args);
-          break;
-        case 'analyze_case_authorities':
-          result = await this.handleAnalyzeCaseAuthorities(args);
-          break;
-        case 'get_dockets':
-          result = await this.handleGetDockets(args);
-          break;
-        case 'get_docket':
-          result = await this.handleGetDocket(args);
-          break;
-        case 'get_judges':
-          result = await this.handleGetJudges(args);
-          break;
-        case 'get_judge':
-          result = await this.handleGetJudge(args);
-          break;
-        case 'get_oral_arguments':
-          result = await this.handleGetOralArguments(args);
-          break;
-        case 'get_oral_argument':
-          result = await this.handleGetOralArgument(args);
-          break;
-        case 'advanced_search':
-          result = await this.handleAdvancedSearch(args);
-          break;
-        case 'get_visualization_data':
-          result = await this.handleGetVisualizationData(args);
-          break;
-        case 'get_bulk_data':
-          result = await this.handleGetBulkData(args);
-          break;
-        case 'get_bankruptcy_data':
-          result = await this.handleGetBankruptcyData(args);
-          break;
-        default:
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${name}`
-          );
-      }
+      const callRequest = {
+        method: 'tools/call',
+        params: {
+          name,
+          arguments: args ?? {}
+        }
+      } as CallToolRequest;
 
-      // Update metrics
-      const duration = timer.end();
+      const requestId = `tool_${name}_${generateId()}`;
+      const context: ToolContext = {
+        logger: this.logger,
+        requestId,
+        cache: this.cache,
+        metrics: this.metrics
+      };
+
+      const result = await this.toolRegistry.execute(callRequest, context);
+
+      const duration = timer.end(true);
       this.metrics.recordRequest(duration, false);
       
-      this.logger.info('Tool execution completed', {
-        toolName: name,
-        duration: duration,
-        success: true
+      this.logger.toolExecution(name, duration, true, {
+        argumentCount: Object.keys(args || {}).length
       });
 
       return result;
@@ -2036,13 +1983,22 @@ export class LegalMCPServer {
       const duration = timer.endWithError(error as Error);
       this.metrics.recordFailure(duration);
       
-      this.logger.error('Tool execution failed', {
-        toolName: name,
-        error: error instanceof Error ? error.message : String(error),
-        duration: duration
+      this.logger.toolExecution(name, duration, false, {
+        error: error instanceof Error ? error.message : String(error)
       });
+      
+      if (error instanceof McpError) {
+        throw error;
+      }
 
-      throw error;
+      if (error instanceof Error && error.message.startsWith('Unknown tool')) {
+        throw new McpError(ErrorCode.MethodNotFound, error.message);
+      }
+      
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 

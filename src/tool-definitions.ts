@@ -300,12 +300,11 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
         type: "object",
         properties: {
           docket: {
-            type: "number",
-            description: "Docket ID to get entries for",
-            minimum: 1
+            type: ["number", "string"],
+            description: "Docket ID to get entries for"
           },
           entry_number: {
-            type: "number",
+            type: ["number", "string"],
             description: "Specific entry number to filter by"
           },
           date_filed_after: {
@@ -317,8 +316,20 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
             type: "string",
             description: "Get entries filed before this date (YYYY-MM-DD)", 
             pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          page: {
+            type: "number",
+            description: "Page number for pagination (default: 1)",
+            minimum: 1
+          },
+          page_size: {
+            type: "number",
+            description: "Number of entries per page (default: 20, max: 100)",
+            minimum: 1,
+            maximum: 100
           }
         },
+        required: ["docket"],
         additionalProperties: false
       }
     },

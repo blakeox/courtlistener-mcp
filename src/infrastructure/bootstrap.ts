@@ -37,7 +37,8 @@ import {
   GetDocketsHandler, 
   GetDocketHandler, 
   GetRecapDocumentsHandler, 
-  GetRecapDocumentHandler 
+  GetRecapDocumentHandler,
+  GetDocketEntriesHandler
 } from '../domains/dockets/handlers.js';
 import { 
   GetFinancialDisclosuresHandler, 
@@ -150,6 +151,7 @@ function registerToolHandlers(): void {
   // Register docket handlers
   toolRegistry.register(new GetDocketsHandler(courtListenerApi));
   toolRegistry.register(new GetDocketHandler(courtListenerApi));
+  toolRegistry.register(new GetDocketEntriesHandler(courtListenerApi));
   toolRegistry.register(new GetRecapDocumentsHandler(courtListenerApi));
   toolRegistry.register(new GetRecapDocumentHandler(courtListenerApi));
 

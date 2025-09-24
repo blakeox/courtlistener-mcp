@@ -6,6 +6,9 @@
 import { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '../infrastructure/logger.js';
 import { Result } from '../common/types.js';
+import { CacheManager } from '../infrastructure/cache.js';
+import { MetricsCollector } from '../infrastructure/metrics.js';
+import { ServerConfig } from '../types.js';
 
 export interface ToolHandler {
   readonly name: string;
@@ -31,6 +34,9 @@ export interface ToolHandler {
 export interface ToolContext {
   logger: Logger;
   requestId: string;
+  cache?: CacheManager;
+  metrics?: MetricsCollector;
+  config?: ServerConfig;
   userId?: string;
 }
 

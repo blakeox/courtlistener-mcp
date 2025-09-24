@@ -319,3 +319,129 @@ export class GetRecapDocumentHandler extends BaseToolHandler {
     }
   }
 }
+
+export class GetDocketEntriesHandler extends BaseToolHandler {
+  readonly name = 'get_docket_entries';
+  readonly description = 'Retrieve individual docket entries with filtering and pagination';
+  readonly category = 'dockets';
+
+  private static schema = z.object({
+    docket: z.union([z.string(), z.number()]).transform(String),
+    entry_number: z.union([z.string(), z.number()]).transform(String).optional(),
+    date_filed_after: z.string().optional(),
+    date_filed_before: z.string().optional(),
+    page: z.number().min(1).optional().default(1),
+    page_size: z.number().min(1).max(100).optional().default(20)
+  });
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  validate(input: any): Result<any, Error> {
+    try {
+      const parsed = GetDocketEntriesHandler.schema.parse(input || {});
+      return { success: true, data: parsed };
+    } catch (error) {
+      return { success: false, error: error as Error };
+    }
+  }
+
+  getSchema(): any {
+    return {
+      type: 'object',
+      properties: {
+        docket: {
+          type: ['string', 'number'],
+          description: 'Docket ID to retrieve entries for'
+        },
+        entry_number: {
+          type: ['string', 'number'],
+          description: 'Filter to a specific entry number'
+        },
+        date_filed_after: {
+          type: 'string',
+          description: 'Return entries filed after this date (YYYY-MM-DD)'
+        },
+        date_filed_before: {
+          type: 'string',
+          description: 'Return entries filed before this date (YYYY-MM-DD)'
+        },
+        page: {
+          type: 'number',
+          minimum: 1,
+          description: 'Page number for pagination',
+          default: 1
+        },
+        page_size: {
+          type: 'number',
+          minimum: 1,
+          maximum: 100,
+          description: 'Number of entries per page (max 100)',
+          default: 20
+        }
+      },
+      required: ['docket'],
+      additionalProperties: false
+    };
+  }
+
+  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+    const params = {
+      docket: input.docket,
+      entry_number: input.entry_number,
+      date_filed_after: input.date_filed_after,
+      date_filed_before: input.date_filed_before,
+      page: input.page ?? 1,
+      page_size: input.page_size ?? 20
+    };
+
+    const timer = context.logger.startTimer('get_docket_entries');
+
+    try {
+      const cacheKey = 'docket_entries';
+      const cached = context.cache?.get<any>(cacheKey, params);
+      if (cached) {
+        context.logger.info('Returning cached docket entries', {
+          docketId: params.docket,
+          requestId: context.requestId
+        });
+        context.metrics?.recordRequest(timer.end(true), true);
+        return this.success(cached);
+      }
+
+      context.logger.info('Fetching docket entries', {
+        docketId: params.docket,
+        requestId: context.requestId
+      });
+
+      const entries = await this.apiClient.getDocketEntries(params);
+
+      const result = {
+        docket_id: params.docket,
+        docket_entries: entries,
+        pagination: {
+          page: params.page,
+          page_size: params.page_size,
+          total_results: entries.count ?? 0
+        }
+      };
+
+      context.cache?.set(cacheKey, params, result, 1800);
+      context.metrics?.recordRequest(timer.end(true), false);
+
+      return this.success(result);
+    } catch (error) {
+      const duration = timer.endWithError(error as Error);
+      context.metrics?.recordFailure(duration);
+      context.logger.error('Failed to fetch docket entries', error as Error, {
+        docketId: params.docket,
+        requestId: context.requestId
+      });
+
+      return this.error('Failed to retrieve docket entries', {
+        message: (error as Error).message
+      });
+    }
+  }
+}
