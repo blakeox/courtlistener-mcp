@@ -9,7 +9,7 @@
     },
     "legal-mcp-remote": {
       "type": "sse",
-      "url": "https://courtlistener-mcp.blakeopowell.workers.dev/sse"
+      "url": "https://courtlistener-mcp.blakeoxford.workers.dev/sse"
     }
   }
 }
