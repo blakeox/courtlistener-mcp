@@ -2,17 +2,17 @@
 
 /**
  * Legal MCP Server - Best Practice Implementation
- * 
+ *
  * A comprehensive Model Context Protocol server providing access to legal research
  * with enterprise-grade features including caching, logging, metrics, and error handling.
- * 
+ *
  * @version 1.0.0
  * @see https://github.com/modelcontextprotocol/typescript-sdk
  * @see https://modelcontextprotocol.io/
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequest,
   CallToolRequestSchema,
@@ -20,66 +20,55 @@ import {
   ListToolsRequestSchema,
   McpError,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from '@modelcontextprotocol/sdk/types.js';
 
 // Import our enhanced modules
-import { getConfig } from './infrastructure/config.js';
-import { createLogger } from './infrastructure/logger.js';
-import { CacheManager } from './infrastructure/cache.js';
-import { MetricsCollector } from './infrastructure/metrics.js';
-import { CourtListenerAPI } from './courtlistener.js';
-import { getEnhancedToolDefinitions } from './tool-definitions.js';
-import { HealthServer } from './http-server.js';
-import { ToolHandlerRegistry, ToolContext } from './server/tool-handler.js';
 import { generateId } from './common/utils.js';
+import { CourtListenerAPI } from './courtlistener.js';
 import {
-  SearchOpinionsHandler,
-  SearchCasesHandler,
-  AdvancedSearchHandler
-} from './domains/search/handlers.js';
-import {
+  AnalyzeCaseAuthoritiesHandler,
   GetCaseDetailsHandler,
   GetRelatedCasesHandler,
-  AnalyzeCaseAuthoritiesHandler
 } from './domains/cases/handlers.js';
+import { GetJudgeHandler, GetJudgesHandler, ListCourtsHandler } from './domains/courts/handlers.js';
 import {
-  GetOpinionTextHandler,
-  AnalyzeLegalArgumentHandler,
-  GetCitationNetworkHandler,
-  LookupCitationHandler
-} from './domains/opinions/handlers.js';
-import {
-  ListCourtsHandler,
-  GetJudgesHandler,
-  GetJudgeHandler
-} from './domains/courts/handlers.js';
-import {
-  GetDocketsHandler,
+  GetDocketEntriesHandler,
   GetDocketHandler,
-  GetRecapDocumentsHandler,
+  GetDocketsHandler,
   GetRecapDocumentHandler,
-  GetDocketEntriesHandler
+  GetRecapDocumentsHandler,
 } from './domains/dockets/handlers.js';
 import {
-  GetFinancialDisclosuresHandler,
+  GetBankruptcyDataHandler,
+  GetBulkDataHandler,
+  GetComprehensiveCaseAnalysisHandler,
+  GetComprehensiveJudgeProfileHandler,
+  GetEnhancedRECAPDataHandler,
+  GetFinancialDisclosureDetailsHandler,
+  GetVisualizationDataHandler,
+  ValidateCitationsHandler,
+} from './domains/enhanced/handlers.js';
+import {
   GetFinancialDisclosureHandler,
+  GetFinancialDisclosuresHandler,
   GetPartiesAndAttorneysHandler,
-  ManageAlertsHandler
+  ManageAlertsHandler,
 } from './domains/miscellaneous/handlers.js';
 import {
-  GetOralArgumentsHandler,
-  GetOralArgumentHandler
-} from './domains/oral-arguments/handlers.js';
-import {
-  GetVisualizationDataHandler,
-  GetBulkDataHandler,
-  GetBankruptcyDataHandler,
-  GetComprehensiveJudgeProfileHandler,
-  GetComprehensiveCaseAnalysisHandler,
-  GetFinancialDisclosureDetailsHandler,
-  ValidateCitationsHandler,
-  GetEnhancedRECAPDataHandler
-} from './domains/enhanced/handlers.js';
+  AnalyzeLegalArgumentHandler,
+  GetCitationNetworkHandler,
+  GetOpinionTextHandler,
+  LookupCitationHandler,
+} from './domains/opinions/handlers.js';
+import { GetOralArgumentHandler, GetOralArgumentsHandler } from './domains/oral-arguments/handlers.js';
+import { AdvancedSearchHandler, SearchCasesHandler, SearchOpinionsHandler } from './domains/search/handlers.js';
+import { HealthServer } from './http-server.js';
+import { CacheManager } from './infrastructure/cache.js';
+import { getConfig } from './infrastructure/config.js';
+import { createLogger } from './infrastructure/logger.js';
+import { MetricsCollector } from './infrastructure/metrics.js';
+import { ToolContext, ToolHandlerRegistry } from './server/tool-handler.js';
+import { getEnhancedToolDefinitions } from './tool-definitions.js';
 
 /**
  * Enhanced Legal MCP Server with best practice implementation
@@ -97,16 +86,16 @@ export class LegalMCPServer {
   constructor() {
     // Initialize configuration
     this.config = getConfig();
-    
+
     // Initialize logging
     this.logger = createLogger(this.config.logging, 'LegalMCP');
-    
+
     // Initialize metrics collection
     this.metrics = new MetricsCollector(this.logger);
-    
+
     // Initialize cache
     this.cache = new CacheManager(this.config.cache, this.logger);
-    
+
     // Initialize CourtListener API client
     this.courtListener = new CourtListenerAPI(
       this.config.courtListener,
@@ -132,8 +121,8 @@ export class LegalMCPServer {
     // Initialize MCP server
     this.server = new Server(
       {
-        name: "legal-mcp",
-        version: "1.0.0",
+        name: 'legal-mcp',
+        version: '1.0.0',
       },
       {
         capabilities: {
@@ -145,7 +134,7 @@ export class LegalMCPServer {
     this.setupServer();
     this.logger.info('Legal MCP Server initialized', {
       version: '1.0.0',
-      features: ['caching', 'logging', 'metrics', 'rate-limiting', 'error-handling']
+      features: ['caching', 'logging', 'metrics', 'rate-limiting', 'error-handling'],
     });
   }
 
@@ -197,7 +186,7 @@ export class LegalMCPServer {
       new GetComprehensiveCaseAnalysisHandler(this.courtListener),
       new GetFinancialDisclosureDetailsHandler(this.courtListener),
       new ValidateCitationsHandler(this.courtListener),
-      new GetEnhancedRECAPDataHandler(this.courtListener)
+      new GetEnhancedRECAPDataHandler(this.courtListener),
     ];
 
     handlers.forEach(handler => this.toolRegistry.register(handler));
@@ -208,12 +197,12 @@ export class LegalMCPServer {
     const enhancedLookup = new Map(enhancedTools.map(tool => [tool.name, tool]));
     const registryTools = this.toolRegistry.getToolDefinitions();
 
-    return registryTools.map((tool) => {
+    return registryTools.map(tool => {
       const enhanced = enhancedLookup.get(tool.name);
       return {
         name: tool.name,
         description: enhanced?.description ?? tool.description,
-        inputSchema: enhanced?.inputSchema ?? tool.inputSchema
+        inputSchema: enhanced?.inputSchema ?? tool.inputSchema,
       };
     });
   }
@@ -242,7 +231,7 @@ export class LegalMCPServer {
       try {
         this.logger.info('Tool execution started', {
           toolName: name,
-          arguments: args
+          arguments: args,
         });
 
         const requestId = `tool_${name}_${generateId()}`;
@@ -250,7 +239,7 @@ export class LegalMCPServer {
           logger: this.logger,
           requestId,
           cache: this.cache,
-          metrics: this.metrics
+          metrics: this.metrics,
         };
 
         const result = await this.toolRegistry.execute(request, context);
@@ -259,7 +248,7 @@ export class LegalMCPServer {
         this.metrics.recordRequest(duration, false);
 
         this.logger.toolExecution(name, duration, true, {
-          argumentCount: Object.keys(args || {}).length
+          argumentCount: Object.keys(args || {}).length,
         });
 
         return result;
@@ -268,7 +257,7 @@ export class LegalMCPServer {
         this.metrics.recordFailure(duration);
 
         this.logger.toolExecution(name, duration, false, {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
 
         if (error instanceof McpError) {
@@ -292,18 +281,12 @@ export class LegalMCPServer {
    */
   private validateInput(toolName: string, args: any, requiredFields: string[] = []): void {
     if (!args && requiredFields.length > 0) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Missing required arguments for ${toolName}`
-      );
+      throw new McpError(ErrorCode.InvalidParams, `Missing required arguments for ${toolName}`);
     }
 
     for (const field of requiredFields) {
       if (args[field] === undefined || args[field] === null) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Missing required field: ${field}`
-        );
+        throw new McpError(ErrorCode.InvalidParams, `Missing required field: ${field}`);
       }
     }
   }
@@ -319,17 +302,17 @@ export class LegalMCPServer {
         version: '1.0.0',
         timestamp: new Date().toISOString(),
         cache_enabled: this.cache.isEnabled(),
-        performance_grade: this.metrics.getPerformanceSummary().performanceGrade
-      }
+        performance_grade: this.metrics.getPerformanceSummary().performanceGrade,
+      },
     };
 
     return {
       content: [
         {
-          type: "text",
-          text: JSON.stringify(response, null, 2)
-        }
-      ]
+          type: 'text',
+          text: JSON.stringify(response, null, 2),
+        },
+      ],
     };
   }
 
@@ -351,15 +334,15 @@ export class LegalMCPServer {
         has_next: hasNext,
         has_previous: hasPrevious,
         next_url: results.next,
-        previous_url: results.previous
+        previous_url: results.previous,
       },
       search_parameters: searchParams,
       results: results.results || [],
       endpoint_info: {
         api_endpoint: endpoint,
-        documentation: "https://www.courtlistener.com/api/rest/v4/",
-        rate_limits: "Managed automatically with intelligent queuing"
-      }
+        documentation: 'https://www.courtlistener.com/api/rest/v4/',
+        rate_limits: 'Managed automatically with intelligent queuing',
+      },
     };
   }
 
@@ -368,32 +351,32 @@ export class LegalMCPServer {
    */
   private getNotFoundSuggestions(resourceType: string, id: any): string {
     const suggestions: Record<string, string[]> = {
-      'case': [
+      case: [
         'Use search_cases to find cases by name, citation, or keywords',
         'Check if the case exists with a different cluster_id',
-        'The case may have been merged with another case'
+        'The case may have been merged with another case',
       ],
-      'opinion': [
+      opinion: [
         'Use search_cases to find the case first, then get_case_details for opinion IDs',
         'Check if the opinion exists under a different opinion_id',
-        'Some opinions may not have full text available'
+        'Some opinions may not have full text available',
       ],
-      'docket': [
+      docket: [
         'Use get_dockets to search for dockets by number or court',
         'Check if the docket exists with a different docket_id',
-        'Some older dockets may not be digitized'
+        'Some older dockets may not be digitized',
       ],
-      'judge': [
+      judge: [
         'Use get_judges to search for judges by name or court',
         'Check if the judge exists with a different person_id',
-        'Some judicial records may be incomplete'
-      ]
+        'Some judicial records may be incomplete',
+      ],
     };
 
     const typeSuggestions = suggestions[resourceType] || [
       'Verify the ID is correct and positive',
       'Check the API documentation for valid ID ranges',
-      'Try searching for the resource using other available tools'
+      'Try searching for the resource using other available tools',
     ];
 
     return `Suggestions:\n${typeSuggestions.map((s: string) => `• ${s}`).join('\n')}`;
@@ -402,10 +385,10 @@ export class LegalMCPServer {
   // Tool implementation methods (using existing handlers with enhancements)
 
   private async handleSearchCases(args: any) {
-    this.validateInput("search_cases", args);
+    this.validateInput('search_cases', args);
 
     const searchParams: Record<string, any> = {};
-    
+
     if (args.query) searchParams.q = args.query;
     if (args.court) searchParams.court = args.court;
     if (args.judge) searchParams.judge = args.judge;
@@ -414,18 +397,16 @@ export class LegalMCPServer {
     if (args.date_filed_after) searchParams.date_filed_after = args.date_filed_after;
     if (args.date_filed_before) searchParams.date_filed_before = args.date_filed_before;
     if (args.precedential_status) searchParams.precedential_status = args.precedential_status;
-    
+
     searchParams.page = args.page || 1;
     searchParams.page_size = Math.min(args.page_size || 20, 100);
 
-    const searchKeys = Object.keys(searchParams).filter(k => 
-      k !== 'order_by' && k !== 'page' && k !== 'page_size'
-    );
-    
+    const searchKeys = Object.keys(searchParams).filter(k => k !== 'order_by' && k !== 'page' && k !== 'page_size');
+
     if (searchKeys.length === 0) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        "At least one search parameter is required (query, court, judge, case_name, citation, or date range)"
+        'At least one search parameter is required (query, court, judge, case_name, citation, or date range)'
       );
     }
 
@@ -440,7 +421,7 @@ export class LegalMCPServer {
           clusterId = parseInt(urlMatch[1]);
         }
       }
-      
+
       return {
         id: clusterId,
         case_name: cluster.case_name,
@@ -454,30 +435,30 @@ export class LegalMCPServer {
         neutral_cite: cluster.neutral_cite,
         absolute_url: cluster.absolute_url,
         summary: cluster.summary,
-        syllabus: cluster.syllabus
+        syllabus: cluster.syllabus,
       };
     });
 
     const paginatedData = this.formatPaginatedResponse(
-      { ...results, results: formattedResults }, 
-      searchParams, 
+      { ...results, results: formattedResults },
+      searchParams,
       '/search/'
     );
 
     return this.formatResponse({
-      search_type: "Case Search",
+      search_type: 'Case Search',
       ...paginatedData,
       research_tips: [
-        "Use specific citations for exact case lookup",
-        "Combine court + date filters for targeted research",
-        "Sort by citation_count to find influential cases",
-        "Use precedential_status to filter by case authority"
-      ]
+        'Use specific citations for exact case lookup',
+        'Combine court + date filters for targeted research',
+        'Sort by citation_count to find influential cases',
+        'Use precedential_status to filter by case authority',
+      ],
     });
   }
 
   private async handleGetCaseDetails(args: any) {
-    this.validateInput("get_case_details", args, ["cluster_id"]);
+    this.validateInput('get_case_details', args, ['cluster_id']);
 
     if (!Number.isInteger(args.cluster_id) || args.cluster_id <= 0) {
       throw new McpError(
@@ -493,11 +474,11 @@ export class LegalMCPServer {
         cluster_id: args.cluster_id,
         case_details: caseDetails,
         analysis_suggestions: [
-          "Use get_opinion_text with opinion IDs to get full text",
-          "Use get_citation_network to analyze precedent relationships",
-          "Check get_related_cases for citing opinions",
-          "Review case_name variations for comprehensive research"
-        ]
+          'Use get_opinion_text with opinion IDs to get full text',
+          'Use get_citation_network to analyze precedent relationships',
+          'Check get_related_cases for citing opinions',
+          'Review case_name variations for comprehensive research',
+        ],
       });
     } catch (error) {
       if (error instanceof McpError && error.message.includes('404')) {
@@ -512,7 +493,7 @@ export class LegalMCPServer {
   }
 
   private async handleGetOpinionText(args: any) {
-    this.validateInput("get_opinion_text", args, ["opinion_id"]);
+    this.validateInput('get_opinion_text', args, ['opinion_id']);
 
     if (!Number.isInteger(args.opinion_id) || args.opinion_id <= 0) {
       throw new McpError(
@@ -537,8 +518,8 @@ export class LegalMCPServer {
           html: opinion.html_with_citations || opinion.html,
           download_url: opinion.download_url,
           absolute_url: opinion.absolute_url,
-          cluster: opinion.cluster
-        }
+          cluster: opinion.cluster,
+        },
       });
     } catch (error) {
       if (error instanceof McpError && error.message.includes('404')) {
@@ -554,41 +535,46 @@ export class LegalMCPServer {
 
   // Add placeholder handlers for remaining tools (implement similar to above pattern)
   private async handleLookupCitation(args: any) {
-    this.validateInput("lookup_citation", args, ["citation"]);
-    
+    this.validateInput('lookup_citation', args, ['citation']);
+
     const results = await this.courtListener.searchCitations(args.citation);
 
     // Format the results for better citation lookup experience
-    const formattedResults = results.results ? results.results.map((cluster: any) => ({
-      id: cluster.id,
-      case_name: cluster.case_name,
-      case_name_short: cluster.case_name_short,
-      court: cluster.court,
-      date_filed: cluster.date_filed,
-      citation_count: cluster.citation_count,
-      precedential_status: cluster.precedential_status,
-      federal_cite_one: cluster.federal_cite_one,
-      state_cite_one: cluster.state_cite_one,
-      neutral_cite: cluster.neutral_cite,
-      absolute_url: cluster.absolute_url
-    })) : [];
+    const formattedResults = results.results
+      ? results.results.map((cluster: any) => ({
+          id: cluster.id,
+          case_name: cluster.case_name,
+          case_name_short: cluster.case_name_short,
+          court: cluster.court,
+          date_filed: cluster.date_filed,
+          citation_count: cluster.citation_count,
+          precedential_status: cluster.precedential_status,
+          federal_cite_one: cluster.federal_cite_one,
+          state_cite_one: cluster.state_cite_one,
+          neutral_cite: cluster.neutral_cite,
+          absolute_url: cluster.absolute_url,
+        }))
+      : [];
 
     return this.formatResponse({
       citation_lookup: {
         query: args.citation,
         total_results: results.count || 0,
         results: formattedResults,
-        search_suggestions: formattedResults.length === 0 ? [
-          "Try using a different citation format (e.g., '410 U.S. 113' instead of full case name)",
-          "Use the case name in search_cases tool for broader results",
-          "Check if the citation exists in the CourtListener database",
-          "Try searching by court and date range if citation is not found"
-        ] : [
-          "Use get_case_details with cluster_id for more information",
-          "Use get_opinion_text to read the full opinion",
-          "Check related cases with get_citation_network"
-        ]
-      }
+        search_suggestions:
+          formattedResults.length === 0
+            ? [
+                "Try using a different citation format (e.g., '410 U.S. 113' instead of full case name)",
+                'Use the case name in search_cases tool for broader results',
+                'Check if the citation exists in the CourtListener database',
+                'Try searching by court and date range if citation is not found',
+              ]
+            : [
+                'Use get_case_details with cluster_id for more information',
+                'Use get_opinion_text to read the full opinion',
+                'Check related cases with get_citation_network',
+              ],
+      },
     });
   }
 
@@ -596,14 +582,14 @@ export class LegalMCPServer {
     const relatedCases = await this.courtListener.getRelatedCases(args.opinion_id);
     return this.formatResponse({
       opinion_id: args.opinion_id,
-      related_cases: relatedCases
+      related_cases: relatedCases,
     });
   }
 
   private async handleListCourts(args: any) {
     const courts = await this.courtListener.getCourts({
       jurisdiction: args?.jurisdiction,
-      in_use: args?.in_use
+      in_use: args?.in_use,
     });
 
     const formattedCourts = courts.results.map(court => ({
@@ -618,19 +604,19 @@ export class LegalMCPServer {
       start_date: court.start_date,
       end_date: court.end_date,
       notes: court.notes,
-      url: court.url
+      url: court.url,
     }));
 
     return this.formatResponse({
       total_courts: courts.count,
-      courts: formattedCourts
+      courts: formattedCourts,
     });
   }
 
   // Add remaining handlers as needed...
   private async handleAnalyzeLegalArgument(args: any) {
-    this.validateInput("analyze_legal_argument", args, ["argument", "search_query"]);
-    
+    this.validateInput('analyze_legal_argument', args, ['argument', 'search_query']);
+
     const timer = this.logger.startTimer('analyze_legal_argument');
     try {
       const cacheKey = 'legal_argument_analysis';
@@ -644,7 +630,7 @@ export class LegalMCPServer {
       const searchParams: Record<string, any> = {
         q: args.search_query,
         page: 1,
-        page_size: 10
+        page_size: 10,
       };
 
       // Add optional filters
@@ -669,7 +655,7 @@ export class LegalMCPServer {
             clusterId = parseInt(urlMatch[1]);
           }
         }
-        
+
         return {
           id: clusterId,
           case_name: cluster.case_name,
@@ -678,7 +664,7 @@ export class LegalMCPServer {
           citation_count: cluster.citation_count,
           precedential_status: cluster.precedential_status,
           relevance_score: this.calculateRelevanceScore(args.argument, cluster),
-          absolute_url: cluster.absolute_url
+          absolute_url: cluster.absolute_url,
         };
       });
 
@@ -688,21 +674,21 @@ export class LegalMCPServer {
         total_cases_found: searchResults.count || 0,
         top_cases: topCases,
         argument_strength: this.assessArgumentStrength(topCases),
-        research_suggestions: this.generateResearchSuggestions(args.argument, topCases)
+        research_suggestions: this.generateResearchSuggestions(args.argument, topCases),
       };
-      
+
       const result = {
         analysis: analysis,
         metadata: {
           search_performed: true,
           filters_applied: Object.keys(searchParams).filter(k => k !== 'q' && k !== 'page' && k !== 'page_size'),
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
 
       this.cache.set(cacheKey, args, result, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -715,20 +701,21 @@ export class LegalMCPServer {
     const argumentWords = argument.toLowerCase().split(/\s+/);
     const caseName = (cluster.case_name || '').toLowerCase();
     const summary = (cluster.summary || '').toLowerCase();
-    
+
     let score = 0;
     argumentWords.forEach(word => {
-      if (word.length > 3) { // Only count meaningful words
+      if (word.length > 3) {
+        // Only count meaningful words
         if (caseName.includes(word)) score += 2;
         if (summary.includes(word)) score += 1;
       }
     });
-    
+
     // Boost score for high citation count (influential cases)
     if (cluster.citation_count > 100) score += 3;
     else if (cluster.citation_count > 50) score += 2;
     else if (cluster.citation_count > 10) score += 1;
-    
+
     return Math.min(score, 10); // Cap at 10
   }
 
@@ -738,31 +725,31 @@ export class LegalMCPServer {
       const year = new Date(c.date_filed).getFullYear();
       return year > 2010;
     }).length;
-    
+
     if (highQualityCases >= 3 && recentCases >= 2) {
-      return "Strong - Multiple highly-cited and recent cases support this argument";
+      return 'Strong - Multiple highly-cited and recent cases support this argument';
     } else if (highQualityCases >= 2 || recentCases >= 3) {
-      return "Moderate - Some supporting precedent exists";
+      return 'Moderate - Some supporting precedent exists';
     } else {
-      return "Weak - Limited supporting precedent found";
+      return 'Weak - Limited supporting precedent found';
     }
   }
 
   private generateResearchSuggestions(argument: string, cases: any[]): string[] {
     const suggestions = [
-      "Review the full text of top-cited cases using get_opinion_text",
-      "Analyze citation networks using get_citation_network for influential cases",
-      "Search for more recent cases in the same jurisdiction"
+      'Review the full text of top-cited cases using get_opinion_text',
+      'Analyze citation networks using get_citation_network for influential cases',
+      'Search for more recent cases in the same jurisdiction',
     ];
-    
+
     if (cases.length > 0) {
       suggestions.push(`Focus on ${cases[0].case_name} as it appears most relevant`);
     }
-    
+
     if (cases.some(c => c.precedential_status === 'Published')) {
-      suggestions.push("Prioritize published opinions for stronger precedential value");
+      suggestions.push('Prioritize published opinions for stronger precedential value');
     }
-    
+
     return suggestions;
   }
 
@@ -773,7 +760,7 @@ export class LegalMCPServer {
         judge: args.judge,
         year: args.year,
         page: args.page,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       const cacheKey = 'financial_disclosures';
@@ -790,10 +777,10 @@ export class LegalMCPServer {
         total_disclosures: results.count || 0,
         disclosures: results.results || results,
         metadata: {
-          purpose: "Judge conflict of interest analysis",
-          data_source: "CourtListener Financial Disclosures API",
-          cache_recommendation: "30 days (annual updates)"
-        }
+          purpose: 'Judge conflict of interest analysis',
+          data_source: 'CourtListener Financial Disclosures API',
+          cache_recommendation: '30 days (annual updates)',
+        },
       };
 
       this.cache.set(cacheKey, params, responseData);
@@ -806,8 +793,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetFinancialDisclosure(args: any) {
-    this.validateInput("get_financial_disclosure", args, ["disclosure_id"]);
-    
+    this.validateInput('get_financial_disclosure', args, ['disclosure_id']);
+
     const timer = this.logger.startTimer('get_financial_disclosure');
     try {
       const cacheKey = 'financial_disclosure';
@@ -818,15 +805,15 @@ export class LegalMCPServer {
       }
 
       const disclosure = await this.courtListener.getFinancialDisclosure(args.disclosure_id);
-      
+
       const result = {
         disclosure_id: args.disclosure_id,
-        disclosure: disclosure
+        disclosure: disclosure,
       };
 
       this.cache.set(cacheKey, args, result, 86400); // Cache for 24 hours
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -835,8 +822,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetPartiesAndAttorneys(args: any) {
-    this.validateInput("get_parties_and_attorneys", args, ["docket_id"]);
-    
+    this.validateInput('get_parties_and_attorneys', args, ['docket_id']);
+
     const timer = this.logger.startTimer('get_parties_and_attorneys');
     try {
       const cacheKey = 'parties_and_attorneys';
@@ -848,18 +835,18 @@ export class LegalMCPServer {
 
       const [parties, attorneys] = await Promise.all([
         this.courtListener.getParties({ docket: args.docket_id }),
-        this.courtListener.getAttorneys({ docket: args.docket_id })
+        this.courtListener.getAttorneys({ docket: args.docket_id }),
       ]);
-      
+
       const result = {
         docket_id: args.docket_id,
         parties: parties,
-        attorneys: attorneys
+        attorneys: attorneys,
       };
 
       this.cache.set(cacheKey, args, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -868,14 +855,14 @@ export class LegalMCPServer {
   }
 
   private async handleGetRECAPDocuments(args: any) {
-    this.validateInput("get_recap_documents", args, ["docket_id"]);
-    
+    this.validateInput('get_recap_documents', args, ['docket_id']);
+
     const timer = this.logger.startTimer('get_recap_documents');
     try {
       const params = {
         docket: args.docket_id,
         page: args.page || 1,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       const cacheKey = 'recap_documents';
@@ -886,20 +873,20 @@ export class LegalMCPServer {
       }
 
       const documents = await this.courtListener.getRECAPDocuments(params);
-      
+
       const result = {
         docket_id: args.docket_id,
         documents: documents,
         pagination: {
           page: params.page,
           page_size: params.page_size,
-          total_results: documents.count || 0
-        }
+          total_results: documents.count || 0,
+        },
       };
 
       this.cache.set(cacheKey, params, result, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -908,8 +895,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetRECAPDocument(args: any) {
-    this.validateInput("get_recap_document", args, ["document_id"]);
-    
+    this.validateInput('get_recap_document', args, ['document_id']);
+
     const timer = this.logger.startTimer('get_recap_document');
     try {
       const cacheKey = 'recap_document';
@@ -920,15 +907,15 @@ export class LegalMCPServer {
       }
 
       const document = await this.courtListener.getRECAPDocument(args.document_id);
-      
+
       const result = {
         document_id: args.document_id,
-        document: document
+        document: document,
       };
 
       this.cache.set(cacheKey, args, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -937,46 +924,46 @@ export class LegalMCPServer {
   }
 
   private async handleManageAlerts(args: any) {
-    this.validateInput("manage_alerts", args, ["action"]);
-    
+    this.validateInput('manage_alerts', args, ['action']);
+
     const timer = this.logger.startTimer('manage_alerts');
     try {
       let result;
-      
+
       switch (args.action) {
         case 'list':
           const alerts = await this.courtListener.getAlerts({
             page: args.page || 1,
-            page_size: Math.min(args.page_size || 20, 100)
+            page_size: Math.min(args.page_size || 20, 100),
           });
           result = {
             action: 'list',
             alerts: alerts,
             pagination: {
               page: args.page || 1,
-              page_size: args.page_size || 20
-            }
+              page_size: args.page_size || 20,
+            },
           };
           break;
-          
+
         case 'create':
-          this.validateInput("manage_alerts", args, ["search_params"]);
+          this.validateInput('manage_alerts', args, ['search_params']);
           result = {
             action: 'create',
             status: 'Alert creation requires authentication',
-            message: 'Please use the CourtListener web interface to create alerts'
+            message: 'Please use the CourtListener web interface to create alerts',
           };
           break;
-          
+
         case 'delete':
-          this.validateInput("manage_alerts", args, ["alert_id"]);
+          this.validateInput('manage_alerts', args, ['alert_id']);
           result = {
             action: 'delete',
             status: 'Alert deletion requires authentication',
-            message: 'Please use the CourtListener web interface to delete alerts'
+            message: 'Please use the CourtListener web interface to delete alerts',
           };
           break;
-          
+
         default:
           throw new Error(`Unknown alert action: ${args.action}`);
       }
@@ -990,13 +977,13 @@ export class LegalMCPServer {
   }
 
   private async handleGetCitationNetwork(args: any) {
-    this.validateInput("get_citation_network", args, ["opinion_id"]);
-    
+    this.validateInput('get_citation_network', args, ['opinion_id']);
+
     const timer = this.logger.startTimer('get_citation_network');
     try {
       const params = {
         depth: args.depth || 2,
-        direction: args.direction || 'both' // 'cited', 'citing', or 'both'
+        direction: args.direction || 'both', // 'cited', 'citing', or 'both'
       };
 
       const cacheKey = 'citation_network';
@@ -1008,7 +995,7 @@ export class LegalMCPServer {
       }
 
       const network = await this.courtListener.getCitationNetwork(args.opinion_id, params);
-      
+
       const result = {
         opinion_id: args.opinion_id,
         network: network,
@@ -1016,13 +1003,13 @@ export class LegalMCPServer {
           depth: params.depth,
           direction: params.direction,
           nodes: network.nodes?.length || 0,
-          edges: network.edges?.length || 0
-        }
+          edges: network.edges?.length || 0,
+        },
       };
 
       this.cache.set(cacheKey, cacheParams, result, 7200); // Cache for 2 hours
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1031,8 +1018,8 @@ export class LegalMCPServer {
   }
 
   private async handleAnalyzeCaseAuthorities(args: any) {
-    this.validateInput("analyze_case_authorities", args, ["opinion_id"]);
-    
+    this.validateInput('analyze_case_authorities', args, ['opinion_id']);
+
     const timer = this.logger.startTimer('analyze_case_authorities');
     try {
       const cacheKey = 'case_authorities';
@@ -1043,24 +1030,24 @@ export class LegalMCPServer {
       }
 
       const authorities = await this.courtListener.getAuthorities(args.opinion_id);
-      
+
       // Analyze the authorities for insights
       const analysis = {
         total_authorities: authorities.length || 0,
         authority_types: this.categorizeAuthorities(authorities),
         citation_strength: this.analyzeCitationStrength(authorities),
-        temporal_distribution: this.analyzeTemporalDistribution(authorities)
+        temporal_distribution: this.analyzeTemporalDistribution(authorities),
       };
-      
+
       const result = {
         opinion_id: args.opinion_id,
         authorities: authorities,
-        analysis: analysis
+        analysis: analysis,
       };
 
       this.cache.set(cacheKey, args, result, 7200); // Cache for 2 hours
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1070,13 +1057,13 @@ export class LegalMCPServer {
 
   private categorizeAuthorities(authorities: any[]): any {
     if (!authorities || !Array.isArray(authorities)) return {};
-    
+
     const categories = {
       supreme_court: 0,
       circuit_court: 0,
       district_court: 0,
       state_court: 0,
-      other: 0
+      other: 0,
     };
 
     authorities.forEach(auth => {
@@ -1099,20 +1086,20 @@ export class LegalMCPServer {
 
   private analyzeCitationStrength(authorities: any[]): any {
     if (!authorities || !Array.isArray(authorities)) return {};
-    
+
     return {
       heavily_cited: authorities.filter(a => (a.citation_count || 0) > 100).length,
       moderately_cited: authorities.filter(a => (a.citation_count || 0) > 10 && (a.citation_count || 0) <= 100).length,
-      lightly_cited: authorities.filter(a => (a.citation_count || 0) <= 10).length
+      lightly_cited: authorities.filter(a => (a.citation_count || 0) <= 10).length,
     };
   }
 
   private analyzeTemporalDistribution(authorities: any[]): any {
     if (!authorities || !Array.isArray(authorities)) return {};
-    
+
     const now = new Date();
     const currentYear = now.getFullYear();
-    
+
     return {
       recent: authorities.filter(a => {
         const year = new Date(a.date_filed || '1900').getFullYear();
@@ -1125,7 +1112,7 @@ export class LegalMCPServer {
       foundational: authorities.filter(a => {
         const year = new Date(a.date_filed || '1900').getFullYear();
         return currentYear - year > 20;
-      }).length
+      }).length,
     };
   }
 
@@ -1138,7 +1125,7 @@ export class LegalMCPServer {
         date_created_after: args.date_created_after,
         date_created_before: args.date_created_before,
         page: args.page,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       const cacheKey = 'dockets';
@@ -1155,15 +1142,15 @@ export class LegalMCPServer {
         total_dockets: results.count || 0,
         dockets: results.results || results,
         research_applications: [
-          "Track case procedural history",
-          "Monitor case progress and filings",
-          "Analyze court efficiency metrics",
-          "Research docket management patterns"
+          'Track case procedural history',
+          'Monitor case progress and filings',
+          'Analyze court efficiency metrics',
+          'Research docket management patterns',
         ],
         metadata: {
-          endpoint: "/dockets/",
-          data_type: "Case procedural information and docket entries"
-        }
+          endpoint: '/dockets/',
+          data_type: 'Case procedural information and docket entries',
+        },
       };
 
       this.cache.set(cacheKey, params, responseData);
@@ -1176,8 +1163,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetDocket(args: any) {
-    this.validateInput("get_docket", args, ["docket_id"]);
-    
+    this.validateInput('get_docket', args, ['docket_id']);
+
     const timer = this.logger.startTimer('get_docket');
     try {
       const cacheKey = 'docket';
@@ -1188,15 +1175,15 @@ export class LegalMCPServer {
       }
 
       const docket = await this.courtListener.getDocket(args.docket_id);
-      
+
       const result = {
         docket_id: args.docket_id,
-        docket: docket
+        docket: docket,
       };
 
       this.cache.set(cacheKey, args, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1214,7 +1201,7 @@ export class LegalMCPServer {
         appointer: args.appointer,
         political_affiliation: args.political_affiliation,
         page: args.page,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       const cacheKey = 'judges';
@@ -1231,16 +1218,16 @@ export class LegalMCPServer {
         total_judges: results.count || 0,
         judges: results.results || results,
         research_applications: [
-          "Judicial appointment analysis",
-          "Court composition studies",
-          "Judge-specific case research",
-          "Judicial career tracking",
-          "Political affiliation analysis"
+          'Judicial appointment analysis',
+          'Court composition studies',
+          'Judge-specific case research',
+          'Judicial career tracking',
+          'Political affiliation analysis',
         ],
         metadata: {
-          endpoint: "/people/",
-          data_type: "Judicial officers and court personnel"
-        }
+          endpoint: '/people/',
+          data_type: 'Judicial officers and court personnel',
+        },
       };
 
       this.cache.set(cacheKey, params, responseData);
@@ -1253,8 +1240,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetJudge(args: any) {
-    this.validateInput("get_judge", args, ["judge_id"]);
-    
+    this.validateInput('get_judge', args, ['judge_id']);
+
     const timer = this.logger.startTimer('get_judge');
     try {
       const cacheKey = 'judge';
@@ -1265,15 +1252,15 @@ export class LegalMCPServer {
       }
 
       const judge = await this.courtListener.getJudge(args.judge_id);
-      
+
       const result = {
         judge_id: args.judge_id,
-        judge: judge
+        judge: judge,
       };
 
       this.cache.set(cacheKey, args, result, 86400); // Cache for 24 hours (judge info changes rarely)
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1291,7 +1278,7 @@ export class LegalMCPServer {
         date_argued_after: args.date_argued_after,
         date_argued_before: args.date_argued_before,
         page: args.page || 1,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       // Remove undefined parameters
@@ -1305,20 +1292,20 @@ export class LegalMCPServer {
       }
 
       const arguments_data = await this.courtListener.getOralArguments(params);
-      
+
       const result = {
         search_params: params,
         oral_arguments: arguments_data,
         pagination: {
           page: params.page,
           page_size: params.page_size,
-          total_results: arguments_data.count || 0
-        }
+          total_results: arguments_data.count || 0,
+        },
       };
 
       this.cache.set(cacheKey, params, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1327,8 +1314,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetOralArgument(args: any) {
-    this.validateInput("get_oral_argument", args, ["audio_id"]);
-    
+    this.validateInput('get_oral_argument', args, ['audio_id']);
+
     const timer = this.logger.startTimer('get_oral_argument');
     try {
       const cacheKey = 'oral_argument';
@@ -1339,15 +1326,15 @@ export class LegalMCPServer {
       }
 
       const oral_argument = await this.courtListener.getOralArgument(args.audio_id);
-      
+
       const result = {
         audio_id: args.audio_id,
-        oral_argument: oral_argument
+        oral_argument: oral_argument,
       };
 
       this.cache.set(cacheKey, args, result, 86400); // Cache for 24 hours
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1361,9 +1348,9 @@ export class LegalMCPServer {
       // Build search parameters, filtering out undefined values
       const searchParams: Record<string, any> = {
         type: args.type || 'o',
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
-      
+
       // Add search parameters only if they have values
       if (args.query) searchParams.q = args.query;
       if (args.court) searchParams.court = args.court;
@@ -1380,10 +1367,8 @@ export class LegalMCPServer {
       if (args.nature_of_suit) searchParams.nature_of_suit = args.nature_of_suit;
 
       // Validate that at least one search parameter is provided
-      const searchKeys = Object.keys(searchParams).filter(k => 
-        k !== 'type' && k !== 'order_by' && k !== 'page_size'
-      );
-      
+      const searchKeys = Object.keys(searchParams).filter(k => k !== 'type' && k !== 'order_by' && k !== 'page_size');
+
       if (searchKeys.length === 0) {
         throw new McpError(
           ErrorCode.InvalidParams,
@@ -1401,10 +1386,10 @@ export class LegalMCPServer {
       const results = await this.courtListener.advancedSearch(searchParams);
 
       const searchTypeLabels = {
-        'o': 'Opinions',
-        'r': 'RECAP Documents', 
-        'p': 'People/Judges',
-        'oa': 'Oral Arguments'
+        o: 'Opinions',
+        r: 'RECAP Documents',
+        p: 'People/Judges',
+        oa: 'Oral Arguments',
       };
 
       const responseData = {
@@ -1413,17 +1398,17 @@ export class LegalMCPServer {
         total_results: results.count || 0,
         results: results.results || results,
         advanced_features: {
-          citation_filtering: args.cited_lt || args.cited_gt ? "Applied" : "Available",
-          temporal_analysis: args.date_filed_after || args.date_filed_before ? "Applied" : "Available",
-          jurisdictional_filtering: args.court ? "Applied" : "Available",
-          procedural_filtering: args.status || args.nature_of_suit ? "Applied" : "Available"
+          citation_filtering: args.cited_lt || args.cited_gt ? 'Applied' : 'Available',
+          temporal_analysis: args.date_filed_after || args.date_filed_before ? 'Applied' : 'Available',
+          jurisdictional_filtering: args.court ? 'Applied' : 'Available',
+          procedural_filtering: args.status || args.nature_of_suit ? 'Applied' : 'Available',
         },
         research_recommendations: [
-          "Use citation count filters to find influential cases",
-          "Apply temporal filters for trend analysis", 
-          "Combine multiple search types for comprehensive research",
-          "Use specific court filters for jurisdictional analysis"
-        ]
+          'Use citation count filters to find influential cases',
+          'Apply temporal filters for trend analysis',
+          'Combine multiple search types for comprehensive research',
+          'Use specific court filters for jurisdictional analysis',
+        ],
       };
 
       this.cache.set(cacheKey, searchParams, responseData);
@@ -1436,8 +1421,8 @@ export class LegalMCPServer {
   }
 
   private async handleGetVisualizationData(args: any) {
-    this.validateInput("get_visualization_data", args, ["data_type"]);
-    
+    this.validateInput('get_visualization_data', args, ['data_type']);
+
     const timer = this.logger.startTimer('get_visualization_data');
     try {
       const cacheKey = 'visualization_data';
@@ -1448,31 +1433,31 @@ export class LegalMCPServer {
       }
 
       let result;
-      
+
       switch (args.data_type) {
         case 'court_distribution':
           result = await this.generateCourtDistributionData(args);
           break;
-          
+
         case 'case_timeline':
           result = await this.generateCaseTimelineData(args);
           break;
-          
+
         case 'citation_network':
           result = await this.generateCitationNetworkData(args);
           break;
-          
+
         case 'judge_statistics':
           result = await this.generateJudgeStatisticsData(args);
           break;
-          
+
         default:
           throw new Error(`Unknown visualization type: ${args.data_type}`);
       }
 
       this.cache.set(cacheKey, args, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1482,7 +1467,7 @@ export class LegalMCPServer {
 
   private async generateCourtDistributionData(args: any) {
     const courts = await this.courtListener.getCourts({ in_use: true });
-    
+
     const distribution = courts.results.reduce((acc: any, court: any) => {
       const jurisdiction = court.jurisdiction || 'Unknown';
       acc[jurisdiction] = (acc[jurisdiction] || 0) + 1;
@@ -1493,7 +1478,7 @@ export class LegalMCPServer {
       type: 'court_distribution',
       data: distribution,
       chart_type: 'pie',
-      total_courts: courts.count
+      total_courts: courts.count,
     };
   }
 
@@ -1504,9 +1489,9 @@ export class LegalMCPServer {
       type: 'case_timeline',
       data: {
         message: 'Timeline generation requires specific date range and case criteria',
-        required_params: ['start_date', 'end_date', 'court_id']
+        required_params: ['start_date', 'end_date', 'court_id'],
       },
-      chart_type: 'timeline'
+      chart_type: 'timeline',
     };
   }
 
@@ -1514,24 +1499,24 @@ export class LegalMCPServer {
     if (!args.opinion_id) {
       throw new Error('opinion_id required for citation network visualization');
     }
-    
+
     const network = await this.courtListener.getCitationNetwork(args.opinion_id, {
-      depth: args.depth || 2
+      depth: args.depth || 2,
     });
-    
+
     return {
       type: 'citation_network',
       data: network,
       chart_type: 'network_graph',
-      center_opinion: args.opinion_id
+      center_opinion: args.opinion_id,
     };
   }
 
   private async generateJudgeStatisticsData(args: any) {
     const judges = await this.courtListener.getJudges({
-      page_size: args.limit || 50
+      page_size: args.limit || 50,
     });
-    
+
     return {
       type: 'judge_statistics',
       data: {
@@ -1541,37 +1526,38 @@ export class LegalMCPServer {
           const court = judge.court || 'Unknown';
           acc[court] = (acc[court] || 0) + 1;
           return acc;
-        }, {})
+        }, {}),
       },
-      chart_type: 'bar'
+      chart_type: 'bar',
     };
   }
 
   private async handleGetBulkData(args: any) {
-    this.validateInput("get_bulk_data", args, ["data_type"]);
-    
+    this.validateInput('get_bulk_data', args, ['data_type']);
+
     const timer = this.logger.startTimer('get_bulk_data');
     try {
       const result: Record<string, any> = {
         data_type: args.data_type,
         status: 'bulk_data_available',
-        message: 'Bulk data access requires special permissions and is typically handled through CourtListener\'s bulk data API',
+        message:
+          "Bulk data access requires special permissions and is typically handled through CourtListener's bulk data API",
         available_formats: ['JSON', 'CSV', 'XML'],
-        recommended_approach: 'Use CourtListener\'s official bulk data downloads',
+        recommended_approach: "Use CourtListener's official bulk data downloads",
         bulk_data_url: 'https://www.courtlistener.com/help/api/bulk-data/',
-        note: 'For large datasets, consider using the pagination parameters in regular API calls'
+        note: 'For large datasets, consider using the pagination parameters in regular API calls',
       };
 
       if (args.data_type === 'sample') {
         // Provide a sample of data for demonstration
         const sampleCases = await this.courtListener.searchOpinions({
-          page_size: Math.min(args.sample_size || 10, 50)
+          page_size: Math.min(args.sample_size || 10, 50),
         });
-        
+
         result['sample_data'] = {
           type: 'opinion_clusters',
           count: sampleCases.results?.length || 0,
-          data: sampleCases.results?.slice(0, 5) || [] // Limit sample
+          data: sampleCases.results?.slice(0, 5) || [], // Limit sample
         };
       }
 
@@ -1593,7 +1579,7 @@ export class LegalMCPServer {
         date_filed_after: args.date_filed_after,
         date_filed_before: args.date_filed_before,
         page: args.page || 1,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       // Remove undefined parameters
@@ -1609,27 +1595,27 @@ export class LegalMCPServer {
       // Search for bankruptcy-related dockets
       const bankruptcyDockets = await this.courtListener.getDockets({
         ...params,
-        court__jurisdiction: 'FB' // Federal Bankruptcy jurisdiction
+        court__jurisdiction: 'FB', // Federal Bankruptcy jurisdiction
       });
-      
+
       const result = {
         search_params: params,
         bankruptcy_cases: bankruptcyDockets,
         pagination: {
           page: params.page,
           page_size: params.page_size,
-          total_results: bankruptcyDockets.count || 0
+          total_results: bankruptcyDockets.count || 0,
         },
         data_notes: [
           'Bankruptcy data includes cases from US Bankruptcy Courts',
           'Use specific court codes for targeted searches',
-          'RECAP documents may be available for detailed case information'
-        ]
+          'RECAP documents may be available for detailed case information',
+        ],
       };
 
       this.cache.set(cacheKey, params, result, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1641,8 +1627,8 @@ export class LegalMCPServer {
    * Get docket entries (Enhanced)
    */
   private async handleGetDocketEntries(args: any) {
-    this.validateInput("get_docket_entries", args);
-    
+    this.validateInput('get_docket_entries', args);
+
     const timer = this.logger.startTimer('get_docket_entries');
     try {
       const params = {
@@ -1651,7 +1637,7 @@ export class LegalMCPServer {
         date_filed_after: args.date_filed_after,
         date_filed_before: args.date_filed_before,
         page: args.page || 1,
-        page_size: Math.min(args.page_size || 20, 100)
+        page_size: Math.min(args.page_size || 20, 100),
       };
 
       const cacheKey = 'docket_entries';
@@ -1669,13 +1655,13 @@ export class LegalMCPServer {
         pagination: {
           page: params.page,
           page_size: params.page_size,
-          total_results: entries.count || 0
-        }
+          total_results: entries.count || 0,
+        },
       };
 
       this.cache.set(cacheKey, params, result, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1687,8 +1673,8 @@ export class LegalMCPServer {
    * Get comprehensive judge profile (Enhanced)
    */
   private async handleGetComprehensiveJudgeProfile(args: any) {
-    this.validateInput("get_comprehensive_judge_profile", args, ["judge_id"]);
-    
+    this.validateInput('get_comprehensive_judge_profile', args, ['judge_id']);
+
     const timer = this.logger.startTimer('get_comprehensive_judge_profile');
     try {
       const cacheKey = 'comprehensive_judge_profile';
@@ -1702,7 +1688,7 @@ export class LegalMCPServer {
 
       this.cache.set(cacheKey, args, profile, 86400); // Cache for 24 hours
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(profile);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1714,8 +1700,8 @@ export class LegalMCPServer {
    * Get comprehensive case analysis (Enhanced)
    */
   private async handleGetComprehensiveCaseAnalysis(args: any) {
-    this.validateInput("get_comprehensive_case_analysis", args, ["cluster_id"]);
-    
+    this.validateInput('get_comprehensive_case_analysis', args, ['cluster_id']);
+
     const timer = this.logger.startTimer('get_comprehensive_case_analysis');
     try {
       const cacheKey = 'comprehensive_case_analysis';
@@ -1729,7 +1715,7 @@ export class LegalMCPServer {
 
       this.cache.set(cacheKey, args, analysis, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(analysis);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1741,12 +1727,12 @@ export class LegalMCPServer {
    * Get financial disclosure details (Enhanced)
    */
   private async handleGetFinancialDisclosureDetails(args: any) {
-    this.validateInput("get_financial_disclosure_details", args, ["disclosure_type"]);
-    
+    this.validateInput('get_financial_disclosure_details', args, ['disclosure_type']);
+
     const timer = this.logger.startTimer('get_financial_disclosure_details');
     try {
       const { disclosure_type, ...params } = args;
-      
+
       const cacheKey = 'financial_disclosure_details';
       const cached = this.cache.get(cacheKey, args);
       if (cached) {
@@ -1781,15 +1767,12 @@ export class LegalMCPServer {
           result = await this.courtListener.getNonInvestmentIncomes(params);
           break;
         default:
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Unknown disclosure type: ${disclosure_type}`
-          );
+          throw new McpError(ErrorCode.InvalidParams, `Unknown disclosure type: ${disclosure_type}`);
       }
 
       this.cache.set(cacheKey, args, result, 3600); // Cache for 1 hour
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1801,8 +1784,8 @@ export class LegalMCPServer {
    * Validate citations (Enhanced)
    */
   private async handleValidateCitations(args: any) {
-    this.validateInput("validate_citations", args, ["text"]);
-    
+    this.validateInput('validate_citations', args, ['text']);
+
     const timer = this.logger.startTimer('validate_citations');
     try {
       const cacheKey = 'validate_citations';
@@ -1816,7 +1799,7 @@ export class LegalMCPServer {
 
       this.cache.set(cacheKey, args, validation, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(validation);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1828,12 +1811,12 @@ export class LegalMCPServer {
    * Get enhanced RECAP data (Enhanced)
    */
   private async handleGetEnhancedRECAPData(args: any) {
-    this.validateInput("get_enhanced_recap_data", args, ["action"]);
-    
+    this.validateInput('get_enhanced_recap_data', args, ['action']);
+
     const timer = this.logger.startTimer('get_enhanced_recap_data');
     try {
       const { action, ...params } = args;
-      
+
       const cacheKey = 'enhanced_recap_data';
       const cached = this.cache.get(cacheKey, args);
       if (cached) {
@@ -1853,15 +1836,12 @@ export class LegalMCPServer {
           result = await this.courtListener.getRECAPEmail(params);
           break;
         default:
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Unknown RECAP action: ${action}`
-          );
+          throw new McpError(ErrorCode.InvalidParams, `Unknown RECAP action: ${action}`);
       }
 
       this.cache.set(cacheKey, args, result, 1800); // Cache for 30 minutes
       this.metrics.recordRequest(timer.end(true), false);
-      
+
       return this.formatResponse(result);
     } catch (error) {
       this.metrics.recordRequest(timer.endWithError(error as Error), false);
@@ -1878,8 +1858,8 @@ export class LegalMCPServer {
       cache_stats: this.cache.getStats(),
       config: {
         cache_enabled: this.cache.isEnabled(),
-        log_level: this.config.logging.level
-      }
+        log_level: this.config.logging.level,
+      },
     };
   }
 
@@ -1889,7 +1869,7 @@ export class LegalMCPServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
     // Start health server if enabled
     if (this.healthServer) {
       try {
@@ -1898,7 +1878,7 @@ export class LegalMCPServer {
         this.logger.warn('Failed to start health server', error as Error);
       }
     }
-    
+
     // Log startup information
     this.logger.info('Legal MCP Server started', {
       version: '1.0.0',
@@ -1906,16 +1886,16 @@ export class LegalMCPServer {
       tools_count: this.toolRegistry.getToolDefinitions().length,
       cache_enabled: this.cache.isEnabled(),
       metrics_enabled: this.config.metrics.enabled,
-      health_server_port: this.config.metrics.port
+      health_server_port: this.config.metrics.port,
     });
 
-    console.error("Legal MCP Server v1.0.0 - Best Practice Implementation");
-    console.error("Enhanced with caching, logging, metrics, and error handling");
+    console.error('Legal MCP Server v1.0.0 - Best Practice Implementation');
+    console.error('Enhanced with caching, logging, metrics, and error handling');
     if (this.healthServer) {
       console.error(`Health server running on http://localhost:${this.config.metrics.port}`);
     }
-    console.error("Repository: https://github.com/blakeox/courtlistener-mcp");
-    console.error("MCP Docs: https://modelcontextprotocol.io/");
+    console.error('Repository: https://github.com/blakeox/courtlistener-mcp');
+    console.error('MCP Docs: https://modelcontextprotocol.io/');
   }
 
   /**
@@ -1924,13 +1904,13 @@ export class LegalMCPServer {
    */
   async listTools(): Promise<{ tools: Tool[] }> {
     const timer = this.logger.startTimer('list_tools');
-    
+
     try {
       const tools = this.getRegisteredTools();
 
       const duration = timer.end();
       this.metrics.recordRequest(duration, false);
-      
+
       return { tools };
     } catch (error) {
       timer.endWithError(error as Error);
@@ -1946,19 +1926,19 @@ export class LegalMCPServer {
   async handleToolCall(request: { name: string; arguments: any }): Promise<any> {
     const { name, arguments: args } = request;
     const timer = this.logger.startTimer(`tool_${name}`);
-    
+
     try {
       this.logger.info('Tool execution started', {
         toolName: name,
-        arguments: args
+        arguments: args,
       });
 
       const callRequest = {
         method: 'tools/call',
         params: {
           name,
-          arguments: args ?? {}
-        }
+          arguments: args ?? {},
+        },
       } as CallToolRequest;
 
       const requestId = `tool_${name}_${generateId()}`;
@@ -1966,27 +1946,27 @@ export class LegalMCPServer {
         logger: this.logger,
         requestId,
         cache: this.cache,
-        metrics: this.metrics
+        metrics: this.metrics,
       };
 
       const result = await this.toolRegistry.execute(callRequest, context);
 
       const duration = timer.end(true);
       this.metrics.recordRequest(duration, false);
-      
+
       this.logger.toolExecution(name, duration, true, {
-        argumentCount: Object.keys(args || {}).length
+        argumentCount: Object.keys(args || {}).length,
       });
 
       return result;
     } catch (error) {
       const duration = timer.endWithError(error as Error);
       this.metrics.recordFailure(duration);
-      
+
       this.logger.toolExecution(name, duration, false, {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
-      
+
       if (error instanceof McpError) {
         throw error;
       }
@@ -1994,7 +1974,7 @@ export class LegalMCPServer {
       if (error instanceof Error && error.message.startsWith('Unknown tool')) {
         throw new McpError(ErrorCode.MethodNotFound, error.message);
       }
-      
+
       throw new McpError(
         ErrorCode.InternalError,
         `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`
@@ -2029,8 +2009,8 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error("Failed to start Legal MCP Server:", error);
+  main().catch(error => {
+    console.error('Failed to start Legal MCP Server:', error);
     process.exit(1);
   });
 }

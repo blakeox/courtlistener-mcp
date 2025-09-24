@@ -4,9 +4,9 @@
  */
 
 import { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { Logger } from '../infrastructure/logger.js';
 import { Result } from '../common/types.js';
 import { CacheManager } from '../infrastructure/cache.js';
+import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ServerConfig } from '../types.js';
 
@@ -14,17 +14,17 @@ export interface ToolHandler {
   readonly name: string;
   readonly description: string;
   readonly category: string;
-  
+
   /**
    * Validate tool input parameters
    */
   validate(input: any): Result<any, Error>;
-  
+
   /**
    * Execute the tool
    */
   execute(input: any, context: ToolContext): Promise<CallToolResult>;
-  
+
   /**
    * Get tool schema definition
    */
@@ -49,7 +49,7 @@ export class ToolHandlerRegistry {
    */
   register(handler: ToolHandler): void {
     this.handlers.set(handler.name, handler);
-    
+
     // Track categories
     if (!this.categories.has(handler.category)) {
       this.categories.set(handler.category, new Set());
@@ -93,19 +93,16 @@ export class ToolHandlerRegistry {
     return Array.from(this.handlers.values()).map(handler => ({
       name: handler.name,
       description: handler.description,
-      inputSchema: handler.getSchema()
+      inputSchema: handler.getSchema(),
     }));
   }
 
   /**
    * Execute a tool with proper error handling
    */
-  async execute(
-    request: CallToolRequest,
-    context: ToolContext
-  ): Promise<CallToolResult> {
+  async execute(request: CallToolRequest, context: ToolContext): Promise<CallToolResult> {
     const handler = this.handlers.get(request.params.name);
-    
+
     if (!handler) {
       throw new Error(`Unknown tool: ${request.params.name}`);
     }
@@ -120,7 +117,7 @@ export class ToolHandlerRegistry {
     context.logger.info(`Executing tool: ${handler.name}`, {
       toolName: handler.name,
       category: handler.category,
-      requestId: context.requestId
+      requestId: context.requestId,
     });
 
     return await handler.execute(validationResult.data, context);
@@ -147,9 +144,9 @@ export abstract class BaseToolHandler implements ToolHandler {
       content: [
         {
           type: 'text',
-          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2)
-        }
-      ]
+          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+        },
+      ],
     };
   }
 
@@ -161,13 +158,17 @@ export abstract class BaseToolHandler implements ToolHandler {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            error: message,
-            details: details || null
-          }, null, 2)
-        }
+          text: JSON.stringify(
+            {
+              error: message,
+              details: details || null,
+            },
+            null,
+            2
+          ),
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }

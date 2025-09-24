@@ -1,8 +1,8 @@
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
-import { CourtListenerAPI } from '../../courtlistener.js';
-import { Result } from '../../common/types.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { Result } from '../../common/types.js';
+import { CourtListenerAPI } from '../../courtlistener.js';
+import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
 
 /**
  * Handler for getting dockets
@@ -24,9 +24,9 @@ export class GetDocketsHandler extends BaseToolHandler {
         docket_number: z.string().optional(),
         date_filed: z.string().optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -40,34 +40,34 @@ export class GetDocketsHandler extends BaseToolHandler {
       properties: {
         court: {
           type: 'string',
-          description: 'Filter by court'
+          description: 'Filter by court',
         },
         case_name: {
           type: 'string',
-          description: 'Search by case name'
+          description: 'Search by case name',
         },
         docket_number: {
           type: 'string',
-          description: 'Filter by docket number'
+          description: 'Filter by docket number',
         },
         date_filed: {
           type: 'string',
-          description: 'Filter by filing date (YYYY-MM-DD or range)'
+          description: 'Filter by filing date (YYYY-MM-DD or range)',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of dockets per page',
-          default: 20
-        }
-      }
+          default: 20,
+        },
+      },
     };
   }
 
@@ -76,7 +76,7 @@ export class GetDocketsHandler extends BaseToolHandler {
       context.logger.info('Getting dockets', {
         court: input.court,
         caseName: input.case_name,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getDockets(input);
@@ -87,12 +87,12 @@ export class GetDocketsHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to get dockets', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message);
     }
@@ -115,9 +115,9 @@ export class GetDocketHandler extends BaseToolHandler {
     try {
       const schema = z.object({
         docket_id: z.union([z.string(), z.number()]).transform(String),
-        include_entries: z.boolean().optional().default(true)
+        include_entries: z.boolean().optional().default(true),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -131,15 +131,15 @@ export class GetDocketHandler extends BaseToolHandler {
       properties: {
         docket_id: {
           type: ['string', 'number'],
-          description: 'Docket ID to retrieve information for'
+          description: 'Docket ID to retrieve information for',
         },
         include_entries: {
           type: 'boolean',
           description: 'Whether to include docket entries',
-          default: true
-        }
+          default: true,
+        },
       },
-      required: ['docket_id']
+      required: ['docket_id'],
     };
   }
 
@@ -147,19 +147,19 @@ export class GetDocketHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting docket details', {
         docketId: input.docket_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getDocket(input.docket_id);
 
       return this.success({
         summary: `Retrieved details for docket ${input.docket_id}`,
-        docket: response
+        docket: response,
       });
     } catch (error) {
       context.logger.error('Failed to get docket details', error as Error, {
         docketId: input.docket_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { docketId: input.docket_id });
     }
@@ -184,9 +184,9 @@ export class GetRecapDocumentsHandler extends BaseToolHandler {
         docket_id: z.union([z.string(), z.number()]).transform(String),
         document_type: z.string().optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -200,27 +200,27 @@ export class GetRecapDocumentsHandler extends BaseToolHandler {
       properties: {
         docket_id: {
           type: ['string', 'number'],
-          description: 'Docket ID to get documents for'
+          description: 'Docket ID to get documents for',
         },
         document_type: {
           type: 'string',
-          description: 'Filter by document type'
+          description: 'Filter by document type',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of documents per page',
-          default: 20
-        }
+          default: 20,
+        },
       },
-      required: ['docket_id']
+      required: ['docket_id'],
     };
   }
 
@@ -229,7 +229,7 @@ export class GetRecapDocumentsHandler extends BaseToolHandler {
       context.logger.info('Getting RECAP documents', {
         docketId: input.docket_id,
         documentType: input.document_type,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getRECAPDocuments(input);
@@ -240,13 +240,13 @@ export class GetRecapDocumentsHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to get RECAP documents', error as Error, {
         docketId: input.docket_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { docketId: input.docket_id });
     }
@@ -269,9 +269,9 @@ export class GetRecapDocumentHandler extends BaseToolHandler {
     try {
       const schema = z.object({
         document_id: z.union([z.string(), z.number()]).transform(String),
-        include_content: z.boolean().optional().default(false)
+        include_content: z.boolean().optional().default(false),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -285,15 +285,15 @@ export class GetRecapDocumentHandler extends BaseToolHandler {
       properties: {
         document_id: {
           type: ['string', 'number'],
-          description: 'RECAP document ID to retrieve'
+          description: 'RECAP document ID to retrieve',
         },
         include_content: {
           type: 'boolean',
           description: 'Whether to include document content/text',
-          default: false
-        }
+          default: false,
+        },
       },
-      required: ['document_id']
+      required: ['document_id'],
     };
   }
 
@@ -301,19 +301,19 @@ export class GetRecapDocumentHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting RECAP document', {
         documentId: input.document_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getRECAPDocument(input.document_id);
 
       return this.success({
         summary: `Retrieved RECAP document ${input.document_id}`,
-        document: response
+        document: response,
       });
     } catch (error) {
       context.logger.error('Failed to get RECAP document', error as Error, {
         documentId: input.document_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { documentId: input.document_id });
     }
@@ -331,7 +331,7 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
     date_filed_after: z.string().optional(),
     date_filed_before: z.string().optional(),
     page: z.number().min(1).optional().default(1),
-    page_size: z.number().min(1).max(100).optional().default(20)
+    page_size: z.number().min(1).max(100).optional().default(20),
   });
 
   constructor(private apiClient: CourtListenerAPI) {
@@ -353,36 +353,36 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
       properties: {
         docket: {
           type: ['string', 'number'],
-          description: 'Docket ID to retrieve entries for'
+          description: 'Docket ID to retrieve entries for',
         },
         entry_number: {
           type: ['string', 'number'],
-          description: 'Filter to a specific entry number'
+          description: 'Filter to a specific entry number',
         },
         date_filed_after: {
           type: 'string',
-          description: 'Return entries filed after this date (YYYY-MM-DD)'
+          description: 'Return entries filed after this date (YYYY-MM-DD)',
         },
         date_filed_before: {
           type: 'string',
-          description: 'Return entries filed before this date (YYYY-MM-DD)'
+          description: 'Return entries filed before this date (YYYY-MM-DD)',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of entries per page (max 100)',
-          default: 20
-        }
+          default: 20,
+        },
       },
       required: ['docket'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -393,7 +393,7 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
       date_filed_after: input.date_filed_after,
       date_filed_before: input.date_filed_before,
       page: input.page ?? 1,
-      page_size: input.page_size ?? 20
+      page_size: input.page_size ?? 20,
     };
 
     const timer = context.logger.startTimer('get_docket_entries');
@@ -404,7 +404,7 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
       if (cached) {
         context.logger.info('Returning cached docket entries', {
           docketId: params.docket,
-          requestId: context.requestId
+          requestId: context.requestId,
         });
         context.metrics?.recordRequest(timer.end(true), true);
         return this.success(cached);
@@ -412,7 +412,7 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
 
       context.logger.info('Fetching docket entries', {
         docketId: params.docket,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const entries = await this.apiClient.getDocketEntries(params);
@@ -423,8 +423,8 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
         pagination: {
           page: params.page,
           page_size: params.page_size,
-          total_results: entries.count ?? 0
-        }
+          total_results: entries.count ?? 0,
+        },
       };
 
       context.cache?.set(cacheKey, params, result, 1800);
@@ -436,11 +436,11 @@ export class GetDocketEntriesHandler extends BaseToolHandler {
       context.metrics?.recordFailure(duration);
       context.logger.error('Failed to fetch docket entries', error as Error, {
         docketId: params.docket,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       return this.error('Failed to retrieve docket entries', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }

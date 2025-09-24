@@ -3,53 +3,46 @@
  * Sets up dependency injection container and service registrations
  */
 
-import { container } from '../infrastructure/container.js';
-import { getConfig } from '../infrastructure/config.js';
-import { createLogger } from '../infrastructure/logger.js';
-import { CacheManager } from '../infrastructure/cache.js';
-import { MetricsCollector } from '../infrastructure/metrics.js';
 import { CourtListenerAPI } from '../courtlistener.js';
 import { DefaultApiClientFactory } from '../infrastructure/api-client-factory.js';
-import { MCPServerFactory } from '../infrastructure/server-factory.js';
-import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
+import { CacheManager } from '../infrastructure/cache.js';
 import { ConfigurationValidator } from '../infrastructure/config-validator.js';
+import { getConfig } from '../infrastructure/config.js';
+import { container } from '../infrastructure/container.js';
+import { createLogger } from '../infrastructure/logger.js';
+import { MetricsCollector } from '../infrastructure/metrics.js';
+import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
+import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
 
 // Import all domain handlers
-import { SearchOpinionsHandler, SearchCasesHandler } from '../domains/search/handlers.js';
-import { 
-  GetCaseDetailsHandler, 
-  GetRelatedCasesHandler, 
-  AnalyzeCaseAuthoritiesHandler 
+import {
+  AnalyzeCaseAuthoritiesHandler,
+  GetCaseDetailsHandler,
+  GetRelatedCasesHandler,
 } from '../domains/cases/handlers.js';
-import { 
-  GetOpinionTextHandler, 
-  AnalyzeLegalArgumentHandler, 
-  GetCitationNetworkHandler, 
-  LookupCitationHandler 
-} from '../domains/opinions/handlers.js';
-import { 
-  ListCourtsHandler, 
-  GetJudgesHandler, 
-  GetJudgeHandler 
-} from '../domains/courts/handlers.js';
-import { 
-  GetDocketsHandler, 
-  GetDocketHandler, 
-  GetRecapDocumentsHandler, 
+import { GetJudgeHandler, GetJudgesHandler, ListCourtsHandler } from '../domains/courts/handlers.js';
+import {
+  GetDocketEntriesHandler,
+  GetDocketHandler,
+  GetDocketsHandler,
   GetRecapDocumentHandler,
-  GetDocketEntriesHandler
+  GetRecapDocumentsHandler,
 } from '../domains/dockets/handlers.js';
-import { 
-  GetFinancialDisclosuresHandler, 
-  GetFinancialDisclosureHandler, 
-  GetPartiesAndAttorneysHandler, 
-  ManageAlertsHandler 
+import {
+  GetFinancialDisclosureHandler,
+  GetFinancialDisclosuresHandler,
+  GetPartiesAndAttorneysHandler,
+  ManageAlertsHandler,
 } from '../domains/miscellaneous/handlers.js';
-import { 
-  GetOralArgumentsHandler, 
-  GetOralArgumentHandler 
-} from '../domains/oral-arguments/handlers.js';
+import {
+  AnalyzeLegalArgumentHandler,
+  GetCitationNetworkHandler,
+  GetOpinionTextHandler,
+  LookupCitationHandler,
+} from '../domains/opinions/handlers.js';
+import { GetOralArgumentHandler, GetOralArgumentsHandler } from '../domains/oral-arguments/handlers.js';
+import { SearchCasesHandler, SearchOpinionsHandler } from '../domains/search/handlers.js';
 
 export function bootstrapServices(): void {
   // Register configuration with validation
@@ -60,49 +53,49 @@ export function bootstrapServices(): void {
       validator.validateAndThrow(config);
       return config;
     },
-    singleton: true
+    singleton: true,
   });
 
   // Register logger
   container.register('logger', {
-    factory: (config) => createLogger(config.logging, 'LegalMCP'),
+    factory: config => createLogger(config.logging, 'LegalMCP'),
     dependencies: ['config'],
-    singleton: true
+    singleton: true,
   });
 
   // Register cache
   container.register('cache', {
     factory: (config, logger) => new CacheManager(config.cache, logger),
     dependencies: ['config', 'logger'],
-    singleton: true
+    singleton: true,
   });
 
   // Register metrics
   container.register('metrics', {
-    factory: (logger) => new MetricsCollector(logger),
+    factory: logger => new MetricsCollector(logger),
     dependencies: ['logger'],
-    singleton: true
+    singleton: true,
   });
 
   // Register API client factory
   container.register('apiClientFactory', {
     factory: (cache, logger, metrics) => new DefaultApiClientFactory(cache, logger, metrics),
     dependencies: ['cache', 'logger', 'metrics'],
-    singleton: true
+    singleton: true,
   });
 
   // Register server factory
   container.register('serverFactory', {
-    factory: (logger) => new MCPServerFactory(logger),
+    factory: logger => new MCPServerFactory(logger),
     dependencies: ['logger'],
-    singleton: true
+    singleton: true,
   });
 
   // Register middleware factory
   container.register('middlewareFactory', {
-    factory: (logger) => new MiddlewareFactory(logger),
+    factory: logger => new MiddlewareFactory(logger),
     dependencies: ['logger'],
-    singleton: true
+    singleton: true,
   });
 
   // Register CourtListener API client
@@ -111,13 +104,13 @@ export function bootstrapServices(): void {
       return apiClientFactory.createCourtListenerClient(config.courtListener);
     },
     dependencies: ['config', 'apiClientFactory'],
-    singleton: true
+    singleton: true,
   });
 
   // Register tool registry
   container.register('toolRegistry', {
     factory: () => new ToolHandlerRegistry(),
-    singleton: true
+    singleton: true,
   });
 
   // Register tool handlers

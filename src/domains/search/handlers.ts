@@ -4,10 +4,10 @@
  */
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
-import { Result, success, failure } from '../../common/types.js';
-import { CourtListenerAPI } from '../../courtlistener.js';
 import { z } from 'zod';
+import { failure, Result, success } from '../../common/types.js';
+import { CourtListenerAPI } from '../../courtlistener.js';
+import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
 
 export class SearchOpinionsHandler extends BaseToolHandler {
   readonly name = 'search_opinions';
@@ -32,7 +32,7 @@ export class SearchOpinionsHandler extends BaseToolHandler {
       judge: input.judge || undefined,
       dateAfter: input.dateAfter || undefined,
       dateBefore: input.dateBefore || undefined,
-      orderBy: input.orderBy || 'relevance'
+      orderBy: input.orderBy || 'relevance',
     };
 
     return success(validatedInput);
@@ -40,10 +40,10 @@ export class SearchOpinionsHandler extends BaseToolHandler {
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
-      context.logger.info('Searching opinions', { 
-        query: input.q, 
+      context.logger.info('Searching opinions', {
+        query: input.q,
         page: input.page,
-        requestId: context.requestId 
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.searchOpinions(input);
@@ -54,19 +54,16 @@ export class SearchOpinionsHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           totalPages: Math.ceil((response.count ?? 0) / input.pageSize),
-          totalCount: response.count ?? 0
-        }
+          totalCount: response.count ?? 0,
+        },
       });
     } catch (error) {
       context.logger.error('Opinion search failed', error as Error, {
         query: input.q,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
-      
-      return this.error(
-        'Failed to search opinions',
-        { message: (error as Error).message }
-      );
+
+      return this.error('Failed to search opinions', { message: (error as Error).message });
     }
   }
 
@@ -76,41 +73,41 @@ export class SearchOpinionsHandler extends BaseToolHandler {
       properties: {
         q: {
           type: 'string',
-          description: 'Search query for opinions'
+          description: 'Search query for opinions',
         },
         page: {
           type: 'number',
           description: 'Page number (default: 1)',
-          minimum: 1
+          minimum: 1,
         },
         pageSize: {
           type: 'number',
           description: 'Number of results per page (default: 20, max: 100)',
           minimum: 1,
-          maximum: 100
+          maximum: 100,
         },
         court: {
           type: 'string',
-          description: 'Filter by court identifier'
+          description: 'Filter by court identifier',
         },
         judge: {
           type: 'string',
-          description: 'Filter by judge name'
+          description: 'Filter by judge name',
         },
         dateAfter: {
           type: 'string',
-          description: 'Filter opinions after this date (YYYY-MM-DD)'
+          description: 'Filter opinions after this date (YYYY-MM-DD)',
         },
         dateBefore: {
           type: 'string',
-          description: 'Filter opinions before this date (YYYY-MM-DD)'
+          description: 'Filter opinions before this date (YYYY-MM-DD)',
         },
         orderBy: {
           type: 'string',
           enum: ['relevance', 'date', 'name'],
-          description: 'Sort order (default: relevance)'
-        }
-      }
+          description: 'Sort order (default: relevance)',
+        },
+      },
     };
   }
 }
@@ -120,43 +117,55 @@ export class AdvancedSearchHandler extends BaseToolHandler {
   readonly description = 'Execute advanced legal research queries with multi-parameter filtering';
   readonly category = 'search';
 
-  private static readonly schema = z.object({
-    type: z.enum(['o', 'r', 'p', 'oa']).default('o'),
-    query: z.string().min(1).optional(),
-    court: z.string().optional(),
-    judge: z.string().optional(),
-    case_name: z.string().optional(),
-    citation: z.string().optional(),
-    docket_number: z.string().optional(),
-    date_filed_after: z.string().optional(),
-    date_filed_before: z.string().optional(),
-    precedential_status: z.string().optional(),
-    cited_lt: z.number().optional(),
-    cited_gt: z.number().optional(),
-    status: z.string().optional(),
-    nature_of_suit: z.string().optional(),
-    order_by: z.string().optional(),
-    page: z.number().int().min(1).optional(),
-    page_size: z.number().int().min(1).max(100).optional().default(20)
-  }).superRefine((value, ctx) => {
-    const meaningfulKeys = [
-      'query', 'court', 'judge', 'case_name', 'citation',
-      'docket_number', 'date_filed_after', 'date_filed_before',
-      'precedential_status', 'cited_lt', 'cited_gt', 'status', 'nature_of_suit'
-    ] as const;
+  private static readonly schema = z
+    .object({
+      type: z.enum(['o', 'r', 'p', 'oa']).default('o'),
+      query: z.string().min(1).optional(),
+      court: z.string().optional(),
+      judge: z.string().optional(),
+      case_name: z.string().optional(),
+      citation: z.string().optional(),
+      docket_number: z.string().optional(),
+      date_filed_after: z.string().optional(),
+      date_filed_before: z.string().optional(),
+      precedential_status: z.string().optional(),
+      cited_lt: z.number().optional(),
+      cited_gt: z.number().optional(),
+      status: z.string().optional(),
+      nature_of_suit: z.string().optional(),
+      order_by: z.string().optional(),
+      page: z.number().int().min(1).optional(),
+      page_size: z.number().int().min(1).max(100).optional().default(20),
+    })
+    .superRefine((value, ctx) => {
+      const meaningfulKeys = [
+        'query',
+        'court',
+        'judge',
+        'case_name',
+        'citation',
+        'docket_number',
+        'date_filed_after',
+        'date_filed_before',
+        'precedential_status',
+        'cited_lt',
+        'cited_gt',
+        'status',
+        'nature_of_suit',
+      ] as const;
 
-    const hasSearchInput = meaningfulKeys.some(key => {
-      const field = value[key];
-      return field !== undefined && field !== null && field !== '';
-    });
-
-    if (!hasSearchInput) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'At least one search parameter must be provided (e.g., query, court, citation).'
+      const hasSearchInput = meaningfulKeys.some(key => {
+        const field = value[key];
+        return field !== undefined && field !== null && field !== '';
       });
-    }
-  });
+
+      if (!hasSearchInput) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'At least one search parameter must be provided (e.g., query, court, citation).',
+        });
+      }
+    });
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
@@ -179,78 +188,78 @@ export class AdvancedSearchHandler extends BaseToolHandler {
           type: 'string',
           enum: ['o', 'r', 'p', 'oa'],
           description: 'Search index type: opinions (o), RECAP documents (r), people/judges (p), oral arguments (oa)',
-          default: 'o'
+          default: 'o',
         },
         query: {
           type: 'string',
-          description: 'Primary keyword search across case metadata'
+          description: 'Primary keyword search across case metadata',
         },
         court: {
           type: 'string',
-          description: 'Filter results to a specific court ID'
+          description: 'Filter results to a specific court ID',
         },
         judge: {
           type: 'string',
-          description: 'Filter by judge name'
+          description: 'Filter by judge name',
         },
         case_name: {
           type: 'string',
-          description: 'Search by case caption'
+          description: 'Search by case caption',
         },
         citation: {
           type: 'string',
-          description: 'Match a particular citation value'
+          description: 'Match a particular citation value',
         },
         docket_number: {
           type: 'string',
-          description: 'Search by docket number'
+          description: 'Search by docket number',
         },
         date_filed_after: {
           type: 'string',
-          description: 'Filter by filing date lower bound (YYYY-MM-DD)'
+          description: 'Filter by filing date lower bound (YYYY-MM-DD)',
         },
         date_filed_before: {
           type: 'string',
-          description: 'Filter by filing date upper bound (YYYY-MM-DD)'
+          description: 'Filter by filing date upper bound (YYYY-MM-DD)',
         },
         precedential_status: {
           type: 'string',
-          description: 'Restrict to a specific precedential status'
+          description: 'Restrict to a specific precedential status',
         },
         cited_lt: {
           type: 'number',
-          description: 'Return results cited fewer than this count'
+          description: 'Return results cited fewer than this count',
         },
         cited_gt: {
           type: 'number',
-          description: 'Return results cited more than this count'
+          description: 'Return results cited more than this count',
         },
         status: {
           type: 'string',
-          description: 'Filter docket status (e.g., open, closed)'
+          description: 'Filter docket status (e.g., open, closed)',
         },
         nature_of_suit: {
           type: 'string',
-          description: 'Filter by nature of suit classification'
+          description: 'Filter by nature of suit classification',
         },
         order_by: {
           type: 'string',
-          description: 'Sort results by the supplied field'
+          description: 'Sort results by the supplied field',
         },
         page: {
           type: 'number',
           minimum: 1,
-          description: 'Page number for pagination'
+          description: 'Page number for pagination',
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of results per page (max 100)',
-          default: 20
-        }
+          default: 20,
+        },
       },
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -260,7 +269,7 @@ export class AdvancedSearchHandler extends BaseToolHandler {
     if (cached) {
       context.logger.info('Advanced search served from cache', {
         requestId: context.requestId,
-        searchType: input.type
+        searchType: input.type,
       });
       return this.success(cached);
     }
@@ -268,19 +277,19 @@ export class AdvancedSearchHandler extends BaseToolHandler {
     context.logger.info('Performing advanced search', {
       requestId: context.requestId,
       type: input.type,
-      hasQuery: Boolean(input.query)
+      hasQuery: Boolean(input.query),
     });
 
     const results = await this.apiClient.advancedSearch({
       ...input,
-      page_size: input.page_size
+      page_size: input.page_size,
     });
 
     const searchTypeLabels: Record<string, string> = {
       o: 'Opinions',
       r: 'RECAP Documents',
       p: 'People & Judges',
-      oa: 'Oral Arguments'
+      oa: 'Oral Arguments',
     };
 
     const responseData = {
@@ -292,14 +301,14 @@ export class AdvancedSearchHandler extends BaseToolHandler {
         citation_filtering: input.cited_lt !== undefined || input.cited_gt !== undefined ? 'Applied' : 'Available',
         temporal_analysis: input.date_filed_after || input.date_filed_before ? 'Applied' : 'Available',
         jurisdictional_filtering: input.court ? 'Applied' : 'Available',
-        procedural_filtering: input.status || input.nature_of_suit ? 'Applied' : 'Available'
+        procedural_filtering: input.status || input.nature_of_suit ? 'Applied' : 'Available',
       },
       research_recommendations: [
         'Use citation count filters to locate influential opinions.',
         'Apply filing date windows to analyze trends across time.',
         'Combine jurisdiction and status filters for precise dockets.',
-        'Leverage multi-type searches to assemble comprehensive briefs.'
-      ]
+        'Leverage multi-type searches to assemble comprehensive briefs.',
+      ],
     };
 
     context.cache?.set(cacheKey, input, responseData, 3600);
@@ -328,15 +337,15 @@ export class SearchCasesHandler extends BaseToolHandler {
       pageSize: Math.min(100, Math.max(1, parseInt(input.pageSize) || 20)),
       court: input.court || undefined,
       dateAfter: input.dateAfter || undefined,
-      dateBefore: input.dateBefore || undefined
+      dateBefore: input.dateBefore || undefined,
     });
   }
 
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     try {
-      context.logger.info('Searching cases', { 
+      context.logger.info('Searching cases', {
         query: input.q,
-        requestId: context.requestId 
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.searchCases(input);
@@ -347,19 +356,16 @@ export class SearchCasesHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           totalPages: Math.ceil((response.count ?? 0) / input.pageSize),
-          totalCount: response.count ?? 0
-        }
+          totalCount: response.count ?? 0,
+        },
       });
     } catch (error) {
       context.logger.error('Case search failed', error as Error, {
         query: input.q,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
-      
-      return this.error(
-        'Failed to search cases',
-        { message: (error as Error).message }
-      );
+
+      return this.error('Failed to search cases', { message: (error as Error).message });
     }
   }
 
@@ -369,32 +375,32 @@ export class SearchCasesHandler extends BaseToolHandler {
       properties: {
         q: {
           type: 'string',
-          description: 'Search query for cases'
+          description: 'Search query for cases',
         },
         page: {
           type: 'number',
           description: 'Page number (default: 1)',
-          minimum: 1
+          minimum: 1,
         },
         pageSize: {
-          type: 'number', 
+          type: 'number',
           description: 'Number of results per page (default: 20, max: 100)',
           minimum: 1,
-          maximum: 100
+          maximum: 100,
         },
         court: {
           type: 'string',
-          description: 'Filter by court identifier'
+          description: 'Filter by court identifier',
         },
         dateAfter: {
           type: 'string',
-          description: 'Filter cases after this date (YYYY-MM-DD)'
+          description: 'Filter cases after this date (YYYY-MM-DD)',
         },
         dateBefore: {
           type: 'string',
-          description: 'Filter cases before this date (YYYY-MM-DD)'
-        }
-      }
+          description: 'Filter cases before this date (YYYY-MM-DD)',
+        },
+      },
     };
   }
 }

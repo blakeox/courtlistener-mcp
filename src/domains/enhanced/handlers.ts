@@ -2,33 +2,38 @@
  * Enhanced and enterprise-grade tool handlers
  */
 
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
-import { CourtListenerAPI } from '../../courtlistener.js';
-import { Result, success, failure } from '../../common/types.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { TimingContext } from '../../infrastructure/logger.js';
 import { z } from 'zod';
+import { failure, Result, success } from '../../common/types.js';
+import { CourtListenerAPI } from '../../courtlistener.js';
+import { TimingContext } from '../../infrastructure/logger.js';
+import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
 
-const visualizationSchema = z.object({
-  data_type: z.enum(['court_distribution', 'case_timeline', 'citation_network', 'judge_statistics']),
-  opinion_id: z.union([z.string(), z.number()]).transform(value => Number(value)).optional(),
-  depth: z.number().int().min(1).max(5).optional(),
-  limit: z.number().int().min(1).max(200).optional(),
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
-  court_id: z.string().optional()
-}).superRefine((value, ctx) => {
-  if (value.data_type === 'citation_network' && (value.opinion_id === undefined || Number.isNaN(value.opinion_id))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'opinion_id is required for citation_network visualizations'
-    });
-  }
-});
+const visualizationSchema = z
+  .object({
+    data_type: z.enum(['court_distribution', 'case_timeline', 'citation_network', 'judge_statistics']),
+    opinion_id: z
+      .union([z.string(), z.number()])
+      .transform(value => Number(value))
+      .optional(),
+    depth: z.number().int().min(1).max(5).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+    start_date: z.string().optional(),
+    end_date: z.string().optional(),
+    court_id: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.data_type === 'citation_network' && (value.opinion_id === undefined || Number.isNaN(value.opinion_id))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'opinion_id is required for citation_network visualizations',
+      });
+    }
+  });
 
 const bulkDataSchema = z.object({
   data_type: z.string().min(1),
-  sample_size: z.number().int().min(1).max(50).optional()
+  sample_size: z.number().int().min(1).max(50).optional(),
 });
 
 const bankruptcySchema = z.object({
@@ -38,56 +43,55 @@ const bankruptcySchema = z.object({
   date_filed_after: z.string().optional(),
   date_filed_before: z.string().optional(),
   page: z.number().int().min(1).optional().default(1),
-  page_size: z.number().int().min(1).max(100).optional().default(20)
+  page_size: z.number().int().min(1).max(100).optional().default(20),
 });
 
 const comprehensiveJudgeSchema = z.object({
-  judge_id: z.union([z.string(), z.number()]).transform(value => Number(value))
+  judge_id: z.union([z.string(), z.number()]).transform(value => Number(value)),
 });
 
 const comprehensiveCaseSchema = z.object({
-  cluster_id: z.union([z.string(), z.number()]).transform(value => Number(value))
+  cluster_id: z.union([z.string(), z.number()]).transform(value => Number(value)),
 });
 
-const disclosureDetailsSchema = z.object({
-  disclosure_type: z.enum([
-    'investments',
-    'debts',
-    'gifts',
-    'agreements',
-    'positions',
-    'reimbursements',
-    'spouse_incomes',
-    'non_investment_incomes'
-  ]),
-  judge: z.union([z.string(), z.number()]).transform(value => String(value)).optional(),
-  year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
-  page: z.number().int().min(1).optional().default(1),
-  page_size: z.number().int().min(1).max(100).optional().default(20)
-}).passthrough();
+const disclosureDetailsSchema = z
+  .object({
+    disclosure_type: z.enum([
+      'investments',
+      'debts',
+      'gifts',
+      'agreements',
+      'positions',
+      'reimbursements',
+      'spouse_incomes',
+      'non_investment_incomes',
+    ]),
+    judge: z
+      .union([z.string(), z.number()])
+      .transform(value => String(value))
+      .optional(),
+    year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
+    page: z.number().int().min(1).optional().default(1),
+    page_size: z.number().int().min(1).max(100).optional().default(20),
+  })
+  .passthrough();
 
 const validateCitationsSchema = z.object({
-  text: z.string().min(1)
+  text: z.string().min(1),
 });
 
-const enhancedRecapSchema = z.object({
-  action: z.enum(['fetch', 'query', 'email'])
-}).passthrough();
+const enhancedRecapSchema = z
+  .object({
+    action: z.enum(['fetch', 'query', 'email']),
+  })
+  .passthrough();
 
-function recordSuccess(
-  context: ToolContext,
-  timer: TimingContext,
-  fromCache: boolean
-) {
+function recordSuccess(context: ToolContext, timer: TimingContext, fromCache: boolean) {
   const duration = timer.end(true, { cacheHit: fromCache });
   context.metrics?.recordRequest(duration, fromCache);
 }
 
-function recordFailure(
-  context: ToolContext,
-  timer: TimingContext,
-  error: Error
-) {
+function recordFailure(context: ToolContext, timer: TimingContext, error: Error) {
   const duration = timer.endWithError(error);
   context.metrics?.recordFailure(duration);
 }
@@ -116,40 +120,40 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
         data_type: {
           type: 'string',
           enum: ['court_distribution', 'case_timeline', 'citation_network', 'judge_statistics'],
-          description: 'Visualization type to generate'
+          description: 'Visualization type to generate',
         },
         opinion_id: {
           type: ['string', 'number'],
-          description: 'Opinion ID required for citation network data'
+          description: 'Opinion ID required for citation network data',
         },
         depth: {
           type: 'number',
           minimum: 1,
           maximum: 5,
-          description: 'Depth for network traversal (citation_network only)'
+          description: 'Depth for network traversal (citation_network only)',
         },
         limit: {
           type: 'number',
           minimum: 1,
           maximum: 200,
           description: 'Limit for judge statistics (judge_statistics only)',
-          default: 50
+          default: 50,
         },
         start_date: {
           type: 'string',
-          description: 'Start date for timeline visualizations (YYYY-MM-DD)'
+          description: 'Start date for timeline visualizations (YYYY-MM-DD)',
         },
         end_date: {
           type: 'string',
-          description: 'End date for timeline visualizations (YYYY-MM-DD)'
+          description: 'End date for timeline visualizations (YYYY-MM-DD)',
         },
         court_id: {
           type: 'string',
-          description: 'Court identifier for timeline visualizations'
-        }
+          description: 'Court identifier for timeline visualizations',
+        },
       },
       required: ['data_type'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -162,7 +166,7 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
       if (cached) {
         context.logger.info('Visualization data served from cache', {
           dataType: input.data_type,
-          requestId: context.requestId
+          requestId: context.requestId,
         });
         recordSuccess(context, timer, true);
         return this.success(cached);
@@ -170,7 +174,7 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
 
       context.logger.info('Generating visualization dataset', {
         dataType: input.data_type,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       let result: any;
@@ -198,10 +202,10 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to generate visualization data', error as Error, {
         dataType: input.data_type,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to generate visualization data', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -219,7 +223,7 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
       type: 'court_distribution',
       data: distribution,
       chart_type: 'pie',
-      total_courts: courts.count
+      total_courts: courts.count,
     };
   }
 
@@ -232,29 +236,29 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
         provided: {
           start_date: input.start_date || null,
           end_date: input.end_date || null,
-          court_id: input.court_id || null
-        }
+          court_id: input.court_id || null,
+        },
       },
-      chart_type: 'timeline'
+      chart_type: 'timeline',
     };
   }
 
   private async generateCitationNetwork(input: z.infer<typeof visualizationSchema>) {
     const network = await this.apiClient.getCitationNetwork(input.opinion_id!, {
-      depth: input.depth || 2
+      depth: input.depth || 2,
     });
 
     return {
       type: 'citation_network',
       data: network,
       chart_type: 'network_graph',
-      center_opinion: input.opinion_id
+      center_opinion: input.opinion_id,
     };
   }
 
   private async generateJudgeStatistics(input: z.infer<typeof visualizationSchema>) {
     const judges = await this.apiClient.getJudges({
-      page_size: input.limit || 50
+      page_size: input.limit || 50,
     });
 
     return {
@@ -266,9 +270,9 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
           const court = judge.court || 'Unknown';
           acc[court] = (acc[court] || 0) + 1;
           return acc;
-        }, {} as Record<string, number>)
+        }, {} as Record<string, number>),
       },
-      chart_type: 'bar'
+      chart_type: 'bar',
     };
   }
 }
@@ -296,18 +300,18 @@ export class GetBulkDataHandler extends BaseToolHandler {
       properties: {
         data_type: {
           type: 'string',
-          description: 'Type of bulk data requested ("sample" returns a demonstration payload)'
+          description: 'Type of bulk data requested ("sample" returns a demonstration payload)',
         },
         sample_size: {
           type: 'number',
           minimum: 1,
           maximum: 50,
           description: 'Sample size when requesting sample data',
-          default: 10
-        }
+          default: 10,
+        },
       },
       required: ['data_type'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -322,18 +326,18 @@ export class GetBulkDataHandler extends BaseToolHandler {
         available_formats: ['JSON', 'CSV', 'XML'],
         recommended_approach: "Use CourtListener's official bulk data downloads",
         bulk_data_url: 'https://www.courtlistener.com/help/api/bulk-data/',
-        note: 'For large datasets, consider using pagination parameters in regular API calls'
+        note: 'For large datasets, consider using pagination parameters in regular API calls',
       };
 
       if (input.data_type === 'sample') {
         const sampleCases = await this.apiClient.searchOpinions({
-          page_size: Math.min(input.sample_size ?? 10, 50)
+          page_size: Math.min(input.sample_size ?? 10, 50),
         });
 
         result.sample_data = {
           type: 'opinion_clusters',
           count: sampleCases.results?.length || 0,
-          data: sampleCases.results?.slice(0, 5) || []
+          data: sampleCases.results?.slice(0, 5) || [],
         };
       }
 
@@ -342,10 +346,10 @@ export class GetBulkDataHandler extends BaseToolHandler {
     } catch (error) {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to prepare bulk data guidance', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to provide bulk data guidance', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -383,10 +387,10 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
           minimum: 1,
           maximum: 100,
           description: 'Number of results per page',
-          default: 20
-        }
+          default: 20,
+        },
       },
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -402,7 +406,7 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
       const cached = context.cache?.get<any>(cacheKey, params);
       if (cached) {
         context.logger.info('Bankruptcy data served from cache', {
-          requestId: context.requestId
+          requestId: context.requestId,
         });
         recordSuccess(context, timer, true);
         return this.success(cached);
@@ -410,12 +414,12 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
 
       context.logger.info('Fetching bankruptcy dockets', {
         requestId: context.requestId,
-        filters: params
+        filters: params,
       });
 
       const bankruptcyDockets = await this.apiClient.getDockets({
         ...params,
-        court__jurisdiction: 'FB'
+        court__jurisdiction: 'FB',
       });
 
       const result = {
@@ -424,13 +428,13 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
         pagination: {
           page: params.page ?? 1,
           page_size: params.page_size ?? 20,
-          total_results: bankruptcyDockets.count || 0
+          total_results: bankruptcyDockets.count || 0,
         },
         data_notes: [
           'Bankruptcy data includes cases from U.S. Bankruptcy Courts',
           'Use specific court codes for targeted searches',
-          'RECAP documents may be available for detailed case information'
-        ]
+          'RECAP documents may be available for detailed case information',
+        ],
       };
 
       context.cache?.set(cacheKey, params, result, 1800);
@@ -439,10 +443,10 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
     } catch (error) {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to fetch bankruptcy data', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to fetch bankruptcy data', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -471,11 +475,11 @@ export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
       properties: {
         judge_id: {
           type: ['string', 'number'],
-          description: 'Judge identifier to retrieve a comprehensive profile for'
-        }
+          description: 'Judge identifier to retrieve a comprehensive profile for',
+        },
       },
       required: ['judge_id'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -498,10 +502,10 @@ export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to fetch comprehensive judge profile', error as Error, {
         judgeId: input.judge_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to fetch comprehensive judge profile', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -530,11 +534,11 @@ export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
       properties: {
         cluster_id: {
           type: ['string', 'number'],
-          description: 'Case cluster ID to analyze'
-        }
+          description: 'Case cluster ID to analyze',
+        },
       },
       required: ['cluster_id'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -557,10 +561,10 @@ export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to fetch comprehensive case analysis', error as Error, {
         clusterId: input.cluster_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to fetch comprehensive case analysis', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -597,34 +601,34 @@ export class GetFinancialDisclosureDetailsHandler extends BaseToolHandler {
             'positions',
             'reimbursements',
             'spouse_incomes',
-            'non_investment_incomes'
+            'non_investment_incomes',
           ],
-          description: 'Category of financial disclosure data to retrieve'
+          description: 'Category of financial disclosure data to retrieve',
         },
         judge: {
           type: ['string', 'number'],
-          description: 'Filter by judge identifier'
+          description: 'Filter by judge identifier',
         },
         year: {
           type: 'number',
-          description: 'Filter disclosures by year'
+          description: 'Filter disclosures by year',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of results per page',
-          default: 20
-        }
+          default: 20,
+        },
       },
       required: ['disclosure_type'],
-      additionalProperties: true
+      additionalProperties: true,
     };
   }
 
@@ -677,10 +681,10 @@ export class GetFinancialDisclosureDetailsHandler extends BaseToolHandler {
     } catch (error) {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to get financial disclosure details', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to get financial disclosure details', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -709,11 +713,11 @@ export class ValidateCitationsHandler extends BaseToolHandler {
       properties: {
         text: {
           type: 'string',
-          description: 'Text containing legal citations to validate'
-        }
+          description: 'Text containing legal citations to validate',
+        },
       },
       required: ['text'],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -735,10 +739,10 @@ export class ValidateCitationsHandler extends BaseToolHandler {
     } catch (error) {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to validate citations', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error('Failed to validate citations', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
@@ -768,11 +772,11 @@ export class GetEnhancedRECAPDataHandler extends BaseToolHandler {
         action: {
           type: 'string',
           enum: ['fetch', 'query', 'email'],
-          description: 'RECAP action to perform'
-        }
+          description: 'RECAP action to perform',
+        },
       },
       required: ['action'],
-      additionalProperties: true
+      additionalProperties: true,
     };
   }
 
@@ -811,10 +815,10 @@ export class GetEnhancedRECAPDataHandler extends BaseToolHandler {
       recordFailure(context, timer, error as Error);
       context.logger.error('Failed to retrieve enhanced RECAP data', error as Error, {
         requestId: context.requestId,
-        action: input.action
+        action: input.action,
       });
       return this.error('Failed to retrieve enhanced RECAP data', {
-        message: (error as Error).message
+        message: (error as Error).message,
       });
     }
   }
