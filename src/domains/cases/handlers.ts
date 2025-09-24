@@ -1,8 +1,8 @@
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
-import { CourtListenerAPI } from '../../courtlistener.js';
-import { Result } from '../../common/types.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { Result } from '../../common/types.js';
+import { CourtListenerAPI } from '../../courtlistener.js';
+import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
 
 /**
  * Handler for case-related operations
@@ -44,15 +44,15 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
       properties: {
         cluster_id: {
           type: ['string', 'number'],
-          description: 'Case cluster ID (preferred). Use search_cases to discover IDs.'
+          description: 'Case cluster ID (preferred). Use search_cases to discover IDs.',
         },
         id: {
           type: ['string', 'number'],
-          description: 'Legacy case ID alias (deprecated).'
-        }
+          description: 'Legacy case ID alias (deprecated).',
+        },
       },
       anyOf: [{ required: ['cluster_id'] }, { required: ['id'] }],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -60,7 +60,7 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting case details', {
         clusterId: input.cluster_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getCaseDetails({
@@ -69,12 +69,12 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
 
       return this.success({
         summary: `Retrieved details for case ${input.cluster_id}`,
-        case: response
+        case: response,
       });
     } catch (error) {
       context.logger.error('Failed to get case details', error as Error, {
         clusterId: input.cluster_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { clusterId: input.cluster_id });
     }
@@ -124,24 +124,24 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
       properties: {
         opinion_id: {
           type: ['string', 'number'],
-          description: 'Opinion ID to find related opinions/cases for'
+          description: 'Opinion ID to find related opinions/cases for',
         },
         cluster_id: {
           type: ['string', 'number'],
-          description: 'Case cluster ID (alias for opinion-based lookups)'
+          description: 'Case cluster ID (alias for opinion-based lookups)',
         },
         case_id: {
           type: ['string', 'number'],
-          description: 'Legacy case identifier (treated like cluster_id)'
+          description: 'Legacy case identifier (treated like cluster_id)',
         },
         limit: {
           type: 'number',
           description: 'Maximum number of related cases to return',
-          default: 10
-        }
+          default: 10,
+        },
       },
       anyOf: [{ required: ['opinion_id'] }, { required: ['cluster_id'] }, { required: ['case_id'] }],
-      additionalProperties: false
+      additionalProperties: false,
     };
   }
 
@@ -149,19 +149,19 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting related cases', {
         opinionId: input.opinion_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getRelatedCases(input.opinion_id);
 
       return this.success({
         summary: `Found ${response.length || 0} related cases/opinions`,
-        relatedCases: Array.isArray(response) ? response.slice(0, input.limit) : response
+        relatedCases: Array.isArray(response) ? response.slice(0, input.limit) : response,
       });
     } catch (error) {
       context.logger.error('Failed to get related cases', error as Error, {
         opinionId: input.opinion_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { opinionId: input.opinion_id });
     }
@@ -185,9 +185,9 @@ export class AnalyzeCaseAuthoritiesHandler extends BaseToolHandler {
       const schema = z.object({
         case_id: z.union([z.string(), z.number()]).transform(String),
         include_citations: z.boolean().optional().default(true),
-        depth: z.number().min(1).max(3).optional().default(1)
+        depth: z.number().min(1).max(3).optional().default(1),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -201,22 +201,22 @@ export class AnalyzeCaseAuthoritiesHandler extends BaseToolHandler {
       properties: {
         case_id: {
           type: ['string', 'number'],
-          description: 'Case ID to analyze authorities for'
+          description: 'Case ID to analyze authorities for',
         },
         include_citations: {
           type: 'boolean',
           description: 'Whether to include citation analysis',
-          default: true
+          default: true,
         },
         depth: {
           type: 'number',
           description: 'Analysis depth (1-3)',
           minimum: 1,
           maximum: 3,
-          default: 1
-        }
+          default: 1,
+        },
       },
-      required: ['case_id']
+      required: ['case_id'],
     };
   }
 
@@ -224,19 +224,19 @@ export class AnalyzeCaseAuthoritiesHandler extends BaseToolHandler {
     try {
       context.logger.info('Analyzing case authorities', {
         caseId: input.case_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.analyzeCaseAuthorities(input);
 
       return this.success({
         summary: `Analyzed authorities for case ${input.case_id}`,
-        analysis: response
+        analysis: response,
       });
     } catch (error) {
       context.logger.error('Failed to analyze case authorities', error as Error, {
         caseId: input.case_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { caseId: input.case_id });
     }

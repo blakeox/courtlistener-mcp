@@ -11,18 +11,18 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { generateId, retry } from '../common/utils.js';
+import { GracefulShutdown, createGracefulShutdown } from '../graceful-shutdown.js';
 import { HealthServer } from '../http-server.js';
 import { CacheManager } from '../infrastructure/cache.js';
 import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
 import { container } from '../infrastructure/container.js';
-import { MiddlewareFactory, RequestContext } from '../infrastructure/middleware-factory.js';
-import { MetricsCollector } from '../infrastructure/metrics.js';
-import { GracefulShutdown, createGracefulShutdown } from '../graceful-shutdown.js';
 import { Logger } from '../infrastructure/logger.js';
+import { MetricsCollector } from '../infrastructure/metrics.js';
+import { MiddlewareFactory, RequestContext } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { getEnhancedToolDefinitions } from '../tool-definitions.js';
-import { ToolHandlerRegistry } from './tool-handler.js';
 import { ServerConfig } from '../types.js';
+import { ToolHandlerRegistry } from './tool-handler.js';
 
 interface ToolMetadata {
   name: string;
@@ -60,8 +60,8 @@ export class BestPracticeLegalMCPServer {
     this.toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
     this.middlewareFactory = container.get<MiddlewareFactory>('middlewareFactory');
     this.config = container.get<ServerConfig>('config');
-  this.circuitBreakers = container.get<CircuitBreakerManager>('circuitBreakerManager');
-  this.cache = container.get<CacheManager>('cache');
+    this.circuitBreakers = container.get<CircuitBreakerManager>('circuitBreakerManager');
+    this.cache = container.get<CacheManager>('cache');
 
     const serverFactory = container.get<MCPServerFactory>('serverFactory');
     this.server = serverFactory.createServer(this.config);
@@ -192,7 +192,7 @@ export class BestPracticeLegalMCPServer {
       }
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       if (this.isShuttingDown) {
         throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
       }
@@ -217,10 +217,7 @@ export class BestPracticeLegalMCPServer {
     });
   }
 
-  private async executeToolWithMiddleware(
-    request: CallToolRequest,
-    requestId: string
-  ): Promise<CallToolResult> {
+  private async executeToolWithMiddleware(request: CallToolRequest, requestId: string): Promise<CallToolResult> {
     const startTime = Date.now();
     const context: RequestContext = {
       requestId,

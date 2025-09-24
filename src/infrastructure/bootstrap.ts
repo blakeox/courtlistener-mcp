@@ -6,6 +6,7 @@
 import { CourtListenerAPI } from '../courtlistener.js';
 import { DefaultApiClientFactory } from '../infrastructure/api-client-factory.js';
 import { CacheManager } from '../infrastructure/cache.js';
+import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
 import { ConfigurationValidator } from '../infrastructure/config-validator.js';
 import { getConfig } from '../infrastructure/config.js';
 import { container } from '../infrastructure/container.js';
@@ -14,7 +15,6 @@ import { MetricsCollector } from '../infrastructure/metrics.js';
 import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
-import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
 
 // Import all domain handlers
 import {
@@ -31,6 +31,16 @@ import {
   GetRecapDocumentsHandler,
 } from '../domains/dockets/handlers.js';
 import {
+  GetBankruptcyDataHandler,
+  GetBulkDataHandler,
+  GetComprehensiveCaseAnalysisHandler,
+  GetComprehensiveJudgeProfileHandler,
+  GetEnhancedRECAPDataHandler,
+  GetFinancialDisclosureDetailsHandler,
+  GetVisualizationDataHandler,
+  ValidateCitationsHandler,
+} from '../domains/enhanced/handlers.js';
+import {
   GetFinancialDisclosureHandler,
   GetFinancialDisclosuresHandler,
   GetPartiesAndAttorneysHandler,
@@ -44,16 +54,6 @@ import {
 } from '../domains/opinions/handlers.js';
 import { GetOralArgumentHandler, GetOralArgumentsHandler } from '../domains/oral-arguments/handlers.js';
 import { AdvancedSearchHandler, SearchCasesHandler, SearchOpinionsHandler } from '../domains/search/handlers.js';
-import {
-  GetVisualizationDataHandler,
-  GetBulkDataHandler,
-  GetBankruptcyDataHandler,
-  GetComprehensiveJudgeProfileHandler,
-  GetComprehensiveCaseAnalysisHandler,
-  GetFinancialDisclosureDetailsHandler,
-  ValidateCitationsHandler,
-  GetEnhancedRECAPDataHandler,
-} from '../domains/enhanced/handlers.js';
 
 export function bootstrapServices(): void {
   // Register configuration with validation
