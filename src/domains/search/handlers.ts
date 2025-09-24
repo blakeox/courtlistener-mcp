@@ -430,7 +430,7 @@ export class SearchCasesHandler extends BaseToolHandler {
           page: input.page,
           totalPages: Math.ceil((response.count ?? 0) / input.page_size),
           totalCount: response.count ?? 0,
-          pageSize: input.page_size,
+          page_size: input.page_size,
         },
         search_parameters: {
           query: input.query,

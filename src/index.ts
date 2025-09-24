@@ -40,8 +40,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
+function ensureBootstrapped() {
+  // If core services aren't registered yet, initialize the container
+  if (!container.has('logger') || !container.has('config')) {
+    bootstrapServices();
+  }
+}
+
 export { BestPracticeLegalMCPServer };
-export class LegalMCPServer extends BestPracticeLegalMCPServer {}
+export class LegalMCPServer extends BestPracticeLegalMCPServer {
+  constructor() {
+    ensureBootstrapped();
+    super();
+  }
+}
 export type LegacyLegalMCPServer = BestPracticeLegalMCPServer & {
   run(): Promise<void>;
   listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;

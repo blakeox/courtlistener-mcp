@@ -323,11 +323,30 @@ export class BestPracticeLegalMCPServer {
       );
 
       const duration = Date.now() - startTime;
-      this.metrics.recordRequest(duration, false);
-      this.logger.toolExecution(request.params.name, duration, !(result as CallToolResult).isError, {
-        requestId,
-      });
 
+      // If a handler returned an error result, normalize to thrown Error (tests expect thrown on failure)
+      if ((result as CallToolResult).isError) {
+        this.metrics.recordFailure(duration);
+        // Try to extract a human-friendly error message from the text content
+        let message = `Tool ${request.params.name} failed`;
+        try {
+          const text: unknown = (result as any)?.content?.[0]?.text;
+          if (typeof text === 'string') {
+            const parsed = JSON.parse(text);
+            if (parsed?.error) message = parsed.error;
+            else if (typeof parsed === 'string') message = parsed;
+            else message = text;
+          }
+        } catch {
+          // ignore JSON parse issues, keep default message
+        }
+
+        this.logger.toolExecution(request.params.name, duration, false, { requestId, error: message });
+        throw new Error(message);
+      }
+
+      this.metrics.recordRequest(duration, false);
+      this.logger.toolExecution(request.params.name, duration, true, { requestId });
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
