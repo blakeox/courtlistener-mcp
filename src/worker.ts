@@ -25,7 +25,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, mcp-session-id',
         'Access-Control-Expose-Headers': 'mcp-session-id',
       },
     });
@@ -33,6 +33,34 @@ async function handleMCPRequest(request: Request): Promise<Response> {
 
   // For SSE connections, return a basic SSE stream
   if (request.method === 'GET') {
+    // Optional auth: if an auth token is configured, require either
+    // - Authorization: Bearer <token>
+    // - or a query param ?access_token=<token>
+    // Note: The actual secret is injected via Cloudflare Worker env (see fetch handler)
+
+    // @ts-ignore - env will be provided by the fetch() wrapper
+    const expectedToken: string | undefined = (globalThis as any).__SSE_AUTH_TOKEN__;
+    if (expectedToken) {
+      const auth = request.headers.get('authorization');
+      const url = new URL(request.url);
+      const qpToken = url.searchParams.get('access_token');
+      const bearer = auth?.toLowerCase().startsWith('bearer ')
+        ? auth.slice(7).trim()
+        : undefined;
+
+      const provided = bearer || qpToken || '';
+      if (!provided || provided !== expectedToken) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            'Content-Type': 'text/plain',
+            'Access-Control-Allow-Origin': '*',
+            'WWW-Authenticate': 'Bearer realm="mcp", error="invalid_token"',
+          },
+        });
+      }
+    }
+
     const sessionId = request.headers.get('mcp-session-id') || Math.random().toString(36).substring(7);
 
     // Create SSE stream using ReadableStream
@@ -210,6 +238,10 @@ export default {
 
       // SSE endpoint for MCP clients
       if (url.pathname === '/sse') {
+        // Bridge the secret from env to the handler scope.
+        // We can't pass env into handleMCPRequest directly without changing its signature,
+        // so we stash it on globalThis for this request.
+        (globalThis as any).__SSE_AUTH_TOKEN__ = env?.SSE_AUTH_TOKEN;
         return handleMCPRequest(request);
       }
 

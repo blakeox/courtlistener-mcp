@@ -14,7 +14,11 @@ import { spawn } from 'node:child_process';
 const DEFAULT_URL = 'https://courtlistener-mcp.blakeoxford.workers.dev/sse';
 const url = process.env.MCP_REMOTE_URL || DEFAULT_URL;
 
-const child = spawn('npx', ['@modelcontextprotocol/inspector', 'mcp-remote', url], {
+// If a token is provided, append it to the URL as access_token to avoid requiring custom headers
+const token = process.env.MCP_SSE_TOKEN;
+const urlWithToken = token ? `${url}${url.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(token)}` : url;
+
+const child = spawn('npx', ['@modelcontextprotocol/inspector', 'mcp-remote', urlWithToken], {
   stdio: 'inherit',
   env: process.env,
 });
