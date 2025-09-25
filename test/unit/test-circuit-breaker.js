@@ -27,12 +27,13 @@ class MockLogger {
 }
 
 // Import the actual CircuitBreaker components
-let CircuitBreaker, CircuitBreakerManager;
+let CircuitBreaker, CircuitBreakerManager, CircuitState;
 
 try {
   const circuitBreakerModule = await import('../../dist/circuit-breaker.js');
   CircuitBreaker = circuitBreakerModule.CircuitBreaker;
   CircuitBreakerManager = circuitBreakerModule.CircuitBreakerManager;
+  CircuitState = circuitBreakerModule.CircuitState;
 } catch (error) {
   console.log('⚠️ Circuit breaker module not found, creating mock tests');
 }
@@ -218,6 +219,148 @@ describe('Circuit Breaker', () => {
     });
   });
 
+  describe('Circuit Breaker Edge Cases', () => {
+    const tinyConfig = {
+      enabled: true,
+      failureThreshold: 1,
+      successThreshold: 2,
+      timeout: 50,
+      resetTimeout: 20,
+      monitoringWindow: 100
+    };
+
+    const singleSuccessConfig = {
+      enabled: true,
+      failureThreshold: 1,
+      successThreshold: 1,
+      timeout: 50,
+      resetTimeout: 20,
+      monitoringWindow: 100
+    };
+
+    it('should close after consecutive successes in half-open state', async () => {
+      if (!CircuitBreaker || !CircuitState) {
+        assert.ok(true, 'Circuit breaker not available - skipping test');
+        return;
+      }
+
+      const shortLogger = new MockLogger();
+      const shortBreaker = new CircuitBreaker('half-open-success', tinyConfig, shortLogger);
+
+      await assert.rejects(
+        () => shortBreaker.execute(async () => {
+          throw new Error('fail-fast');
+        }),
+        /fail-fast/
+      );
+
+      const openStats = shortBreaker.getStats();
+      assert.strictEqual(openStats.state, CircuitState.OPEN);
+      assert.ok(openStats.nextAttemptTime && openStats.nextAttemptTime > Date.now());
+
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      const firstResult = await shortBreaker.execute(async () => 'recovered-1');
+      assert.strictEqual(firstResult, 'recovered-1');
+
+      const halfOpenStats = shortBreaker.getStats();
+      assert.strictEqual(halfOpenStats.state, CircuitState.HALF_OPEN);
+      assert.strictEqual(halfOpenStats.successCount, 1);
+
+      const secondResult = await shortBreaker.execute(async () => 'recovered-2');
+      assert.strictEqual(secondResult, 'recovered-2');
+
+      const closedStats = shortBreaker.getStats();
+      assert.strictEqual(closedStats.state, CircuitState.CLOSED);
+      assert.strictEqual(closedStats.successCount, 0);
+      assert.strictEqual(closedStats.failureCount, 0);
+      assert.strictEqual(closedStats.nextAttemptTime, undefined);
+    });
+
+    it('should reopen immediately if half-open execution fails', async () => {
+      if (!CircuitBreaker || !CircuitState) {
+        assert.ok(true, 'Circuit breaker not available - skipping test');
+        return;
+      }
+
+      const shortLogger = new MockLogger();
+      const breaker = new CircuitBreaker('half-open-failure', tinyConfig, shortLogger);
+
+      await assert.rejects(
+        () => breaker.execute(async () => {
+          throw new Error('initial failure');
+        }),
+        /initial failure/
+      );
+
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      await assert.rejects(
+        () => breaker.execute(async () => {
+          throw new Error('half-open failure');
+        }),
+        /half-open failure/
+      );
+
+      const reopenedStats = breaker.getStats();
+      assert.strictEqual(reopenedStats.state, CircuitState.OPEN);
+      assert.ok(reopenedStats.nextAttemptTime && reopenedStats.nextAttemptTime > Date.now());
+      assert.strictEqual(reopenedStats.successCount, 0);
+    });
+
+    it('should report health status based on state and failure rate', async () => {
+      if (!CircuitBreaker || !CircuitState) {
+        assert.ok(true, 'Circuit breaker not available - skipping test');
+        return;
+      }
+
+      const healthLogger = new MockLogger();
+      const healthBreaker = new CircuitBreaker('health-check', singleSuccessConfig, healthLogger);
+
+      assert.strictEqual(healthBreaker.isHealthy(), true);
+
+      await assert.rejects(
+        () => healthBreaker.execute(async () => {
+          throw new Error('boom');
+        }),
+        /boom/
+      );
+
+      assert.strictEqual(healthBreaker.isHealthy(), false);
+
+      await new Promise(resolve => setTimeout(resolve, 25));
+      await healthBreaker.execute(async () => 'recovery');
+
+      assert.strictEqual(healthBreaker.isHealthy(), true);
+    });
+
+    it('should reset state and counters when reset is called', async () => {
+      if (!CircuitBreaker || !CircuitState) {
+        assert.ok(true, 'Circuit breaker not available - skipping test');
+        return;
+      }
+
+      const resetLogger = new MockLogger();
+      const resetBreaker = new CircuitBreaker('manual-reset', singleSuccessConfig, resetLogger);
+
+      await assert.rejects(
+        () => resetBreaker.execute(async () => {
+          throw new Error('reset failure');
+        }),
+        /reset failure/
+      );
+
+      resetBreaker.reset();
+
+      const stats = resetBreaker.getStats();
+      assert.strictEqual(stats.state, CircuitState.CLOSED);
+      assert.strictEqual(stats.failureCount, 0);
+      assert.strictEqual(stats.successCount, 0);
+      assert.strictEqual(stats.nextAttemptTime, undefined);
+      assert.strictEqual(resetBreaker.isHealthy(), true);
+    });
+  });
+
   describe('Circuit Breaker Statistics', () => {
     it('should provide execution statistics', () => {
       if (!CircuitBreaker) {
@@ -359,6 +502,39 @@ describe('Circuit Breaker Manager', () => {
       } else {
         assert.ok(true, 'Manager stats method not implemented');
       }
+    });
+
+    it('should reflect health status across managed breakers', async () => {
+      if (!CircuitBreakerManager || !CircuitBreaker) {
+        assert.ok(true, 'Circuit breaker manager not available - skipping test');
+        return;
+      }
+
+      const config = {
+        enabled: true,
+        failureThreshold: 1,
+        successThreshold: 1,
+        timeout: 50,
+        resetTimeout: 20,
+        monitoringWindow: 100
+      };
+
+      const healthyBreaker = manager.getBreaker('healthy-service', config);
+      const unhealthyBreaker = manager.getBreaker('unhealthy-service', config);
+
+      await healthyBreaker.execute(async () => 'ok');
+
+      await assert.rejects(
+        () => unhealthyBreaker.execute(async () => {
+          throw new Error('service failure');
+        }),
+        /service failure/
+      );
+
+      assert.strictEqual(manager.areAllHealthy(), false);
+
+      manager.resetAll();
+      assert.strictEqual(manager.areAllHealthy(), true);
     });
   });
 

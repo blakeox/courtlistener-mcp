@@ -1,3 +1,8 @@
+dist/
+coverage/
+node_modules/
+*.log
+*.lock
 # Prettier ignore patterns for Legal MCP Server
 
 # Build outputs

@@ -242,6 +242,20 @@ LOG_FORMAT=json
 METRICS_ENABLED=true
 METRICS_PORT=3001
 NODE_ENV=production
+
+# Remote SSE gateway (Cloudflare Worker)
+# Static token (fallback when OIDC is not configured)
+SSE_AUTH_TOKEN=your_shared_secret
+
+# OAuth/OIDC (preferred)
+OIDC_ISSUER=https://your-issuer.example.com
+OIDC_AUDIENCE=api://legal-mcp
+OIDC_JWKS_URL=https://your-issuer.example.com/.well-known/jwks.json # optional override
+OIDC_REQUIRED_SCOPE=mcp:connect
+
+# Connection limiting (protect remote SSE endpoint)
+MAX_SSE_CONNECTIONS=100             # global concurrent SSE connections (default 100)
+MAX_SSE_CONNECTIONS_PER_IP=5        # per-client IP concurrent connections (default 5)
 ```
 
 ### Health Monitoring

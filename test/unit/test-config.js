@@ -8,6 +8,11 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 
+async function importConfigFresh() {
+  const suffix = `${Date.now()}-${Math.random()}`;
+  return await import(`../../dist/infrastructure/config.js?t=${suffix}`);
+}
+
 describe('Configuration Management', () => {
   let originalEnv;
   
@@ -57,7 +62,7 @@ describe('Configuration Management', () => {
       delete process.env.CACHE_MAX_SIZE;
       
       // Use timestamp to force fresh import
-      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
+  const { getConfig } = await importConfigFresh();
       const config = getConfig();
       
       // Use actual defaults from config.ts: TTL=300, not 600
@@ -74,7 +79,7 @@ describe('Configuration Management', () => {
       process.env.METRICS_ENABLED = 'true'; // === 'true' = true  
       process.env.LOGGING_ENABLED = 'false'; // !== 'false' = false (should stay false)
       
-      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
+  const { getConfig } = await importConfigFresh();
       const config = getConfig();
       
       assert.strictEqual(config.cache.enabled, false);
@@ -94,7 +99,7 @@ describe('Configuration Management', () => {
       process.env.COURTLISTENER_TIMEOUT = '60000';
       
       // Use timestamp to force fresh import instead of require.cache
-      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
+  const { getConfig } = await importConfigFresh();
       const config = getConfig();
       
       assert.strictEqual(config.cache.ttl, 900);
@@ -156,7 +161,7 @@ describe('Configuration Management', () => {
       // Clear LOG_LEVEL to ensure we get default
       delete process.env.LOG_LEVEL;
       
-      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
+  const { getConfig } = await importConfigFresh();
       const config = getConfig();
       
       // These are the actual defaults regardless of environment
@@ -172,7 +177,7 @@ describe('Configuration Management', () => {
       // Explicitly set log level since config doesn't auto-adjust for environment
       process.env.LOG_LEVEL = 'warn';
       
-      const { getConfig } = await import(`../../dist/infrastructure/config.js?t=${Date.now()}`);
+  const { getConfig } = await importConfigFresh();
       const config = getConfig();
       
       assert.strictEqual(config.logging.level, 'warn');
