@@ -14,8 +14,34 @@ export interface SanitizationConfig {
   blockedPatterns: RegExp[];
 }
 
+/**
+ * Sanitizable value types - recursive union for any JSON-like structure
+ */
+export type SanitizableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | SanitizableValue[]
+  | { [key: string]: SanitizableValue };
+
+/**
+ * JSON Schema for validation
+ */
+export interface JsonSchema {
+  type?: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+  required?: boolean;
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+}
+
 export interface SanitizationResult {
-  sanitized: any;
+  sanitized: SanitizableValue;
   warnings: string[];
   blocked: boolean;
   reason?: string;
@@ -62,10 +88,10 @@ export class InputSanitizer {
   /**
    * Sanitize and validate input data
    */
-  sanitize(input: any, path: string = 'root'): SanitizationResult {
+  sanitize(input: unknown, path: string = 'root'): SanitizationResult {
     if (!this.config.enabled) {
       return {
-        sanitized: input,
+        sanitized: input as SanitizableValue,
         warnings: [],
         blocked: false,
       };
@@ -84,6 +110,7 @@ export class InputSanitizer {
       this.logger.warn('Sanitization failed', { path, error: errorMessage });
       result.blocked = true;
       result.reason = `Sanitization failed: ${errorMessage}`;
+      result.sanitized = null;
     }
 
     if (result.warnings.length > 0) {
@@ -99,7 +126,12 @@ export class InputSanitizer {
   /**
    * Recursively sanitize a value
    */
-  private sanitizeValue(value: any, path: string, depth: number, result: SanitizationResult): any {
+  private sanitizeValue(
+    value: unknown,
+    path: string,
+    depth: number,
+    result: SanitizationResult
+  ): SanitizableValue {
     // Check depth limit
     if (depth > this.config.maxObjectDepth) {
       throw new Error(`Maximum object depth (${this.config.maxObjectDepth}) exceeded at ${path}`);
@@ -121,21 +153,23 @@ export class InputSanitizer {
 
     // Handle arrays
     if (Array.isArray(value)) {
+      let arrayToProcess = value;
       if (value.length > this.config.maxArrayLength) {
         result.warnings.push(`Array truncated at ${path} (length: ${value.length})`);
-        value = value.slice(0, this.config.maxArrayLength);
+        arrayToProcess = value.slice(0, this.config.maxArrayLength);
       }
 
-      return value.map((item: any, index: number) =>
+      return arrayToProcess.map((item, index: number) =>
         this.sanitizeValue(item, `${path}[${index}]`, depth + 1, result),
       );
     }
 
     // Handle objects
     if (typeof value === 'object') {
-      const sanitized: any = {};
+      const sanitized: Record<string, SanitizableValue> = {};
+      const objValue = value as Record<string, unknown>;
 
-      for (const [key, val] of Object.entries(value)) {
+      for (const [key, val] of Object.entries(objValue)) {
         const sanitizedKey = this.sanitizeString(key, `${path}.${key}`, result);
         sanitized[sanitizedKey] = this.sanitizeValue(val, `${path}.${key}`, depth + 1, result);
       }
@@ -187,8 +221,8 @@ export class InputSanitizer {
    * Validate that input conforms to expected schema
    */
   validateSchema(
-    input: any,
-    schema: any,
+    input: unknown,
+    schema: JsonSchema,
     path: string = 'root',
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -209,7 +243,7 @@ export class InputSanitizer {
   /**
    * Recursively validate value against schema
    */
-  private validateValue(value: any, schema: any, path: string, errors: string[]): void {
+  private validateValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
     if (schema.type) {
       const actualType = Array.isArray(value) ? 'array' : typeof value;
 
@@ -224,15 +258,18 @@ export class InputSanitizer {
       return;
     }
 
-    if (schema.properties && typeof value === 'object' && !Array.isArray(value)) {
+    if (schema.properties && typeof value === 'object' && !Array.isArray(value) && value !== null) {
+      const objValue = value as Record<string, unknown>;
       for (const [prop, propSchema] of Object.entries(schema.properties)) {
-        this.validateValue(value[prop], propSchema, `${path}.${prop}`, errors);
+        this.validateValue(objValue[prop], propSchema, `${path}.${prop}`, errors);
       }
     }
 
     if (schema.items && Array.isArray(value)) {
       value.forEach((item, index) => {
-        this.validateValue(item, schema.items, `${path}[${index}]`, errors);
+        if (schema.items) {
+          this.validateValue(item, schema.items, `${path}[${index}]`, errors);
+        }
       });
     }
 

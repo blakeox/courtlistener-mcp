@@ -28,8 +28,8 @@ export interface AuditEvent {
   toolName?: string;
   clientId?: string;
   authContext: AuthContext;
-  requestArgs?: any;
-  responseData?: any;
+  requestArgs?: Record<string, unknown>;
+  responseData?: unknown;
   duration: number;
   success: boolean;
   error?: string;
@@ -138,12 +138,12 @@ export class AuditLogger {
     correlationId: string,
     toolName: string,
     authContext: AuthContext,
-    requestArgs: any,
-    responseData: any,
+    requestArgs: Record<string, unknown>,
+    responseData: unknown,
     duration: number,
     success: boolean,
     error?: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): AuditEvent {
     return {
       correlationId,
@@ -155,7 +155,7 @@ export class AuditLogger {
         isAuthenticated: authContext.isAuthenticated,
         permissions: authContext.permissions,
       },
-      requestArgs: this.auditConfig.includeRequestBody ? this.truncateData(requestArgs) : undefined,
+      requestArgs: this.auditConfig.includeRequestBody ? this.truncateData(requestArgs) as Record<string, unknown> : undefined,
       responseData: this.auditConfig.includeResponseBody
         ? this.truncateData(responseData)
         : undefined,
@@ -174,7 +174,7 @@ export class AuditLogger {
     authContext: AuthContext,
     success: boolean,
     error?: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): AuditEvent {
     return {
       correlationId,
@@ -200,7 +200,7 @@ export class AuditLogger {
 
     // Remove sensitive fields from request args
     if (sanitized.requestArgs) {
-      sanitized.requestArgs = this.removeSensitiveFields(sanitized.requestArgs);
+      sanitized.requestArgs = this.removeSensitiveFields(sanitized.requestArgs) as Record<string, unknown>;
     }
 
     // Remove sensitive fields from response data
@@ -222,12 +222,14 @@ export class AuditLogger {
   /**
    * Remove sensitive fields from data
    */
-  private removeSensitiveFields(data: any): any {
+  private removeSensitiveFields(data: unknown): unknown {
     if (!data || typeof data !== 'object') {
       return data;
     }
 
-    const cleaned = Array.isArray(data) ? [...data] : { ...data };
+    const cleaned: Record<string, unknown> = Array.isArray(data) 
+      ? ([...data] as unknown as Record<string, unknown>)
+      : { ...(data as Record<string, unknown>) };
 
     for (const field of this.auditConfig.sensitiveFields) {
       if (field in cleaned) {
@@ -248,7 +250,7 @@ export class AuditLogger {
   /**
    * Truncate data to maximum length
    */
-  private truncateData(data: any): any {
+  private truncateData(data: unknown): unknown {
     if (!data) {
       return data;
     }
@@ -262,7 +264,7 @@ export class AuditLogger {
     const truncated = jsonString.substring(0, this.auditConfig.maxBodyLength);
 
     try {
-      return JSON.parse(truncated + '"}');
+      return JSON.parse(truncated + '"}') as unknown;
     } catch {
       return {
         _truncated: true,

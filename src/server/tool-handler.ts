@@ -4,7 +4,9 @@
  */
 
 import { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { Result } from '../common/types.js';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { Result, success, failure } from '../common/types.js';
 import { CacheManager } from '../infrastructure/cache.js';
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
@@ -179,5 +181,77 @@ export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
       ],
       isError: true,
     };
+  }
+}
+
+/**
+ * Typed Tool Handler with Automatic Validation and Schema Generation
+ * 
+ * This class provides:
+ * - Automatic input validation from Zod schemas
+ * - Type inference for input/output
+ * - Auto-generated JSON schemas
+ * - Reduced boilerplate
+ * 
+ * @example
+ * ```typescript
+ * const searchSchema = z.object({
+ *   query: z.string().optional(),
+ *   court: z.string().optional(),
+ *   page: z.number().int().min(1).default(1),
+ * });
+ * 
+ * export class SearchHandler extends TypedToolHandler {
+ *   readonly name = 'search';
+ *   readonly description = 'Search cases';
+ *   readonly category = 'search';
+ *   protected readonly schema = searchSchema;
+ *   
+ *   // Input is automatically typed!
+ *   async execute(input: z.infer<typeof searchSchema>, context: ToolContext) {
+ *     // TypeScript knows input has query, court, page properties
+ *     const results = await this.apiClient.search(input);
+ *     return this.success(results);
+ *   }
+ * }
+ * ```
+ */
+export abstract class TypedToolHandler<
+  TSchema extends z.ZodTypeAny = z.ZodTypeAny,
+  TInput = z.infer<TSchema>,
+  TOutput = unknown
+> extends BaseToolHandler<TInput, TOutput> {
+  /**
+   * Zod schema for input validation
+   * Define this in your subclass for automatic validation and type inference
+   */
+  protected abstract readonly schema: TSchema;
+
+  /**
+   * Validate input using the defined Zod schema
+   * This is automatically implemented - no need to override
+   */
+  validate(input: unknown): Result<TInput, Error> {
+    try {
+      const validated = this.schema.parse(input) as TInput;
+      return success(validated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return failure(new Error(`Validation failed: ${message}`));
+      }
+      return failure(error as Error);
+    }
+  }
+
+  /**
+   * Get JSON Schema from Zod schema
+   * This is automatically implemented - no need to override
+   */
+  getSchema(): Record<string, unknown> {
+    return zodToJsonSchema(this.schema, {
+      target: 'openApi3',
+      $refStrategy: 'none',
+    }) as Record<string, unknown>;
   }
 }
