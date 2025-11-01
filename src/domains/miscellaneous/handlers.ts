@@ -1,69 +1,55 @@
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { Result } from '../../common/types.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 /**
+ * Zod schemas for miscellaneous handlers
+ */
+const getFinancialDisclosuresSchema = z.object({
+  judge_id: z.union([z.string(), z.number()]).transform(String).optional(),
+  year: z.number().min(1990).max(new Date().getFullYear()).optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+});
+
+const getFinancialDisclosureSchema = z.object({
+  disclosure_id: z.union([z.string(), z.number()]).transform(String),
+});
+
+const getPartiesAndAttorneysSchema = z.object({
+  docket_id: z.union([z.string(), z.number()]).transform(String),
+  include_attorneys: z.boolean().optional().default(true),
+  include_parties: z.boolean().optional().default(true),
+});
+
+const manageAlertsSchema = z.object({
+  action: z.enum(['create', 'list', 'update', 'delete']),
+  alert_id: z.union([z.string(), z.number()]).transform(String).optional(),
+  query: z.string().optional(),
+  frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  alert_type: z.enum(['case', 'opinion', 'docket']).optional(),
+});
+
+/**
  * Handler for getting financial disclosures
  */
-export class GetFinancialDisclosuresHandler extends BaseToolHandler {
+export class GetFinancialDisclosuresHandler extends TypedToolHandler<
+  typeof getFinancialDisclosuresSchema
+> {
   readonly name = 'get_financial_disclosures';
   readonly description = 'Get financial disclosures for judges';
   readonly category = 'financial';
+  protected readonly schema = getFinancialDisclosuresSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        judge_id: z.union([z.string(), z.number()]).transform(String).optional(),
-        year: z.number().min(1990).max(new Date().getFullYear()).optional(),
-        page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        judge_id: {
-          type: ['string', 'number'],
-          description: 'Filter by specific judge ID',
-        },
-        year: {
-          type: 'number',
-          minimum: 1990,
-          maximum: new Date().getFullYear(),
-          description: 'Filter by disclosure year',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-          default: 1,
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of disclosures per page',
-          default: 20,
-        },
-      },
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getFinancialDisclosuresSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting financial disclosures', {
         judgeId: input.judge_id,
@@ -94,49 +80,29 @@ export class GetFinancialDisclosuresHandler extends BaseToolHandler {
 /**
  * Handler for getting specific financial disclosure
  */
-export class GetFinancialDisclosureHandler extends BaseToolHandler {
+export class GetFinancialDisclosureHandler extends TypedToolHandler<
+  typeof getFinancialDisclosureSchema
+> {
   readonly name = 'get_financial_disclosure';
   readonly description = 'Get details of a specific financial disclosure';
   readonly category = 'financial';
+  protected readonly schema = getFinancialDisclosureSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        disclosure_id: z.union([z.string(), z.number()]).transform(String),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        disclosure_id: {
-          type: ['string', 'number'],
-          description: 'Financial disclosure ID to retrieve',
-        },
-      },
-      required: ['disclosure_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getFinancialDisclosureSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting financial disclosure', {
         disclosureId: input.disclosure_id,
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.getFinancialDisclosure(input.disclosure_id);
+      const response = await this.apiClient.getFinancialDisclosure(parseInt(input.disclosure_id));
 
       return this.success({
         summary: `Retrieved financial disclosure ${input.disclosure_id}`,
@@ -155,54 +121,22 @@ export class GetFinancialDisclosureHandler extends BaseToolHandler {
 /**
  * Handler for getting parties and attorneys
  */
-export class GetPartiesAndAttorneysHandler extends BaseToolHandler {
+export class GetPartiesAndAttorneysHandler extends TypedToolHandler<
+  typeof getPartiesAndAttorneysSchema
+> {
   readonly name = 'get_parties_and_attorneys';
   readonly description = 'Get parties and attorneys information for a case';
   readonly category = 'legal-entities';
+  protected readonly schema = getPartiesAndAttorneysSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        docket_id: z.union([z.string(), z.number()]).transform(String),
-        include_attorneys: z.boolean().optional().default(true),
-        include_parties: z.boolean().optional().default(true),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        docket_id: {
-          type: ['string', 'number'],
-          description: 'Docket ID to get parties and attorneys for',
-        },
-        include_attorneys: {
-          type: 'boolean',
-          description: 'Whether to include attorney information',
-          default: true,
-        },
-        include_parties: {
-          type: 'boolean',
-          description: 'Whether to include party information',
-          default: true,
-        },
-      },
-      required: ['docket_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getPartiesAndAttorneysSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting parties and attorneys', {
         docketId: input.docket_id,
@@ -228,65 +162,20 @@ export class GetPartiesAndAttorneysHandler extends BaseToolHandler {
 /**
  * Handler for managing alerts
  */
-export class ManageAlertsHandler extends BaseToolHandler {
+export class ManageAlertsHandler extends TypedToolHandler<typeof manageAlertsSchema> {
   readonly name = 'manage_alerts';
   readonly description = 'Manage legal alerts and notifications';
   readonly category = 'alerts';
+  protected readonly schema = manageAlertsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        action: z.enum(['create', 'list', 'update', 'delete']),
-        alert_id: z.union([z.string(), z.number()]).transform(String).optional(),
-        query: z.string().optional(),
-        frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-        alert_type: z.enum(['case', 'opinion', 'docket']).optional(),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['create', 'list', 'update', 'delete'],
-          description: 'Action to perform on alerts',
-        },
-        alert_id: {
-          type: ['string', 'number'],
-          description: 'Alert ID (required for update/delete)',
-        },
-        query: {
-          type: 'string',
-          description: 'Search query for the alert (required for create)',
-        },
-        frequency: {
-          type: 'string',
-          enum: ['daily', 'weekly', 'monthly'],
-          description: 'Alert frequency',
-        },
-        alert_type: {
-          type: 'string',
-          enum: ['case', 'opinion', 'docket'],
-          description: 'Type of content to alert on',
-        },
-      },
-      required: ['action'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof manageAlertsSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Managing alerts', {
         action: input.action,
