@@ -9,20 +9,24 @@
 ## 🎯 Executive Summary
 
 This roadmap identifies opportunities for further refactoring to improve:
+
 - **Type Safety**: Replace 253 `any` types with specific types
 - **Code Duplication**: Extract common patterns from 3,106 lines of handler code
 - **Complexity**: Refactor 10+ functions over 100 lines
-- **Maintainability**: Standardize validation, schema generation, and error handling
+- **Maintainability**: Standardize validation, schema generation, and error
+  handling
 
 **Estimated Effort**: 4-6 days  
 **Risk Level**: Low (incremental, testable changes)  
-**Expected Impact**: High (improved maintainability, type safety, and developer experience)
+**Expected Impact**: High (improved maintainability, type safety, and developer
+experience)
 
 ---
 
 ## 📊 Current State Analysis
 
 ### Code Metrics
+
 - **Total Source Files**: 75 TypeScript files
 - **Total Test Files**: 57 TypeScript files
 - **Largest Files**: 10 files over 500 lines
@@ -33,22 +37,25 @@ This roadmap identifies opportunities for further refactoring to improve:
 ### Identified Issues
 
 #### 1. Type Safety (Critical Priority)
+
 ```bash
 Found 253 `any` types across:
   - src/middleware/sanitization.ts: 9 instances
-  - src/middleware/audit.ts: 4 instances  
+  - src/middleware/audit.ts: 4 instances
   - src/infrastructure/*: 45 instances
   - src/domains/*/handlers.ts: 150+ instances
   - src/endpoints/*: 15 instances
 ```
 
 #### 2. Code Duplication (High Priority)
+
 - **Validation Patterns**: Every handler has near-identical `validate()` methods
 - **Schema Generation**: Every handler has similar `getSchema()` methods
 - **Error Handling**: Repetitive try-catch-return patterns
 - **Caching Logic**: Duplicate cache check/set patterns
 
 #### 3. Large Files (Medium Priority)
+
 ```
 src/domains/enhanced/handlers.ts    871 lines
 src/infrastructure/openapi-generator.ts    858 lines
@@ -63,6 +70,7 @@ src/infrastructure/enhanced-express-server.ts    548 lines
 ```
 
 #### 4. Complex Functions (Medium Priority)
+
 ```
 src/tool-definitions.ts:15    519 lines (massive!)
 src/infrastructure/openapi-generator.ts:158    268 lines
@@ -83,6 +91,7 @@ src/domains/search/handlers.ts:57    147 lines
 **File**: `src/middleware/sanitization.ts`
 
 **Current Issues**:
+
 ```typescript
 sanitized: any;
 sanitize(input: any, path: string = 'root'): SanitizationResult
@@ -90,15 +99,16 @@ private sanitizeValue(value: any, ...): any
 ```
 
 **Proposed Fix**:
+
 ```typescript
 // Define proper recursive types
-export type SanitizableValue = 
-  | string 
-  | number 
-  | boolean 
-  | null 
+export type SanitizableValue =
+  | string
+  | number
+  | boolean
+  | null
   | undefined
-  | SanitizableValue[] 
+  | SanitizableValue[]
   | { [key: string]: SanitizableValue };
 
 export interface SanitizationResult {
@@ -113,16 +123,16 @@ export class InputSanitizer {
     if (this.isBlocked(input)) {
       return { sanitized: null, warnings: [], blocked: true };
     }
-    
+
     const sanitized = this.sanitizeValue(input, path, 0, result);
     return { sanitized, warnings: result.warnings, blocked: false };
   }
-  
+
   private sanitizeValue(
-    value: unknown, 
-    path: string, 
-    depth: number, 
-    result: SanitizationResult
+    value: unknown,
+    path: string,
+    depth: number,
+    result: SanitizationResult,
   ): SanitizableValue {
     // Use type guards for safe handling
     if (isString(value)) return this.sanitizeString(value);
@@ -131,13 +141,14 @@ export class InputSanitizer {
     if (isNull(value) || isUndefined(value)) return null;
     if (isArray(value)) return this.sanitizeArray(value, path, depth, result);
     if (isObject(value)) return this.sanitizeObject(value, path, depth, result);
-    
+
     return null; // Unknown types become null
   }
 }
 ```
 
-**Impact**: ✅ Type-safe sanitization, better IDE support, prevents runtime errors
+**Impact**: ✅ Type-safe sanitization, better IDE support, prevents runtime
+errors
 
 ---
 
@@ -146,6 +157,7 @@ export class InputSanitizer {
 **File**: `src/middleware/audit.ts`
 
 **Current Issues**:
+
 ```typescript
 requestArgs?: any;
 responseData?: any;
@@ -153,6 +165,7 @@ private removeSensitiveFields(data: any): any
 ```
 
 **Proposed Fix**:
+
 ```typescript
 // Use specific types for audit data
 export interface AuditEventData {
@@ -171,20 +184,18 @@ export interface AuditEvent extends AuditEventData {
 
 export class AuditLoggingMiddleware {
   private removeSensitiveFields(
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
   ): Record<string, unknown> {
     const sanitized = { ...data };
-    
+
     for (const field of this.sensitiveFields) {
       delete sanitized[field];
     }
-    
+
     return sanitized;
   }
-  
-  private truncateData(
-    data: Record<string, unknown>
-  ): Record<string, unknown> {
+
+  private truncateData(data: Record<string, unknown>): Record<string, unknown> {
     // Type-safe truncation logic
   }
 }
@@ -199,6 +210,7 @@ export class AuditLoggingMiddleware {
 **File**: `src/infrastructure/error-types.ts`
 
 **Current Issues**:
+
 ```typescript
 value?: any;
 validationErrors: Array<{ field: string; message: string; value?: any }>
@@ -207,6 +219,7 @@ addData(key: string, value: any): this
 ```
 
 **Proposed Fix**:
+
 ```typescript
 // Use unknown for user-provided values, then validate
 export interface ValidationError {
@@ -218,11 +231,11 @@ export interface ValidationError {
 
 export class ConfigurationError extends BaseError {
   public readonly validationErrors: ValidationError[];
-  
+
   constructor(
     message: string,
     validationErrors: ValidationError[] = [],
-    context?: ErrorContext
+    context?: ErrorContext,
   ) {
     super(message, 'CONFIGURATION_ERROR', context);
     this.validationErrors = validationErrors;
@@ -235,7 +248,7 @@ export class ApiError extends BaseError {
     statusText: string;
     data: unknown;
   };
-  
+
   addData(key: string, value: unknown): this {
     this.context = this.context || {};
     this.context[key] = value;
@@ -255,6 +268,7 @@ export class ApiError extends BaseError {
 **Strategy**: Create reusable validation base class
 
 **Current Pattern** (repeated in every handler):
+
 ```typescript
 export class SomeHandler extends BaseToolHandler {
   validate(input: any): Result<any, Error> {
@@ -266,11 +280,11 @@ export class SomeHandler extends BaseToolHandler {
       return { success: false, error: error as Error };
     }
   }
-  
+
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     // implementation
   }
-  
+
   getSchema(): any {
     return { type: 'object', properties: { ... } };
   }
@@ -278,15 +292,16 @@ export class SomeHandler extends BaseToolHandler {
 ```
 
 **Proposed Pattern**:
+
 ```typescript
 // New generic base handler with type inference
 export abstract class TypedToolHandler<
   TInput = unknown,
-  TOutput = unknown
+  TOutput = unknown,
 > extends BaseToolHandler {
   // Abstract Zod schema - subclasses define this
   protected abstract readonly schema: z.ZodType<TInput>;
-  
+
   // Automatic validation with type inference
   validate(input: unknown): Result<TInput, Error> {
     try {
@@ -296,13 +311,13 @@ export abstract class TypedToolHandler<
       return { success: false, error: error as Error };
     }
   }
-  
+
   // Type-safe execute with inferred types
   abstract execute(
-    input: TInput, 
-    context: ToolContext
+    input: TInput,
+    context: ToolContext,
   ): Promise<CallToolResult<TOutput>>;
-  
+
   // Auto-generate JSON Schema from Zod schema
   getSchema(): JSONSchema {
     return zodToJsonSchema(this.schema);
@@ -320,11 +335,11 @@ export class SearchOpinionsHandler extends TypedToolHandler<
     page: z.number().int().min(1).default(1),
     page_size: z.number().int().min(1).max(100).default(20),
   });
-  
+
   // Input is automatically typed as SearchOpinionsInput!
   async execute(
-    input: z.infer<typeof this.schema>, 
-    context: ToolContext
+    input: z.infer<typeof this.schema>,
+    context: ToolContext,
   ): Promise<CallToolResult> {
     // Fully type-safe implementation
     // TypeScript knows exactly what properties input has
@@ -333,6 +348,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 ```
 
 **Benefits**:
+
 - ✅ **Type Safety**: Input automatically typed from Zod schema
 - ✅ **DRY**: No more repeated validation boilerplate
 - ✅ **Auto-generation**: JSON Schema generated from Zod
@@ -340,6 +356,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 - ✅ **Maintainability**: Change schema, validation updates automatically
 
 **Files to Update** (150+ instances eliminated):
+
 - `src/domains/cases/handlers.ts` - 3 handlers
 - `src/domains/courts/handlers.ts` - 3 handlers
 - `src/domains/dockets/handlers.ts` - 5 handlers
@@ -349,7 +366,8 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 - `src/domains/oral-arguments/handlers.ts` - 2 handlers
 - `src/domains/search/handlers.ts` - 3 handlers
 
-**Impact**: 
+**Impact**:
+
 - ✅ Eliminate ~900 lines of boilerplate code
 - ✅ Full type safety across all handlers
 - ✅ Automatic schema generation
@@ -366,12 +384,14 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 **File**: `src/infrastructure/enhanced-api-client.ts`
 
 **Issues**:
+
 ```typescript
 async searchOpinions(params: any, priority: number = 0): Promise<any>
 async searchCases(params: any, priority: number = 0): Promise<any>
 ```
 
 **Fix**: Define proper interfaces for all API methods:
+
 ```typescript
 export interface SearchParams {
   query?: string;
@@ -390,15 +410,15 @@ export interface SearchResponse<T> {
 
 export class EnhancedCourtListenerAPIClient {
   async searchOpinions(
-    params: SearchParams, 
-    priority: number = 0
+    params: SearchParams,
+    priority: number = 0,
   ): Promise<SearchResponse<Opinion>> {
     // Type-safe implementation
   }
-  
+
   async searchCases(
-    params: SearchParams, 
-    priority: number = 0
+    params: SearchParams,
+    priority: number = 0,
   ): Promise<SearchResponse<Case>> {
     // Type-safe implementation
   }
@@ -410,24 +430,26 @@ export class EnhancedCourtListenerAPIClient {
 **File**: `src/infrastructure/openapi-generator.ts`
 
 **Issues**:
+
 ```typescript
 public addPath(path: string, method: string, operation: any): void
 private convertToYaml(obj: any, indent: number): string
 ```
 
 **Fix**: Use proper OpenAPI types:
+
 ```typescript
 import { OpenAPIV3 } from 'openapi-types';
 
 export class OpenAPIGenerator {
   public addPath(
-    path: string, 
-    method: string, 
-    operation: OpenAPIV3.OperationObject
+    path: string,
+    method: string,
+    operation: OpenAPIV3.OperationObject,
   ): void {
     // Type-safe path operations
   }
-  
+
   private convertToYaml(obj: OpenAPIV3.Document, indent: number): string {
     // Type-safe YAML conversion
   }
@@ -449,6 +471,7 @@ export class OpenAPIGenerator {
 ##### Pattern 1: Caching Logic (Repeated 32 times)
 
 **Current** (repeated in every handler):
+
 ```typescript
 async execute(input: TInput, context: ToolContext): Promise<CallToolResult> {
   const cacheKey = 'some_handler';
@@ -457,50 +480,51 @@ async execute(input: TInput, context: ToolContext): Promise<CallToolResult> {
     context.logger.info('Served from cache', { requestId: context.requestId });
     return this.success(cached);
   }
-  
+
   // ... do work ...
-  
+
   context.cache?.set(cacheKey, input, result, 3600);
   return this.success(result);
 }
 ```
 
 **Proposed**: Extract to mixin or decorator:
+
 ```typescript
 // src/server/handler-decorators.ts
 export function withCache(ttl: number = 3600) {
   return function <T extends TypedToolHandler>(
     target: T,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
-    
-    descriptor.value = async function(
-      this: T, 
-      input: unknown, 
-      context: ToolContext
+
+    descriptor.value = async function (
+      this: T,
+      input: unknown,
+      context: ToolContext,
     ) {
       const cacheKey = this.name;
       const cached = context.cache?.get(cacheKey, input);
-      
+
       if (cached) {
-        context.logger.info('Served from cache', { 
+        context.logger.info('Served from cache', {
           tool: this.name,
-          requestId: context.requestId 
+          requestId: context.requestId,
         });
         return this.success(cached);
       }
-      
+
       const result = await originalMethod.call(this, input, context);
-      
+
       if (result.isError === false) {
         context.cache?.set(cacheKey, input, result.content, ttl);
       }
-      
+
       return result;
     };
-    
+
     return descriptor;
   };
 }
@@ -519,6 +543,7 @@ export class SearchOpinionsHandler extends TypedToolHandler {
 ##### Pattern 2: Error Logging (Repeated 32 times)
 
 **Current**:
+
 ```typescript
 catch (error) {
   context.logger.error('Failed to ...', error as Error, {
@@ -530,6 +555,7 @@ catch (error) {
 ```
 
 **Proposed**: Extract to helper method in `BaseToolHandler`:
+
 ```typescript
 export abstract class BaseToolHandler {
   protected handleError(
@@ -538,13 +564,13 @@ export abstract class BaseToolHandler {
     additionalContext?: Record<string, unknown>
   ): CallToolResult {
     const err = error instanceof Error ? error : new Error(String(error));
-    
+
     context.logger.error(`Failed to execute ${this.name}`, err, {
       requestId: context.requestId,
       tool: this.name,
       ...additionalContext,
     });
-    
+
     return this.error(err.message, additionalContext);
   }
 }
@@ -558,6 +584,7 @@ catch (error) {
 ##### Pattern 3: Response Formatting (Repeated 32 times)
 
 **Proposed**: Extract to `ResponseBuilder` (already exists, expand it):
+
 ```typescript
 // src/common/response-builder.ts
 export class ResponseBuilder {
@@ -565,7 +592,7 @@ export class ResponseBuilder {
     results: T[],
     count: number,
     page: number,
-    pageSize: number
+    pageSize: number,
   ): PaginatedResponse<T> {
     return {
       results,
@@ -577,10 +604,10 @@ export class ResponseBuilder {
       has_previous: page > 1,
     };
   }
-  
+
   static withMetadata<T>(
     data: T,
-    metadata: ResponseMetadata
+    metadata: ResponseMetadata,
   ): EnhancedResponse<T> {
     return {
       data,
@@ -594,7 +621,8 @@ export class ResponseBuilder {
 }
 ```
 
-**Impact**: 
+**Impact**:
+
 - ✅ Reduce handler code by ~40% (1,200+ lines)
 - ✅ Consistent patterns across all handlers
 - ✅ Easier to add new handlers
@@ -606,9 +634,11 @@ export class ResponseBuilder {
 
 **Estimated Time**: 4-6 hours
 
-**Problem**: `tool-definitions.ts` is 569 lines of manual schema definitions that duplicate Zod schemas in handlers
+**Problem**: `tool-definitions.ts` is 569 lines of manual schema definitions
+that duplicate Zod schemas in handlers
 
 **Current State**:
+
 - Handlers define Zod schemas for validation
 - `tool-definitions.ts` manually defines JSON schemas for MCP
 - These can drift out of sync
@@ -619,15 +649,15 @@ export class ResponseBuilder {
 // src/server/tool-registry.ts (enhanced)
 export class ToolHandlerRegistry {
   private handlers = new Map<string, TypedToolHandler>();
-  
+
   // Register handler (existing)
   register(handler: TypedToolHandler): void {
     this.handlers.set(handler.name, handler);
   }
-  
+
   // NEW: Generate tool definitions from registered handlers
   generateToolDefinitions(): EnhancedTool[] {
-    return Array.from(this.handlers.values()).map(handler => ({
+    return Array.from(this.handlers.values()).map((handler) => ({
       name: handler.name,
       description: handler.description,
       category: handler.category,
@@ -637,45 +667,42 @@ export class ToolHandlerRegistry {
       examples: handler.examples || [],
     }));
   }
-  
+
   // NEW: Generate OpenAPI spec from handlers
   generateOpenAPISpec(): OpenAPIV3.Document {
     const generator = new OpenAPIGenerator();
-    
+
     for (const handler of this.handlers.values()) {
-      generator.addPath(
-        `/tools/${handler.name}`,
-        'post',
-        {
-          summary: handler.description,
-          tags: [handler.category],
-          requestBody: {
+      generator.addPath(`/tools/${handler.name}`, 'post', {
+        summary: handler.description,
+        tags: [handler.category],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: handler.getSchema(),
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Success',
             content: {
               'application/json': {
-                schema: handler.getSchema(),
+                schema: { type: 'object' },
               },
             },
           },
-          responses: {
-            '200': {
-              description: 'Success',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' },
-                },
-              },
-            },
-          },
-        }
-      );
+        },
+      });
     }
-    
+
     return generator.getSpec();
   }
 }
 ```
 
 **Benefits**:
+
 - ✅ Single source of truth (Zod schemas)
 - ✅ No drift between validation and documentation
 - ✅ Auto-update schemas when handlers change
@@ -694,6 +721,7 @@ export class ToolHandlerRegistry {
 **Current**: 8 handlers in one file
 
 **Proposed**: Split into focused files:
+
 ```
 src/domains/enhanced/
 ├── handlers/
@@ -711,6 +739,7 @@ src/domains/enhanced/
 ```
 
 **Benefits**:
+
 - ✅ Easier to navigate (8 files × ~100 lines each)
 - ✅ Better git history (changes isolated)
 - ✅ Parallel development (no merge conflicts)
@@ -719,6 +748,7 @@ src/domains/enhanced/
 #### Split `infrastructure/openapi-generator.ts` (858 lines)
 
 **Proposed**:
+
 ```
 src/infrastructure/openapi/
 ├── generator.ts         (main class, ~200 lines)
@@ -739,6 +769,7 @@ src/infrastructure/openapi/
 **Current**: One massive function with 32 tool definitions
 
 **Proposed**: Split into domain-specific files:
+
 ```typescript
 // src/tool-definitions/index.ts
 export function getEnhancedToolDefinitions(): EnhancedTool[] {
@@ -788,33 +819,34 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
 **Problem**: API client methods take loose `params` objects
 
 **Proposed**: Type-safe fluent query builder:
+
 ```typescript
 // src/infrastructure/query-builder.ts
 export class OpinionQueryBuilder {
   private params: Record<string, unknown> = {};
-  
+
   query(text: string): this {
     this.params.query = text;
     return this;
   }
-  
+
   court(courtId: string): this {
     this.params.court = courtId;
     return this;
   }
-  
+
   dateRange(after: string, before?: string): this {
     this.params.date_filed_after = after;
     if (before) this.params.date_filed_before = before;
     return this;
   }
-  
+
   paginate(page: number, pageSize: number = 20): this {
     this.params.page = page;
     this.params.page_size = pageSize;
     return this;
   }
-  
+
   build(): SearchParams {
     return this.params as SearchParams;
   }
@@ -838,32 +870,33 @@ const results = await apiClient.searchOpinions(params);
 **Estimated Time**: 2-3 hours
 
 **Proposed**: Structured logging for all tool calls:
+
 ```typescript
 // src/middleware/request-logger.ts
 export class RequestLoggerMiddleware extends BaseMiddleware {
   readonly name = 'request-logger';
-  
+
   async process(
-    context: RequestContext, 
-    next: () => Promise<unknown>
+    context: RequestContext,
+    next: () => Promise<unknown>,
   ): Promise<unknown> {
     const startTime = Date.now();
-    
+
     this.logger.info('Request started', {
       requestId: context.requestId,
       tool: context.metadata.toolName,
       userId: context.userId,
     });
-    
+
     try {
       const result = await next();
-      
+
       this.logger.info('Request completed', {
         requestId: context.requestId,
         duration: Date.now() - startTime,
         success: true,
       });
-      
+
       return result;
     } catch (error) {
       this.logger.error('Request failed', error as Error, {
@@ -883,6 +916,7 @@ export class RequestLoggerMiddleware extends BaseMiddleware {
 **Estimated Time**: 2-3 hours
 
 **Proposed**: Fallback strategies when services fail:
+
 ```typescript
 // src/infrastructure/fallback-strategies.ts
 export interface FallbackStrategy<T> {
@@ -892,11 +926,11 @@ export interface FallbackStrategy<T> {
 
 export class CachedResponseFallback<T> implements FallbackStrategy<T> {
   constructor(private cacheKey: string) {}
-  
+
   canFallback(error: Error): boolean {
     return error instanceof ApiError && error.statusCode >= 500;
   }
-  
+
   async execute(context: ToolContext): Promise<T> {
     // Try to return stale cache data
     const stale = context.cache?.getStale<T>(this.cacheKey);
@@ -910,10 +944,10 @@ export class CachedResponseFallback<T> implements FallbackStrategy<T> {
 
 export class BaseToolHandler {
   protected fallbackStrategies: FallbackStrategy<unknown>[] = [];
-  
+
   protected async executeWithFallback<T>(
     operation: () => Promise<T>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<T> {
     try {
       return await operation();
@@ -921,7 +955,7 @@ export class BaseToolHandler {
       for (const strategy of this.fallbackStrategies) {
         if (strategy.canFallback(error as Error)) {
           try {
-            return await strategy.execute(context) as T;
+            return (await strategy.execute(context)) as T;
           } catch (fallbackError) {
             // Continue to next strategy
           }
@@ -944,8 +978,8 @@ export class BaseToolHandler {
 ```typescript
 export interface StreamingHandler {
   streamExecute(
-    input: unknown, 
-    context: ToolContext
+    input: unknown,
+    context: ToolContext,
   ): AsyncIterableIterator<Partial<CallToolResult>>;
 }
 
@@ -954,20 +988,24 @@ export class SearchOpinionsHandler implements StreamingHandler {
     // Stream metadata first
     yield {
       isError: false,
-      content: [{ 
-        type: 'text', 
-        text: 'Searching opinions...' 
-      }],
+      content: [
+        {
+          type: 'text',
+          text: 'Searching opinions...',
+        },
+      ],
     };
-    
+
     // Stream results as they arrive
     for await (const batch of this.apiClient.streamOpinions(input)) {
       yield {
         isError: false,
-        content: [{
-          type: 'text',
-          text: JSON.stringify(batch, null, 2),
-        }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(batch, null, 2),
+          },
+        ],
       };
     }
   }
@@ -987,17 +1025,13 @@ export class PaginationCache {
     page: number,
     pageSize: number,
     data: T[],
-    ttl: number
+    ttl: number,
   ): void {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
     this.cache.set(pageKey, data, ttl);
   }
-  
-  get<T>(
-    baseKey: string,
-    page: number,
-    pageSize: number
-  ): T[] | null {
+
+  get<T>(baseKey: string, page: number, pageSize: number): T[] | null {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
     return this.cache.get<T[]>(pageKey);
   }
@@ -1009,6 +1043,7 @@ export class PaginationCache {
 ## ✅ Success Metrics
 
 ### Code Quality Metrics
+
 - [ ] **Type Safety**: Reduce `any` types from 253 → <20
 - [ ] **Code Duplication**: Reduce handler code from 3,106 → <2,000 lines
 - [ ] **File Size**: No files over 600 lines
@@ -1016,12 +1051,14 @@ export class PaginationCache {
 - [ ] **Test Coverage**: Maintain 100% passing tests
 
 ### Developer Experience Metrics
+
 - [ ] **Build Time**: Maintain or improve (<5s)
 - [ ] **IDE Performance**: Better autocomplete and type hints
 - [ ] **Onboarding**: New handlers take <30 min to create
 - [ ] **Documentation**: Auto-generated from code
 
 ### Maintainability Metrics
+
 - [ ] **Bug Rate**: Reduce type-related bugs by 80%
 - [ ] **Change Velocity**: Faster feature implementation
 - [ ] **Code Reviews**: Shorter, more focused reviews
@@ -1031,50 +1068,59 @@ export class PaginationCache {
 ## 🚀 Implementation Strategy
 
 ### Approach
+
 1. **Incremental**: One phase at a time, fully tested
 2. **Non-Breaking**: All changes backward compatible
 3. **Measured**: Run benchmarks before/after
 4. **Validated**: 100% test pass rate maintained
 
 ### Risk Mitigation
+
 - **Create feature branch** for each phase
 - **Run full test suite** after each change
 - **Performance benchmarks** to catch regressions
 - **Rollback plan** if issues arise
 
 ### Daily Progress Tracking
+
 ```markdown
 ## Day 1: Type Safety - Infrastructure
+
 - [ ] Middleware sanitization types
 - [ ] Middleware audit types
 - [ ] Error types refactor
 - [ ] Tests: 24/24 passing ✅
 
 ## Day 2: Type Safety - Handlers
+
 - [ ] Create TypedToolHandler base class
 - [ ] Migrate 8 handlers to typed version
 - [ ] Update tests
 - [ ] Tests: 24/24 passing ✅
 
 ## Day 3: Reduce Duplication - Patterns
+
 - [ ] Extract caching decorator
 - [ ] Extract error handling helpers
 - [ ] Expand ResponseBuilder
 - [ ] Tests: 24/24 passing ✅
 
 ## Day 4: Reduce Duplication - Schemas
+
 - [ ] Auto-generate tool definitions
 - [ ] Delete tool-definitions.ts
 - [ ] Update documentation endpoint
 - [ ] Tests: 24/24 passing ✅
 
 ## Day 5: Reduce Complexity
+
 - [ ] Split large files
 - [ ] Refactor long functions
 - [ ] Update imports
 - [ ] Tests: 24/24 passing ✅
 
 ## Day 6: Advanced Improvements
+
 - [ ] Query builder pattern
 - [ ] Request logging middleware
 - [ ] Fallback strategies
@@ -1088,16 +1134,17 @@ export class PaginationCache {
 ### Example: Complete Handler Transformation
 
 **Before** (Current):
+
 ```typescript
 export class SearchOpinionsHandler extends BaseToolHandler {
   readonly name = 'search_opinions';
   readonly description = 'Search legal opinions';
   readonly category = 'search';
-  
+
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
-  
+
   validate(input: any): Result<any, Error> {
     try {
       const schema = z.object({
@@ -1112,7 +1159,7 @@ export class SearchOpinionsHandler extends BaseToolHandler {
       return { success: false, error: error as Error };
     }
   }
-  
+
   getSchema(): any {
     return {
       type: 'object',
@@ -1124,28 +1171,30 @@ export class SearchOpinionsHandler extends BaseToolHandler {
       },
     };
   }
-  
+
   async execute(input: any, context: ToolContext): Promise<CallToolResult> {
     const cacheKey = 'search_opinions';
     const cached = context.cache?.get<any>(cacheKey, input);
     if (cached) {
-      context.logger.info('Served from cache', { requestId: context.requestId });
+      context.logger.info('Served from cache', {
+        requestId: context.requestId,
+      });
       return this.success(cached);
     }
-    
+
     try {
-      context.logger.info('Searching opinions', { 
-        query: input.query, 
-        requestId: context.requestId 
+      context.logger.info('Searching opinions', {
+        query: input.query,
+        requestId: context.requestId,
       });
-      
+
       const results = await this.apiClient.searchOpinions(input);
-      
+
       const response = {
         count: results.count,
         results: results.results,
       };
-      
+
       context.cache?.set(cacheKey, input, response, 3600);
       return this.success(response);
     } catch (error) {
@@ -1160,6 +1209,7 @@ export class SearchOpinionsHandler extends BaseToolHandler {
 ```
 
 **After** (Refactored):
+
 ```typescript
 // Define types once
 const searchOpinionsSchema = z.object({
@@ -1185,25 +1235,25 @@ export class SearchOpinionsHandler extends TypedToolHandler<
   readonly description = 'Search legal opinions';
   readonly category = 'search';
   protected readonly schema = searchOpinionsSchema;
-  
+
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
-  
+
   @withCache(3600)
   @withMetrics()
   async execute(
-    input: SearchOpinionsInput, 
-    context: ToolContext
+    input: SearchOpinionsInput,
+    context: ToolContext,
   ): Promise<CallToolResult<SearchOpinionsOutput>> {
     return this.executeWithFallback(async () => {
-      context.logger.info('Searching opinions', { 
-        query: input.query, 
-        requestId: context.requestId 
+      context.logger.info('Searching opinions', {
+        query: input.query,
+        requestId: context.requestId,
       });
-      
+
       const results = await this.apiClient.searchOpinions(input);
-      
+
       return this.success({
         count: results.count,
         results: results.results,
@@ -1214,6 +1264,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 ```
 
 **Improvements**:
+
 - ✅ **78 lines → 38 lines** (51% reduction)
 - ✅ **Fully typed** (no `any` types)
 - ✅ **No boilerplate** (validation, caching, error handling extracted)
@@ -1226,6 +1277,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<
 ## 🎯 Conclusion
 
 This roadmap provides a clear path to:
+
 - **Improve type safety** (253 → <20 `any` types)
 - **Reduce duplication** (40% code reduction)
 - **Lower complexity** (no files >600 lines)
@@ -1238,4 +1290,3 @@ This roadmap provides a clear path to:
 ---
 
 **Ready to begin Phase 1?** 🚀
-

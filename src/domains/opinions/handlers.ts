@@ -1,57 +1,35 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { Result } from '../../common/types.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+
+/**
+ * Zod schemas for opinions handlers
+ */
+const getOpinionTextSchema = z.object({
+  opinion_id: z
+    .union([z.coerce.number().int().positive(), z.string()])
+    .transform((v) => String(v)),
+  format: z.enum(['text', 'html', 'pdf']).optional().default('text'),
+});
 
 /**
  * Handler for getting opinion text
  */
-export class GetOpinionTextHandler extends BaseToolHandler {
+export class GetOpinionTextHandler extends TypedToolHandler<typeof getOpinionTextSchema> {
   readonly name = 'get_opinion_text';
   readonly description = 'Get the full text of a specific opinion';
   readonly category = 'opinions';
+  protected readonly schema = getOpinionTextSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        opinion_id: z
-          .union([z.coerce.number().int().positive(), z.string()])
-          .transform((v) => String(v)),
-        format: z.enum(['text', 'html', 'pdf']).optional().default('text'),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        opinion_id: {
-          type: ['string', 'number'],
-          description: 'Opinion ID to retrieve text for',
-        },
-        format: {
-          type: 'string',
-          enum: ['text', 'html', 'pdf'],
-          description: 'Format for the opinion text',
-          default: 'text',
-        },
-      },
-      required: ['opinion_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getOpinionTextSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting opinion text', {
         opinionId: input.opinion_id,
@@ -78,51 +56,33 @@ export class GetOpinionTextHandler extends BaseToolHandler {
   }
 }
 
+const analyzeLegalArgumentSchema = z.object({
+  argument: z.string().min(1),
+  search_query: z.string().min(1),
+  jurisdiction: z.string().optional(),
+  date_range_start: z.string().optional(),
+  date_range_end: z.string().optional(),
+});
+
 /**
  * Handler for analyzing legal arguments in opinions
  */
-export class AnalyzeLegalArgumentHandler extends BaseToolHandler {
+export class AnalyzeLegalArgumentHandler extends TypedToolHandler<
+  typeof analyzeLegalArgumentSchema
+> {
   readonly name = 'analyze_legal_argument';
   readonly description = 'Analyze legal arguments and reasoning in opinions';
   readonly category = 'opinions';
+  protected readonly schema = analyzeLegalArgumentSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      // Align with integration test which supplies argument, search_query, date_range_start
-      const schema = z.object({
-        argument: z.string().min(1),
-        search_query: z.string().min(1),
-        jurisdiction: z.string().optional(),
-        date_range_start: z.string().optional(),
-        date_range_end: z.string().optional(),
-      });
-
-      const validated = schema.parse(input ?? {});
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        argument: { type: 'string', description: 'The legal argument or claim to analyze' },
-        search_query: { type: 'string', description: 'Keywords to search for relevant cases' },
-        jurisdiction: { type: 'string', description: 'Optional court filter' },
-        date_range_start: { type: 'string', description: 'Optional start date (YYYY-MM-DD)' },
-        date_range_end: { type: 'string', description: 'Optional end date (YYYY-MM-DD)' },
-      },
-      required: ['argument', 'search_query'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof analyzeLegalArgumentSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Analyzing legal argument', {
         argument: input.argument,
@@ -145,73 +105,35 @@ export class AnalyzeLegalArgumentHandler extends BaseToolHandler {
         argument: input.argument,
         requestId: context.requestId,
       });
-      return this.error((error as Error).message, { opinionId: input.opinion_id });
+      return this.error((error as Error).message, { argument: input.argument });
     }
   }
 }
 
+const getCitationNetworkSchema = z.object({
+  opinion_id: z.union([z.string(), z.number()]).transform(String),
+  depth: z.number().min(1).max(3).optional().default(2),
+  direction: z.enum(['cited_by', 'cites', 'both']).optional().default('both'),
+  limit: z.number().min(1).max(100).optional().default(50),
+});
+
 /**
  * Handler for getting citation networks
  */
-export class GetCitationNetworkHandler extends BaseToolHandler {
+export class GetCitationNetworkHandler extends TypedToolHandler<typeof getCitationNetworkSchema> {
   readonly name = 'get_citation_network';
   readonly description = 'Get the citation network for an opinion or case';
   readonly category = 'opinions';
+  protected readonly schema = getCitationNetworkSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        opinion_id: z.union([z.string(), z.number()]).transform(String),
-        depth: z.number().min(1).max(3).optional().default(2),
-        direction: z.enum(['cited_by', 'cites', 'both']).optional().default('both'),
-        limit: z.number().min(1).max(100).optional().default(50),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        opinion_id: {
-          type: ['string', 'number'],
-          description: 'Opinion ID to get citation network for',
-        },
-        depth: {
-          type: 'number',
-          minimum: 1,
-          maximum: 3,
-          description: 'Network depth (1-3)',
-          default: 2,
-        },
-        direction: {
-          type: 'string',
-          enum: ['cited_by', 'cites', 'both'],
-          description: 'Citation direction to explore',
-          default: 'both',
-        },
-        limit: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Maximum number of citations to return',
-          default: 50,
-        },
-      },
-      required: ['opinion_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getCitationNetworkSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting citation network', {
         opinionId: input.opinion_id,
@@ -240,57 +162,29 @@ export class GetCitationNetworkHandler extends BaseToolHandler {
   }
 }
 
+const lookupCitationSchema = z.object({
+  citation: z.string().min(1),
+  normalize: z.boolean().optional().default(true),
+  include_alternatives: z.boolean().optional().default(false),
+});
+
 /**
  * Handler for citation lookup
  */
-export class LookupCitationHandler extends BaseToolHandler {
+export class LookupCitationHandler extends TypedToolHandler<typeof lookupCitationSchema> {
   readonly name = 'lookup_citation';
   readonly description = 'Look up cases by legal citation';
   readonly category = 'opinions';
+  protected readonly schema = lookupCitationSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        citation: z.string().min(1),
-        normalize: z.boolean().optional().default(true),
-        include_alternatives: z.boolean().optional().default(false),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        citation: {
-          type: 'string',
-          description: 'Legal citation to look up (e.g., "410 U.S. 113")',
-        },
-        normalize: {
-          type: 'boolean',
-          description: 'Whether to normalize the citation format',
-          default: true,
-        },
-        include_alternatives: {
-          type: 'boolean',
-          description: 'Whether to include alternative citations',
-          default: false,
-        },
-      },
-      required: ['citation'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof lookupCitationSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Looking up citation', {
         citation: input.citation,
