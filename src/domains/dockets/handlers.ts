@@ -1,77 +1,63 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { Result } from '../../common/types.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+
+/**
+ * Zod schemas for dockets handlers
+ */
+const getDocketsSchema = z.object({
+  court: z.string().optional(),
+  case_name: z.string().optional(),
+  docket_number: z.string().optional(),
+  date_filed: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+});
+
+const getDocketSchema = z.object({
+  docket_id: z.union([z.string(), z.number()]).transform(String),
+  include_entries: z.boolean().optional().default(true),
+});
+
+const getRecapDocumentsSchema = z.object({
+  docket_id: z.union([z.string(), z.number()]).transform(String),
+  document_type: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+});
+
+const getRecapDocumentSchema = z.object({
+  document_id: z.union([z.string(), z.number()]).transform(String),
+  include_content: z.boolean().optional().default(false),
+});
+
+const getDocketEntriesSchema = z.object({
+  docket: z.union([z.string(), z.number()]).transform(String),
+  entry_number: z.union([z.string(), z.number()]).transform(String).optional(),
+  date_filed_after: z.string().optional(),
+  date_filed_before: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+});
 
 /**
  * Handler for getting dockets
  */
-export class GetDocketsHandler extends BaseToolHandler {
+export class GetDocketsHandler extends TypedToolHandler<typeof getDocketsSchema> {
   readonly name = 'get_dockets';
   readonly description = 'Get docket information with filtering options';
   readonly category = 'dockets';
+  protected readonly schema = getDocketsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        court: z.string().optional(),
-        case_name: z.string().optional(),
-        docket_number: z.string().optional(),
-        date_filed: z.string().optional(),
-        page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        court: {
-          type: 'string',
-          description: 'Filter by court',
-        },
-        case_name: {
-          type: 'string',
-          description: 'Search by case name',
-        },
-        docket_number: {
-          type: 'string',
-          description: 'Filter by docket number',
-        },
-        date_filed: {
-          type: 'string',
-          description: 'Filter by filing date (YYYY-MM-DD or range)',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-          default: 1,
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of dockets per page',
-          default: 20,
-        },
-      },
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getDocketsSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting dockets', {
         court: input.court,
@@ -102,55 +88,27 @@ export class GetDocketsHandler extends BaseToolHandler {
 /**
  * Handler for getting specific docket information
  */
-export class GetDocketHandler extends BaseToolHandler {
+export class GetDocketHandler extends TypedToolHandler<typeof getDocketSchema> {
   readonly name = 'get_docket';
   readonly description = 'Get detailed information about a specific docket';
   readonly category = 'dockets';
+  protected readonly schema = getDocketSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        docket_id: z.union([z.string(), z.number()]).transform(String),
-        include_entries: z.boolean().optional().default(true),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        docket_id: {
-          type: ['string', 'number'],
-          description: 'Docket ID to retrieve information for',
-        },
-        include_entries: {
-          type: 'boolean',
-          description: 'Whether to include docket entries',
-          default: true,
-        },
-      },
-      required: ['docket_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getDocketSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting docket details', {
         docketId: input.docket_id,
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.getDocket(input.docket_id);
+      const response = await this.apiClient.getDocket(parseInt(input.docket_id));
 
       return this.success({
         summary: `Retrieved details for docket ${input.docket_id}`,
@@ -169,62 +127,20 @@ export class GetDocketHandler extends BaseToolHandler {
 /**
  * Handler for managing RECAP documents
  */
-export class GetRecapDocumentsHandler extends BaseToolHandler {
+export class GetRecapDocumentsHandler extends TypedToolHandler<typeof getRecapDocumentsSchema> {
   readonly name = 'get_recap_documents';
   readonly description = 'Get RECAP documents for a docket';
   readonly category = 'dockets';
+  protected readonly schema = getRecapDocumentsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        docket_id: z.union([z.string(), z.number()]).transform(String),
-        document_type: z.string().optional(),
-        page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        docket_id: {
-          type: ['string', 'number'],
-          description: 'Docket ID to get documents for',
-        },
-        document_type: {
-          type: 'string',
-          description: 'Filter by document type',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-          default: 1,
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of documents per page',
-          default: 20,
-        },
-      },
-      required: ['docket_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getRecapDocumentsSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting RECAP documents', {
         docketId: input.docket_id,
@@ -256,55 +172,27 @@ export class GetRecapDocumentsHandler extends BaseToolHandler {
 /**
  * Handler for getting specific RECAP document
  */
-export class GetRecapDocumentHandler extends BaseToolHandler {
+export class GetRecapDocumentHandler extends TypedToolHandler<typeof getRecapDocumentSchema> {
   readonly name = 'get_recap_document';
   readonly description = 'Get a specific RECAP document';
   readonly category = 'dockets';
+  protected readonly schema = getRecapDocumentSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        document_id: z.union([z.string(), z.number()]).transform(String),
-        include_content: z.boolean().optional().default(false),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        document_id: {
-          type: ['string', 'number'],
-          description: 'RECAP document ID to retrieve',
-        },
-        include_content: {
-          type: 'boolean',
-          description: 'Whether to include document content/text',
-          default: false,
-        },
-      },
-      required: ['document_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getRecapDocumentSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting RECAP document', {
         documentId: input.document_id,
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.getRECAPDocument(input.document_id);
+      const response = await this.apiClient.getRECAPDocument(parseInt(input.document_id));
 
       return this.success({
         summary: `Retrieved RECAP document ${input.document_id}`,
@@ -320,94 +208,44 @@ export class GetRecapDocumentHandler extends BaseToolHandler {
   }
 }
 
-export class GetDocketEntriesHandler extends BaseToolHandler {
+/**
+ * Handler for getting docket entries
+ */
+export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEntriesSchema> {
   readonly name = 'get_docket_entries';
   readonly description = 'Retrieve individual docket entries with filtering and pagination';
   readonly category = 'dockets';
-
-  private static schema = z.object({
-    docket: z.union([z.string(), z.number()]).transform(String),
-    entry_number: z.union([z.string(), z.number()]).transform(String).optional(),
-    date_filed_after: z.string().optional(),
-    date_filed_before: z.string().optional(),
-    page: z.number().min(1).optional().default(1),
-    page_size: z.number().min(1).max(100).optional().default(20),
-  });
+  protected readonly schema = getDocketEntriesSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const parsed = GetDocketEntriesHandler.schema.parse(input || {});
-      return { success: true, data: parsed };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        docket: {
-          type: ['string', 'number'],
-          description: 'Docket ID to retrieve entries for',
-        },
-        entry_number: {
-          type: ['string', 'number'],
-          description: 'Filter to a specific entry number',
-        },
-        date_filed_after: {
-          type: 'string',
-          description: 'Return entries filed after this date (YYYY-MM-DD)',
-        },
-        date_filed_before: {
-          type: 'string',
-          description: 'Return entries filed before this date (YYYY-MM-DD)',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-          default: 1,
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of entries per page (max 100)',
-          default: 20,
-        },
-      },
-      required: ['docket'],
-      additionalProperties: false,
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getDocketEntriesSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     const params = {
       docket: input.docket,
       entry_number: input.entry_number,
       date_filed_after: input.date_filed_after,
       date_filed_before: input.date_filed_before,
-      page: input.page ?? 1,
-      page_size: input.page_size ?? 20,
+      page: input.page,
+      page_size: input.page_size,
     };
 
     const timer = context.logger.startTimer('get_docket_entries');
 
     try {
       const cacheKey = 'docket_entries';
-      const cached = context.cache?.get<any>(cacheKey, params);
+      const cached = context.cache?.get<unknown>(cacheKey, params);
       if (cached) {
         context.logger.info('Returning cached docket entries', {
           docketId: params.docket,
           requestId: context.requestId,
         });
         context.metrics?.recordRequest(timer.end(true), true);
-        return this.success(cached);
+        return this.success(cached as Record<string, unknown>);
       }
 
       context.logger.info('Fetching docket entries', {
