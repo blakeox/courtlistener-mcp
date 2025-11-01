@@ -53,7 +53,7 @@ export class CourtListenerConfigValidator implements ConfigValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 }
@@ -78,7 +78,7 @@ export class CacheConfigValidator implements ConfigValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 }
@@ -105,7 +105,7 @@ export class LogConfigValidator implements ConfigValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 }
@@ -117,7 +117,7 @@ export class ServerConfigValidator implements ConfigValidator {
     this.validators = new Map<string, ConfigValidator>([
       ['courtListener', new CourtListenerConfigValidator()],
       ['cache', new CacheConfigValidator()],
-      ['logging', new LogConfigValidator()]
+      ['logging', new LogConfigValidator()],
     ]);
   }
 
@@ -134,10 +134,10 @@ export class ServerConfigValidator implements ConfigValidator {
       }
 
       const result = validator.validate(sectionConfig);
-      
+
       // Prefix errors and warnings with section name
-      allErrors.push(...result.errors.map(error => `[${section}] ${error}`));
-      allWarnings.push(...result.warnings.map(warning => `[${section}] ${warning}`));
+      allErrors.push(...result.errors.map((error) => `[${section}] ${error}`));
+      allWarnings.push(...result.warnings.map((warning) => `[${section}] ${warning}`));
     }
 
     // Cross-section validations
@@ -146,7 +146,7 @@ export class ServerConfigValidator implements ConfigValidator {
     return {
       isValid: allErrors.length === 0,
       errors: allErrors,
-      warnings: allWarnings
+      warnings: allWarnings,
     };
   }
 
@@ -168,7 +168,9 @@ export class ServerConfigValidator implements ConfigValidator {
       }
 
       if (config.security.allowAnonymous && config.security.authEnabled) {
-        warnings.push('Anonymous access allowed with authentication enabled - verify this is intentional');
+        warnings.push(
+          'Anonymous access allowed with authentication enabled - verify this is intentional',
+        );
       }
     }
   }
@@ -185,7 +187,7 @@ export class EnvironmentConfigValidator {
     // Check Node.js version
     const nodeVersion = process.version;
     const majorVersion = parseInt(nodeVersion.split('.')[0].substring(1));
-    
+
     if (majorVersion < 18) {
       errors.push(`Node.js version ${nodeVersion} is not supported. Minimum version is 18.0.0`);
     }
@@ -194,9 +196,9 @@ export class EnvironmentConfigValidator {
     const requiredEnvVars: string[] = [];
     const optionalEnvVars = [
       'COURTLISTENER_BASE_URL',
-      'LOG_LEVEL', 
+      'LOG_LEVEL',
       'CACHE_ENABLED',
-      'METRICS_ENABLED'
+      'METRICS_ENABLED',
     ];
 
     for (const envVar of requiredEnvVars) {
@@ -219,7 +221,7 @@ export class EnvironmentConfigValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 }
@@ -238,13 +240,13 @@ export class ConfigurationValidator {
     return {
       isValid: serverResult.isValid && envResult.isValid,
       errors: [...serverResult.errors, ...envResult.errors],
-      warnings: [...serverResult.warnings, ...envResult.warnings]
+      warnings: [...serverResult.warnings, ...envResult.warnings],
     };
   }
 
   validateAndThrow(config: ServerConfig): void {
     const result = this.validateAll(config);
-    
+
     if (!result.isValid) {
       const errorMessage = `Configuration validation failed:\n${result.errors.join('\n')}`;
       throw new Error(errorMessage);
@@ -252,7 +254,7 @@ export class ConfigurationValidator {
 
     if (result.warnings.length > 0) {
       console.warn('Configuration warnings:');
-      result.warnings.forEach(warning => console.warn(`  - ${warning}`));
+      result.warnings.forEach((warning) => console.warn(`  - ${warning}`));
     }
   }
 }

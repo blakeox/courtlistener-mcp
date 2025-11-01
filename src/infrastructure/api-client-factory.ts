@@ -17,16 +17,11 @@ export class DefaultApiClientFactory implements ApiClientFactory {
   constructor(
     private cache: CacheManager,
     private logger: Logger,
-    private metrics: MetricsCollector
+    private metrics: MetricsCollector,
   ) {}
 
   createCourtListenerClient(config: CourtListenerConfig): CourtListenerAPI {
     // Create client with dependencies
-    return new CourtListenerAPI(
-      config,
-      this.cache,
-      this.logger,
-      this.metrics
-    );
+    return new CourtListenerAPI(config, this.cache, this.logger, this.metrics);
   }
 }

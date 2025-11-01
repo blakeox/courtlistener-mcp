@@ -19,14 +19,10 @@ export class PerformanceMonitor {
   private traceCollector: TraceCollector;
   private intervalId?: NodeJS.Timeout;
 
-  constructor(
-    logger: Logger,
-    metrics: MetricsCollector,
-    options: PerformanceMonitorOptions = {}
-  ) {
+  constructor(logger: Logger, metrics: MetricsCollector, options: PerformanceMonitorOptions = {}) {
     this.logger = logger.child('PerformanceMonitor');
     this.metrics = metrics;
-    
+
     this.alerts = new AlertManager(this.logger, options.alerts);
     this.healthChecks = new HealthCheckManager(this.logger, options.healthChecks);
     this.resourceMonitor = new ResourceMonitor(this.logger, options.resources);
@@ -34,13 +30,13 @@ export class PerformanceMonitor {
 
     // Start monitoring
     this.startMonitoring(options.monitoringInterval || 30000);
-    
+
     this.logger.info('Performance monitoring started', {
       monitoringInterval: options.monitoringInterval || 30000,
       alertsEnabled: !options.alerts?.disabled,
       healthChecksEnabled: !options.healthChecks?.disabled,
       resourceMonitoringEnabled: !options.resources?.disabled,
-      tracingEnabled: !options.tracing?.disabled
+      tracingEnabled: !options.tracing?.disabled,
     });
   }
 
@@ -66,7 +62,7 @@ export class PerformanceMonitor {
     const result = await this.healthChecks.runAllChecks({
       metrics: this.metrics,
       resourceMonitor: this.resourceMonitor,
-      traceCollector: this.traceCollector
+      traceCollector: this.traceCollector,
     });
 
     // Check for alerts
@@ -75,7 +71,7 @@ export class PerformanceMonitor {
     this.logger.debug('Health check completed', {
       status: result.status,
       checksRun: Object.keys(result.checks).length,
-      failedChecks: Object.values(result.checks).filter(c => c.status === 'fail').length
+      failedChecks: Object.values(result.checks).filter((c) => c.status === 'fail').length,
     });
 
     return result;
@@ -86,7 +82,7 @@ export class PerformanceMonitor {
    */
   async checkResourceUsage(): Promise<ResourceUsage> {
     const usage = await this.resourceMonitor.getResourceUsage();
-    
+
     // Check for resource alerts
     this.alerts.processResourceUsage(usage);
 
@@ -98,7 +94,7 @@ export class PerformanceMonitor {
    */
   async processTraces(): Promise<TraceAnalysis> {
     const analysis = await this.traceCollector.analyzeTraces();
-    
+
     // Check for performance alerts
     this.alerts.processTraceAnalysis(analysis);
 
@@ -116,7 +112,7 @@ export class PerformanceMonitor {
       resources: this.resourceMonitor.getLastUsage(),
       traces: this.traceCollector.getAnalysis(),
       alerts: this.alerts.getActiveAlerts(),
-      performance: this.metrics.getPerformanceSummary()
+      performance: this.metrics.getPerformanceSummary(),
     };
   }
 
@@ -128,7 +124,7 @@ export class PerformanceMonitor {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
     }
-    
+
     this.logger.info('Performance monitoring stopped');
   }
 
@@ -141,7 +137,7 @@ export class PerformanceMonitor {
       checksPerformed: this.healthChecks.getChecksPerformed(),
       alertsTriggered: this.alerts.getAlertsTriggered(),
       tracesCollected: this.traceCollector.getTracesCollected(),
-      resourceUsage: this.resourceMonitor.getLastUsage()
+      resourceUsage: this.resourceMonitor.getLastUsage(),
     };
   }
 }
@@ -166,9 +162,9 @@ export class AlertManager {
         responseTime: 5000,
         errorRate: 0.25,
         memoryUsage: 0.85,
-        cpuUsage: 0.90,
-        ...options.thresholds
-      }
+        cpuUsage: 0.9,
+        ...options.thresholds,
+      },
     };
   }
 
@@ -184,7 +180,7 @@ export class AlertManager {
           severity: result.status === 'critical' ? 'critical' : 'warning',
           message: check.message,
           timestamp: new Date().toISOString(),
-          data: { checkName, ...check }
+          data: { checkName, ...check },
         });
       } else {
         // Clear alert if it exists
@@ -204,7 +200,7 @@ export class AlertManager {
         severity: usage.memory.usagePercent > 0.95 ? 'critical' : 'warning',
         message: `High memory usage: ${(usage.memory.usagePercent * 100).toFixed(1)}%`,
         timestamp: new Date().toISOString(),
-        data: { memoryUsage: usage.memory }
+        data: { memoryUsage: usage.memory },
       });
     } else {
       this.clearAlert('resource_memory');
@@ -218,7 +214,7 @@ export class AlertManager {
         severity: usage.cpu.usagePercent > 0.95 ? 'critical' : 'warning',
         message: `High CPU usage: ${(usage.cpu.usagePercent * 100).toFixed(1)}%`,
         timestamp: new Date().toISOString(),
-        data: { cpuUsage: usage.cpu }
+        data: { cpuUsage: usage.cpu },
       });
     } else {
       this.clearAlert('resource_cpu');
@@ -233,10 +229,13 @@ export class AlertManager {
       this.triggerAlert({
         id: 'performance_response_time',
         type: 'performance',
-        severity: analysis.averageResponseTime > this.options.thresholds!.responseTime! * 2 ? 'critical' : 'warning',
+        severity:
+          analysis.averageResponseTime > this.options.thresholds!.responseTime! * 2
+            ? 'critical'
+            : 'warning',
         message: `High response time: ${analysis.averageResponseTime.toFixed(0)}ms`,
         timestamp: new Date().toISOString(),
-        data: { responseTime: analysis.averageResponseTime }
+        data: { responseTime: analysis.averageResponseTime },
       });
     } else {
       this.clearAlert('performance_response_time');
@@ -247,10 +246,11 @@ export class AlertManager {
       this.triggerAlert({
         id: 'performance_error_rate',
         type: 'performance',
-        severity: analysis.errorRate > this.options.thresholds!.errorRate! * 2 ? 'critical' : 'warning',
+        severity:
+          analysis.errorRate > this.options.thresholds!.errorRate! * 2 ? 'critical' : 'warning',
         message: `High error rate: ${(analysis.errorRate * 100).toFixed(1)}%`,
         timestamp: new Date().toISOString(),
-        data: { errorRate: analysis.errorRate }
+        data: { errorRate: analysis.errorRate },
       });
     } else {
       this.clearAlert('performance_error_rate');
@@ -274,13 +274,13 @@ export class AlertManager {
         alertId: alert.id,
         type: alert.type,
         severity: alert.severity,
-        message: alert.message
+        message: alert.message,
       });
     }
 
     // Add to history
     this.alertHistory.push({ ...alert });
-    
+
     // Trim history
     if (this.alertHistory.length > this.options.alertHistory!) {
       this.alertHistory = this.alertHistory.slice(-this.options.alertHistory!);
@@ -291,11 +291,11 @@ export class AlertManager {
     if (this.activeAlerts.has(alertId)) {
       const alert = this.activeAlerts.get(alertId)!;
       this.activeAlerts.delete(alertId);
-      
+
       this.logger.info('Alert cleared', {
         alertId,
         type: alert.type,
-        duration: Date.now() - new Date(alert.timestamp).getTime()
+        duration: Date.now() - new Date(alert.timestamp).getTime(),
       });
     }
   }
@@ -326,7 +326,7 @@ export class HealthCheckManager {
     this.logger = logger.child('HealthCheckManager');
     this.options = {
       disabled: options.disabled || false,
-      timeout: options.timeout || 5000
+      timeout: options.timeout || 5000,
     };
   }
 
@@ -335,7 +335,7 @@ export class HealthCheckManager {
       return {
         status: 'healthy',
         checks: {},
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
 
@@ -356,31 +356,30 @@ export class HealthCheckManager {
       checks.performance = performanceHealth;
 
       // Determine overall status
-      const failedChecks = Object.values(checks).filter(check => check.status === 'fail');
-      const status = failedChecks.length === 0 ? 'healthy' : 
-                    failedChecks.length <= 1 ? 'warning' : 'critical';
+      const failedChecks = Object.values(checks).filter((check) => check.status === 'fail');
+      const status =
+        failedChecks.length === 0 ? 'healthy' : failedChecks.length <= 1 ? 'warning' : 'critical';
 
       this.lastResult = {
         status,
         checks,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       return this.lastResult;
-
     } catch (error) {
       this.logger.error('Health check failed', error as Error);
-      
+
       this.lastResult = {
         status: 'critical',
         checks: {
           system: {
             status: 'fail',
             message: `Health check system error: ${(error as Error).message}`,
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       return this.lastResult;
@@ -398,28 +397,28 @@ export class HealthCheckManager {
       data: {
         grade: performanceSummary.performanceGrade,
         successRate: performanceSummary.successRate,
-        responseTime: metricsData.average_response_time
-      }
+        responseTime: metricsData.average_response_time,
+      },
     };
   }
 
   private async checkResources(resourceMonitor: ResourceMonitor): Promise<HealthCheck> {
     try {
       const usage = await resourceMonitor.getResourceUsage();
-      const memoryOk = usage.memory.usagePercent < 0.90;
-      const cpuOk = usage.cpu.usagePercent < 0.90;
+      const memoryOk = usage.memory.usagePercent < 0.9;
+      const cpuOk = usage.cpu.usagePercent < 0.9;
 
       return {
         status: memoryOk && cpuOk ? 'pass' : 'fail',
         message: `Memory: ${(usage.memory.usagePercent * 100).toFixed(1)}%, CPU: ${(usage.cpu.usagePercent * 100).toFixed(1)}%`,
         timestamp: new Date().toISOString(),
-        data: usage
+        data: usage,
       };
     } catch (error) {
       return {
         status: 'fail',
         message: `Resource check failed: ${(error as Error).message}`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -427,13 +426,13 @@ export class HealthCheckManager {
   private checkPerformance(traceCollector: TraceCollector): HealthCheck {
     const analysis = traceCollector.getAnalysis();
     const responseTimeOk = analysis.averageResponseTime < 3000;
-    const errorRateOk = analysis.errorRate < 0.10;
+    const errorRateOk = analysis.errorRate < 0.1;
 
     return {
       status: responseTimeOk && errorRateOk ? 'pass' : 'fail',
       message: `Avg response: ${analysis.averageResponseTime.toFixed(0)}ms, Error rate: ${(analysis.errorRate * 100).toFixed(1)}%`,
       timestamp: new Date().toISOString(),
-      data: analysis
+      data: analysis,
     };
   }
 
@@ -459,7 +458,7 @@ export class ResourceMonitor {
     this.logger = logger.child('ResourceMonitor');
     this.options = {
       disabled: options.disabled || false,
-      sampleInterval: options.sampleInterval || 5000
+      sampleInterval: options.sampleInterval || 5000,
     };
     this.startTime = Date.now();
   }
@@ -470,7 +469,7 @@ export class ResourceMonitor {
         timestamp: new Date().toISOString(),
         memory: { used: 0, total: 0, usagePercent: 0 },
         cpu: { usagePercent: 0 },
-        uptime: Math.floor((Date.now() - this.startTime) / 1000)
+        uptime: Math.floor((Date.now() - this.startTime) / 1000),
       };
     }
 
@@ -489,16 +488,15 @@ export class ResourceMonitor {
         memory: {
           used: memoryUsage.heapUsed,
           total: memoryUsage.heapTotal,
-          usagePercent: memoryUsage.heapUsed / memoryUsage.heapTotal
+          usagePercent: memoryUsage.heapUsed / memoryUsage.heapTotal,
         },
         cpu: {
-          usagePercent: cpuPercent
+          usagePercent: cpuPercent,
         },
-        uptime: Math.floor((Date.now() - this.startTime) / 1000)
+        uptime: Math.floor((Date.now() - this.startTime) / 1000),
       };
 
       return this.lastUsage;
-
     } catch (error) {
       this.logger.error('Failed to get resource usage', error as Error);
       throw error;
@@ -528,7 +526,7 @@ export class TraceCollector {
     this.options = {
       disabled: options.disabled || false,
       maxTraces: options.maxTraces || 1000,
-      retentionTime: options.retentionTime || 3600000 // 1 hour
+      retentionTime: options.retentionTime || 3600000, // 1 hour
     };
   }
 
@@ -540,7 +538,7 @@ export class TraceCollector {
 
     // Trim old traces
     const cutoff = Date.now() - this.options.retentionTime!;
-    this.traces = this.traces.filter(t => new Date(t.timestamp).getTime() > cutoff);
+    this.traces = this.traces.filter((t) => new Date(t.timestamp).getTime() > cutoff);
 
     // Limit number of traces
     if (this.traces.length > this.options.maxTraces!) {
@@ -556,18 +554,19 @@ export class TraceCollector {
         errorRate: 0,
         operationBreakdown: {},
         slowestOperations: [],
-        recentErrors: []
+        recentErrors: [],
       };
     }
 
     const totalTraces = this.traces.length;
-    const averageResponseTime = this.traces.reduce((sum, trace) => sum + trace.duration, 0) / totalTraces;
-    const errors = this.traces.filter(trace => trace.error);
+    const averageResponseTime =
+      this.traces.reduce((sum, trace) => sum + trace.duration, 0) / totalTraces;
+    const errors = this.traces.filter((trace) => trace.error);
     const errorRate = errors.length / totalTraces;
 
     // Operation breakdown
     const operationBreakdown: Record<string, { count: number; avgDuration: number }> = {};
-    this.traces.forEach(trace => {
+    this.traces.forEach((trace) => {
       if (!operationBreakdown[trace.operation]) {
         operationBreakdown[trace.operation] = { count: 0, avgDuration: 0 };
       }
@@ -580,20 +579,20 @@ export class TraceCollector {
     const slowestOperations = this.traces
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 10)
-      .map(trace => ({
+      .map((trace) => ({
         operation: trace.operation,
         duration: trace.duration,
-        timestamp: trace.timestamp
+        timestamp: trace.timestamp,
       }));
 
     // Recent errors
     const recentErrors = errors
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10)
-      .map(trace => ({
+      .map((trace) => ({
         operation: trace.operation,
         error: trace.error!,
-        timestamp: trace.timestamp
+        timestamp: trace.timestamp,
       }));
 
     return {
@@ -602,7 +601,7 @@ export class TraceCollector {
       errorRate,
       operationBreakdown,
       slowestOperations,
-      recentErrors
+      recentErrors,
     };
   }
 

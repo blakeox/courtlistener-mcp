@@ -76,11 +76,7 @@ export class AuditLogger {
   private correlationConfig: CorrelationConfig;
   private auditConfig: AuditConfig;
 
-  constructor(
-    logger: Logger,
-    correlationConfig: CorrelationConfig,
-    auditConfig: AuditConfig
-  ) {
+  constructor(logger: Logger, correlationConfig: CorrelationConfig, auditConfig: AuditConfig) {
     this.logger = logger.child('Audit');
     this.correlationConfig = correlationConfig;
     this.auditConfig = auditConfig;
@@ -89,7 +85,7 @@ export class AuditLogger {
       this.logger.info('Audit logging enabled', {
         includeRequestBody: this.auditConfig.includeRequestBody,
         includeResponseBody: this.auditConfig.includeResponseBody,
-        maxBodyLength: this.auditConfig.maxBodyLength
+        maxBodyLength: this.auditConfig.maxBodyLength,
       });
     }
   }
@@ -103,7 +99,7 @@ export class AuditLogger {
     }
 
     const existingId = headers[this.correlationConfig.headerName.toLowerCase()];
-    
+
     if (existingId) {
       return existingId;
     }
@@ -131,7 +127,7 @@ export class AuditLogger {
     if (typeof logMethod === 'function') {
       logMethod.call(this.logger, 'MCP Audit Event', sanitizedEvent);
     } else {
-      this.logger.info('MCP Audit Event', sanitizedEvent);
+      this.logger.info('MCP Audit Event', sanitizedEvent as unknown as Record<string, unknown>);
     }
   }
 
@@ -147,7 +143,7 @@ export class AuditLogger {
     duration: number,
     success: boolean,
     error?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): AuditEvent {
     return {
       correlationId,
@@ -157,16 +153,16 @@ export class AuditLogger {
       clientId: authContext.clientId,
       authContext: {
         isAuthenticated: authContext.isAuthenticated,
-        permissions: authContext.permissions
+        permissions: authContext.permissions,
       },
-      requestArgs: this.auditConfig.includeRequestBody ? 
-                   this.truncateData(requestArgs) : undefined,
-      responseData: this.auditConfig.includeResponseBody ? 
-                    this.truncateData(responseData) : undefined,
+      requestArgs: this.auditConfig.includeRequestBody ? this.truncateData(requestArgs) : undefined,
+      responseData: this.auditConfig.includeResponseBody
+        ? this.truncateData(responseData)
+        : undefined,
       duration,
       success,
       error,
-      ...metadata
+      ...metadata,
     };
   }
 
@@ -178,7 +174,7 @@ export class AuditLogger {
     authContext: AuthContext,
     success: boolean,
     error?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): AuditEvent {
     return {
       correlationId,
@@ -187,12 +183,12 @@ export class AuditLogger {
       clientId: authContext.clientId,
       authContext: {
         isAuthenticated: authContext.isAuthenticated,
-        permissions: authContext.permissions
+        permissions: authContext.permissions,
       },
       duration: 0,
       success,
       error,
-      ...metadata
+      ...metadata,
     };
   }
 
@@ -216,7 +212,7 @@ export class AuditLogger {
     if (sanitized.authContext?.apiKey) {
       sanitized.authContext = {
         ...sanitized.authContext,
-        apiKey: sanitized.authContext.apiKey.substring(0, 8) + '...'
+        apiKey: sanitized.authContext.apiKey.substring(0, 8) + '...',
       };
     }
 
@@ -258,20 +254,20 @@ export class AuditLogger {
     }
 
     const jsonString = JSON.stringify(data);
-    
+
     if (jsonString.length <= this.auditConfig.maxBodyLength) {
       return data;
     }
 
     const truncated = jsonString.substring(0, this.auditConfig.maxBodyLength);
-    
+
     try {
       return JSON.parse(truncated + '"}');
     } catch {
-      return { 
-        _truncated: true, 
+      return {
+        _truncated: true,
         _originalLength: jsonString.length,
-        _data: truncated 
+        _data: truncated,
       };
     }
   }
@@ -287,7 +283,7 @@ export function createAuditComponents(logger: Logger): {
   const correlationConfig: CorrelationConfig = {
     enabled: process.env.CORRELATION_ENABLED !== 'false',
     headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
-    generateId: process.env.CORRELATION_GENERATE_ID !== 'false'
+    generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
   };
 
   const auditConfig: AuditConfig = {
@@ -296,9 +292,9 @@ export function createAuditComponents(logger: Logger): {
     includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
     includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
     maxBodyLength: parseInt(process.env.AUDIT_MAX_BODY_LENGTH || '2000'),
-    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS ? 
-                     process.env.AUDIT_SENSITIVE_FIELDS.split(',').map(f => f.trim()) :
-                     ['password', 'token', 'secret', 'key', 'auth']
+    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
+      ? process.env.AUDIT_SENSITIVE_FIELDS.split(',').map((f) => f.trim())
+      : ['password', 'token', 'secret', 'key', 'auth'],
   };
 
   const audit = new AuditLogger(logger, correlationConfig, auditConfig);

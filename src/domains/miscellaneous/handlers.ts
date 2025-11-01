@@ -22,9 +22,9 @@ export class GetFinancialDisclosuresHandler extends BaseToolHandler {
         judge_id: z.union([z.string(), z.number()]).transform(String).optional(),
         year: z.number().min(1990).max(new Date().getFullYear()).optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -38,28 +38,28 @@ export class GetFinancialDisclosuresHandler extends BaseToolHandler {
       properties: {
         judge_id: {
           type: ['string', 'number'],
-          description: 'Filter by specific judge ID'
+          description: 'Filter by specific judge ID',
         },
         year: {
           type: 'number',
           minimum: 1990,
           maximum: new Date().getFullYear(),
-          description: 'Filter by disclosure year'
+          description: 'Filter by disclosure year',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of disclosures per page',
-          default: 20
-        }
-      }
+          default: 20,
+        },
+      },
     };
   }
 
@@ -68,7 +68,7 @@ export class GetFinancialDisclosuresHandler extends BaseToolHandler {
       context.logger.info('Getting financial disclosures', {
         judgeId: input.judge_id,
         year: input.year,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getFinancialDisclosures(input);
@@ -79,12 +79,12 @@ export class GetFinancialDisclosuresHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to get financial disclosures', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message);
     }
@@ -106,9 +106,9 @@ export class GetFinancialDisclosureHandler extends BaseToolHandler {
   validate(input: any): Result<any, Error> {
     try {
       const schema = z.object({
-        disclosure_id: z.union([z.string(), z.number()]).transform(String)
+        disclosure_id: z.union([z.string(), z.number()]).transform(String),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -122,10 +122,10 @@ export class GetFinancialDisclosureHandler extends BaseToolHandler {
       properties: {
         disclosure_id: {
           type: ['string', 'number'],
-          description: 'Financial disclosure ID to retrieve'
-        }
+          description: 'Financial disclosure ID to retrieve',
+        },
       },
-      required: ['disclosure_id']
+      required: ['disclosure_id'],
     };
   }
 
@@ -133,19 +133,19 @@ export class GetFinancialDisclosureHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting financial disclosure', {
         disclosureId: input.disclosure_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getFinancialDisclosure(input.disclosure_id);
 
       return this.success({
         summary: `Retrieved financial disclosure ${input.disclosure_id}`,
-        disclosure: response
+        disclosure: response,
       });
     } catch (error) {
       context.logger.error('Failed to get financial disclosure', error as Error, {
         disclosureId: input.disclosure_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { disclosureId: input.disclosure_id });
     }
@@ -169,9 +169,9 @@ export class GetPartiesAndAttorneysHandler extends BaseToolHandler {
       const schema = z.object({
         docket_id: z.union([z.string(), z.number()]).transform(String),
         include_attorneys: z.boolean().optional().default(true),
-        include_parties: z.boolean().optional().default(true)
+        include_parties: z.boolean().optional().default(true),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -185,20 +185,20 @@ export class GetPartiesAndAttorneysHandler extends BaseToolHandler {
       properties: {
         docket_id: {
           type: ['string', 'number'],
-          description: 'Docket ID to get parties and attorneys for'
+          description: 'Docket ID to get parties and attorneys for',
         },
         include_attorneys: {
           type: 'boolean',
           description: 'Whether to include attorney information',
-          default: true
+          default: true,
         },
         include_parties: {
           type: 'boolean',
           description: 'Whether to include party information',
-          default: true
-        }
+          default: true,
+        },
       },
-      required: ['docket_id']
+      required: ['docket_id'],
     };
   }
 
@@ -206,19 +206,19 @@ export class GetPartiesAndAttorneysHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting parties and attorneys', {
         docketId: input.docket_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getPartiesAndAttorneys(input);
 
       return this.success({
         summary: `Retrieved parties and attorneys for docket ${input.docket_id}`,
-        data: response
+        data: response,
       });
     } catch (error) {
       context.logger.error('Failed to get parties and attorneys', error as Error, {
         docketId: input.docket_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { docketId: input.docket_id });
     }
@@ -244,9 +244,9 @@ export class ManageAlertsHandler extends BaseToolHandler {
         alert_id: z.union([z.string(), z.number()]).transform(String).optional(),
         query: z.string().optional(),
         frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-        alert_type: z.enum(['case', 'opinion', 'docket']).optional()
+        alert_type: z.enum(['case', 'opinion', 'docket']).optional(),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -261,28 +261,28 @@ export class ManageAlertsHandler extends BaseToolHandler {
         action: {
           type: 'string',
           enum: ['create', 'list', 'update', 'delete'],
-          description: 'Action to perform on alerts'
+          description: 'Action to perform on alerts',
         },
         alert_id: {
           type: ['string', 'number'],
-          description: 'Alert ID (required for update/delete)'
+          description: 'Alert ID (required for update/delete)',
         },
         query: {
           type: 'string',
-          description: 'Search query for the alert (required for create)'
+          description: 'Search query for the alert (required for create)',
         },
         frequency: {
           type: 'string',
           enum: ['daily', 'weekly', 'monthly'],
-          description: 'Alert frequency'
+          description: 'Alert frequency',
         },
         alert_type: {
           type: 'string',
           enum: ['case', 'opinion', 'docket'],
-          description: 'Type of content to alert on'
-        }
+          description: 'Type of content to alert on',
+        },
       },
-      required: ['action']
+      required: ['action'],
     };
   }
 
@@ -291,19 +291,19 @@ export class ManageAlertsHandler extends BaseToolHandler {
       context.logger.info('Managing alerts', {
         action: input.action,
         alertId: input.alert_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.manageAlerts(input);
 
       return this.success({
         summary: `Successfully ${input.action}d alert`,
-        result: response
+        result: response,
       });
     } catch (error) {
       context.logger.error('Failed to manage alerts', error as Error, {
         action: input.action,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { action: input.action });
     }

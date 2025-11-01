@@ -34,7 +34,7 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(error => {
+  main().catch((error) => {
     console.error('Fatal error starting Legal MCP Server:', error);
     process.exit(1);
   });
@@ -63,6 +63,6 @@ export type LegacyLegalMCPServer = BestPracticeLegalMCPServer & {
       | {
           name: string;
           arguments?: Record<string, unknown>;
-        }
+        },
   ): Promise<CallToolResult>;
 };

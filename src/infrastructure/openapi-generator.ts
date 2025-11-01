@@ -85,22 +85,22 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
         contact: {
           name: 'Legal MCP Support',
           url: 'https://github.com/blakeox/courtlistener-mcp',
-          email: 'support@legal-mcp.com'
+          email: 'support@legal-mcp.com',
         },
         license: {
           name: 'MIT',
-          url: 'https://opensource.org/licenses/MIT'
-        }
+          url: 'https://opensource.org/licenses/MIT',
+        },
       },
       servers: [
         {
           url: 'http://localhost:3001',
-          description: 'Development server'
+          description: 'Development server',
         },
         {
           url: 'https://api.legal-mcp.com',
-          description: 'Production server'
-        }
+          description: 'Production server',
+        },
       ],
       paths: {},
       components: {
@@ -112,46 +112,46 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
             type: 'apiKey',
             in: 'header',
             name: 'X-API-Key',
-            description: 'API key for authenticated endpoints'
+            description: 'API key for authenticated endpoints',
           },
           BearerAuth: {
             type: 'http',
             scheme: 'bearer',
             bearerFormat: 'JWT',
-            description: 'JWT token for enterprise authentication'
-          }
-        }
+            description: 'JWT token for enterprise authentication',
+          },
+        },
       },
       tags: [
         {
           name: 'Health',
-          description: 'System health and monitoring endpoints'
+          description: 'System health and monitoring endpoints',
         },
         {
           name: 'Search',
-          description: 'Legal case and document search operations'
+          description: 'Legal case and document search operations',
         },
         {
           name: 'Cases',
-          description: 'Legal case information and details'
+          description: 'Legal case information and details',
         },
         {
           name: 'Opinions',
-          description: 'Legal opinion text and metadata'
+          description: 'Legal opinion text and metadata',
         },
         {
           name: 'Courts',
-          description: 'Court information and jurisdictions'
+          description: 'Court information and jurisdictions',
         },
         {
           name: 'Analysis',
-          description: 'Legal argument analysis and research tools'
+          description: 'Legal argument analysis and research tools',
         },
         {
           name: 'Metrics',
-          description: 'Performance metrics and analytics'
-        }
-      ]
+          description: 'Performance metrics and analytics',
+        },
+      ],
     };
   }
 
@@ -163,59 +163,59 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           status: {
             type: 'string',
             enum: ['healthy', 'degraded', 'unhealthy'],
-            description: 'Overall system health status'
+            description: 'Overall system health status',
           },
           timestamp: {
             type: 'string',
             format: 'date-time',
-            description: 'Health check timestamp'
+            description: 'Health check timestamp',
           },
           uptime: {
             type: 'number',
-            description: 'Server uptime in seconds'
+            description: 'Server uptime in seconds',
           },
           version: {
             type: 'string',
-            description: 'Server version'
+            description: 'Server version',
           },
           dependencies: {
             type: 'object',
             properties: {
               courtlistener: {
-                $ref: '#/components/schemas/DependencyStatus'
+                $ref: '#/components/schemas/DependencyStatus',
               },
               cache: {
-                $ref: '#/components/schemas/DependencyStatus'
+                $ref: '#/components/schemas/DependencyStatus',
               },
               database: {
-                $ref: '#/components/schemas/DependencyStatus'
-              }
-            }
-          }
+                $ref: '#/components/schemas/DependencyStatus',
+              },
+            },
+          },
         },
-        required: ['status', 'timestamp', 'uptime', 'version']
+        required: ['status', 'timestamp', 'uptime', 'version'],
       },
       DependencyStatus: {
         type: 'object',
         properties: {
           status: {
             type: 'string',
-            enum: ['healthy', 'degraded', 'unhealthy']
+            enum: ['healthy', 'degraded', 'unhealthy'],
           },
           responseTime: {
             type: 'number',
-            description: 'Response time in milliseconds'
+            description: 'Response time in milliseconds',
           },
           lastCheck: {
             type: 'string',
-            format: 'date-time'
+            format: 'date-time',
           },
           error: {
             type: 'string',
-            description: 'Error message if unhealthy'
-          }
+            description: 'Error message if unhealthy',
+          },
         },
-        required: ['status', 'lastCheck']
+        required: ['status', 'lastCheck'],
       },
       Metrics: {
         type: 'object',
@@ -226,8 +226,8 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
               total: { type: 'number' },
               successful: { type: 'number' },
               failed: { type: 'number' },
-              averageResponseTime: { type: 'number' }
-            }
+              averageResponseTime: { type: 'number' },
+            },
           },
           cache: {
             type: 'object',
@@ -235,18 +235,18 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
               hits: { type: 'number' },
               misses: { type: 'number' },
               hitRate: { type: 'number' },
-              size: { type: 'number' }
-            }
+              size: { type: 'number' },
+            },
           },
           system: {
             type: 'object',
             properties: {
               uptime: { type: 'number' },
               memoryUsage: { type: 'number' },
-              cpuUsage: { type: 'number' }
-            }
-          }
-        }
+              cpuUsage: { type: 'number' },
+            },
+          },
+        },
       },
       SearchRequest: {
         type: 'object',
@@ -254,174 +254,174 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           query: {
             type: 'string',
             description: 'Search query text',
-            example: 'constitutional law'
+            example: 'constitutional law',
           },
           citation: {
             type: 'string',
             description: 'Legal citation to search for',
-            example: '410 U.S. 113'
+            example: '410 U.S. 113',
           },
           case_name: {
             type: 'string',
             description: 'Case name to search for',
-            example: 'Brown v. Board of Education'
+            example: 'Brown v. Board of Education',
           },
           court: {
             type: 'string',
             description: 'Court identifier or name',
-            example: 'scotus'
+            example: 'scotus',
           },
           judge: {
             type: 'string',
             description: 'Judge name',
-            example: 'John Roberts'
+            example: 'John Roberts',
           },
           date_filed_after: {
             type: 'string',
             format: 'date',
             description: 'Filed after this date',
-            example: '2020-01-01'
+            example: '2020-01-01',
           },
           date_filed_before: {
             type: 'string',
             format: 'date',
             description: 'Filed before this date',
-            example: '2023-12-31'
+            example: '2023-12-31',
           },
           page: {
             type: 'integer',
             minimum: 1,
             default: 1,
-            description: 'Page number for pagination'
+            description: 'Page number for pagination',
           },
           page_size: {
             type: 'integer',
             minimum: 1,
             maximum: 100,
             default: 20,
-            description: 'Number of results per page'
-          }
-        }
+            description: 'Number of results per page',
+          },
+        },
       },
       SearchResponse: {
         type: 'object',
         properties: {
           count: {
             type: 'integer',
-            description: 'Total number of results'
+            description: 'Total number of results',
           },
           next: {
             type: 'string',
             nullable: true,
-            description: 'URL for next page'
+            description: 'URL for next page',
           },
           previous: {
             type: 'string',
             nullable: true,
-            description: 'URL for previous page'
+            description: 'URL for previous page',
           },
           results: {
             type: 'array',
             items: {
-              $ref: '#/components/schemas/CaseResult'
-            }
-          }
+              $ref: '#/components/schemas/CaseResult',
+            },
+          },
         },
-        required: ['count', 'results']
+        required: ['count', 'results'],
       },
       CaseResult: {
         type: 'object',
         properties: {
           id: {
             type: 'integer',
-            description: 'Unique case identifier'
+            description: 'Unique case identifier',
           },
           cluster_id: {
             type: 'integer',
-            description: 'Opinion cluster identifier'
+            description: 'Opinion cluster identifier',
           },
           case_name: {
             type: 'string',
-            description: 'Full case name'
+            description: 'Full case name',
           },
           citation: {
             type: 'string',
-            description: 'Primary citation'
+            description: 'Primary citation',
           },
           court: {
             type: 'string',
-            description: 'Court name'
+            description: 'Court name',
           },
           date_filed: {
             type: 'string',
             format: 'date',
-            description: 'Date case was filed'
+            description: 'Date case was filed',
           },
           judge: {
             type: 'string',
-            description: 'Presiding judge'
+            description: 'Presiding judge',
           },
           snippet: {
             type: 'string',
-            description: 'Text snippet from opinion'
+            description: 'Text snippet from opinion',
           },
           opinions: {
             type: 'array',
             items: {
-              $ref: '#/components/schemas/OpinionSummary'
-            }
-          }
+              $ref: '#/components/schemas/OpinionSummary',
+            },
+          },
         },
-        required: ['id', 'case_name', 'court']
+        required: ['id', 'case_name', 'court'],
       },
       OpinionSummary: {
         type: 'object',
         properties: {
           id: {
             type: 'integer',
-            description: 'Opinion identifier'
+            description: 'Opinion identifier',
           },
           type: {
             type: 'string',
             enum: ['majority', 'dissenting', 'concurring', 'plurality'],
-            description: 'Type of opinion'
+            description: 'Type of opinion',
           },
           author: {
             type: 'string',
-            description: 'Opinion author'
+            description: 'Opinion author',
           },
           word_count: {
             type: 'integer',
-            description: 'Word count of opinion text'
-          }
-        }
+            description: 'Word count of opinion text',
+          },
+        },
       },
       ErrorResponse: {
         type: 'object',
         properties: {
           error: {
             type: 'string',
-            description: 'Error type'
+            description: 'Error type',
           },
           message: {
             type: 'string',
-            description: 'Human-readable error message'
+            description: 'Human-readable error message',
           },
           details: {
             type: 'object',
-            description: 'Additional error details'
+            description: 'Additional error details',
           },
           timestamp: {
             type: 'string',
-            format: 'date-time'
+            format: 'date-time',
           },
           request_id: {
             type: 'string',
-            description: 'Unique request identifier for tracking'
-          }
+            description: 'Unique request identifier for tracking',
+          },
         },
-        required: ['error', 'message', 'timestamp']
-      }
+        required: ['error', 'message', 'timestamp'],
+      },
     };
   }
 
@@ -435,92 +435,92 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
               type: 'object',
               properties: {
                 success: { type: 'boolean', example: true },
-                message: { type: 'string' }
-              }
-            }
-          }
-        }
+                message: { type: 'string' },
+              },
+            },
+          },
+        },
       },
       BadRequest: {
         description: 'Bad request - invalid parameters',
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '#/components/schemas/ErrorResponse',
             },
             example: {
               error: 'validation_error',
               message: 'Invalid parameter: page must be a positive integer',
               timestamp: '2023-09-23T10:30:00Z',
-              request_id: 'req_123456789'
-            }
-          }
-        }
+              request_id: 'req_123456789',
+            },
+          },
+        },
       },
       Unauthorized: {
         description: 'Unauthorized - authentication required',
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '#/components/schemas/ErrorResponse',
             },
             example: {
               error: 'unauthorized',
               message: 'Authentication credentials were not provided.',
               timestamp: '2023-09-23T10:30:00Z',
-              request_id: 'req_123456789'
-            }
-          }
-        }
+              request_id: 'req_123456789',
+            },
+          },
+        },
       },
       NotFound: {
         description: 'Resource not found',
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '#/components/schemas/ErrorResponse',
             },
             example: {
               error: 'not_found',
               message: 'Case with ID 999999 not found',
               timestamp: '2023-09-23T10:30:00Z',
-              request_id: 'req_123456789'
-            }
-          }
-        }
+              request_id: 'req_123456789',
+            },
+          },
+        },
       },
       RateLimit: {
         description: 'Rate limit exceeded',
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '#/components/schemas/ErrorResponse',
             },
             example: {
               error: 'rate_limit_exceeded',
               message: 'Rate limit of 100 requests per minute exceeded',
               timestamp: '2023-09-23T10:30:00Z',
-              request_id: 'req_123456789'
-            }
-          }
-        }
+              request_id: 'req_123456789',
+            },
+          },
+        },
       },
       InternalError: {
         description: 'Internal server error',
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '#/components/schemas/ErrorResponse',
             },
             example: {
               error: 'internal_server_error',
               message: 'An unexpected error occurred',
               timestamp: '2023-09-23T10:30:00Z',
-              request_id: 'req_123456789'
-            }
-          }
-        }
-      }
+              request_id: 'req_123456789',
+            },
+          },
+        },
+      },
     };
   }
 
@@ -534,8 +534,8 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
         schema: {
           type: 'integer',
           minimum: 1,
-          default: 1
-        }
+          default: 1,
+        },
       },
       PageSizeParam: {
         name: 'page_size',
@@ -546,8 +546,8 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           type: 'integer',
           minimum: 1,
           maximum: 100,
-          default: 20
-        }
+          default: 20,
+        },
       },
       ClusterIdParam: {
         name: 'cluster_id',
@@ -556,8 +556,8 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
         required: true,
         schema: {
           type: 'integer',
-          minimum: 1
-        }
+          minimum: 1,
+        },
       },
       OpinionIdParam: {
         name: 'opinion_id',
@@ -566,9 +566,9 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
         required: true,
         schema: {
           type: 'integer',
-          minimum: 1
-        }
-      }
+          minimum: 1,
+        },
+      },
     };
   }
 
@@ -592,7 +592,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/HealthStatus'
+                $ref: '#/components/schemas/HealthStatus',
               },
               example: {
                 status: 'healthy',
@@ -603,22 +603,22 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
                   courtlistener: {
                     status: 'healthy',
                     responseTime: 150,
-                    lastCheck: '2023-09-23T10:30:00Z'
+                    lastCheck: '2023-09-23T10:30:00Z',
                   },
                   cache: {
                     status: 'healthy',
                     responseTime: 5,
-                    lastCheck: '2023-09-23T10:30:00Z'
-                  }
-                }
-              }
-            }
-          }
+                    lastCheck: '2023-09-23T10:30:00Z',
+                  },
+                },
+              },
+            },
+          },
         },
         '503': {
-          $ref: '#/components/responses/InternalError'
-        }
-      }
+          $ref: '#/components/responses/InternalError',
+        },
+      },
     });
 
     this.addPath('/metrics', 'GET', {
@@ -632,12 +632,12 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/Metrics'
-              }
-            }
-          }
-        }
-      }
+                $ref: '#/components/schemas/Metrics',
+              },
+            },
+          },
+        },
+      },
     });
 
     this.addPath('/status', 'GET', {
@@ -656,13 +656,13 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
                   status: { type: 'string', example: 'online' },
                   uptime: { type: 'number' },
                   version: { type: 'string' },
-                  timestamp: { type: 'string', format: 'date-time' }
-                }
-              }
-            }
-          }
-        }
-      }
+                  timestamp: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -670,7 +670,8 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     this.addPath('/api/search', 'GET', {
       tags: ['Search'],
       summary: 'Search legal cases',
-      description: 'Search for legal cases using various criteria including citation, case name, court, and date ranges',
+      description:
+        'Search for legal cases using various criteria including citation, case name, court, and date ranges',
       operationId: 'searchCases',
       parameters: [
         {
@@ -679,7 +680,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           description: 'General search query',
           required: false,
           schema: { type: 'string' },
-          example: 'constitutional law'
+          example: 'constitutional law',
         },
         {
           name: 'citation',
@@ -687,7 +688,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           description: 'Legal citation',
           required: false,
           schema: { type: 'string' },
-          example: '410 U.S. 113'
+          example: '410 U.S. 113',
         },
         {
           name: 'case_name',
@@ -695,7 +696,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           description: 'Case name',
           required: false,
           schema: { type: 'string' },
-          example: 'Brown v. Board'
+          example: 'Brown v. Board',
         },
         {
           name: 'court',
@@ -703,31 +704,31 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           description: 'Court identifier',
           required: false,
           schema: { type: 'string' },
-          example: 'scotus'
+          example: 'scotus',
         },
         {
           name: 'judge',
           in: 'query',
           description: 'Judge name',
           required: false,
-          schema: { type: 'string' }
+          schema: { type: 'string' },
         },
         {
           name: 'date_filed_after',
           in: 'query',
           description: 'Filed after date (YYYY-MM-DD)',
           required: false,
-          schema: { type: 'string', format: 'date' }
+          schema: { type: 'string', format: 'date' },
         },
         {
           name: 'date_filed_before',
           in: 'query',
           description: 'Filed before date (YYYY-MM-DD)',
           required: false,
-          schema: { type: 'string', format: 'date' }
+          schema: { type: 'string', format: 'date' },
         },
         { $ref: '#/components/parameters/PageParam' },
-        { $ref: '#/components/parameters/PageSizeParam' }
+        { $ref: '#/components/parameters/PageSizeParam' },
       ],
       responses: {
         '200': {
@@ -735,15 +736,15 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/SearchResponse'
-              }
-            }
-          }
+                $ref: '#/components/schemas/SearchResponse',
+              },
+            },
+          },
         },
         '400': { $ref: '#/components/responses/BadRequest' },
         '429': { $ref: '#/components/responses/RateLimit' },
-        '500': { $ref: '#/components/responses/InternalError' }
-      }
+        '500': { $ref: '#/components/responses/InternalError' },
+      },
     });
   }
 
@@ -753,28 +754,23 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
       summary: 'Get case details',
       description: 'Retrieve detailed information about a specific case by cluster ID',
       operationId: 'getCaseDetails',
-      parameters: [
-        { $ref: '#/components/parameters/ClusterIdParam' }
-      ],
+      parameters: [{ $ref: '#/components/parameters/ClusterIdParam' }],
       responses: {
         '200': {
           description: 'Case details',
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/CaseResult'
-              }
-            }
-          }
+                $ref: '#/components/schemas/CaseResult',
+              },
+            },
+          },
         },
         '401': { $ref: '#/components/responses/Unauthorized' },
         '404': { $ref: '#/components/responses/NotFound' },
-        '500': { $ref: '#/components/responses/InternalError' }
+        '500': { $ref: '#/components/responses/InternalError' },
       },
-      security: [
-        { ApiKeyAuth: [] },
-        { BearerAuth: [] }
-      ]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
     });
   }
 
@@ -784,9 +780,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
       summary: 'Get opinion text',
       description: 'Retrieve the full text of a legal opinion',
       operationId: 'getOpinionText',
-      parameters: [
-        { $ref: '#/components/parameters/OpinionIdParam' }
-      ],
+      parameters: [{ $ref: '#/components/parameters/OpinionIdParam' }],
       responses: {
         '200': {
           description: 'Opinion text and metadata',
@@ -800,20 +794,17 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
                   author: { type: 'string' },
                   text: { type: 'string' },
                   word_count: { type: 'integer' },
-                  cluster_id: { type: 'integer' }
-                }
-              }
-            }
-          }
+                  cluster_id: { type: 'integer' },
+                },
+              },
+            },
+          },
         },
         '401': { $ref: '#/components/responses/Unauthorized' },
         '404': { $ref: '#/components/responses/NotFound' },
-        '500': { $ref: '#/components/responses/InternalError' }
+        '500': { $ref: '#/components/responses/InternalError' },
       },
-      security: [
-        { ApiKeyAuth: [] },
-        { BearerAuth: [] }
-      ]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
     });
   }
 
@@ -826,7 +817,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
 
     this.logger.info('Generated complete OpenAPI specification', {
       paths: Object.keys(this.spec.paths).length,
-      schemas: Object.keys(this.spec.components.schemas).length
+      schemas: Object.keys(this.spec.components.schemas).length,
     });
 
     return this.spec;

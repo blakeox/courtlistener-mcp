@@ -42,7 +42,7 @@ export class HealthCheckManager {
     private logger: Logger,
     private metrics: MetricsCollector,
     private cache: CacheManager,
-    private apiClient: CourtListenerAPI
+    private apiClient: CourtListenerAPI,
   ) {
     this.startTime = Date.now();
     this.startPeriodicChecks();
@@ -57,7 +57,7 @@ export class HealthCheckManager {
 
     // Check all dependencies
     const dependencies = await this.checkAllDependencies();
-    
+
     // Determine overall status
     const overallStatus = this.determineOverallStatus(dependencies);
 
@@ -70,7 +70,7 @@ export class HealthCheckManager {
       uptime,
       version: process.env.npm_package_version || '0.1.0',
       dependencies,
-      metrics: healthMetrics
+      metrics: healthMetrics,
     };
   }
 
@@ -89,7 +89,7 @@ export class HealthCheckManager {
             name,
             status: 'healthy',
             responseTime: Date.now() - startTime,
-            lastChecked: new Date().toISOString()
+            lastChecked: new Date().toISOString(),
           };
           break;
 
@@ -99,7 +99,7 @@ export class HealthCheckManager {
             name,
             status: 'healthy',
             responseTime: Date.now() - startTime,
-            lastChecked: new Date().toISOString()
+            lastChecked: new Date().toISOString(),
           };
           break;
 
@@ -109,7 +109,7 @@ export class HealthCheckManager {
             name,
             status: 'healthy',
             responseTime: Date.now() - startTime,
-            lastChecked: new Date().toISOString()
+            lastChecked: new Date().toISOString(),
           };
           break;
 
@@ -122,7 +122,7 @@ export class HealthCheckManager {
         status: 'unhealthy',
         responseTime: Date.now() - startTime,
         error: (error as Error).message,
-        lastChecked: new Date().toISOString()
+        lastChecked: new Date().toISOString(),
       };
     }
 
@@ -138,12 +138,12 @@ export class HealthCheckManager {
       // Check critical dependencies only
       await this.checkCache();
       await this.checkCourtListenerAPI();
-      
+
       return { ready: true };
     } catch (error) {
-      return { 
-        ready: false, 
-        reason: `Dependency check failed: ${(error as Error).message}` 
+      return {
+        ready: false,
+        reason: `Dependency check failed: ${(error as Error).message}`,
       };
     }
   }
@@ -156,20 +156,20 @@ export class HealthCheckManager {
       // Basic health checks
       const memUsage = process.memoryUsage();
       const heapUsedPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-      
+
       // Check if memory usage is critical (>90%)
       if (heapUsedPercent > 90) {
-        return { 
-          alive: false, 
-          reason: `Critical memory usage: ${heapUsedPercent.toFixed(1)}%` 
+        return {
+          alive: false,
+          reason: `Critical memory usage: ${heapUsedPercent.toFixed(1)}%`,
         };
       }
 
       return { alive: true };
     } catch (error) {
-      return { 
-        alive: false, 
-        reason: `Liveness check failed: ${(error as Error).message}` 
+      return {
+        alive: false,
+        reason: `Liveness check failed: ${(error as Error).message}`,
       };
     }
   }
@@ -199,9 +199,7 @@ export class HealthCheckManager {
 
   private async checkAllDependencies(): Promise<DependencyStatus[]> {
     const dependencies = ['courtlistener-api', 'cache', 'memory'];
-    const results = await Promise.allSettled(
-      dependencies.map(dep => this.checkDependency(dep))
-    );
+    const results = await Promise.allSettled(dependencies.map((dep) => this.checkDependency(dep)));
 
     return results.map((result, index) => {
       if (result.status === 'fulfilled') {
@@ -211,15 +209,17 @@ export class HealthCheckManager {
           name: dependencies[index],
           status: 'unhealthy' as const,
           error: result.reason?.message || 'Unknown error',
-          lastChecked: new Date().toISOString()
+          lastChecked: new Date().toISOString(),
         };
       }
     });
   }
 
-  private determineOverallStatus(dependencies: DependencyStatus[]): 'healthy' | 'degraded' | 'unhealthy' {
-    const unhealthyCount = dependencies.filter(dep => dep.status === 'unhealthy').length;
-    const degradedCount = dependencies.filter(dep => dep.status === 'degraded').length;
+  private determineOverallStatus(
+    dependencies: DependencyStatus[],
+  ): 'healthy' | 'degraded' | 'unhealthy' {
+    const unhealthyCount = dependencies.filter((dep) => dep.status === 'unhealthy').length;
+    const degradedCount = dependencies.filter((dep) => dep.status === 'degraded').length;
 
     if (unhealthyCount > 0) {
       return 'unhealthy';
@@ -246,11 +246,11 @@ export class HealthCheckManager {
   private async checkCache(): Promise<void> {
     const testKey = '_health_check_';
     const testValue = Date.now().toString();
-    
+
     // Test cache write and read
-    this.cache.set(testKey, testValue, 10); // 10 second TTL
-    const retrieved = this.cache.get(testKey);
-    
+    this.cache.set(testKey, {}, testValue, 10); // 10 second TTL
+    const retrieved = this.cache.get<string>(testKey);
+
     if (retrieved !== testValue) {
       throw new Error('Cache read/write test failed');
     }
@@ -259,7 +259,7 @@ export class HealthCheckManager {
   private checkMemoryUsage(): void {
     const memUsage = process.memoryUsage();
     const heapUsedPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    
+
     if (heapUsedPercent > 85) {
       throw new Error(`High memory usage: ${heapUsedPercent.toFixed(1)}%`);
     }
@@ -267,7 +267,7 @@ export class HealthCheckManager {
 
   private async getHealthMetrics(): Promise<HealthMetrics> {
     const memoryUsage = process.memoryUsage();
-    
+
     // Get CPU usage (simplified)
     const cpuUsage = process.cpuUsage();
     const cpuPercent = (cpuUsage.user + cpuUsage.system) / 1000000; // Convert to seconds
@@ -278,9 +278,11 @@ export class HealthCheckManager {
       memoryUsage,
       cpuUsage: cpuPercent,
       requestCount: currentMetrics.requests_total,
-      errorRate: currentMetrics.requests_total > 0 ? 
-        (currentMetrics.requests_failed / currentMetrics.requests_total) : 0,
-      averageResponseTime: currentMetrics.average_response_time
+      errorRate:
+        currentMetrics.requests_total > 0
+          ? currentMetrics.requests_failed / currentMetrics.requests_total
+          : 0,
+      averageResponseTime: currentMetrics.average_response_time,
     };
   }
 }

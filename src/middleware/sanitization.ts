@@ -38,7 +38,7 @@ export class InputSanitizer {
 
   constructor(logger: Logger, config?: Partial<SanitizationConfig>) {
     this.logger = logger.child('InputSanitizer');
-    
+
     this.config = {
       enabled: true,
       maxStringLength: 10000,
@@ -46,7 +46,7 @@ export class InputSanitizer {
       maxObjectDepth: 10,
       allowedTags: ['b', 'i', 'em', 'strong', 'p', 'br'],
       blockedPatterns: InputSanitizer.INJECTION_PATTERNS,
-      ...config
+      ...config,
     };
 
     if (this.config.enabled) {
@@ -54,7 +54,7 @@ export class InputSanitizer {
         maxStringLength: this.config.maxStringLength,
         maxArrayLength: this.config.maxArrayLength,
         maxObjectDepth: this.config.maxObjectDepth,
-        blockedPatterns: this.config.blockedPatterns.length
+        blockedPatterns: this.config.blockedPatterns.length,
       });
     }
   }
@@ -67,14 +67,14 @@ export class InputSanitizer {
       return {
         sanitized: input,
         warnings: [],
-        blocked: false
+        blocked: false,
       };
     }
 
     const result: SanitizationResult = {
       sanitized: null,
       warnings: [],
-      blocked: false
+      blocked: false,
     };
 
     try {
@@ -89,7 +89,7 @@ export class InputSanitizer {
     if (result.warnings.length > 0) {
       this.logger.debug('Input sanitization warnings', {
         path,
-        warnings: result.warnings
+        warnings: result.warnings,
       });
     }
 
@@ -126,20 +126,20 @@ export class InputSanitizer {
         value = value.slice(0, this.config.maxArrayLength);
       }
 
-      return value.map((item: any, index: number) => 
-        this.sanitizeValue(item, `${path}[${index}]`, depth + 1, result)
+      return value.map((item: any, index: number) =>
+        this.sanitizeValue(item, `${path}[${index}]`, depth + 1, result),
       );
     }
 
     // Handle objects
     if (typeof value === 'object') {
       const sanitized: any = {};
-      
+
       for (const [key, val] of Object.entries(value)) {
         const sanitizedKey = this.sanitizeString(key, `${path}.${key}`, result);
         sanitized[sanitizedKey] = this.sanitizeValue(val, `${path}.${key}`, depth + 1, result);
       }
-      
+
       return sanitized;
     }
 
@@ -165,9 +165,9 @@ export class InputSanitizer {
         this.logger.warn('Potential injection attempt detected', {
           path,
           pattern: pattern.toString(),
-          match: match?.[0]?.substring(0, 50)
+          match: match?.[0]?.substring(0, 50),
         });
-        
+
         // Block the entire request if injection detected
         throw new Error(`Potential injection detected at ${path}: ${match?.[0]?.substring(0, 50)}`);
       }
@@ -186,7 +186,11 @@ export class InputSanitizer {
   /**
    * Validate that input conforms to expected schema
    */
-  validateSchema(input: any, schema: any, path: string = 'root'): { valid: boolean; errors: string[] } {
+  validateSchema(
+    input: any,
+    schema: any,
+    path: string = 'root',
+  ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     try {
@@ -198,7 +202,7 @@ export class InputSanitizer {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -208,7 +212,7 @@ export class InputSanitizer {
   private validateValue(value: any, schema: any, path: string, errors: string[]): void {
     if (schema.type) {
       const actualType = Array.isArray(value) ? 'array' : typeof value;
-      
+
       if (actualType !== schema.type) {
         errors.push(`Type mismatch at ${path}: expected ${schema.type}, got ${actualType}`);
         return;
@@ -250,7 +254,7 @@ export function createInputSanitizer(logger: Logger): InputSanitizer {
     enabled: process.env.SANITIZATION_ENABLED !== 'false',
     maxStringLength: parseInt(process.env.SANITIZATION_MAX_STRING_LENGTH || '10000'),
     maxArrayLength: parseInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH || '1000'),
-    maxObjectDepth: parseInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH || '10')
+    maxObjectDepth: parseInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH || '10'),
   };
 
   return new InputSanitizer(logger, config);

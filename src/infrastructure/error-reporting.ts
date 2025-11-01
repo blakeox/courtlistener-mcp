@@ -5,12 +5,7 @@
 
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
-import {
-  BaseError,
-  ErrorSeverity,
-  ErrorCategory,
-  ErrorContext
-} from './error-types.js';
+import { BaseError, ErrorSeverity, ErrorCategory, ErrorContext } from './error-types.js';
 
 export interface ErrorReport {
   id: string;
@@ -73,7 +68,7 @@ export class ErrorReportingService {
   constructor(
     logger: Logger,
     config: Partial<ErrorReportingConfig> = {},
-    metrics?: MetricsCollector
+    metrics?: MetricsCollector,
   ) {
     this.logger = logger;
     this.metrics = metrics;
@@ -85,11 +80,11 @@ export class ErrorReportingService {
       reportingThreshold: {
         criticalErrors: 1,
         highErrors: 5,
-        mediumErrors: 20
+        mediumErrors: 20,
       },
       externalEndpoints: {},
       retentionDays: 30,
-      ...config
+      ...config,
     };
 
     if (this.config.enableAggregation) {
@@ -107,12 +102,12 @@ export class ErrorReportingService {
 
       // Update or create error report
       let report = this.errorReports.get(errorKey);
-      
+
       if (report) {
         // Update existing report
         report.frequency++;
         report.lastSeen = now;
-        
+
         // Update affected endpoints
         if (error.context.endpoint && !report.affectedEndpoints.includes(error.context.endpoint)) {
           report.affectedEndpoints.push(error.context.endpoint);
@@ -123,7 +118,7 @@ export class ErrorReportingService {
           // In a real system, this would track unique users
           report.userImpact.totalUsers = Math.max(report.userImpact.totalUsers, 1);
           report.userImpact.affectedUsers++;
-          report.userImpact.impactPercentage = 
+          report.userImpact.impactPercentage =
             (report.userImpact.affectedUsers / report.userImpact.totalUsers) * 100;
         }
       } else {
@@ -139,11 +134,11 @@ export class ErrorReportingService {
           userImpact: {
             totalUsers: 1,
             affectedUsers: error.context.userId ? 1 : 0,
-            impactPercentage: error.context.userId ? 100 : 0
+            impactPercentage: error.context.userId ? 100 : 0,
           },
           resolution: {
-            status: 'unresolved'
-          }
+            status: 'unresolved',
+          },
         };
       }
 
@@ -158,11 +153,13 @@ export class ErrorReportingService {
       this.logger.debug(`Error reported to centralized system`, {
         errorKey,
         frequency: report.frequency,
-        severity: error.severity
+        severity: error.severity,
       });
-
     } catch (reportingError) {
-      this.logger.error('Failed to report error to centralized system', reportingError instanceof Error ? reportingError : new Error(String(reportingError)));
+      this.logger.error(
+        'Failed to report error to centralized system',
+        reportingError instanceof Error ? reportingError : new Error(String(reportingError)),
+      );
     }
   }
 
@@ -180,15 +177,15 @@ export class ErrorReportingService {
 
     // Apply filters
     if (filters?.severity) {
-      reports = reports.filter(r => r.error.severity === filters.severity);
+      reports = reports.filter((r) => r.error.severity === filters.severity);
     }
-    
+
     if (filters?.category) {
-      reports = reports.filter(r => r.error.category === filters.category);
+      reports = reports.filter((r) => r.error.category === filters.category);
     }
-    
+
     if (filters?.status) {
-      reports = reports.filter(r => r.resolution.status === filters.status);
+      reports = reports.filter((r) => r.resolution.status === filters.status);
     }
 
     // Sort by severity and frequency
@@ -196,11 +193,11 @@ export class ErrorReportingService {
       const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
       const aSeverity = severityOrder[a.error.severity] || 0;
       const bSeverity = severityOrder[b.error.severity] || 0;
-      
+
       if (aSeverity !== bSeverity) {
         return bSeverity - aSeverity; // Higher severity first
       }
-      
+
       return b.frequency - a.frequency; // Higher frequency first
     });
 
@@ -215,7 +212,7 @@ export class ErrorReportingService {
    */
   public getErrorTrends(timeWindow = '1h'): ErrorTrend[] {
     return Array.from(this.errorTrends.values())
-      .filter(trend => trend.timeWindow === timeWindow)
+      .filter((trend) => trend.timeWindow === timeWindow)
       .sort((a, b) => b.count - a.count);
   }
 
@@ -226,7 +223,7 @@ export class ErrorReportingService {
     errorKey: string,
     status: 'unresolved' | 'investigating' | 'resolved' | 'ignored',
     assignee?: string,
-    notes?: string
+    notes?: string,
   ): boolean {
     const report = this.errorReports.get(errorKey);
     if (!report) {
@@ -236,7 +233,7 @@ export class ErrorReportingService {
     report.resolution.status = status;
     report.resolution.assignee = assignee;
     report.resolution.notes = notes;
-    
+
     if (status === 'resolved') {
       report.resolution.resolvedAt = new Date().toISOString();
     }
@@ -244,7 +241,7 @@ export class ErrorReportingService {
     this.logger.info(`Error resolution updated`, {
       errorKey,
       status,
-      assignee
+      assignee,
     });
 
     return true;
@@ -258,12 +255,20 @@ export class ErrorReportingService {
 
     if (format === 'csv') {
       const headers = [
-        'ID', 'Timestamp', 'Error Message', 'Category', 'Severity',
-        'Frequency', 'First Seen', 'Last Seen', 'Affected Endpoints',
-        'Status', 'Assignee'
+        'ID',
+        'Timestamp',
+        'Error Message',
+        'Category',
+        'Severity',
+        'Frequency',
+        'First Seen',
+        'Last Seen',
+        'Affected Endpoints',
+        'Status',
+        'Assignee',
       ];
 
-      const rows = reports.map(report => [
+      const rows = reports.map((report) => [
         report.id,
         report.timestamp,
         report.error.message,
@@ -274,10 +279,10 @@ export class ErrorReportingService {
         report.lastSeen,
         report.affectedEndpoints.join(';'),
         report.resolution.status,
-        report.resolution.assignee || ''
+        report.resolution.assignee || '',
       ]);
 
-      return [headers, ...rows].map(row => row.join(',')).join('\n');
+      return [headers, ...rows].map((row) => row.join(',')).join('\n');
     }
 
     return JSON.stringify(reports, null, 2);
@@ -292,7 +297,7 @@ export class ErrorReportingService {
       error.category,
       error.severity,
       this.normalizeErrorMessage(error.message),
-      error.context.endpoint || 'unknown'
+      error.context.endpoint || 'unknown',
     ];
 
     return components.join('::');
@@ -324,7 +329,7 @@ export class ErrorReportingService {
    */
   private checkAlertThresholds(report: ErrorReport): void {
     const threshold = this.getThresholdForSeverity(report.error.severity);
-    
+
     if (report.frequency >= threshold) {
       this.sendAlert(report);
     }
@@ -362,7 +367,7 @@ export class ErrorReportingService {
       severity: report.error.severity,
       frequency: report.frequency,
       endpoints: report.affectedEndpoints,
-      userImpact: report.userImpact
+      userImpact: report.userImpact,
     };
 
     try {
@@ -378,11 +383,13 @@ export class ErrorReportingService {
       this.logger.info(`Alert sent for error report`, {
         reportId: report.id,
         severity: report.error.severity,
-        frequency: report.frequency
+        frequency: report.frequency,
       });
-
     } catch (error) {
-      this.logger.error('Failed to send error alert', error instanceof Error ? error : new Error(String(error)));
+      this.logger.error(
+        'Failed to send error alert',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
@@ -407,7 +414,7 @@ export class ErrorReportingService {
    */
   private updateErrorTrends(error: BaseError): void {
     const trendKey = `${error.category}_${error.severity}_1h`;
-    
+
     let trend = this.errorTrends.get(trendKey);
     if (!trend) {
       trend = {
@@ -416,7 +423,7 @@ export class ErrorReportingService {
         count: 0,
         trend: 'stable',
         changePercentage: 0,
-        timeWindow: '1h'
+        timeWindow: '1h',
       };
     }
 
@@ -437,7 +444,7 @@ export class ErrorReportingService {
    * Perform periodic aggregation and cleanup
    */
   private performAggregation(): void {
-    const cutoffDate = new Date(Date.now() - (this.config.retentionDays * 24 * 60 * 60 * 1000));
+    const cutoffDate = new Date(Date.now() - this.config.retentionDays * 24 * 60 * 60 * 1000);
     let removedCount = 0;
 
     // Clean up old reports
@@ -454,7 +461,7 @@ export class ErrorReportingService {
     this.logger.debug('Error aggregation completed', {
       totalReports: this.errorReports.size,
       removedReports: removedCount,
-      trends: this.errorTrends.size
+      trends: this.errorTrends.size,
     });
   }
 

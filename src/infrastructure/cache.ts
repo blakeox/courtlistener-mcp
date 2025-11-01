@@ -6,6 +6,45 @@
 import { CacheEntry, CacheConfig } from '../types.js';
 import { Logger } from './logger.js';
 
+/**
+ * Cache Manager
+ *
+ * In-memory LRU cache with TTL (Time To Live) expiration.
+ *
+ * **Features**:
+ * - LRU (Least Recently Used) eviction policy
+ * - TTL-based expiration
+ * - Automatic cleanup of expired entries
+ * - Configurable max size
+ * - Per-entry custom TTL support
+ * - Cache statistics and monitoring
+ *
+ * **Use Cases**:
+ * - API response caching
+ * - Expensive computation results
+ * - Database query results
+ *
+ * @example
+ * ```typescript
+ * const cache = new CacheManager(config.cache, logger);
+ *
+ * // Store data
+ * cache.set('/api/cases', { page: 1 }, responseData);
+ *
+ * // Retrieve data
+ * const cached = cache.get<CaseData>('/api/cases', { page: 1 });
+ * if (cached) {
+ *   return cached; // Cache hit
+ * }
+ *
+ * // Custom TTL (10 minutes instead of default)
+ * cache.set('/api/cases', params, data, 600);
+ *
+ * // Get statistics
+ * const stats = cache.getStats();
+ * console.log(`Cache: ${stats.validEntries}/${stats.maxSize} entries`);
+ * ```
+ */
 export class CacheManager {
   private cache = new Map<string, CacheEntry>();
   private accessOrder = new Map<string, number>();
@@ -13,15 +52,18 @@ export class CacheManager {
   private logger: Logger;
   private cleanupInterval?: NodeJS.Timeout;
 
-  constructor(private config: CacheConfig, logger: Logger) {
+  constructor(
+    private config: CacheConfig,
+    logger: Logger,
+  ) {
     this.logger = logger;
-    
+
     if (this.config.enabled) {
       // Cleanup expired entries every minute
       this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
       this.logger.info('Cache manager initialized', {
         ttl: this.config.ttl,
-        maxSize: this.config.maxSize
+        maxSize: this.config.maxSize,
       });
     }
   }
@@ -29,24 +71,24 @@ export class CacheManager {
   /**
    * Generate cache key from endpoint and parameters
    */
-  private generateKey(endpoint: string, params?: any): string {
-    if (!params) return endpoint;
-    
+  private generateKey(endpoint: string, params?: Record<string, unknown>): string {
+    if (!params || Object.keys(params).length === 0) return endpoint;
+
     // Sort parameters for consistent keys
     const sortedParams = Object.keys(params)
       .sort()
-      .reduce((obj, key) => {
+      .reduce<Record<string, unknown>>((obj, key) => {
         obj[key] = params[key];
         return obj;
-      }, {} as any);
-    
+      }, {});
+
     return `${endpoint}:${JSON.stringify(sortedParams)}`;
   }
 
   /**
    * Get cached data
    */
-  get<T>(endpoint: string, params?: any): T | null {
+  get<T>(endpoint: string, params?: Record<string, unknown>): T | null {
     if (!this.config.enabled) return null;
 
     const key = this.generateKey(endpoint, params);
@@ -57,8 +99,9 @@ export class CacheManager {
       return null;
     }
 
+    const now = Date.now();
     // Check if expired
-    if (Date.now() > entry.expiresAt) {
+    if (now > entry.expiresAt) {
       this.cache.delete(key);
       this.accessOrder.delete(key);
       this.logger.debug('Cache entry expired', { key });
@@ -68,40 +111,41 @@ export class CacheManager {
     // Update access order for LRU
     this.accessOrder.set(key, ++this.accessCounter);
     this.logger.debug('Cache hit', { key });
-    
+
     return entry.data as T;
   }
 
   /**
    * Set cache data
    */
-  set<T>(endpoint: string, params: any, data: T): void;
-  set<T>(endpoint: string, params: any, data: T, customTtl: number): void;
-  set<T>(endpoint: string, params: any, data: T, customTtl?: number): void {
+  set<T>(endpoint: string, params: Record<string, unknown>, data: T): void;
+  set<T>(endpoint: string, params: Record<string, unknown>, data: T, customTtl: number): void;
+  set<T>(endpoint: string, params: Record<string, unknown>, data: T, customTtl?: number): void {
     if (!this.config.enabled) return;
 
     const key = this.generateKey(endpoint, params);
-    
+
     // Check if we need to evict entries
     if (this.cache.size >= this.config.maxSize) {
       this.evictLRU();
     }
 
-    const ttl = customTtl !== undefined ? customTtl : this.config.ttl;
+    const ttl = customTtl ?? this.config.ttl;
+    const now = Date.now();
     const entry: CacheEntry<T> = {
       data,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + (ttl * 1000)
+      timestamp: now,
+      expiresAt: now + ttl * 1000,
     };
 
     this.cache.set(key, entry);
     this.accessOrder.set(key, ++this.accessCounter);
-    
-    this.logger.debug('Cache set', { 
-      key, 
+
+    this.logger.debug('Cache set', {
+      key,
       size: this.cache.size,
       expiresAt: new Date(entry.expiresAt).toISOString(),
-      ttl: ttl
+      ttl: ttl,
     });
   }
 
@@ -132,26 +176,25 @@ export class CacheManager {
     }
 
     if (removedCount > 0) {
-      this.logger.debug('Cache cleanup completed', { 
-        removedCount, 
-        remainingEntries: this.cache.size 
+      this.logger.debug('Cache cleanup completed', {
+        removedCount,
+        remainingEntries: this.cache.size,
       });
     }
   }
 
   /**
    * Evict least recently used entry
+   * Optimized: Finds the entry with minimum access time in one pass
    */
   private evictLRU(): void {
-    let lruKey: string | null = null;
-    let lruAccess = Infinity;
+    if (this.accessOrder.size === 0) return;
 
-    for (const [key, accessTime] of this.accessOrder.entries()) {
-      if (accessTime < lruAccess) {
-        lruAccess = accessTime;
-        lruKey = key;
-      }
-    }
+    // Use Array.from with reduce for better performance on small maps
+    const [lruKey] = Array.from(this.accessOrder.entries()).reduce(
+      ([minKey, minTime], [key, time]) => (time < minTime ? [key, time] : [minKey, minTime]),
+      ['', Number.POSITIVE_INFINITY] as const,
+    );
 
     if (lruKey) {
       this.cache.delete(lruKey);
@@ -182,7 +225,7 @@ export class CacheManager {
       expiredEntries,
       maxSize: this.config.maxSize,
       enabled: this.config.enabled,
-      ttl: this.config.ttl
+      ttl: this.config.ttl,
     };
   }
 

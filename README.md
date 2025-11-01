@@ -420,7 +420,8 @@ The Cloudflare Worker exposes an SSE endpoint at `/sse` for remote MCP clients.
 - Health: `GET https://<your-worker-subdomain>/health`
 - SSE: `GET https://<your-worker-subdomain>/sse`
 
-Optional auth can be enabled by setting a Worker secret `SSE_AUTH_TOKEN`. When set, clients must provide a token via either:
+Optional auth can be enabled by setting a Worker secret `SSE_AUTH_TOKEN`. When
+set, clients must provide a token via either:
 
 - HTTP header: `Authorization: Bearer <token>`
 - Query string: `?access_token=<token>`
@@ -445,8 +446,9 @@ pnpm run mcp:remote
 
 ChatGPT or Claude Desktop connection:
 
-- Use the SSE URL directly. If auth is enabled, append `?access_token=your-token` to the URL or configure a Bearer header if the client supports custom headers.
-or see [EXAMPLES.md](./EXAMPLES.md).
+- Use the SSE URL directly. If auth is enabled, append
+  `?access_token=your-token` to the URL or configure a Bearer header if the
+  client supports custom headers. or see [EXAMPLES.md](./EXAMPLES.md).
 
 ## MCP Integration
 

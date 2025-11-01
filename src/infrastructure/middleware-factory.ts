@@ -23,7 +23,7 @@ export class AuthenticationMiddleware implements Middleware {
 
   constructor(
     private config: ServerConfig['security'],
-    private logger: Logger
+    private logger: Logger,
   ) {}
 
   async process(context: RequestContext, next: () => Promise<any>): Promise<any> {
@@ -33,7 +33,7 @@ export class AuthenticationMiddleware implements Middleware {
 
     // Authentication logic would go here
     this.logger.debug('Processing authentication', { requestId: context.requestId });
-    
+
     return next();
   }
 }
@@ -44,7 +44,7 @@ export class RateLimitMiddleware implements Middleware {
 
   constructor(
     private config: ServerConfig['security'],
-    private logger: Logger
+    private logger: Logger,
   ) {}
 
   async process(context: RequestContext, next: () => Promise<any>): Promise<any> {
@@ -70,11 +70,11 @@ export class RateLimitMiddleware implements Middleware {
     requestData.count++;
     this.requestCounts.set(clientId, requestData);
 
-    this.logger.debug('Rate limit check passed', { 
+    this.logger.debug('Rate limit check passed', {
       requestId: context.requestId,
       clientId,
       count: requestData.count,
-      limit: this.config.maxRequestsPerMinute
+      limit: this.config.maxRequestsPerMinute,
     });
 
     return next();
@@ -97,9 +97,9 @@ export class MiddlewareFactory {
       middlewares.push(new RateLimitMiddleware(config.security, this.logger));
     }
 
-    this.logger.info('Created middleware stack', { 
+    this.logger.info('Created middleware stack', {
       middlewareCount: middlewares.length,
-      middlewares: middlewares.map(m => m.name)
+      middlewares: middlewares.map((m) => m.name),
     });
 
     return middlewares;
@@ -108,7 +108,7 @@ export class MiddlewareFactory {
   async executeMiddlewareStack(
     middlewares: Middleware[],
     context: RequestContext,
-    finalHandler: () => Promise<any>
+    finalHandler: () => Promise<any>,
   ): Promise<any> {
     let index = 0;
 

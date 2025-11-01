@@ -5,6 +5,7 @@
 
 export * from './cache.js';
 export * from './config.js';
+export * from './config-schema.js';
 export * from './logger.js';
 export * from './metrics.js';
 export * from './container.js';

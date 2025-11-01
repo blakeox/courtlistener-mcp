@@ -3,11 +3,11 @@
  * Uses async patterns for improved performance and reliability
  */
 
-import { 
-  ConnectionPoolManager, 
-  RequestQueueManager, 
+import {
+  ConnectionPoolManager,
+  RequestQueueManager,
   CircuitBreaker,
-  CircuitBreakerOptions 
+  CircuitBreakerOptions,
 } from './async-patterns.js';
 import { Logger } from './logger.js';
 import { CacheManager } from './cache.js';
@@ -41,7 +41,7 @@ export class EnhancedCourtListenerAPIClient {
   private logger: Logger;
   private cache: CacheManager;
   private metrics: MetricsCollector;
-  
+
   private connectionPool: ConnectionPoolManager;
   private requestQueue: RequestQueueManager;
   private circuitBreaker?: CircuitBreaker;
@@ -50,7 +50,7 @@ export class EnhancedCourtListenerAPIClient {
     options: EnhancedAPIOptions,
     logger: Logger,
     cache: CacheManager,
-    metrics: MetricsCollector
+    metrics: MetricsCollector,
   ) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.apiKey = options.apiKey;
@@ -67,18 +67,18 @@ export class EnhancedCourtListenerAPIClient {
       circuitBreakerOptions: {
         failureThreshold: 5,
         timeout: 60000,
-        ...options.circuitBreakerOptions
+        ...options.circuitBreakerOptions,
       },
       connectionPool: {
         maxConnections: 10,
         maxIdleTime: 30000,
-        ...options.connectionPool
+        ...options.connectionPool,
       },
       requestQueue: {
         maxConcurrent: 5,
         rateLimit: 10, // 10 requests per second
-        ...options.requestQueue
-      }
+        ...options.requestQueue,
+      },
     };
 
     // Initialize async patterns
@@ -89,7 +89,7 @@ export class EnhancedCourtListenerAPIClient {
       this.circuitBreaker = new CircuitBreaker(
         'courtlistener-api',
         this.options.circuitBreakerOptions,
-        this.logger
+        this.logger,
       );
     }
 
@@ -97,7 +97,7 @@ export class EnhancedCourtListenerAPIClient {
       baseUrl: this.baseUrl,
       circuitBreakerEnabled: this.options.enableCircuitBreaker,
       connectionPoolConfig: this.options.connectionPool,
-      requestQueueConfig: this.options.requestQueue
+      requestQueueConfig: this.options.requestQueue,
     });
   }
 
@@ -107,24 +107,24 @@ export class EnhancedCourtListenerAPIClient {
   async request<T>(
     endpoint: string,
     options: RequestOptions = {},
-    priority: number = 0
+    priority: number = 0,
   ): Promise<T> {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
-    
+
     this.logger.debug('API request started', {
       requestId,
       endpoint,
       method: options.method || 'GET',
-      priority
+      priority,
     });
 
     try {
       // Check cache first
       const cacheKey = this.buildCacheKey(endpoint, options);
       if (options.method === 'GET' || !options.method) {
-        const cached = await this.cache.get<T>(cacheKey);
-        if (cached) {
+        const cached = this.cache.get<T>(cacheKey);
+        if (cached !== null) {
           this.logger.debug('Cache hit for request', { requestId, endpoint });
           this.metrics.recordCacheHit();
           const responseTime = Date.now() - startTime;
@@ -135,25 +135,25 @@ export class EnhancedCourtListenerAPIClient {
 
       // Execute request through queue with circuit breaker
       const queue = this.requestQueue.getQueue('api-requests', this.options.requestQueue);
-      
+
       const result = await queue.enqueue(
         async () => {
           const operation = async () => this.executeRequest<T>(endpoint, options, requestId);
-          
+
           if (this.circuitBreaker) {
             return await this.circuitBreaker.execute(operation);
           }
-          
+
           return await operation();
         },
         priority,
-        { requestId, endpoint, method: options.method || 'GET' }
+        { requestId, endpoint, method: options.method || 'GET' },
       );
 
-      // Cache successful GET requests
+      // Cache successful GET requests - use sync cache API with proper signature
       if ((options.method === 'GET' || !options.method) && options.cacheTtl !== 0) {
-        const ttl = options.cacheTtl || 300000; // 5 minutes default
-        await this.cache.set(cacheKey, result, ttl);
+        const ttl = options.cacheTtl ?? 300; // 5 minutes default (in seconds for cache API)
+        this.cache.set(cacheKey, {}, result as Record<string, unknown>, ttl);
       }
 
       const responseTime = Date.now() - startTime;
@@ -161,18 +161,17 @@ export class EnhancedCourtListenerAPIClient {
         requestId,
         endpoint,
         responseTime,
-        cached: false
+        cached: false,
       });
 
       this.metrics.recordRequest(responseTime, false);
       return result;
-
     } catch (error) {
       const responseTime = Date.now() - startTime;
       this.logger.error('API request failed', error as Error, {
         requestId,
         endpoint,
-        method: options.method || 'GET'
+        method: options.method || 'GET',
       });
 
       this.metrics.recordFailure(responseTime);
@@ -186,20 +185,20 @@ export class EnhancedCourtListenerAPIClient {
   private async executeRequest<T>(
     endpoint: string,
     options: RequestOptions,
-    requestId: string
+    requestId: string,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const method = options.method || 'GET';
-    
+
     const requestOptions: RequestInit = {
       method,
       headers: {
-        'Authorization': `Token ${this.apiKey}`,
+        Authorization: `Token ${this.apiKey}`,
         'Content-Type': 'application/json',
         'User-Agent': 'CourtListener-MCP-Enhanced/2.0',
-        ...options.headers
+        ...options.headers,
       },
-      signal: AbortSignal.timeout(this.options.timeout)
+      signal: AbortSignal.timeout(this.options.timeout),
     };
 
     if (options.body) {
@@ -214,11 +213,11 @@ export class EnhancedCourtListenerAPIClient {
         }
       });
       const finalUrl = urlObj.toString();
-      
+
       this.logger.debug('Executing HTTP request', {
         requestId,
         url: finalUrl,
-        method
+        method,
       });
 
       const response = await fetch(finalUrl, requestOptions);
@@ -228,7 +227,7 @@ export class EnhancedCourtListenerAPIClient {
     this.logger.debug('Executing HTTP request', {
       requestId,
       url,
-      method
+      method,
     });
 
     const response = await fetch(url, requestOptions);
@@ -243,7 +242,7 @@ export class EnhancedCourtListenerAPIClient {
       requestId,
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
+      headers: Object.fromEntries(response.headers.entries()),
     });
 
     if (!response.ok) {
@@ -266,11 +265,11 @@ export class EnhancedCourtListenerAPIClient {
       }
 
       const error = new APIError(errorMessage, response.status, errorDetails);
-      
+
       this.logger.error('API response error', error, {
         requestId,
         status: response.status,
-        errorDetails
+        errorDetails,
       });
 
       throw error;
@@ -278,18 +277,18 @@ export class EnhancedCourtListenerAPIClient {
 
     try {
       const data = await response.json();
-      
+
       this.logger.debug('Response parsed successfully', {
         requestId,
-        dataSize: JSON.stringify(data).length
+        dataSize: JSON.stringify(data).length,
       });
 
       return data;
     } catch (error) {
       this.logger.error('Failed to parse response JSON', error as Error, {
-        requestId
+        requestId,
       });
-      
+
       throw new APIError('Invalid JSON response', response.status, { requestId });
     }
   }
@@ -298,11 +297,7 @@ export class EnhancedCourtListenerAPIClient {
    * Build cache key for request
    */
   private buildCacheKey(endpoint: string, options: RequestOptions): string {
-    const parts = [
-      'api',
-      endpoint.replace(/[^\w]/g, '_'),
-      options.method || 'GET'
-    ];
+    const parts = ['api', endpoint.replace(/[^\w]/g, '_'), options.method || 'GET'];
 
     if (options.params) {
       const paramString = Object.entries(options.params)
@@ -330,8 +325,8 @@ export class EnhancedCourtListenerAPIClient {
         requestsError: metrics.requests_failed,
         totalRequests: metrics.requests_total,
         averageResponseTime: metrics.average_response_time,
-        uptime: metrics.uptime_seconds
-      }
+        uptime: metrics.uptime_seconds,
+      },
     };
   }
 
@@ -340,51 +335,68 @@ export class EnhancedCourtListenerAPIClient {
    */
   async close(): Promise<void> {
     this.logger.info('Closing enhanced API client...');
-    
-    await Promise.all([
-      this.connectionPool.closeAll(),
-      this.requestQueue.closeAll()
-    ]);
+
+    await Promise.all([this.connectionPool.closeAll(), this.requestQueue.closeAll()]);
 
     this.logger.info('Enhanced API client closed');
   }
 
   // Convenience methods for common endpoints
   async searchOpinions(params: any, priority: number = 0): Promise<any> {
-    return this.request('/api/rest/v4/search/', {
-      method: 'GET',
-      params: { type: 'o', ...params },
-      cacheTtl: 300000 // 5 minutes
-    }, priority);
+    return this.request(
+      '/api/rest/v4/search/',
+      {
+        method: 'GET',
+        params: { type: 'o', ...params },
+        cacheTtl: 300000, // 5 minutes
+      },
+      priority,
+    );
   }
 
   async searchCases(params: any, priority: number = 0): Promise<any> {
-    return this.request('/api/rest/v4/search/', {
-      method: 'GET',
-      params: { type: 'r', ...params },
-      cacheTtl: 300000
-    }, priority);
+    return this.request(
+      '/api/rest/v4/search/',
+      {
+        method: 'GET',
+        params: { type: 'r', ...params },
+        cacheTtl: 300000,
+      },
+      priority,
+    );
   }
 
   async getOpinion(id: string, priority: number = 0): Promise<any> {
-    return this.request(`/api/rest/v4/opinions/${id}/`, {
-      method: 'GET',
-      cacheTtl: 600000 // 10 minutes
-    }, priority);
+    return this.request(
+      `/api/rest/v4/opinions/${id}/`,
+      {
+        method: 'GET',
+        cacheTtl: 600000, // 10 minutes
+      },
+      priority,
+    );
   }
 
   async getCase(id: string, priority: number = 0): Promise<any> {
-    return this.request(`/api/rest/v4/dockets/${id}/`, {
-      method: 'GET',
-      cacheTtl: 600000
-    }, priority);
+    return this.request(
+      `/api/rest/v4/dockets/${id}/`,
+      {
+        method: 'GET',
+        cacheTtl: 600000,
+      },
+      priority,
+    );
   }
 
   async getCourts(priority: number = 0): Promise<any> {
-    return this.request('/api/rest/v4/courts/', {
-      method: 'GET',
-      cacheTtl: 3600000 // 1 hour
-    }, priority);
+    return this.request(
+      '/api/rest/v4/courts/',
+      {
+        method: 'GET',
+        cacheTtl: 3600000, // 1 hour
+      },
+      priority,
+    );
   }
 }
 
@@ -395,7 +407,7 @@ export class APIError extends Error {
   constructor(
     message: string,
     public status: number,
-    public details: any = {}
+    public details: any = {},
   ) {
     super(message);
     this.name = 'APIError';

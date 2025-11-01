@@ -31,15 +31,15 @@ export class CompressionMiddleware {
 
   constructor(
     private config: CompressionConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child('Compression');
-    
+
     if (this.config.enabled) {
       this.logger.info('Response compression enabled', {
         threshold: this.config.threshold,
         level: this.config.level,
-        types: this.config.types
+        types: this.config.types,
       });
     }
   }
@@ -48,9 +48,9 @@ export class CompressionMiddleware {
    * Compress response data if applicable
    */
   async compressResponse(
-    data: any, 
+    data: any,
     contentType: string = 'application/json',
-    acceptEncoding: string = ''
+    acceptEncoding: string = '',
   ): Promise<CompressionResult> {
     if (!this.config.enabled) {
       const jsonData = typeof data === 'string' ? data : JSON.stringify(data);
@@ -59,7 +59,7 @@ export class CompressionMiddleware {
         originalSize: Buffer.byteLength(jsonData),
         compressedSize: Buffer.byteLength(jsonData),
         ratio: 1,
-        data: jsonData
+        data: jsonData,
       };
     }
 
@@ -73,7 +73,7 @@ export class CompressionMiddleware {
         originalSize,
         compressedSize: originalSize,
         ratio: 1,
-        data: jsonData
+        data: jsonData,
       };
     }
 
@@ -90,7 +90,7 @@ export class CompressionMiddleware {
         compressedSize,
         ratio: Math.round(ratio * 100) / 100,
         duration,
-        savings: `${Math.round((1 - compressedSize / originalSize) * 100)}%`
+        savings: `${Math.round((1 - compressedSize / originalSize) * 100)}%`,
       });
 
       return {
@@ -99,13 +99,12 @@ export class CompressionMiddleware {
         compressedSize,
         ratio,
         data: compressed,
-        encoding: 'gzip'
+        encoding: 'gzip',
       };
-
     } catch (error) {
       this.logger.warn('Compression failed, returning uncompressed', {
         error: error instanceof Error ? error.message : String(error),
-        originalSize
+        originalSize,
       });
 
       return {
@@ -113,7 +112,7 @@ export class CompressionMiddleware {
         originalSize,
         compressedSize: originalSize,
         ratio: 1,
-        data: jsonData
+        data: jsonData,
       };
     }
   }
@@ -134,15 +133,15 @@ export class CompressionMiddleware {
       this.logger.debug('Request decompressed', {
         compressedSize: data.length,
         decompressedSize: decompressed.length,
-        duration
+        duration,
       });
 
       return decompressed.toString();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error('Decompression failed', undefined, { 
+      this.logger.error('Decompression failed', undefined, {
         error: errorMessage,
-        dataSize: data.length
+        dataSize: data.length,
       });
       throw new Error('Failed to decompress request data');
     }
@@ -151,11 +150,7 @@ export class CompressionMiddleware {
   /**
    * Check if response should be compressed
    */
-  private shouldCompress(
-    size: number, 
-    contentType: string, 
-    acceptEncoding: string
-  ): boolean {
+  private shouldCompress(size: number, contentType: string, acceptEncoding: string): boolean {
     // Check size threshold
     if (size < this.config.threshold) {
       return false;
@@ -167,7 +162,7 @@ export class CompressionMiddleware {
     }
 
     // Check content type
-    if (!this.config.types.some(type => contentType.includes(type))) {
+    if (!this.config.types.some((type) => contentType.includes(type))) {
       return false;
     }
 
@@ -187,7 +182,7 @@ export class CompressionMiddleware {
       enabled: this.config.enabled,
       threshold: this.config.threshold,
       level: this.config.level,
-      supportedTypes: this.config.types
+      supportedTypes: this.config.types,
     };
   }
 }
@@ -200,9 +195,9 @@ export function createCompressionMiddleware(logger: Logger): CompressionMiddlewa
     enabled: process.env.COMPRESSION_ENABLED === 'true',
     threshold: parseInt(process.env.COMPRESSION_THRESHOLD || '1024'),
     level: parseInt(process.env.COMPRESSION_LEVEL || '6'),
-    types: process.env.COMPRESSION_TYPES ? 
-           process.env.COMPRESSION_TYPES.split(',').map(t => t.trim()) :
-           ['application/json', 'text/plain', 'text/html', 'application/javascript']
+    types: process.env.COMPRESSION_TYPES
+      ? process.env.COMPRESSION_TYPES.split(',').map((t) => t.trim())
+      : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
   };
 
   return new CompressionMiddleware(config, logger);

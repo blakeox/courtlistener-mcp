@@ -24,9 +24,9 @@ export class GetOralArgumentsHandler extends BaseToolHandler {
         date_argued: z.string().optional(),
         docket_id: z.union([z.string(), z.number()]).transform(String).optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -40,34 +40,34 @@ export class GetOralArgumentsHandler extends BaseToolHandler {
       properties: {
         court: {
           type: 'string',
-          description: 'Filter by court'
+          description: 'Filter by court',
         },
         case_name: {
           type: 'string',
-          description: 'Search by case name'
+          description: 'Search by case name',
         },
         date_argued: {
           type: 'string',
-          description: 'Filter by argument date (YYYY-MM-DD or range)'
+          description: 'Filter by argument date (YYYY-MM-DD or range)',
         },
         docket_id: {
           type: ['string', 'number'],
-          description: 'Filter by docket ID'
+          description: 'Filter by docket ID',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of oral arguments per page',
-          default: 20
-        }
-      }
+          default: 20,
+        },
+      },
     };
   }
 
@@ -76,7 +76,7 @@ export class GetOralArgumentsHandler extends BaseToolHandler {
       context.logger.info('Getting oral arguments', {
         court: input.court,
         caseName: input.case_name,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getOralArguments(input);
@@ -87,12 +87,12 @@ export class GetOralArgumentsHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to get oral arguments', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message);
     }
@@ -116,9 +116,9 @@ export class GetOralArgumentHandler extends BaseToolHandler {
       const schema = z.object({
         oral_argument_id: z.union([z.string(), z.number()]).transform(String),
         include_transcript: z.boolean().optional().default(false),
-        include_audio_url: z.boolean().optional().default(true)
+        include_audio_url: z.boolean().optional().default(true),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -132,20 +132,20 @@ export class GetOralArgumentHandler extends BaseToolHandler {
       properties: {
         oral_argument_id: {
           type: ['string', 'number'],
-          description: 'Oral argument ID to retrieve information for'
+          description: 'Oral argument ID to retrieve information for',
         },
         include_transcript: {
           type: 'boolean',
           description: 'Whether to include transcript text',
-          default: false
+          default: false,
         },
         include_audio_url: {
           type: 'boolean',
           description: 'Whether to include audio file URLs',
-          default: true
-        }
+          default: true,
+        },
       },
-      required: ['oral_argument_id']
+      required: ['oral_argument_id'],
     };
   }
 
@@ -153,19 +153,19 @@ export class GetOralArgumentHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting oral argument details', {
         oralArgumentId: input.oral_argument_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getOralArgument(input.oral_argument_id);
 
       return this.success({
         summary: `Retrieved details for oral argument ${input.oral_argument_id}`,
-        oralArgument: response
+        oralArgument: response,
       });
     } catch (error) {
       context.logger.error('Failed to get oral argument details', error as Error, {
         oralArgumentId: input.oral_argument_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { oralArgumentId: input.oral_argument_id });
     }

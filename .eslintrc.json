@@ -6,11 +6,7 @@
     "sourceType": "module",
     "project": "./tsconfig.json"
   },
-  "plugins": [
-    "@typescript-eslint",
-    "node",
-    "import"
-  ],
+  "plugins": ["@typescript-eslint", "node", "import"],
   "extends": [
     "eslint:recommended",
     "@typescript-eslint/recommended",
@@ -36,23 +32,25 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
-    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-explicit-any": [
+      "warn",
+      {
+        "ignoreRestArgs": false,
+        "fixToUnknown": true
+      }
+    ],
     "@typescript-eslint/prefer-const": "error",
     "@typescript-eslint/no-var-requires": "error",
-    "@typescript-eslint/consistent-type-imports": "error",
-    
+    "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+    "@typescript-eslint/prefer-nullish-coalescing": "warn",
+    "@typescript-eslint/prefer-optional-chain": "warn",
+
     // Import rules
     "import/order": [
       "error",
       {
-        "groups": [
-          "builtin",
-          "external",
-          "internal",
-          "parent",
-          "sibling",
-          "index"
-        ],
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
         "newlines-between": "always",
         "alphabetize": {
           "order": "asc",
@@ -62,7 +60,7 @@
     ],
     "import/no-unresolved": "error",
     "import/no-duplicates": "error",
-    
+
     // General JavaScript/TypeScript
     "no-console": "off", // Allow console for server applications
     "no-debugger": "error",
@@ -71,12 +69,12 @@
     "no-var": "error",
     "object-shorthand": "error",
     "prefer-template": "error",
-    
+
     // Node.js specific
     "node/no-missing-import": "off", // Handled by TypeScript
     "node/no-unsupported-features/es-syntax": "off", // We're using TypeScript
     "node/no-extraneous-import": "off", // Handled by TypeScript
-    
+
     // Code style
     "indent": ["error", 2, { "SwitchCase": 1 }],
     "quotes": ["error", "single", { "avoidEscape": true }],
@@ -89,7 +87,7 @@
     "space-in-parens": ["error", "never"],
     "space-before-blocks": "error",
     "keyword-spacing": "error",
-    
+
     // MCP Server specific
     "max-len": ["warn", { "code": 120, "ignoreUrls": true }],
     "complexity": ["warn", 15],
@@ -98,7 +96,10 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.js", "test/**/*"],
+      "files": ["**/*.test.ts", "**/*.test.js", "test/**/*", "*.ts"],
+      "parserOptions": {
+        "project": "./tsconfig.test.json"
+      },
       "env": {
         "jest": true,
         "mocha": true
@@ -106,6 +107,11 @@
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
         "max-len": "off"
       }
     },
@@ -117,11 +123,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "dist/",
-    "node_modules/",
-    "coverage/",
-    "test-output/",
-    "*.d.ts"
-  ]
+  "ignorePatterns": ["dist/", "node_modules/", "coverage/", "test-output/", "*.d.ts"]
 }

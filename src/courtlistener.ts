@@ -3,16 +3,16 @@
  */
 
 import fetch from 'node-fetch';
-import { 
-  CourtListenerConfig, 
-  CourtListenerResponse, 
-  OpinionCluster, 
-  Opinion, 
-  Court, 
-  Judge, 
+import {
+  CourtListenerConfig,
+  CourtListenerResponse,
+  OpinionCluster,
+  Opinion,
+  Court,
+  Judge,
   Docket,
   SearchParams,
-  AdvancedSearchParams 
+  AdvancedSearchParams,
 } from './types.js';
 import { CacheManager } from './infrastructure/cache.js';
 import { Logger } from './infrastructure/logger.js';
@@ -28,11 +28,11 @@ export class CourtListenerAPI {
     private config: CourtListenerConfig,
     private cache: CacheManager,
     private logger: Logger,
-    private metrics: MetricsCollector
+    private metrics: MetricsCollector,
   ) {
     this.logger.info('CourtListener API client initialized', {
       baseUrl: this.config.baseUrl,
-      rateLimitPerMinute: this.config.rateLimitPerMinute
+      rateLimitPerMinute: this.config.rateLimitPerMinute,
     });
   }
 
@@ -42,7 +42,7 @@ export class CourtListenerAPI {
   private async makeRequest<T>(
     endpoint: string,
     params?: Record<string, any>,
-    options: { useCache?: boolean; cacheTtlOverride?: number } = {}
+    options: { useCache?: boolean; cacheTtlOverride?: number } = {},
   ): Promise<T> {
     const timer = this.logger.startTimer(`API ${endpoint}`);
     const { useCache = true, cacheTtlOverride } = options;
@@ -51,7 +51,7 @@ export class CourtListenerAPI {
       // Check cache first
       if (useCache && this.cache.isEnabled()) {
         const cached = this.cache.get<T>(endpoint, params);
-        if (cached) {
+        if (cached !== null) {
           this.metrics.recordRequest(timer.end(), true);
           return cached;
         }
@@ -59,7 +59,7 @@ export class CourtListenerAPI {
 
       // Build URL with parameters
       const url = this.buildUrl(endpoint, params);
-      
+
       // Rate limit the request
       await this.rateLimit();
 
@@ -72,31 +72,30 @@ export class CourtListenerAPI {
         throw this.createApiError(response, endpoint, errorText);
       }
 
-      const data = await response.json() as T;
+      const data = (await response.json()) as T;
 
       // Cache successful responses
-      if (useCache && this.cache.isEnabled() && response.ok) {
+      if (useCache && this.cache.isEnabled() && response.ok && params) {
         this.cache.set(endpoint, params, data);
       }
 
       const duration = timer.end();
       this.metrics.recordRequest(duration, false);
-      
+
       this.logger.apiCall('GET', endpoint, duration, response.status, {
         params,
-        cached: false
+        cached: false,
       });
 
       return data;
-
     } catch (error) {
       const duration = timer.endWithError(error as Error);
       this.metrics.recordFailure(duration);
-      
+
       if (error instanceof Error) {
         this.logger.error(`API request failed: ${endpoint}`, error, { params });
       }
-      
+
       throw error;
     }
   }
@@ -104,17 +103,20 @@ export class CourtListenerAPI {
   /**
    * Build URL with query parameters
    */
-  private buildUrl(endpoint: string, params?: Record<string, any>): string {
+  private buildUrl(endpoint: string, params?: Record<string, unknown>): string {
     const baseUrl = `${this.config.baseUrl}${endpoint}`;
-    
+
     if (!params || Object.keys(params).length === 0) {
       return baseUrl;
     }
 
     // Filter out undefined, null, and empty string values
     const cleanParams = Object.entries(params)
-      .filter(([_, value]) => value !== undefined && value !== null && value !== '')
-      .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .reduce<Record<string, string>>(
+        (obj, [key, value]) => ({ ...obj, [key]: String(value) }),
+        {},
+      );
 
     const searchParams = new URLSearchParams();
     Object.entries(cleanParams).forEach(([key, value]) => {
@@ -139,20 +141,19 @@ export class CourtListenerAPI {
           signal: controller.signal,
           headers: {
             'User-Agent': 'Legal-MCP-Server/1.0',
-            'Accept': 'application/json'
-          }
+            Accept: 'application/json',
+          },
         });
 
         clearTimeout(timeoutId);
         return response;
-
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(`Request attempt ${attempt} failed`, {
           url,
           error: lastError.message,
           attempt,
-          maxAttempts: this.config.retryAttempts
+          maxAttempts: this.config.retryAttempts,
         });
 
         // Don't retry on final attempt
@@ -160,7 +161,7 @@ export class CourtListenerAPI {
 
         // Exponential backoff
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -175,41 +176,38 @@ export class CourtListenerAPI {
       400: [
         'Check that all parameters are valid and properly formatted',
         'Remove any unsupported order_by parameters',
-        'Verify date formats are YYYY-MM-DD'
+        'Verify date formats are YYYY-MM-DD',
       ],
       401: [
         'Check if API authentication is required for this endpoint',
-        'Verify API credentials if using authenticated endpoints'
+        'Verify API credentials if using authenticated endpoints',
       ],
       403: [
         'This endpoint may require special permissions',
-        'Check if the requested resource is restricted'
+        'Check if the requested resource is restricted',
       ],
       404: [
         'Verify the resource ID exists',
         'Use search tools to find valid IDs',
-        'Check if the resource has been merged or removed'
+        'Check if the resource has been merged or removed',
       ],
-      429: [
-        'Reduce request frequency',
-        'Implement request queuing',
-        'Consider caching responses'
-      ],
+      429: ['Reduce request frequency', 'Implement request queuing', 'Consider caching responses'],
       500: [
         'This is a server error - try again later',
-        'Check CourtListener status page for known issues'
-      ]
+        'Check CourtListener status page for known issues',
+      ],
     };
 
     const statusSuggestions = suggestions[response.status] || [
       'Check the CourtListener API documentation',
-      'Verify your request parameters'
+      'Verify your request parameters',
     ];
 
-    const message = `CourtListener API error: ${response.status} ${response.statusText}\n` +
-                   `Endpoint: ${endpoint}\n` +
-                   `Suggestions:\n${statusSuggestions.map((s: string) => `• ${s}`).join('\n')}\n` +
-                   `Response: ${body}`;
+    const message =
+      `CourtListener API error: ${response.status} ${response.statusText}\n` +
+      `Endpoint: ${endpoint}\n` +
+      `Suggestions:\n${statusSuggestions.map((s: string) => `• ${s}`).join('\n')}\n` +
+      `Response: ${body}`;
 
     const error = new Error(message);
     (error as any).status = response.status;
@@ -236,7 +234,7 @@ export class CourtListenerAPI {
 
     const processNext = () => {
       const now = Date.now();
-      
+
       // Reset window if needed
       if (now - this.windowStart >= 60000) {
         this.requestCount = 0;
@@ -252,7 +250,7 @@ export class CourtListenerAPI {
         const resolve = this.rateLimitQueue.shift()!;
         this.requestCount++;
         resolve();
-        
+
         // Process next immediately if under limit
         setImmediate(processNext);
       } else {
@@ -407,8 +405,8 @@ export class CourtListenerAPI {
   async analyzeLegalArgument(args: any): Promise<any> {
     // This would require custom implementation or external service
     return {
-      analysis: "Legal argument analysis not yet implemented",
-      arguments: args
+      analysis: 'Legal argument analysis not yet implemented',
+      arguments: args,
     };
   }
 
@@ -416,7 +414,7 @@ export class CourtListenerAPI {
   async getPartiesAndAttorneys(args: any): Promise<any> {
     const [parties, attorneys] = await Promise.all([
       this.getParties(args),
-      this.getAttorneys(args)
+      this.getAttorneys(args),
     ]);
     return { parties, attorneys };
   }
@@ -443,8 +441,8 @@ export class CourtListenerAPI {
   async getBulkData(args: any): Promise<any> {
     // This would typically require special bulk API endpoints
     return {
-      message: "Bulk data operations not yet implemented",
-      args
+      message: 'Bulk data operations not yet implemented',
+      args,
     };
   }
 
@@ -591,7 +589,7 @@ export class CourtListenerAPI {
       politicalAffiliations,
       abaRatings,
       retentionEvents,
-      financialDisclosures
+      financialDisclosures,
     ] = await Promise.all([
       this.getJudge(judgeId),
       this.getJudicialPositions({ person: judgeId }),
@@ -599,7 +597,7 @@ export class CourtListenerAPI {
       this.getJudgePoliticalAffiliations({ person: judgeId }),
       this.getABARatings({ person: judgeId }),
       this.getRetentionEvents({ person: judgeId }),
-      this.getFinancialDisclosures({ person: judgeId })
+      this.getFinancialDisclosures({ person: judgeId }),
     ]);
 
     return {
@@ -609,26 +607,19 @@ export class CourtListenerAPI {
       politicalAffiliations: politicalAffiliations.results || [],
       abaRatings: abaRatings.results || [],
       retentionEvents: retentionEvents.results || [],
-      financialDisclosures: financialDisclosures.results || []
+      financialDisclosures: financialDisclosures.results || [],
     };
   }
 
   // Enhanced case analysis with all related data
   async getComprehensiveCaseAnalysis(clusterId: number): Promise<any> {
-    const [
-      cluster,
-      docket,
-      docketEntries,
-      parties,
-      attorneys,
-      tags
-    ] = await Promise.all([
+    const [cluster, docket, docketEntries, parties, attorneys, tags] = await Promise.all([
       this.getOpinionCluster(clusterId),
       this.getDocket(clusterId).catch(() => null),
       this.getDocketEntries({ docket: clusterId }).catch(() => ({ results: [] })),
       this.getParties({ docket: clusterId }).catch(() => ({ results: [] })),
       this.getAttorneys({ docket: clusterId }).catch(() => ({ results: [] })),
-      this.getDocketTags({ docket: clusterId }).catch(() => ({ results: [] }))
+      this.getDocketTags({ docket: clusterId }).catch(() => ({ results: [] })),
     ]);
 
     return {
@@ -637,7 +628,7 @@ export class CourtListenerAPI {
       docketEntries: docketEntries.results || [],
       parties: parties.results || [],
       attorneys: attorneys.results || [],
-      tags: tags.results || []
+      tags: tags.results || [],
     };
   }
 }

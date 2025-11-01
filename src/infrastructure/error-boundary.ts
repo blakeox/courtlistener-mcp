@@ -12,7 +12,7 @@ import {
   ErrorCategory,
   ErrorContext,
   InternalServerError,
-  ErrorContextBuilder
+  ErrorContextBuilder,
 } from './error-types.js';
 
 export interface ErrorBoundaryConfig {
@@ -50,7 +50,7 @@ export class ErrorBoundaryMiddleware {
   constructor(
     logger: Logger,
     config: Partial<ErrorBoundaryConfig> = {},
-    metrics?: MetricsCollector
+    metrics?: MetricsCollector,
   ) {
     this.logger = logger;
     this.metrics = metrics;
@@ -62,9 +62,9 @@ export class ErrorBoundaryMiddleware {
       alertThresholds: {
         criticalErrorsPerMinute: 5,
         highErrorsPerMinute: 10,
-        totalErrorsPerMinute: 50
+        totalErrorsPerMinute: 50,
       },
-      ...config
+      ...config,
     };
 
     this.errorMetrics = {
@@ -74,7 +74,7 @@ export class ErrorBoundaryMiddleware {
       errorsByStatusCode: new Map(),
       criticalErrorsInLastMinute: 0,
       highErrorsInLastMinute: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
     };
 
     // Clean up old error records every minute
@@ -84,40 +84,37 @@ export class ErrorBoundaryMiddleware {
   /**
    * Main error handling middleware
    */
-  public handleError = (
-    error: Error,
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): void => {
+  public handleError = (error: Error, req: Request, res: Response, next: NextFunction): void => {
     const startTime = Date.now();
 
     try {
       // Build error context from request
       const context = this.buildErrorContext(req);
-      
+
       // Convert to BaseError if needed
       const appError = this.normalizeError(error, context);
-      
+
       // Log the error
       this.logError(appError, req);
-      
+
       // Update metrics
       this.updateMetrics(appError);
-      
+
       // Check alert thresholds
       this.checkAlertThresholds();
-      
+
       // Send response
       this.sendErrorResponse(appError, req, res);
-      
+
       // Record response time
       const responseTime = Date.now() - startTime;
       this.updateResponseTimeMetrics(responseTime);
-
     } catch (handlingError) {
       // If error handling itself fails, fall back to basic response
-      this.logger.error('Error in error handling middleware', handlingError instanceof Error ? handlingError : new Error(String(handlingError)));
+      this.logger.error(
+        'Error in error handling middleware',
+        handlingError instanceof Error ? handlingError : new Error(String(handlingError)),
+      );
       this.sendFallbackErrorResponse(res);
     }
   };
@@ -145,7 +142,7 @@ export class ErrorBoundaryMiddleware {
           404,
           context,
           true,
-          false
+          false,
         );
       }
     })();
@@ -170,18 +167,18 @@ export class ErrorBoundaryMiddleware {
                 408,
                 context,
                 true,
-                true
+                true,
               );
             }
           })();
-          
+
           next(error);
         }
       }, timeoutMs);
 
       res.on('finish', () => clearTimeout(timeout));
       res.on('close', () => clearTimeout(timeout));
-      
+
       next();
     };
   };
@@ -191,7 +188,7 @@ export class ErrorBoundaryMiddleware {
    */
   private buildErrorContext(req: Request): ErrorContext {
     return new ErrorContextBuilder()
-      .setRequestId(req.headers['x-request-id'] as string || `req_${Date.now()}`)
+      .setRequestId((req.headers['x-request-id'] as string) || `req_${Date.now()}`)
       .setUserId(req.headers['x-user-id'] as string)
       .setEndpoint(req.originalUrl)
       .setMethod(req.method)
@@ -227,7 +224,7 @@ export class ErrorBoundaryMiddleware {
             400,
             context,
             true,
-            false
+            false,
           );
         }
       })();
@@ -243,7 +240,7 @@ export class ErrorBoundaryMiddleware {
             500,
             context,
             true,
-            true
+            true,
           );
         }
       })();
@@ -259,7 +256,7 @@ export class ErrorBoundaryMiddleware {
             408,
             context,
             true,
-            true
+            true,
           );
         }
       })();
@@ -269,7 +266,7 @@ export class ErrorBoundaryMiddleware {
     return new InternalServerError(
       this.config.enableDetailedErrors ? error.message : 'An unexpected error occurred',
       context,
-      false
+      false,
     );
   }
 
@@ -283,8 +280,8 @@ export class ErrorBoundaryMiddleware {
         method: req.method,
         url: req.originalUrl,
         userAgent: req.headers['user-agent'],
-        ip: req.ip
-      }
+        ip: req.ip,
+      },
     };
 
     switch (error.severity) {
@@ -310,15 +307,15 @@ export class ErrorBoundaryMiddleware {
     if (!this.config.enableMetrics) return;
 
     this.errorMetrics.totalErrors++;
-    
+
     // Update by category
     const categoryCount = this.errorMetrics.errorsByCategory.get(error.category) || 0;
     this.errorMetrics.errorsByCategory.set(error.category, categoryCount + 1);
-    
+
     // Update by severity
     const severityCount = this.errorMetrics.errorsBySeverity.get(error.severity) || 0;
     this.errorMetrics.errorsBySeverity.set(error.severity, severityCount + 1);
-    
+
     // Update by status code
     const statusCount = this.errorMetrics.errorsByStatusCode.get(error.httpStatus) || 0;
     this.errorMetrics.errorsByStatusCode.set(error.httpStatus, statusCount + 1);
@@ -326,7 +323,7 @@ export class ErrorBoundaryMiddleware {
     // Track recent errors for alerting
     this.recentErrors.push({
       timestamp: Date.now(),
-      severity: error.severity
+      severity: error.severity,
     });
 
     // Send metrics to collector
@@ -340,7 +337,7 @@ export class ErrorBoundaryMiddleware {
    */
   private updateResponseTimeMetrics(responseTime: number): void {
     // Simple moving average (in production, use a proper sliding window)
-    this.errorMetrics.averageResponseTime = 
+    this.errorMetrics.averageResponseTime =
       (this.errorMetrics.averageResponseTime + responseTime) / 2;
   }
 
@@ -355,16 +352,14 @@ export class ErrorBoundaryMiddleware {
 
     // Count recent errors
     const recentCritical = this.recentErrors.filter(
-      e => e.timestamp >= oneMinuteAgo && e.severity === ErrorSeverity.CRITICAL
+      (e) => e.timestamp >= oneMinuteAgo && e.severity === ErrorSeverity.CRITICAL,
     ).length;
 
     const recentHigh = this.recentErrors.filter(
-      e => e.timestamp >= oneMinuteAgo && e.severity === ErrorSeverity.HIGH
+      (e) => e.timestamp >= oneMinuteAgo && e.severity === ErrorSeverity.HIGH,
     ).length;
 
-    const recentTotal = this.recentErrors.filter(
-      e => e.timestamp >= oneMinuteAgo
-    ).length;
+    const recentTotal = this.recentErrors.filter((e) => e.timestamp >= oneMinuteAgo).length;
 
     // Update metrics
     this.errorMetrics.criticalErrorsInLastMinute = recentCritical;
@@ -372,27 +367,37 @@ export class ErrorBoundaryMiddleware {
 
     // Check thresholds and log alerts
     if (recentCritical >= this.config.alertThresholds.criticalErrorsPerMinute) {
-      this.logger.error(`ALERT: Critical error threshold exceeded: ${recentCritical} errors in last minute`, undefined, {
-        alertType: 'critical_errors_threshold',
-        count: recentCritical,
-        threshold: this.config.alertThresholds.criticalErrorsPerMinute
-      });
+      this.logger.error(
+        `ALERT: Critical error threshold exceeded: ${recentCritical} errors in last minute`,
+        undefined,
+        {
+          alertType: 'critical_errors_threshold',
+          count: recentCritical,
+          threshold: this.config.alertThresholds.criticalErrorsPerMinute,
+        },
+      );
     }
 
     if (recentHigh >= this.config.alertThresholds.highErrorsPerMinute) {
-      this.logger.warn(`ALERT: High error threshold exceeded: ${recentHigh} errors in last minute`, {
-        alertType: 'high_errors_threshold',
-        count: recentHigh,
-        threshold: this.config.alertThresholds.highErrorsPerMinute
-      });
+      this.logger.warn(
+        `ALERT: High error threshold exceeded: ${recentHigh} errors in last minute`,
+        {
+          alertType: 'high_errors_threshold',
+          count: recentHigh,
+          threshold: this.config.alertThresholds.highErrorsPerMinute,
+        },
+      );
     }
 
     if (recentTotal >= this.config.alertThresholds.totalErrorsPerMinute) {
-      this.logger.warn(`ALERT: Total error threshold exceeded: ${recentTotal} errors in last minute`, {
-        alertType: 'total_errors_threshold',
-        count: recentTotal,
-        threshold: this.config.alertThresholds.totalErrorsPerMinute
-      });
+      this.logger.warn(
+        `ALERT: Total error threshold exceeded: ${recentTotal} errors in last minute`,
+        {
+          alertType: 'total_errors_threshold',
+          count: recentTotal,
+          threshold: this.config.alertThresholds.totalErrorsPerMinute,
+        },
+      );
     }
   }
 
@@ -401,7 +406,7 @@ export class ErrorBoundaryMiddleware {
    */
   private cleanupOldErrors(): void {
     const oneHourAgo = Date.now() - 3600000; // 1 hour
-    this.recentErrors = this.recentErrors.filter(e => e.timestamp >= oneHourAgo);
+    this.recentErrors = this.recentErrors.filter((e) => e.timestamp >= oneHourAgo);
   }
 
   /**
@@ -418,7 +423,7 @@ export class ErrorBoundaryMiddleware {
       errorId: error.errorId,
       timestamp: error.timestamp,
       path: req.originalUrl,
-      method: req.method
+      method: req.method,
     };
 
     // Add additional error-specific data
@@ -452,7 +457,7 @@ export class ErrorBoundaryMiddleware {
     res.status(500).json({
       error: 'internal_server_error',
       message: 'An unexpected error occurred',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -492,7 +497,7 @@ export class ErrorBoundaryMiddleware {
       errorsByStatusCode: new Map(),
       criticalErrorsInLastMinute: 0,
       highErrorsInLastMinute: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
     };
     this.recentErrors = [];
   }

@@ -16,7 +16,7 @@ declare module './best-practice-server.js' {
         | {
             name: string;
             arguments?: Record<string, unknown>;
-          }
+          },
     ): Promise<CallToolResult>;
   }
 }

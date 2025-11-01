@@ -21,13 +21,13 @@ export class DocumentationService {
 
     // OpenAPI JSON specification
     router.get('/openapi.json', this.getOpenAPISpec.bind(this));
-    
-    // OpenAPI YAML specification  
+
+    // OpenAPI YAML specification
     router.get('/openapi.yaml', this.getOpenAPIYaml.bind(this));
-    
+
     // Swagger UI HTML page
     router.get('/docs', this.getSwaggerUI.bind(this));
-    
+
     // API documentation landing page
     router.get('/', this.getDocumentationHome.bind(this));
 
@@ -46,11 +46,13 @@ export class DocumentationService {
       res.json(spec);
       this.logger.info('Served OpenAPI JSON specification');
     } catch (error) {
-      this.logger.error('Failed to generate OpenAPI spec', 
-        error instanceof Error ? error : new Error(String(error)));
-      res.status(500).json({ 
+      this.logger.error(
+        'Failed to generate OpenAPI spec',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      res.status(500).json({
         error: 'internal_server_error',
-        message: 'Failed to generate API specification' 
+        message: 'Failed to generate API specification',
       });
     }
   }
@@ -62,11 +64,13 @@ export class DocumentationService {
       res.send(yaml);
       this.logger.info('Served OpenAPI YAML specification');
     } catch (error) {
-      this.logger.error('Failed to generate OpenAPI YAML', 
-        error instanceof Error ? error : new Error(String(error)));
-      res.status(500).json({ 
+      this.logger.error(
+        'Failed to generate OpenAPI YAML',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      res.status(500).json({
         error: 'internal_server_error',
-        message: 'Failed to generate YAML specification' 
+        message: 'Failed to generate YAML specification',
       });
     }
   }
@@ -264,15 +268,17 @@ export class DocumentationService {
     try {
       const openApiSpec = this.openAPIGenerator.generateFullSpec();
       const postmanCollection = this.convertOpenAPIToPostman(openApiSpec);
-      
+
       res.json(postmanCollection);
       this.logger.info('Served Postman collection');
     } catch (error) {
-      this.logger.error('Failed to generate Postman collection', 
-        error instanceof Error ? error : new Error(String(error)));
-      res.status(500).json({ 
+      this.logger.error(
+        'Failed to generate Postman collection',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      res.status(500).json({
         error: 'internal_server_error',
-        message: 'Failed to generate Postman collection' 
+        message: 'Failed to generate Postman collection',
       });
     }
   }
@@ -283,67 +289,67 @@ export class DocumentationService {
         name: spec.info.title,
         description: spec.info.description,
         version: spec.info.version,
-        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+        schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
       },
       auth: {
-        type: "apikey",
+        type: 'apikey',
         apikey: [
           {
-            key: "key",
-            value: "X-API-Key",
-            type: "string"
+            key: 'key',
+            value: 'X-API-Key',
+            type: 'string',
           },
           {
-            key: "value",
-            value: "{{api_key}}",
-            type: "string"
+            key: 'value',
+            value: '{{api_key}}',
+            type: 'string',
           },
           {
-            key: "in",
-            value: "header",
-            type: "string"
-          }
-        ]
+            key: 'in',
+            value: 'header',
+            type: 'string',
+          },
+        ],
       },
       variable: [
         {
-          key: "base_url",
-          value: "http://localhost:3001",
-          type: "string"
+          key: 'base_url',
+          value: 'http://localhost:3001',
+          type: 'string',
         },
         {
-          key: "api_key",
-          value: "your_api_key_here",
-          type: "string"
-        }
+          key: 'api_key',
+          value: 'your_api_key_here',
+          type: 'string',
+        },
       ],
-      item: []
+      item: [],
     };
 
     // Convert OpenAPI paths to Postman requests
     for (const [path, methods] of Object.entries(spec.paths)) {
       for (const [method, operation] of Object.entries(methods as Record<string, any>)) {
-        const operationData = operation as any;
-        
+        const operationData = operation;
+
         const request = {
           name: operationData.summary || `${method.toUpperCase()} ${path}`,
           request: {
             method: method.toUpperCase(),
             header: [
               {
-                key: "Content-Type",
-                value: "application/json"
-              }
+                key: 'Content-Type',
+                value: 'application/json',
+              },
             ],
             url: {
               raw: `{{base_url}}${path}`,
-              host: ["{{base_url}}"],
+              host: ['{{base_url}}'],
               path: path.split('/').filter(Boolean),
-              query: this.extractQueryParams(operationData.parameters || [])
+              query: this.extractQueryParams(operationData.parameters || []),
             },
-            description: operationData.description || ''
+            description: operationData.description || '',
           },
-          response: []
+          response: [],
         };
 
         collection.item.push(request);
@@ -355,12 +361,12 @@ export class DocumentationService {
 
   private extractQueryParams(parameters: any[]): any[] {
     return parameters
-      .filter(param => param.in === 'query')
-      .map(param => ({
+      .filter((param) => param.in === 'query')
+      .map((param) => ({
         key: param.name,
         value: param.example || '',
         description: param.description || '',
-        disabled: !param.required
+        disabled: !param.required,
       }));
   }
 }

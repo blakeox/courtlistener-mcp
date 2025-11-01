@@ -22,9 +22,9 @@ export class ListCourtsHandler extends BaseToolHandler {
         jurisdiction: z.string().optional(),
         court_type: z.enum(['federal', 'state', 'appellate', 'district', 'supreme']).optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -38,27 +38,27 @@ export class ListCourtsHandler extends BaseToolHandler {
       properties: {
         jurisdiction: {
           type: 'string',
-          description: 'Filter by jurisdiction (e.g., federal, state name)'
+          description: 'Filter by jurisdiction (e.g., federal, state name)',
         },
         court_type: {
           type: 'string',
           enum: ['federal', 'state', 'appellate', 'district', 'supreme'],
-          description: 'Filter by court type'
+          description: 'Filter by court type',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of courts per page',
-          default: 20
-        }
-      }
+          default: 20,
+        },
+      },
     };
   }
 
@@ -67,7 +67,7 @@ export class ListCourtsHandler extends BaseToolHandler {
       context.logger.info('Listing courts', {
         jurisdiction: input.jurisdiction,
         courtType: input.court_type,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.listCourts(input);
@@ -78,12 +78,12 @@ export class ListCourtsHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to list courts', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message);
     }
@@ -109,9 +109,9 @@ export class GetJudgesHandler extends BaseToolHandler {
         name: z.string().optional(),
         active: z.boolean().optional(),
         page: z.number().min(1).optional().default(1),
-        page_size: z.number().min(1).max(100).optional().default(20)
+        page_size: z.number().min(1).max(100).optional().default(20),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -125,30 +125,30 @@ export class GetJudgesHandler extends BaseToolHandler {
       properties: {
         court: {
           type: 'string',
-          description: 'Filter by court'
+          description: 'Filter by court',
         },
         name: {
           type: 'string',
-          description: 'Search by judge name'
+          description: 'Search by judge name',
         },
         active: {
           type: 'boolean',
-          description: 'Filter by active status'
+          description: 'Filter by active status',
         },
         page: {
           type: 'number',
           minimum: 1,
           description: 'Page number for pagination',
-          default: 1
+          default: 1,
         },
         page_size: {
           type: 'number',
           minimum: 1,
           maximum: 100,
           description: 'Number of judges per page',
-          default: 20
-        }
-      }
+          default: 20,
+        },
+      },
     };
   }
 
@@ -157,7 +157,7 @@ export class GetJudgesHandler extends BaseToolHandler {
       context.logger.info('Getting judges', {
         court: input.court,
         name: input.name,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getJudges(input);
@@ -168,12 +168,12 @@ export class GetJudgesHandler extends BaseToolHandler {
         pagination: {
           page: input.page,
           count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size)
-        }
+          total_pages: Math.ceil((response.count || 0) / input.page_size),
+        },
       });
     } catch (error) {
       context.logger.error('Failed to get judges', error as Error, {
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message);
     }
@@ -195,9 +195,9 @@ export class GetJudgeHandler extends BaseToolHandler {
   validate(input: any): Result<any, Error> {
     try {
       const schema = z.object({
-        judge_id: z.union([z.string(), z.number()]).transform(String)
+        judge_id: z.union([z.string(), z.number()]).transform(String),
       });
-      
+
       const validated = schema.parse(input);
       return { success: true, data: validated };
     } catch (error) {
@@ -211,10 +211,10 @@ export class GetJudgeHandler extends BaseToolHandler {
       properties: {
         judge_id: {
           type: ['string', 'number'],
-          description: 'Judge ID to retrieve information for'
-        }
+          description: 'Judge ID to retrieve information for',
+        },
       },
-      required: ['judge_id']
+      required: ['judge_id'],
     };
   }
 
@@ -222,19 +222,19 @@ export class GetJudgeHandler extends BaseToolHandler {
     try {
       context.logger.info('Getting judge details', {
         judgeId: input.judge_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
 
       const response = await this.apiClient.getJudge(input.judge_id);
 
       return this.success({
         summary: `Retrieved details for judge ${input.judge_id}`,
-        judge: response
+        judge: response,
       });
     } catch (error) {
       context.logger.error('Failed to get judge details', error as Error, {
         judgeId: input.judge_id,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
       return this.error((error as Error).message, { judgeId: input.judge_id });
     }

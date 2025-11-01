@@ -19,32 +19,30 @@ export class ConnectionPoolManager {
 
   getPool(hostname: string, options: ConnectionPoolOptions = {}): ConnectionPool {
     const poolKey = `${hostname}:${options.port || 443}`;
-    
+
     if (!this.pools.has(poolKey)) {
       this.logger.info('Creating new connection pool', { hostname, poolKey });
       const pool = new ConnectionPool(hostname, options, this.logger);
       this.pools.set(poolKey, pool);
     }
-    
+
     return this.pools.get(poolKey)!;
   }
 
   async closeAll(): Promise<void> {
-    this.logger.info('Closing all connection pools', { 
-      poolCount: this.pools.size 
+    this.logger.info('Closing all connection pools', {
+      poolCount: this.pools.size,
     });
-    
-    await Promise.all(
-      Array.from(this.pools.values()).map(pool => pool.close())
-    );
-    
+
+    await Promise.all(Array.from(this.pools.values()).map((pool) => pool.close()));
+
     this.pools.clear();
   }
 
   getStats(): ConnectionPoolStats {
     const stats: ConnectionPoolStats = {
       totalPools: this.pools.size,
-      pools: {}
+      pools: {},
     };
 
     this.pools.forEach((pool, key) => {
@@ -69,16 +67,16 @@ export class ConnectionPool {
   constructor(
     private hostname: string,
     options: ConnectionPoolOptions = {},
-    logger: Logger
+    logger: Logger,
   ) {
     this.options = {
       maxConnections: options.maxConnections || 10,
       maxIdleTime: options.maxIdleTime || 30000,
       connectionTimeout: options.connectionTimeout || 5000,
       port: options.port || 443,
-      keepAlive: options.keepAlive !== false
+      keepAlive: options.keepAlive !== false,
     };
-    
+
     this.logger = logger.child(`Pool:${hostname}`);
     this.startMaintenanceTimer();
   }
@@ -89,14 +87,14 @@ export class ConnectionPool {
     }
 
     // Try to get an idle connection
-    const idleConnection = this.connections.find(conn => 
-      !this.activeConnections.has(conn) && !conn.isExpired()
+    const idleConnection = this.connections.find(
+      (conn) => !this.activeConnections.has(conn) && !conn.isExpired(),
     );
 
     if (idleConnection) {
       this.activeConnections.add(idleConnection);
-      this.logger.debug('Reusing idle connection', { 
-        connectionId: idleConnection.id 
+      this.logger.debug('Reusing idle connection', {
+        connectionId: idleConnection.id,
       });
       return idleConnection;
     }
@@ -116,7 +114,7 @@ export class ConnectionPool {
   release(connection: PooledConnection): void {
     this.activeConnections.delete(connection);
     connection.lastUsed = Date.now();
-    
+
     // Process waiting requests
     if (this.waitQueue.length > 0) {
       const request = this.waitQueue.shift()!;
@@ -124,18 +122,18 @@ export class ConnectionPool {
       request.resolve(connection);
     }
 
-    this.logger.debug('Released connection', { 
+    this.logger.debug('Released connection', {
       connectionId: connection.id,
-      queueLength: this.waitQueue.length
+      queueLength: this.waitQueue.length,
     });
   }
 
   private async createConnection(): Promise<PooledConnection> {
     const connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    this.logger.debug('Creating new connection', { 
+
+    this.logger.debug('Creating new connection', {
       connectionId,
-      hostname: this.hostname 
+      hostname: this.hostname,
     });
 
     const connection: PooledConnection = {
@@ -147,7 +145,7 @@ export class ConnectionPool {
       isExpired: () => {
         const age = Date.now() - connection.lastUsed;
         return age > this.options.maxIdleTime;
-      }
+      },
     };
 
     return connection;
@@ -156,7 +154,7 @@ export class ConnectionPool {
   private async waitForConnection(): Promise<PooledConnection> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        const index = this.waitQueue.findIndex(req => req.resolve === resolve);
+        const index = this.waitQueue.findIndex((req) => req.resolve === resolve);
         if (index >= 0) {
           this.waitQueue.splice(index, 1);
         }
@@ -168,32 +166,35 @@ export class ConnectionPool {
           clearTimeout(timeout);
           resolve(conn);
         },
-        reject
+        reject,
       });
     });
   }
 
   private startMaintenanceTimer(): void {
-    setInterval(() => {
-      this.cleanupExpiredConnections();
-    }, Math.min(this.options.maxIdleTime / 2, 30000));
+    setInterval(
+      () => {
+        this.cleanupExpiredConnections();
+      },
+      Math.min(this.options.maxIdleTime / 2, 30000),
+    );
   }
 
   private cleanupExpiredConnections(): void {
     const beforeCount = this.connections.length;
-    
-    this.connections = this.connections.filter(conn => {
+
+    this.connections = this.connections.filter((conn) => {
       if (this.activeConnections.has(conn)) {
         return true; // Keep active connections
       }
-      
+
       if (conn.isExpired()) {
-        this.logger.debug('Removing expired connection', { 
-          connectionId: conn.id 
+        this.logger.debug('Removing expired connection', {
+          connectionId: conn.id,
         });
         return false;
       }
-      
+
       return true;
     });
 
@@ -201,7 +202,7 @@ export class ConnectionPool {
       this.logger.debug('Cleaned up expired connections', {
         before: beforeCount,
         after: this.connections.length,
-        removed: beforeCount - this.connections.length
+        removed: beforeCount - this.connections.length,
       });
     }
   }
@@ -210,9 +211,9 @@ export class ConnectionPool {
     this.closed = true;
     this.activeConnections.clear();
     this.connections.length = 0;
-    
+
     // Reject all waiting requests
-    this.waitQueue.forEach(request => {
+    this.waitQueue.forEach((request) => {
       request.reject(new Error('Connection pool closed'));
     });
     this.waitQueue.length = 0;
@@ -227,7 +228,7 @@ export class ConnectionPool {
       activeConnections: this.activeConnections.size,
       idleConnections: this.connections.length - this.activeConnections.size,
       queueLength: this.waitQueue.length,
-      maxConnections: this.options.maxConnections
+      maxConnections: this.options.maxConnections,
     };
   }
 }
@@ -250,26 +251,24 @@ export class RequestQueueManager {
       const queue = new RequestQueue(name, options, this.logger);
       this.queues.set(name, queue);
     }
-    
+
     return this.queues.get(name)!;
   }
 
   async closeAll(): Promise<void> {
-    this.logger.info('Closing all request queues', { 
-      queueCount: this.queues.size 
+    this.logger.info('Closing all request queues', {
+      queueCount: this.queues.size,
     });
-    
-    await Promise.all(
-      Array.from(this.queues.values()).map(queue => queue.close())
-    );
-    
+
+    await Promise.all(Array.from(this.queues.values()).map((queue) => queue.close()));
+
     this.queues.clear();
   }
 
   getStats(): RequestQueueStats {
     const stats: RequestQueueStats = {
       totalQueues: this.queues.size,
-      queues: {}
+      queues: {},
     };
 
     this.queues.forEach((queue, name) => {
@@ -294,23 +293,23 @@ export class RequestQueue {
   constructor(
     private name: string,
     options: RequestQueueOptions = {},
-    logger: Logger
+    logger: Logger,
   ) {
     this.options = {
       maxConcurrent: options.maxConcurrent || 5,
       rateLimit: options.rateLimit || 0, // 0 = no limit
       timeout: options.timeout || 30000,
       retryAttempts: options.retryAttempts || 3,
-      retryDelay: options.retryDelay || 1000
+      retryDelay: options.retryDelay || 1000,
     };
-    
+
     this.logger = logger.child(`Queue:${name}`);
   }
 
   async enqueue<T>(
     operation: () => Promise<T>,
     priority: number = 0,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<T> {
     if (this.closed) {
       throw new Error('Request queue is closed');
@@ -325,11 +324,11 @@ export class RequestQueue {
         resolve,
         reject,
         attempts: 0,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
 
       // Insert based on priority (higher priority first)
-      const insertIndex = this.queue.findIndex(item => item.priority < priority);
+      const insertIndex = this.queue.findIndex((item) => item.priority < priority);
       if (insertIndex === -1) {
         this.queue.push(request);
       } else {
@@ -340,7 +339,7 @@ export class RequestQueue {
         requestId: request.id,
         priority,
         queueLength: this.queue.length,
-        metadata
+        metadata,
       });
 
       this.processQueue();
@@ -356,16 +355,16 @@ export class RequestQueue {
 
     try {
       const currentlyProcessing: Promise<void>[] = [];
-      
+
       while (this.queue.length > 0 && currentlyProcessing.length < this.options.maxConcurrent) {
         // Rate limiting
         if (this.options.rateLimit > 0) {
           const timeSinceLastExecution = Date.now() - this.lastExecution;
           const minInterval = 1000 / this.options.rateLimit;
-          
+
           if (timeSinceLastExecution < minInterval) {
-            await new Promise(resolve => 
-              setTimeout(resolve, minInterval - timeSinceLastExecution)
+            await new Promise((resolve) =>
+              setTimeout(resolve, minInterval - timeSinceLastExecution),
             );
           }
         }
@@ -392,7 +391,6 @@ export class RequestQueue {
       if (this.queue.length > 0) {
         setImmediate(() => this.processQueue());
       }
-
     } finally {
       this.processing = false;
     }
@@ -406,36 +404,32 @@ export class RequestQueue {
       this.logger.debug('Processing request', {
         requestId: request.id,
         attempt: request.attempts,
-        queueTime: startTime - request.createdAt
+        queueTime: startTime - request.createdAt,
       });
 
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Request timeout')), this.options.timeout);
       });
 
-      const result = await Promise.race([
-        request.operation(),
-        timeoutPromise
-      ]);
+      const result = await Promise.race([request.operation(), timeoutPromise]);
 
       const duration = Date.now() - startTime;
       this.logger.debug('Request completed', {
         id: request.id,
         duration,
-        attempts: request.attempts
+        attempts: request.attempts,
       });
 
       request.resolve(result);
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       if (request.attempts < this.options.retryAttempts) {
         this.logger.warn('Request failed, retrying', {
           id: request.id,
           attempt: request.attempts,
           error: (error as Error).message,
-          duration
+          duration,
         });
 
         // Add delay before retry
@@ -443,12 +437,11 @@ export class RequestQueue {
           this.queue.unshift(request); // Put back at front for retry
           this.processQueue();
         }, this.options.retryDelay * request.attempts);
-
       } else {
         this.logger.error('Request failed after all retries', error as Error, {
           id: request.id,
           attempts: request.attempts,
-          duration
+          duration,
         });
 
         request.reject(error as Error);
@@ -458,9 +451,9 @@ export class RequestQueue {
 
   async close(): Promise<void> {
     this.closed = true;
-    
+
     // Reject all pending requests
-    this.queue.forEach(request => {
+    this.queue.forEach((request) => {
       request.reject(new Error('Request queue closed'));
     });
     this.queue.length = 0;
@@ -474,7 +467,7 @@ export class RequestQueue {
       queueLength: this.queue.length,
       processing: this.processing,
       maxConcurrent: this.options.maxConcurrent,
-      rateLimit: this.options.rateLimit
+      rateLimit: this.options.rateLimit,
     };
   }
 }
@@ -493,7 +486,7 @@ export class CircuitBreaker {
   constructor(
     private name: string,
     private options: CircuitBreakerOptions,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child(`CircuitBreaker:${name}`);
   }
@@ -505,7 +498,7 @@ export class CircuitBreaker {
       }
       this.state = 'HALF_OPEN';
       this.logger.info('Circuit breaker transitioning to HALF_OPEN', {
-        name: this.name
+        name: this.name,
       });
     }
 
@@ -524,7 +517,7 @@ export class CircuitBreaker {
     if (this.state === 'HALF_OPEN') {
       this.state = 'CLOSED';
       this.logger.info('Circuit breaker closed after successful request', {
-        name: this.name
+        name: this.name,
       });
     }
   }
@@ -536,11 +529,11 @@ export class CircuitBreaker {
     if (this.failureCount >= this.options.failureThreshold) {
       this.state = 'OPEN';
       this.nextAttemptTime = Date.now() + this.options.timeout;
-      
+
       this.logger.warn('Circuit breaker opened due to failures', {
         name: this.name,
         failureCount: this.failureCount,
-        nextAttemptTime: this.nextAttemptTime
+        nextAttemptTime: this.nextAttemptTime,
       });
     }
   }
@@ -555,7 +548,7 @@ export class CircuitBreaker {
       state: this.state,
       failureCount: this.failureCount,
       lastFailureTime: this.lastFailureTime,
-      nextAttemptTime: this.nextAttemptTime
+      nextAttemptTime: this.nextAttemptTime,
     };
   }
 }

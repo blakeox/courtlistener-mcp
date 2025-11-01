@@ -24,15 +24,15 @@ export class AuthenticationMiddleware {
 
   constructor(
     private config: AuthConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child('Authentication');
-    
+
     if (this.config.enabled) {
       this.logger.info('Authentication middleware enabled', {
         allowAnonymous: this.config.allowAnonymous,
         configuredKeys: this.config.apiKeys.length,
-        headerName: this.config.headerName
+        headerName: this.config.headerName,
       });
     }
   }
@@ -44,18 +44,18 @@ export class AuthenticationMiddleware {
     if (!this.config.enabled) {
       return {
         isAuthenticated: true,
-        permissions: ['*']
+        permissions: ['*'],
       };
     }
 
     const apiKey = this.extractApiKey(headers);
-    
+
     if (!apiKey) {
       if (this.config.allowAnonymous) {
         this.logger.debug('Anonymous request allowed');
         return {
           isAuthenticated: false,
-          permissions: ['read']
+          permissions: ['read'],
         };
       } else {
         this.logger.warn('Authentication required but no API key provided');
@@ -64,26 +64,26 @@ export class AuthenticationMiddleware {
     }
 
     const isValid = this.validateApiKey(apiKey);
-    
+
     if (!isValid) {
-      this.logger.warn('Invalid API key provided', { 
-        keyPrefix: apiKey.substring(0, 8) + '...' 
+      this.logger.warn('Invalid API key provided', {
+        keyPrefix: apiKey.substring(0, 8) + '...',
       });
       throw new Error('Authentication failed: Invalid API key');
     }
 
     const clientId = this.generateClientId(apiKey);
-    
-    this.logger.debug('Request authenticated successfully', { 
+
+    this.logger.debug('Request authenticated successfully', {
       clientId,
-      keyPrefix: apiKey.substring(0, 8) + '...' 
+      keyPrefix: apiKey.substring(0, 8) + '...',
     });
 
     return {
       isAuthenticated: true,
       apiKey,
       clientId,
-      permissions: ['read', 'write', 'admin']
+      permissions: ['read', 'write', 'admin'],
     };
   }
 
@@ -91,8 +91,7 @@ export class AuthenticationMiddleware {
    * Extract API key from request headers
    */
   private extractApiKey(headers: Record<string, string>): string | undefined {
-    const authHeader = headers[this.config.headerName.toLowerCase()] || 
-                      headers['authorization'];
+    const authHeader = headers[this.config.headerName.toLowerCase()] || headers['authorization'];
 
     if (!authHeader) {
       return undefined;
@@ -125,8 +124,7 @@ export class AuthenticationMiddleware {
    * Check if client has specific permission
    */
   hasPermission(context: AuthContext, permission: string): boolean {
-    return context.permissions.includes('*') || 
-           context.permissions.includes(permission);
+    return context.permissions.includes('*') || context.permissions.includes(permission);
   }
 }
 
@@ -136,10 +134,11 @@ export class AuthenticationMiddleware {
 export function createAuthMiddleware(logger: Logger): AuthenticationMiddleware {
   const config: AuthConfig = {
     enabled: process.env.AUTH_ENABLED === 'true',
-    apiKeys: process.env.AUTH_API_KEYS ? 
-             process.env.AUTH_API_KEYS.split(',').map(key => key.trim()) : [],
+    apiKeys: process.env.AUTH_API_KEYS
+      ? process.env.AUTH_API_KEYS.split(',').map((key) => key.trim())
+      : [],
     allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
-    headerName: process.env.AUTH_HEADER_NAME || 'x-api-key'
+    headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
   };
 
   return new AuthenticationMiddleware(config, logger);

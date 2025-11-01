@@ -16,7 +16,7 @@ import {
   AuthenticationError,
   NotFoundError,
   RateLimitError,
-  ErrorContextBuilder
+  ErrorContextBuilder,
 } from './error-types.js';
 
 export interface ErrorHandlingConfig {
@@ -52,7 +52,7 @@ export class ExpressErrorHandler {
     logger: Logger,
     config: Partial<ErrorHandlingConfig> = {},
     metrics?: MetricsCollector,
-    circuitBreaker?: CircuitBreaker
+    circuitBreaker?: CircuitBreaker,
   ) {
     this.app = app;
     this.logger = logger;
@@ -65,34 +65,22 @@ export class ExpressErrorHandler {
       reporting: {},
       timeout: {
         enabled: true,
-        timeoutMs: 30000 // 30 seconds
+        timeoutMs: 30000, // 30 seconds
       },
       requestId: {
         enabled: true,
         header: 'x-request-id',
-        generate: true
+        generate: true,
       },
-      ...config
+      ...config,
     };
 
     // Initialize services
-    this.boundary = new ErrorBoundaryMiddleware(
-      logger,
-      this.config.boundary,
-      metrics
-    );
+    this.boundary = new ErrorBoundaryMiddleware(logger, this.config.boundary, metrics);
 
-    this.recovery = new ErrorRecoveryService(
-      logger,
-      circuitBreaker,
-      this.config.recovery
-    );
+    this.recovery = new ErrorRecoveryService(logger, circuitBreaker, this.config.recovery);
 
-    this.reporting = new ErrorReportingService(
-      logger,
-      this.config.reporting,
-      metrics
-    );
+    this.reporting = new ErrorReportingService(logger, this.config.reporting, metrics);
 
     this.setupMiddleware();
   }
@@ -123,9 +111,12 @@ export class ExpressErrorHandler {
    * Request ID middleware
    */
   private requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
-    const requestId = req.headers[this.config.requestId.header] as string ||
-      (this.config.requestId.generate ? `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : undefined);
-    
+    const requestId =
+      (req.headers[this.config.requestId.header] as string) ||
+      (this.config.requestId.generate
+        ? `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        : undefined);
+
     if (requestId) {
       req.headers[this.config.requestId.header] = requestId;
       res.setHeader(this.config.requestId.header, requestId);
@@ -141,11 +132,11 @@ export class ExpressErrorHandler {
     error: Error,
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ): void {
     // Convert to BaseError if needed
     const context = new ErrorContextBuilder()
-      .setRequestId(req.headers[this.config.requestId.header] as string || 'unknown')
+      .setRequestId((req.headers[this.config.requestId.header] as string) || 'unknown')
       .setEndpoint(req.originalUrl)
       .setMethod(req.method)
       .setUserId(req.headers['x-user-id'] as string)
@@ -195,23 +186,17 @@ export class ExpressErrorHandler {
   private wrapHandlerInternal(handler: Function, method: string, path: string) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const context = this.recovery.createRecoveryContext(
-          path,
-          method,
-          { handlerName: handler.name || 'anonymous' }
-        );
+        const context = this.recovery.createRecoveryContext(path, method, {
+          handlerName: handler.name || 'anonymous',
+        });
 
         // Execute with recovery if it's an async handler
         if (handler.constructor.name === 'AsyncFunction') {
-          await this.recovery.executeWithRecovery(
-            () => handler(req, res, next),
-            context,
-            {
-              enableRetry: false, // Don't retry HTTP handlers by default
-              enableFallback: true,
-              enableCircuitBreaker: true
-            }
-          );
+          await this.recovery.executeWithRecovery(() => handler(req, res, next), context, {
+            enableRetry: false, // Don't retry HTTP handlers by default
+            enableFallback: true,
+            enableCircuitBreaker: true,
+          });
         } else {
           // Synchronous handler
           handler(req, res, next);
@@ -231,30 +216,30 @@ export class ExpressErrorHandler {
       return new ValidationError(
         error.message,
         [], // validation errors array
-        context
+        context,
       );
     }
 
-    if (error.name === 'UnauthorizedError' || error.message.toLowerCase().includes('unauthorized')) {
-      return new AuthenticationError(
-        'Authentication required',
-        context
-      );
+    if (
+      error.name === 'UnauthorizedError' ||
+      error.message.toLowerCase().includes('unauthorized')
+    ) {
+      return new AuthenticationError('Authentication required', context);
     }
 
     if (error.name === 'NotFoundError' || error.message.toLowerCase().includes('not found')) {
-      return new NotFoundError(
-        error.message,
-        context
-      );
+      return new NotFoundError(error.message, context);
     }
 
-    if (error.name === 'TooManyRequestsError' || error.message.toLowerCase().includes('rate limit')) {
+    if (
+      error.name === 'TooManyRequestsError' ||
+      error.message.toLowerCase().includes('rate limit')
+    ) {
       return new RateLimitError(
         100, // limit
         60000, // window in ms (1 minute)
         60, // retry after seconds
-        context
+        context,
       );
     }
 
@@ -268,7 +253,7 @@ export class ExpressErrorHandler {
           500,
           context,
           true,
-          false
+          false,
         );
       }
     })();
@@ -279,68 +264,83 @@ export class ExpressErrorHandler {
    */
   public addErrorReportingEndpoints(): void {
     // Error reports dashboard
-    this.app.get('/admin/errors', this.boundary.wrapAsync(async (req: Request, res: Response) => {
-      const filters = {
-        severity: req.query.severity as any,
-        category: req.query.category as any,
-        status: req.query.status as string,
-        limit: parseInt(req.query.limit as string) || 50,
-        offset: parseInt(req.query.offset as string) || 0
-      };
+    this.app.get(
+      '/admin/errors',
+      this.boundary.wrapAsync(async (req: Request, res: Response) => {
+        const filters = {
+          severity: req.query.severity as any,
+          category: req.query.category as any,
+          status: req.query.status as string,
+          limit: parseInt(req.query.limit as string) || 50,
+          offset: parseInt(req.query.offset as string) || 0,
+        };
 
-      const reports = this.reporting.getErrorReports(filters);
-      const trends = this.reporting.getErrorTrends();
+        const reports = this.reporting.getErrorReports(filters);
+        const trends = this.reporting.getErrorTrends();
 
-      res.json({
-        reports,
-        trends,
-        pagination: {
-          limit: filters.limit,
-          offset: filters.offset,
-          total: reports.length
-        }
-      });
-    }));
+        res.json({
+          reports,
+          trends,
+          pagination: {
+            limit: filters.limit,
+            offset: filters.offset,
+            total: reports.length,
+          },
+        });
+      }),
+    );
 
     // Error trends endpoint
-    this.app.get('/admin/errors/trends', this.boundary.wrapAsync(async (req: Request, res: Response) => {
-      const timeWindow = req.query.timeWindow as string || '1h';
-      const trends = this.reporting.getErrorTrends(timeWindow);
-      res.json({ trends });
-    }));
+    this.app.get(
+      '/admin/errors/trends',
+      this.boundary.wrapAsync(async (req: Request, res: Response) => {
+        const timeWindow = (req.query.timeWindow as string) || '1h';
+        const trends = this.reporting.getErrorTrends(timeWindow);
+        res.json({ trends });
+      }),
+    );
 
     // Error metrics endpoint
-    this.app.get('/admin/errors/metrics', this.boundary.wrapAsync(async (req: Request, res: Response) => {
-      const errorMetrics = this.boundary.getMetrics();
-      res.json(errorMetrics);
-    }));
+    this.app.get(
+      '/admin/errors/metrics',
+      this.boundary.wrapAsync(async (req: Request, res: Response) => {
+        const errorMetrics = this.boundary.getMetrics();
+        res.json(errorMetrics);
+      }),
+    );
 
     // Export error reports
-    this.app.get('/admin/errors/export', this.boundary.wrapAsync(async (req: Request, res: Response) => {
-      const format = req.query.format as 'json' | 'csv' || 'json';
-      const data = this.reporting.exportReports(format);
-      
-      const contentType = format === 'csv' ? 'text/csv' : 'application/json';
-      const filename = `error-reports-${new Date().toISOString().split('T')[0]}.${format}`;
-      
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(data);
-    }));
+    this.app.get(
+      '/admin/errors/export',
+      this.boundary.wrapAsync(async (req: Request, res: Response) => {
+        const format = (req.query.format as 'json' | 'csv') || 'json';
+        const data = this.reporting.exportReports(format);
+
+        const contentType = format === 'csv' ? 'text/csv' : 'application/json';
+        const filename = `error-reports-${new Date().toISOString().split('T')[0]}.${format}`;
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(data);
+      }),
+    );
 
     // Update error resolution
-    this.app.patch('/admin/errors/:errorKey/resolution', this.boundary.wrapAsync(async (req: Request, res: Response) => {
-      const { errorKey } = req.params;
-      const { status, assignee, notes } = req.body;
+    this.app.patch(
+      '/admin/errors/:errorKey/resolution',
+      this.boundary.wrapAsync(async (req: Request, res: Response) => {
+        const { errorKey } = req.params;
+        const { status, assignee, notes } = req.body;
 
-      const updated = this.reporting.updateErrorResolution(errorKey, status, assignee, notes);
-      
-      if (updated) {
-        res.json({ success: true, message: 'Error resolution updated' });
-      } else {
-        res.status(404).json({ error: 'Error report not found' });
-      }
-    }));
+        const updated = this.reporting.updateErrorResolution(errorKey, status, assignee, notes);
+
+        if (updated) {
+          res.json({ success: true, message: 'Error resolution updated' });
+        } else {
+          res.status(404).json({ error: 'Error report not found' });
+        }
+      }),
+    );
   }
 
   /**
@@ -350,7 +350,7 @@ export class ExpressErrorHandler {
     return {
       boundary: this.boundary,
       recovery: this.recovery,
-      reporting: this.reporting
+      reporting: this.reporting,
     };
   }
 
@@ -361,7 +361,7 @@ export class ExpressErrorHandler {
     return {
       boundary: this.boundary.getMetrics(),
       reports: this.reporting.getErrorReports({ limit: 100 }),
-      trends: this.reporting.getErrorTrends()
+      trends: this.reporting.getErrorTrends(),
     };
   }
 

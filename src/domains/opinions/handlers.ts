@@ -19,7 +19,9 @@ export class GetOpinionTextHandler extends BaseToolHandler {
   validate(input: any): Result<any, Error> {
     try {
       const schema = z.object({
-        opinion_id: z.union([z.coerce.number().int().positive(), z.string()]).transform(v => String(v)),
+        opinion_id: z
+          .union([z.coerce.number().int().positive(), z.string()])
+          .transform((v) => String(v)),
         format: z.enum(['text', 'html', 'pdf']).optional().default('text'),
       });
 
@@ -133,7 +135,9 @@ export class AnalyzeLegalArgumentHandler extends BaseToolHandler {
 
       // Ensure shape includes analysis.top_cases; coerce strings to object
       const analysis =
-        typeof response?.analysis === 'object' && response.analysis ? response.analysis : { top_cases: [] };
+        typeof response?.analysis === 'object' && response.analysis
+          ? response.analysis
+          : { top_cases: [] };
 
       return this.success({ analysis });
     } catch (error) {

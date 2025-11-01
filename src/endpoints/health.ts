@@ -10,7 +10,7 @@ import { Logger } from '../infrastructure/logger.js';
 export class HealthEndpoints {
   constructor(
     private healthChecker: HealthCheckManager,
-    private logger: Logger
+    private logger: Logger,
   ) {}
 
   /**
@@ -20,11 +20,11 @@ export class HealthEndpoints {
   async health(req: Request, res: Response): Promise<void> {
     try {
       const healthStatus = await this.healthChecker.getHealthStatus();
-      
+
       const statusCode = {
-        'healthy': 200,
-        'degraded': 200, // Still functional but with warnings
-        'unhealthy': 503
+        healthy: 200,
+        degraded: 200, // Still functional but with warnings
+        unhealthy: 503,
       }[healthStatus.status];
 
       res.status(statusCode).json({
@@ -34,16 +34,15 @@ export class HealthEndpoints {
         version: healthStatus.version,
         service: 'courtlistener-mcp',
         dependencies: healthStatus.dependencies,
-        metrics: healthStatus.metrics
+        metrics: healthStatus.metrics,
       });
-
     } catch (error) {
       this.logger.error('Health check failed', error as Error);
       res.status(503).json({
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         error: (error as Error).message,
-        service: 'courtlistener-mcp'
+        service: 'courtlistener-mcp',
       });
     }
   }
@@ -55,19 +54,19 @@ export class HealthEndpoints {
   async readiness(req: Request, res: Response): Promise<void> {
     try {
       const readiness = await this.healthChecker.getReadinessStatus();
-      
+
       if (readiness.ready) {
         res.status(200).json({
           status: 'ready',
           timestamp: new Date().toISOString(),
-          service: 'courtlistener-mcp'
+          service: 'courtlistener-mcp',
         });
       } else {
         res.status(503).json({
           status: 'not_ready',
           timestamp: new Date().toISOString(),
           reason: readiness.reason,
-          service: 'courtlistener-mcp'
+          service: 'courtlistener-mcp',
         });
       }
     } catch (error) {
@@ -76,7 +75,7 @@ export class HealthEndpoints {
         status: 'not_ready',
         timestamp: new Date().toISOString(),
         reason: (error as Error).message,
-        service: 'courtlistener-mcp'
+        service: 'courtlistener-mcp',
       });
     }
   }
@@ -88,19 +87,19 @@ export class HealthEndpoints {
   async liveness(req: Request, res: Response): Promise<void> {
     try {
       const liveness = this.healthChecker.getLivenessStatus();
-      
+
       if (liveness.alive) {
         res.status(200).json({
           status: 'alive',
           timestamp: new Date().toISOString(),
-          service: 'courtlistener-mcp'
+          service: 'courtlistener-mcp',
         });
       } else {
         res.status(503).json({
           status: 'not_alive',
           timestamp: new Date().toISOString(),
           reason: liveness.reason,
-          service: 'courtlistener-mcp'
+          service: 'courtlistener-mcp',
         });
       }
     } catch (error) {
@@ -109,7 +108,7 @@ export class HealthEndpoints {
         status: 'not_alive',
         timestamp: new Date().toISOString(),
         reason: (error as Error).message,
-        service: 'courtlistener-mcp'
+        service: 'courtlistener-mcp',
       });
     }
   }
@@ -121,18 +120,17 @@ export class HealthEndpoints {
   async metrics(req: Request, res: Response): Promise<void> {
     try {
       const healthStatus = await this.healthChecker.getHealthStatus();
-      
+
       // Prometheus text format
       const prometheusMetrics = this.formatPrometheusMetrics(healthStatus);
-      
+
       res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
       res.status(200).send(prometheusMetrics);
-      
     } catch (error) {
       this.logger.error('Metrics endpoint failed', error as Error);
       res.status(500).json({
         error: 'Failed to retrieve metrics',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -144,7 +142,7 @@ export class HealthEndpoints {
   async status(req: Request, res: Response): Promise<void> {
     try {
       const healthStatus = await this.healthChecker.getHealthStatus();
-      
+
       res.status(200).json({
         application: {
           name: 'CourtListener MCP Server',
@@ -152,34 +150,33 @@ export class HealthEndpoints {
           description: 'Legal research and case law search API integration',
           status: healthStatus.status,
           uptime: healthStatus.uptime,
-          timestamp: healthStatus.timestamp
+          timestamp: healthStatus.timestamp,
         },
         system: {
           memory: healthStatus.metrics.memoryUsage,
           cpu: healthStatus.metrics.cpuUsage,
           node_version: process.version,
           platform: process.platform,
-          arch: process.arch
+          arch: process.arch,
         },
-        dependencies: healthStatus.dependencies.map(dep => ({
+        dependencies: healthStatus.dependencies.map((dep) => ({
           name: dep.name,
           status: dep.status,
           responseTime: dep.responseTime,
           lastChecked: dep.lastChecked,
-          ...(dep.error && { error: dep.error })
+          ...(dep.error && { error: dep.error }),
         })),
         metrics: {
           totalRequests: healthStatus.metrics.requestCount,
           errorRate: (healthStatus.metrics.errorRate * 100).toFixed(2) + '%',
-          averageResponseTime: Math.round(healthStatus.metrics.averageResponseTime) + 'ms'
-        }
+          averageResponseTime: Math.round(healthStatus.metrics.averageResponseTime) + 'ms',
+        },
       });
-      
     } catch (error) {
       this.logger.error('Status endpoint failed', error as Error);
       res.status(500).json({
         error: 'Failed to retrieve status information',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -216,9 +213,12 @@ courtlistener_mcp_memory_usage_bytes{type="heapTotal"} ${metrics.memoryUsage.hea
 
 # HELP courtlistener_mcp_dependency_status Dependency health status (1=healthy, 0=unhealthy)
 # TYPE courtlistener_mcp_dependency_status gauge
-${healthStatus.dependencies.map((dep: any) => 
-  `courtlistener_mcp_dependency_status{dependency="${dep.name}"} ${dep.status === 'healthy' ? 1 : 0} ${timestamp}`
-).join('\n')}
+${healthStatus.dependencies
+  .map(
+    (dep: any) =>
+      `courtlistener_mcp_dependency_status{dependency="${dep.name}"} ${dep.status === 'healthy' ? 1 : 0} ${timestamp}`,
+  )
+  .join('\n')}
 `.trim();
   }
 }

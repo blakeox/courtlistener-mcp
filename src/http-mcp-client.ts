@@ -29,7 +29,7 @@ class HTTPMCPClient {
     // Fetch available tools from the worker
     try {
       const response = await fetch(`${WORKER_BASE_URL}/tools`);
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       this.tools = data.tools || [];
     } catch (error) {
       console.error('Failed to initialize HTTP MCP Client:', error);
@@ -40,55 +40,55 @@ class HTTPMCPClient {
   async handleMessage(message: string): Promise<any> {
     try {
       const request = JSON.parse(message) as MCPRequest;
-      
+
       switch (request.method) {
         case 'initialize':
           return this.handleInitialize(request);
-        
+
         case 'tools/list':
           return this.handleListTools(request);
-        
+
         case 'tools/call':
           return this.handleToolCall(request);
-        
+
         default:
           return {
-            jsonrpc: "2.0",
+            jsonrpc: '2.0',
             id: request.id,
             error: {
               code: -32601,
-              message: `Method not found: ${request.method}`
-            }
+              message: `Method not found: ${request.method}`,
+            },
           };
       }
     } catch (error) {
       return {
-        jsonrpc: "2.0",
+        jsonrpc: '2.0',
         id: null,
         error: {
           code: -32700,
-          message: "Parse error"
-        }
+          message: 'Parse error',
+        },
       };
     }
   }
 
   async handleInitialize(request: MCPRequest): Promise<any> {
     await this.initialize();
-    
+
     return {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: request.id,
       result: {
-        protocolVersion: "2024-11-05",
+        protocolVersion: '2024-11-05',
         capabilities: {
           tools: {},
         },
         serverInfo: {
-          name: "HTTP MCP Client for Cloudflare Worker",
-          version: "1.0.0"
-        }
-      }
+          name: 'HTTP MCP Client for Cloudflare Worker',
+          version: '1.0.0',
+        },
+      },
     };
   }
 
@@ -98,62 +98,62 @@ class HTTPMCPClient {
     }
 
     return {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: request.id,
       result: {
-        tools: this.tools
-      }
+        tools: this.tools,
+      },
     };
   }
 
   async handleToolCall(request: MCPRequest): Promise<any> {
     const { name, arguments: args } = request.params || {};
-    
+
     try {
       // Call the Cloudflare Worker tool endpoint
       const response = await fetch(`${WORKER_BASE_URL}/tools/${name}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(args || {})
+        body: JSON.stringify(args || {}),
       });
 
       if (!response.ok) {
-        const errorData = await response.json() as any;
+        const errorData = (await response.json()) as any;
         return {
-          jsonrpc: "2.0",
+          jsonrpc: '2.0',
           id: request.id,
           error: {
             code: -32603,
-            message: errorData.error || `HTTP ${response.status}`
-          }
+            message: errorData.error || `HTTP ${response.status}`,
+          },
         };
       }
 
       const result = await response.json();
-      
+
       return {
-        jsonrpc: "2.0",
+        jsonrpc: '2.0',
         id: request.id,
         result: {
           content: [
             {
-              type: "text",
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        }
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
-        jsonrpc: "2.0",
+        jsonrpc: '2.0',
         id: request.id,
         error: {
           code: -32603,
-          message: `Tool execution failed: ${errorMessage}`
-        }
+          message: `Tool execution failed: ${errorMessage}`,
+        },
       };
     }
   }
@@ -162,18 +162,18 @@ class HTTPMCPClient {
 // Main execution
 async function main() {
   const client = new HTTPMCPClient();
-  
+
   process.stdin.setEncoding('utf8');
-  
+
   let buffer = '';
-  
+
   process.stdin.on('data', async (chunk) => {
     buffer += chunk;
-    
+
     // Process complete JSON messages
     const lines = buffer.split('\n');
     buffer = lines.pop() || ''; // Keep incomplete line in buffer
-    
+
     for (const line of lines) {
       if (line.trim()) {
         try {
@@ -197,7 +197,7 @@ async function main() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    console.error("Failed to start HTTP MCP Client:", error);
+    console.error('Failed to start HTTP MCP Client:', error);
     process.exit(1);
   });
 }

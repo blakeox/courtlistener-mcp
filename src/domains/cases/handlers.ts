@@ -24,11 +24,11 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
           cluster_id: z.union([z.coerce.number().int(), z.string()]).optional(),
           id: z.union([z.coerce.number().int(), z.string()]).optional(),
         })
-        .refine(data => data.cluster_id !== undefined || data.id !== undefined, {
+        .refine((data) => data.cluster_id !== undefined || data.id !== undefined, {
           message: 'cluster_id (or legacy id) is required',
           path: ['cluster_id'],
         })
-        .transform(data => {
+        .transform((data) => {
           const raw = (data.cluster_id ?? data.id) as string | number;
           const num = Number(raw);
           if (!Number.isFinite(num) || num <= 0) {
@@ -109,11 +109,11 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
           case_id: z.union([z.string(), z.number()]).optional(),
           limit: z.coerce.number().int().min(1).max(100).optional().default(10),
         })
-        .refine(data => data.opinion_id ?? data.cluster_id ?? data.case_id, {
+        .refine((data) => data.opinion_id ?? data.cluster_id ?? data.case_id, {
           message: 'opinion_id or cluster_id is required to look up related cases',
           path: ['opinion_id'],
         })
-        .transform(data => ({
+        .transform((data) => ({
           opinion_id: Number(data.opinion_id ?? data.cluster_id ?? data.case_id),
           limit: data.limit,
         }));
@@ -147,7 +147,11 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
           default: 10,
         },
       },
-      anyOf: [{ required: ['opinion_id'] }, { required: ['cluster_id'] }, { required: ['case_id'] }],
+      anyOf: [
+        { required: ['opinion_id'] },
+        { required: ['cluster_id'] },
+        { required: ['case_id'] },
+      ],
       additionalProperties: false,
     };
   }

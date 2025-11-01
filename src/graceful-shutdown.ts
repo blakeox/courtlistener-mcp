@@ -26,15 +26,15 @@ export class GracefulShutdown {
 
   constructor(
     private config: ShutdownConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child('GracefulShutdown');
-    
+
     if (this.config.enabled) {
       this.setupSignalHandlers();
       this.logger.info('Graceful shutdown enabled', {
         timeout: this.config.timeout,
-        signals: this.config.signals
+        signals: this.config.signals,
       });
     }
   }
@@ -45,11 +45,11 @@ export class GracefulShutdown {
   addHook(hook: ShutdownHook): void {
     this.hooks.push(hook);
     this.hooks.sort((a, b) => a.priority - b.priority);
-    
+
     this.logger.debug('Shutdown hook registered', {
       name: hook.name,
       priority: hook.priority,
-      totalHooks: this.hooks.length
+      totalHooks: this.hooks.length,
     });
   }
 
@@ -57,7 +57,7 @@ export class GracefulShutdown {
    * Remove a cleanup hook
    */
   removeHook(name: string): void {
-    const index = this.hooks.findIndex(hook => hook.name === name);
+    const index = this.hooks.findIndex((hook) => hook.name === name);
     if (index !== -1) {
       this.hooks.splice(index, 1);
       this.logger.debug('Shutdown hook removed', { name });
@@ -85,25 +85,24 @@ export class GracefulShutdown {
    */
   private async performShutdown(reason: string): Promise<void> {
     const startTime = Date.now();
-    
+
     try {
       // Execute cleanup hooks in priority order
       await this.executeCleanupHooks();
-      
+
       const duration = Date.now() - startTime;
       this.logger.info('Graceful shutdown completed', {
         reason,
         duration,
-        hooksExecuted: this.hooks.length
+        hooksExecuted: this.hooks.length,
       });
-
     } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error('Graceful shutdown failed', undefined, {
         reason,
         duration,
         hooksExecuted: this.hooks.length,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -114,38 +113,31 @@ export class GracefulShutdown {
   private async executeCleanupHooks(): Promise<void> {
     const promises = this.hooks.map(async (hook) => {
       const timer = this.logger.startTimer(`shutdown_${hook.name}`);
-      
+
       try {
-        await Promise.race([
-          hook.cleanup(),
-          this.createTimeoutPromise(hook.name)
-        ]);
-        
+        await Promise.race([hook.cleanup(), this.createTimeoutPromise(hook.name)]);
+
         const duration = timer.end();
         this.logger.debug('Shutdown hook completed', {
           name: hook.name,
-          duration
+          duration,
         });
-        
       } catch (error) {
         const duration = timer.endWithError(error as Error);
         this.logger.warn('Shutdown hook failed', {
           name: hook.name,
           duration,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     });
 
     // Wait for all hooks with overall timeout
     try {
-      await Promise.race([
-        Promise.all(promises),
-        this.createOverallTimeoutPromise()
-      ]);
+      await Promise.race([Promise.all(promises), this.createOverallTimeoutPromise()]);
     } catch (error) {
       this.logger.error('Shutdown hooks timed out', undefined, {
-        errorMessage: error instanceof Error ? error.message : String(error)
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -179,7 +171,7 @@ export class GracefulShutdown {
     for (const signal of this.config.signals) {
       process.on(signal as NodeJS.Signals, () => {
         this.logger.info(`Received ${signal} signal`);
-        
+
         this.shutdown(`Signal: ${signal}`)
           .then(() => {
             this.logger.info('Graceful shutdown complete, exiting');
@@ -187,7 +179,7 @@ export class GracefulShutdown {
           })
           .catch((error) => {
             this.logger.error('Graceful shutdown failed', undefined, {
-              error: error instanceof Error ? error.message : String(error)
+              error: error instanceof Error ? error.message : String(error),
             });
             this.forceExit();
           });
@@ -197,18 +189,16 @@ export class GracefulShutdown {
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
       this.logger.error('Uncaught exception', error);
-      this.shutdown('Uncaught exception')
-        .finally(() => this.forceExit());
+      this.shutdown('Uncaught exception').finally(() => this.forceExit());
     });
 
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       this.logger.error('Unhandled promise rejection', undefined, {
         reason: String(reason),
-        promise: promise.toString()
+        promise: promise.toString(),
       });
-      this.shutdown('Unhandled promise rejection')
-        .finally(() => this.forceExit());
+      this.shutdown('Unhandled promise rejection').finally(() => this.forceExit());
     });
   }
 
@@ -233,7 +223,7 @@ export class GracefulShutdown {
     return {
       isShuttingDown: this.isShuttingDown,
       hooksRegistered: this.hooks.length,
-      config: this.config
+      config: this.config,
     };
   }
 }
@@ -246,9 +236,9 @@ export function createGracefulShutdown(logger: Logger): GracefulShutdown {
     enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
     timeout: parseInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT || '30000'),
     forceTimeout: parseInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT || '5000'),
-    signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS ? 
-             process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map(s => s.trim()) :
-             ['SIGTERM', 'SIGINT', 'SIGUSR2']
+    signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
+      ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
+      : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
   };
 
   return new GracefulShutdown(config, logger);

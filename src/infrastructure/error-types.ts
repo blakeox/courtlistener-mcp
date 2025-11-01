@@ -23,7 +23,7 @@ export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 // Error categories for classification
@@ -39,7 +39,7 @@ export enum ErrorCategory {
   INTERNAL = 'internal',
   BUSINESS_LOGIC = 'business_logic',
   CONFIGURATION = 'configuration',
-  DEPENDENCY = 'dependency'
+  DEPENDENCY = 'dependency',
 }
 
 /**
@@ -62,7 +62,7 @@ export abstract class BaseError extends Error {
     httpStatus: number,
     context: Partial<ErrorContext> = {},
     isOperational = true,
-    retryable = false
+    retryable = false,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -73,11 +73,11 @@ export abstract class BaseError extends Error {
     this.isOperational = isOperational;
     this.retryable = retryable;
     this.timestamp = new Date().toISOString();
-    
+
     this.context = {
       timestamp: this.timestamp,
       stackTrace: this.stack,
-      ...context
+      ...context,
     };
 
     // Maintain proper stack trace
@@ -103,8 +103,8 @@ export abstract class BaseError extends Error {
       retryable: this.retryable,
       context: {
         ...this.context,
-        stackTrace: undefined // Don't expose stack traces in API responses
-      }
+        stackTrace: undefined, // Don't expose stack traces in API responses
+      },
     };
   }
 
@@ -116,7 +116,7 @@ export abstract class BaseError extends Error {
       category: this.category,
       severity: this.severity,
       timestamp: this.timestamp,
-      context: this.context
+      context: this.context,
     };
   }
 }
@@ -134,24 +134,16 @@ export class ValidationError extends BaseError {
   constructor(
     message: string,
     validationErrors: Array<{ field: string; message: string; value?: any }> = [],
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
-    super(
-      message,
-      ErrorCategory.VALIDATION,
-      ErrorSeverity.LOW,
-      400,
-      context,
-      true,
-      false
-    );
+    super(message, ErrorCategory.VALIDATION, ErrorSeverity.LOW, 400, context, true, false);
     this.validationErrors = validationErrors;
   }
 
   public toJSON() {
     return {
       ...super.toJSON(),
-      validationErrors: this.validationErrors
+      validationErrors: this.validationErrors,
     };
   }
 }
@@ -161,15 +153,7 @@ export class ValidationError extends BaseError {
  */
 export class AuthenticationError extends BaseError {
   constructor(message = 'Authentication required', context: Partial<ErrorContext> = {}) {
-    super(
-      message,
-      ErrorCategory.AUTHENTICATION,
-      ErrorSeverity.MEDIUM,
-      401,
-      context,
-      true,
-      false
-    );
+    super(message, ErrorCategory.AUTHENTICATION, ErrorSeverity.MEDIUM, 401, context, true, false);
   }
 }
 
@@ -182,24 +166,16 @@ export class AuthorizationError extends BaseError {
   constructor(
     message = 'Insufficient permissions',
     requiredPermissions?: string[],
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
-    super(
-      message,
-      ErrorCategory.AUTHORIZATION,
-      ErrorSeverity.MEDIUM,
-      403,
-      context,
-      true,
-      false
-    );
+    super(message, ErrorCategory.AUTHORIZATION, ErrorSeverity.MEDIUM, 403, context, true, false);
     this.requiredPermissions = requiredPermissions;
   }
 
   public toJSON() {
     return {
       ...super.toJSON(),
-      requiredPermissions: this.requiredPermissions
+      requiredPermissions: this.requiredPermissions,
     };
   }
 }
@@ -215,17 +191,9 @@ export class NotFoundError extends BaseError {
     message = 'Resource not found',
     resourceType?: string,
     resourceId?: string,
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
-    super(
-      message,
-      ErrorCategory.NOT_FOUND,
-      ErrorSeverity.LOW,
-      404,
-      context,
-      true,
-      false
-    );
+    super(message, ErrorCategory.NOT_FOUND, ErrorSeverity.LOW, 404, context, true, false);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
   }
@@ -234,7 +202,7 @@ export class NotFoundError extends BaseError {
     return {
       ...super.toJSON(),
       resourceType: this.resourceType,
-      resourceId: this.resourceId
+      resourceId: this.resourceId,
     };
   }
 }
@@ -251,7 +219,7 @@ export class RateLimitError extends BaseError {
     limit: number,
     windowMs: number,
     retryAfter: number,
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
     super(
       `Rate limit exceeded: ${limit} requests per ${windowMs}ms`,
@@ -260,7 +228,7 @@ export class RateLimitError extends BaseError {
       429,
       context,
       true,
-      true
+      true,
     );
     this.limit = limit;
     this.windowMs = windowMs;
@@ -272,7 +240,7 @@ export class RateLimitError extends BaseError {
       ...super.toJSON(),
       limit: this.limit,
       windowMs: this.windowMs,
-      retryAfter: this.retryAfter
+      retryAfter: this.retryAfter,
     };
   }
 }
@@ -290,10 +258,11 @@ export class ExternalAPIError extends BaseError {
     message: string,
     apiStatusCode?: number,
     apiResponse?: any,
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
     const isRetryable = apiStatusCode ? apiStatusCode >= 500 || apiStatusCode === 429 : true;
-    const severity = apiStatusCode && apiStatusCode >= 500 ? ErrorSeverity.HIGH : ErrorSeverity.MEDIUM;
+    const severity =
+      apiStatusCode && apiStatusCode >= 500 ? ErrorSeverity.HIGH : ErrorSeverity.MEDIUM;
 
     super(
       `External API error from ${apiName}: ${message}`,
@@ -302,7 +271,7 @@ export class ExternalAPIError extends BaseError {
       502,
       context,
       true,
-      isRetryable
+      isRetryable,
     );
     this.apiName = apiName;
     this.apiStatusCode = apiStatusCode;
@@ -314,7 +283,7 @@ export class ExternalAPIError extends BaseError {
       ...super.toJSON(),
       apiName: this.apiName,
       apiStatusCode: this.apiStatusCode,
-      apiResponse: this.apiResponse
+      apiResponse: this.apiResponse,
     };
   }
 }
@@ -325,27 +294,15 @@ export class ExternalAPIError extends BaseError {
 export class BusinessLogicError extends BaseError {
   public readonly businessCode?: string;
 
-  constructor(
-    message: string,
-    businessCode?: string,
-    context: Partial<ErrorContext> = {}
-  ) {
-    super(
-      message,
-      ErrorCategory.BUSINESS_LOGIC,
-      ErrorSeverity.MEDIUM,
-      422,
-      context,
-      true,
-      false
-    );
+  constructor(message: string, businessCode?: string, context: Partial<ErrorContext> = {}) {
+    super(message, ErrorCategory.BUSINESS_LOGIC, ErrorSeverity.MEDIUM, 422, context, true, false);
     this.businessCode = businessCode;
   }
 
   public toJSON() {
     return {
       ...super.toJSON(),
-      businessCode: this.businessCode
+      businessCode: this.businessCode,
     };
   }
 }
@@ -357,7 +314,7 @@ export class InternalServerError extends BaseError {
   constructor(
     message = 'Internal server error',
     context: Partial<ErrorContext> = {},
-    isOperational = false
+    isOperational = false,
   ) {
     super(
       message,
@@ -366,7 +323,7 @@ export class InternalServerError extends BaseError {
       500,
       context,
       isOperational,
-      false
+      false,
     );
   }
 }
@@ -377,27 +334,15 @@ export class InternalServerError extends BaseError {
 export class ConfigurationError extends BaseError {
   public readonly configKey?: string;
 
-  constructor(
-    message: string,
-    configKey?: string,
-    context: Partial<ErrorContext> = {}
-  ) {
-    super(
-      message,
-      ErrorCategory.CONFIGURATION,
-      ErrorSeverity.CRITICAL,
-      500,
-      context,
-      false,
-      false
-    );
+  constructor(message: string, configKey?: string, context: Partial<ErrorContext> = {}) {
+    super(message, ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL, 500, context, false, false);
     this.configKey = configKey;
   }
 
   public toJSON() {
     return {
       ...super.toJSON(),
-      configKey: this.configKey
+      configKey: this.configKey,
     };
   }
 }
@@ -413,7 +358,7 @@ export class DependencyError extends BaseError {
     dependencyName: string,
     dependencyType: string,
     message: string,
-    context: Partial<ErrorContext> = {}
+    context: Partial<ErrorContext> = {},
   ) {
     super(
       `Dependency error from ${dependencyName} (${dependencyType}): ${message}`,
@@ -422,7 +367,7 @@ export class DependencyError extends BaseError {
       503,
       context,
       true,
-      true
+      true,
     );
     this.dependencyName = dependencyName;
     this.dependencyType = dependencyType;
@@ -432,7 +377,7 @@ export class DependencyError extends BaseError {
     return {
       ...super.toJSON(),
       dependencyName: this.dependencyName,
-      dependencyType: this.dependencyType
+      dependencyType: this.dependencyType,
     };
   }
 }
@@ -484,7 +429,7 @@ export class ErrorContextBuilder {
   public build(): ErrorContext {
     return {
       timestamp: new Date().toISOString(),
-      ...this.context
+      ...this.context,
     };
   }
 }
@@ -502,27 +447,24 @@ export class ErrorFactory {
   public static createValidationError(
     message: string,
     validationErrors?: Array<{ field: string; message: string; value?: any }>,
-    additionalContext?: Partial<ErrorContext>
+    additionalContext?: Partial<ErrorContext>,
   ): ValidationError {
-    return new ValidationError(
-      message,
-      validationErrors,
-      { ...this.defaultContext, ...additionalContext }
-    );
+    return new ValidationError(message, validationErrors, {
+      ...this.defaultContext,
+      ...additionalContext,
+    });
   }
 
   public static createNotFoundError(
     message: string,
     resourceType?: string,
     resourceId?: string,
-    additionalContext?: Partial<ErrorContext>
+    additionalContext?: Partial<ErrorContext>,
   ): NotFoundError {
-    return new NotFoundError(
-      message,
-      resourceType,
-      resourceId,
-      { ...this.defaultContext, ...additionalContext }
-    );
+    return new NotFoundError(message, resourceType, resourceId, {
+      ...this.defaultContext,
+      ...additionalContext,
+    });
   }
 
   public static createExternalAPIError(
@@ -530,36 +472,29 @@ export class ErrorFactory {
     message: string,
     statusCode?: number,
     response?: any,
-    additionalContext?: Partial<ErrorContext>
+    additionalContext?: Partial<ErrorContext>,
   ): ExternalAPIError {
-    return new ExternalAPIError(
-      apiName,
-      message,
-      statusCode,
-      response,
-      { ...this.defaultContext, ...additionalContext }
-    );
+    return new ExternalAPIError(apiName, message, statusCode, response, {
+      ...this.defaultContext,
+      ...additionalContext,
+    });
   }
 
   public static createBusinessLogicError(
     message: string,
     businessCode?: string,
-    additionalContext?: Partial<ErrorContext>
+    additionalContext?: Partial<ErrorContext>,
   ): BusinessLogicError {
-    return new BusinessLogicError(
-      message,
-      businessCode,
-      { ...this.defaultContext, ...additionalContext }
-    );
+    return new BusinessLogicError(message, businessCode, {
+      ...this.defaultContext,
+      ...additionalContext,
+    });
   }
 
   public static createInternalServerError(
     message?: string,
-    additionalContext?: Partial<ErrorContext>
+    additionalContext?: Partial<ErrorContext>,
   ): InternalServerError {
-    return new InternalServerError(
-      message,
-      { ...this.defaultContext, ...additionalContext }
-    );
+    return new InternalServerError(message, { ...this.defaultContext, ...additionalContext });
   }
 }

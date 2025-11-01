@@ -191,7 +191,7 @@ export class AdvancedSearchHandler extends BaseToolHandler {
         'nature_of_suit',
       ] as const;
 
-      const hasSearchInput = meaningfulKeys.some(key => {
+      const hasSearchInput = meaningfulKeys.some((key) => {
         const field = value[key];
         return field !== undefined && field !== null && field !== '';
       });
@@ -224,7 +224,8 @@ export class AdvancedSearchHandler extends BaseToolHandler {
         type: {
           type: 'string',
           enum: ['o', 'r', 'p', 'oa'],
-          description: 'Search index type: opinions (o), RECAP documents (r), people/judges (p), oral arguments (oa)',
+          description:
+            'Search index type: opinions (o), RECAP documents (r), people/judges (p), oral arguments (oa)',
           default: 'o',
         },
         query: {
@@ -335,8 +336,10 @@ export class AdvancedSearchHandler extends BaseToolHandler {
       total_results: results.count ?? 0,
       results: results.results ?? results,
       advanced_features: {
-        citation_filtering: input.cited_lt !== undefined || input.cited_gt !== undefined ? 'Applied' : 'Available',
-        temporal_analysis: input.date_filed_after || input.date_filed_before ? 'Applied' : 'Available',
+        citation_filtering:
+          input.cited_lt !== undefined || input.cited_gt !== undefined ? 'Applied' : 'Available',
+        temporal_analysis:
+          input.date_filed_after || input.date_filed_before ? 'Applied' : 'Available',
         jurisdictional_filtering: input.court ? 'Applied' : 'Available',
         procedural_filtering: input.status || input.nature_of_suit ? 'Applied' : 'Available',
       },

@@ -51,7 +51,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
           },
           court: {
             type: 'string',
-            description: "Court identifier (e.g., 'scotus', 'ca1', 'ca2'). Use list_courts to see available courts.",
+            description:
+              "Court identifier (e.g., 'scotus', 'ca1', 'ca2'). Use list_courts to see available courts.",
           },
           judge: {
             type: 'string',
@@ -78,7 +79,15 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
           precedential_status: {
             type: 'string',
             description: 'Filter by precedential status',
-            enum: ['Published', 'Unpublished', 'Errata', 'Separate', 'In-chambers', 'Relating-to', 'Unknown'],
+            enum: [
+              'Published',
+              'Unpublished',
+              'Errata',
+              'Separate',
+              'In-chambers',
+              'Relating-to',
+              'Unknown',
+            ],
           },
           page: {
             type: 'number',
@@ -114,7 +123,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
         properties: {
           cluster_id: {
             type: 'number',
-            description: 'CourtListener cluster ID for the case. Use search_cases to find cluster IDs.',
+            description:
+              'CourtListener cluster ID for the case. Use search_cases to find cluster IDs.',
             minimum: 1,
           },
         },
@@ -124,7 +134,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
     },
     {
       name: 'get_opinion_text',
-      description: 'Retrieve the full text content of a specific legal opinion, including HTML and plain text formats',
+      description:
+        'Retrieve the full text content of a specific legal opinion, including HTML and plain text formats',
       category: 'details',
       complexity: 'simple',
       rateLimitWeight: 1,
@@ -140,7 +151,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
         properties: {
           opinion_id: {
             type: 'number',
-            description: 'CourtListener opinion ID. Use get_case_details to find opinion IDs from a case.',
+            description:
+              'CourtListener opinion ID. Use get_case_details to find opinion IDs from a case.',
             minimum: 1,
           },
         },
@@ -255,7 +267,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
     },
     {
       name: 'list_courts',
-      description: 'List all available courts with their metadata, jurisdiction information, and operational status',
+      description:
+        'List all available courts with their metadata, jurisdiction information, and operational status',
       category: 'reference',
       complexity: 'simple',
       rateLimitWeight: 1,
@@ -454,7 +467,9 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
         {
           name: 'Citation validation',
           description: 'Check if citations in text are valid',
-          arguments: { text: 'See Roe v. Wade, 410 U.S. 113 (1973) and Brown v. Board, 347 U.S. 483 (1954)' },
+          arguments: {
+            text: 'See Roe v. Wade, 410 U.S. 113 (1973) and Brown v. Board, 347 U.S. 483 (1954)',
+          },
         },
       ],
       inputSchema: {
@@ -472,7 +487,8 @@ export function getEnhancedToolDefinitions(): EnhancedTool[] {
     },
     {
       name: 'get_enhanced_recap_data',
-      description: 'Access advanced RECAP/PACER features including document fetching and email notifications',
+      description:
+        'Access advanced RECAP/PACER features including document fetching and email notifications',
       category: 'details',
       complexity: 'intermediate',
       rateLimitWeight: 2,
@@ -543,7 +559,7 @@ export function getToolExamples(): Record<string, Array<{ description: string; c
 
   for (const tool of tools) {
     examples[tool.name] =
-      tool.examples?.map(example => ({
+      tool.examples?.map((example) => ({
         description: example.description,
         code: JSON.stringify(example.arguments, null, 2),
       })) || [];

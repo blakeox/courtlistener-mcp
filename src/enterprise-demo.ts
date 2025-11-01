@@ -84,7 +84,9 @@ function displayEnterpriseStatus() {
  */
 function startEnterpriseServer() {
   // Check if any enterprise features are enabled
-  const enabledFeatures = Object.keys(ENTERPRISE_FEATURES).filter(key => process.env[key] === 'true');
+  const enabledFeatures = Object.keys(ENTERPRISE_FEATURES).filter(
+    (key) => process.env[key] === 'true',
+  );
 
   if (enabledFeatures.length > 0) {
     console.error(`\n🚀 Starting with ${enabledFeatures.length} enterprise features enabled...\n`);
@@ -99,7 +101,7 @@ function startEnterpriseServer() {
       const server = new module.LegalMCPServer();
       await server.start();
     })
-    .catch(error => {
+    .catch((error) => {
       console.error('Failed to start Legal MCP Server:', error);
       process.exit(1);
     });

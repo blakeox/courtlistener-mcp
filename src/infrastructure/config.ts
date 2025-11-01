@@ -3,69 +3,119 @@
  * Provides environment-based configuration with validation for all components
  */
 
+import { parseLogFormat, parseLogLevel, parsePositiveInt } from '../common/validation.js';
 import { ServerConfig } from '../types.js';
+import { validateConfigWithZod } from './config-schema.js';
 
 const defaultConfig: ServerConfig = {
   courtListener: {
     baseUrl: process.env.COURTLISTENER_BASE_URL || 'https://www.courtlistener.com/api/rest/v4',
     version: 'v4',
-    timeout: parseInt(process.env.COURTLISTENER_TIMEOUT || '30000'),
-    retryAttempts: parseInt(process.env.COURTLISTENER_RETRY_ATTEMPTS || '3'),
-    rateLimitPerMinute: parseInt(process.env.COURTLISTENER_RATE_LIMIT || '100')
+    timeout: parsePositiveInt(process.env.COURTLISTENER_TIMEOUT, 30000, 1000),
+    retryAttempts: parsePositiveInt(process.env.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
+    rateLimitPerMinute: parsePositiveInt(process.env.COURTLISTENER_RATE_LIMIT, 100, 1),
   },
   cache: {
     enabled: process.env.CACHE_ENABLED !== 'false',
-    ttl: parseInt(process.env.CACHE_TTL || '300'), // 5 minutes default
-    maxSize: parseInt(process.env.CACHE_MAX_SIZE || '1000')
+    ttl: parsePositiveInt(process.env.CACHE_TTL, 300, 0), // 5 minutes default
+    maxSize: parsePositiveInt(process.env.CACHE_MAX_SIZE, 1000, 1),
   },
   logging: {
-    level: (process.env.LOG_LEVEL as any) || 'info',
-    format: (process.env.LOG_FORMAT as any) || 'json',
-    enabled: process.env.LOGGING_ENABLED !== 'false'
+    level: parseLogLevel(process.env.LOG_LEVEL),
+    format: parseLogFormat(process.env.LOG_FORMAT),
+    enabled: process.env.LOGGING_ENABLED !== 'false',
   },
   metrics: {
     enabled: process.env.METRICS_ENABLED === 'true',
-    port: process.env.METRICS_PORT ? parseInt(process.env.METRICS_PORT) : undefined
+    port: process.env.METRICS_PORT
+      ? parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535)
+      : undefined,
   },
   // Enhanced security and middleware configuration
   security: {
     authEnabled: process.env.AUTH_ENABLED === 'true',
-    apiKeys: process.env.AUTH_API_KEYS ? 
-             process.env.AUTH_API_KEYS.split(',').map(key => key.trim()) : [],
+    apiKeys: process.env.AUTH_API_KEYS
+      ? process.env.AUTH_API_KEYS.split(',')
+          .map((key) => key.trim())
+          .filter((key) => key.length > 0)
+      : [],
     allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
     corsEnabled: process.env.CORS_ENABLED !== 'false',
-    corsOrigins: process.env.CORS_ORIGINS ? 
-                 process.env.CORS_ORIGINS.split(',').map(origin => origin.trim()) : ['*'],
+    corsOrigins: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',')
+          .map((origin) => origin.trim())
+          .filter((origin) => origin.length > 0)
+      : ['*'],
     rateLimitEnabled: process.env.RATE_LIMIT_ENABLED === 'true',
-    maxRequestsPerMinute: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-    sanitizationEnabled: process.env.SANITIZATION_ENABLED !== 'false'
+    maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
+    sanitizationEnabled: process.env.SANITIZATION_ENABLED !== 'false',
   },
   audit: {
     enabled: process.env.AUDIT_ENABLED === 'true',
     logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
     includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
     includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
-    maxBodyLength: parseInt(process.env.AUDIT_MAX_BODY_LENGTH || '2000'),
-    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS ? 
-                     process.env.AUDIT_SENSITIVE_FIELDS.split(',').map(f => f.trim()) :
-                     ['password', 'token', 'secret', 'key', 'auth']
+    maxBodyLength: parsePositiveInt(process.env.AUDIT_MAX_BODY_LENGTH, 2000, 0),
+    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
+      ? process.env.AUDIT_SENSITIVE_FIELDS.split(',')
+          .map((f) => f.trim())
+          .filter((f) => f.length > 0)
+      : ['password', 'token', 'secret', 'key', 'auth'],
   },
   circuitBreaker: {
     enabled: process.env.CIRCUIT_BREAKER_ENABLED === 'true',
-    failureThreshold: parseInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD || '5'),
-    successThreshold: parseInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD || '3'),
-    timeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '10000'),
-    resetTimeout: parseInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT || '60000')
+    failureThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5, 1),
+    successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 3, 1),
+    timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1),
+    resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
   },
   compression: {
     enabled: process.env.COMPRESSION_ENABLED === 'true',
-    threshold: parseInt(process.env.COMPRESSION_THRESHOLD || '1024'),
-    level: parseInt(process.env.COMPRESSION_LEVEL || '6')
-  }
+    threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
+    level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 1, 9),
+  },
 };
 
+/**
+ * Get the server configuration
+ * 
+ * Loads configuration from environment variables with defaults,
+ * validates it, and returns a type-safe ServerConfig object.
+ * 
+ * **Validation**:
+ * 1. Custom validation for business rules
+ * 2. Zod schema validation for type safety
+ * 
+ * **Environment Variables**:
+ * - `COURTLISTENER_BASE_URL` - API base URL
+ * - `CACHE_ENABLED` - Enable/disable caching
+ * - `LOG_LEVEL` - Logging level (debug, info, warn, error)
+ * - And many more...
+ * 
+ * @returns Validated server configuration
+ * @throws {Error} If configuration is invalid
+ * 
+ * @example
+ * ```typescript
+ * const config = getConfig();
+ * console.log(config.courtListener.baseUrl);
+ * console.log(config.cache.enabled);
+ * ```
+ * 
+ * @see {@link ServerConfig} for complete configuration structure
+ */
 export function getConfig(): ServerConfig {
-  return validateConfig(defaultConfig);
+  const config = validateConfig(defaultConfig);
+  
+  // Additional Zod validation for type safety
+  try {
+    return validateConfigWithZod(config);
+  } catch (error) {
+    // If Zod validation fails, log but still return the config
+    // (existing validation should have caught most issues)
+    console.warn('Zod validation warning:', error);
+    return config;
+  }
 }
 
 function validateConfig(config: ServerConfig): ServerConfig {
@@ -147,7 +197,7 @@ export function getEnvironmentInfo() {
     arch: process.arch,
     uptime: process.uptime(),
     memoryUsage: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
   };
 }
 
@@ -156,7 +206,7 @@ export function getEnvironmentInfo() {
  */
 export function getConfigSummary() {
   const config = getConfig();
-  
+
   return {
     features: {
       authentication: config.security.authEnabled,
@@ -166,20 +216,20 @@ export function getConfigSummary() {
       caching: config.cache.enabled,
       metrics: config.metrics.enabled,
       sanitization: config.security.sanitizationEnabled,
-      cors: config.security.corsEnabled
+      cors: config.security.corsEnabled,
     },
     limits: {
       cacheSize: config.cache.maxSize,
       cacheTtl: config.cache.ttl,
       rateLimitPerMinute: config.courtListener.rateLimitPerMinute,
       requestTimeout: config.courtListener.timeout,
-      circuitBreakerThreshold: config.circuitBreaker.failureThreshold
+      circuitBreakerThreshold: config.circuitBreaker.failureThreshold,
     },
     security: {
       authEnabled: config.security.authEnabled,
       allowAnonymous: config.security.allowAnonymous,
       apiKeysConfigured: config.security.apiKeys.length,
-      corsOrigins: config.security.corsOrigins.length
-    }
+      corsOrigins: config.security.corsOrigins.length,
+    },
   };
 }

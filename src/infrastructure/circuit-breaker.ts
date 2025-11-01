@@ -16,8 +16,8 @@ export interface CircuitBreakerConfig {
 
 export enum CircuitState {
   CLOSED = 'closed',
-  OPEN = 'open', 
-  HALF_OPEN = 'half_open'
+  OPEN = 'open',
+  HALF_OPEN = 'half_open',
 }
 
 export interface CircuitStats {
@@ -40,21 +40,21 @@ export class CircuitBreaker {
   private totalRequests = 0;
   private totalFailures = 0;
   private startTime = Date.now();
-  
+
   private logger: Logger;
 
   constructor(
     private name: string,
     private config: CircuitBreakerConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child('CircuitBreaker');
-    
+
     if (this.config.enabled) {
       this.logger.info('Circuit breaker initialized', {
         name: this.name,
         failureThreshold: this.config.failureThreshold,
-        resetTimeout: this.config.resetTimeout
+        resetTimeout: this.config.resetTimeout,
       });
     }
   }
@@ -72,27 +72,26 @@ export class CircuitBreaker {
     // Check if circuit is open
     if (this.state === CircuitState.OPEN) {
       if (Date.now() < this.nextAttemptTime!) {
-        const error = new Error(`Circuit breaker '${this.name}' is OPEN. Next attempt at ${new Date(this.nextAttemptTime!)}`);
+        const error = new Error(
+          `Circuit breaker '${this.name}' is OPEN. Next attempt at ${new Date(this.nextAttemptTime!)}`,
+        );
         this.logger.debug('Circuit breaker blocking request', {
           name: this.name,
           state: this.state,
-          nextAttemptTime: this.nextAttemptTime
+          nextAttemptTime: this.nextAttemptTime,
         });
         throw error;
       } else {
         // Move to half-open state
         this.state = CircuitState.HALF_OPEN;
         this.logger.info('Circuit breaker transitioning to HALF_OPEN', {
-          name: this.name
+          name: this.name,
         });
       }
     }
 
     try {
-      const result = await Promise.race([
-        operation(),
-        this.createTimeoutPromise()
-      ]);
+      const result = await Promise.race([operation(), this.createTimeoutPromise()]);
 
       this.onSuccess();
       return result;
@@ -107,7 +106,7 @@ export class CircuitBreaker {
    */
   private onSuccess(): void {
     this.successCount++;
-    
+
     if (this.state === CircuitState.HALF_OPEN) {
       if (this.successCount >= this.config.successThreshold) {
         // Reset to closed state
@@ -116,10 +115,10 @@ export class CircuitBreaker {
         this.successCount = 0;
         this.lastFailureTime = undefined;
         this.nextAttemptTime = undefined;
-        
+
         this.logger.info('Circuit breaker reset to CLOSED', {
           name: this.name,
-          successCount: this.successCount
+          successCount: this.successCount,
         });
       }
     } else if (this.state === CircuitState.CLOSED) {
@@ -140,7 +139,7 @@ export class CircuitBreaker {
       name: this.name,
       error: error.message,
       currentFailureCount: this.failureCount,
-      state: this.state
+      state: this.state,
     });
 
     if (this.state === CircuitState.HALF_OPEN) {
@@ -165,7 +164,7 @@ export class CircuitBreaker {
     this.logger.error('Circuit breaker opened', undefined, {
       name: this.name,
       failures: this.failureCount,
-      nextAttemptTime: this.nextAttemptTime
+      nextAttemptTime: this.nextAttemptTime,
     });
   }
 
@@ -192,7 +191,7 @@ export class CircuitBreaker {
       nextAttemptTime: this.nextAttemptTime,
       totalRequests: this.totalRequests,
       totalFailures: this.totalFailures,
-      uptime: Date.now() - this.startTime
+      uptime: Date.now() - this.startTime,
     };
   }
 
@@ -205,7 +204,7 @@ export class CircuitBreaker {
     }
 
     const stats = this.getStats();
-    
+
     // Consider healthy if:
     // - Circuit is closed, or
     // - Circuit is half-open with recent successes, or
@@ -220,7 +219,7 @@ export class CircuitBreaker {
 
     if (stats.totalRequests > 0) {
       const failureRate = stats.totalFailures / stats.totalRequests;
-      return failureRate < (this.config.failureThreshold / 100);
+      return failureRate < this.config.failureThreshold / 100;
     }
 
     return false;
@@ -237,7 +236,7 @@ export class CircuitBreaker {
     this.nextAttemptTime = undefined;
 
     this.logger.info('Circuit breaker manually reset', {
-      name: this.name
+      name: this.name,
     });
   }
 }
@@ -270,7 +269,7 @@ export class CircuitBreakerManager {
    */
   getAllStats(): Record<string, CircuitStats> {
     const stats: Record<string, CircuitStats> = {};
-    
+
     for (const [name, breaker] of this.breakers) {
       stats[name] = breaker.getStats();
     }
@@ -313,6 +312,6 @@ export function createCircuitBreakerConfig(): CircuitBreakerConfig {
     successThreshold: parseInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD || '3'),
     timeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '10000'),
     resetTimeout: parseInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT || '60000'),
-    monitoringWindow: parseInt(process.env.CIRCUIT_BREAKER_MONITORING_WINDOW || '300000')
+    monitoringWindow: parseInt(process.env.CIRCUIT_BREAKER_MONITORING_WINDOW || '300000'),
   };
 }

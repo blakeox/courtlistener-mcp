@@ -37,6 +37,38 @@ interface ToolMetadata {
   description?: string;
 }
 
+/**
+ * Best Practice Legal MCP Server
+ *
+ * Production-ready MCP server implementation providing comprehensive access to
+ * the CourtListener legal database with enterprise-grade features.
+ *
+ * **Features**:
+ * - Dependency injection for testability and flexibility
+ * - Middleware support (authentication, rate limiting, sanitization)
+ * - Circuit breakers for resilience
+ * - Graceful shutdown handling
+ * - Health monitoring and metrics
+ * - Request tracking and performance monitoring
+ * - Comprehensive error handling
+ *
+ * **Usage**:
+ * ```typescript
+ * import { bootstrapServices } from './infrastructure/bootstrap.js';
+ * import { BestPracticeLegalMCPServer } from './server/best-practice-server.js';
+ *
+ * bootstrapServices();
+ * const server = new BestPracticeLegalMCPServer();
+ * await server.start();
+ * ```
+ *
+ * **Configuration**:
+ * Configure via environment variables or the configuration system.
+ * See `ServerConfig` type for available options.
+ *
+ * @see {@link ServerConfig} for configuration options
+ * @see {@link bootstrapServices} for service initialization
+ */
 export class BestPracticeLegalMCPServer {
   private readonly server: Server;
   private readonly logger: Logger;
@@ -54,6 +86,20 @@ export class BestPracticeLegalMCPServer {
   private readonly activeRequests = new Set<string>();
   private readonly enhancedToolMetadata = this.buildEnhancedMetadata();
 
+  /**
+   * Creates a new BestPracticeLegalMCPServer instance
+   *
+   * **Prerequisites**: Call `bootstrapServices()` before creating an instance
+   * to ensure all dependencies are registered in the DI container.
+   *
+   * @throws {Error} If services are not bootstrapped
+   *
+   * @example
+   * ```typescript
+   * bootstrapServices();
+   * const server = new BestPracticeLegalMCPServer();
+   * ```
+   */
   constructor() {
     this.logger = container.get<Logger>('logger');
     this.metrics = container.get<MetricsCollector>('metrics');
@@ -75,14 +121,36 @@ export class BestPracticeLegalMCPServer {
   }
 
   /**
-   * Backwards-compatible alias for start() used by legacy demos/tests
+   * Backwards-compatible alias for start()
+   *
+   * @deprecated Use `start()` instead
+   * @see {@link start}
    */
   async run(): Promise<void> {
     await this.start();
   }
 
   /**
-   * Start the MCP server using stdio transport and optional health server
+   * Start the MCP server
+   *
+   * Initializes the stdio transport for MCP communication and starts
+   * the optional health server if configured.
+   *
+   * **What happens when you start**:
+   * 1. Sets up stdio transport for MCP protocol
+   * 2. Connects the server to the transport
+   * 3. Starts health monitoring endpoint (if enabled)
+   * 4. Logs server status and features
+   *
+   * @returns Promise that resolves when the server is started
+   * @throws {Error} If server fails to start
+   *
+   * @example
+   * ```typescript
+   * const server = new BestPracticeLegalMCPServer();
+   * await server.start();
+   * // Server is now ready to accept MCP requests
+   * ```
    */
   async start(): Promise<void> {
     this.logger.info('Starting Legal MCP Server (best-practice profile)...', {
@@ -104,7 +172,25 @@ export class BestPracticeLegalMCPServer {
   }
 
   /**
-   * Stop the MCP server and wait for in-flight requests to finish
+   * Stop the MCP server gracefully
+   *
+   * Performs a graceful shutdown:
+   * 1. Marks server as shutting down (rejects new requests)
+   * 2. Waits for active requests to complete
+   * 3. Stops health server
+   * 4. Closes transport connection
+   * 5. Cleans up resources
+   *
+   * @returns Promise that resolves when shutdown is complete
+   *
+   * @example
+   * ```typescript
+   * // Graceful shutdown on SIGINT
+   * process.on('SIGINT', async () => {
+   *   await server.stop();
+   *   process.exit(0);
+   * });
+   * ```
    */
   async stop(): Promise<void> {
     if (this.isShuttingDown) {
@@ -124,7 +210,7 @@ export class BestPracticeLegalMCPServer {
         activeRequests: this.activeRequests.size,
         waitedMs: Date.now() - start,
       });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     if (this.activeRequests.size > 0) {
@@ -175,7 +261,7 @@ export class BestPracticeLegalMCPServer {
       | {
           name: string;
           arguments?: Record<string, unknown>;
-        }
+        },
   ): Promise<CallToolResult> {
     if (this.isShuttingDown) {
       throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
@@ -240,7 +326,7 @@ export class BestPracticeLegalMCPServer {
       this.logger.child('HealthServer'),
       this.metrics,
       this.cache,
-      this.circuitBreakers
+      this.circuitBreakers,
     );
   }
 
@@ -266,7 +352,7 @@ export class BestPracticeLegalMCPServer {
       }
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (this.isShuttingDown) {
         throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
       }
@@ -283,7 +369,7 @@ export class BestPracticeLegalMCPServer {
 
         throw new McpError(
           ErrorCode.InternalError,
-          `Error executing ${request.params.name}: ${error instanceof Error ? error.message : String(error)}`
+          `Error executing ${request.params.name}: ${error instanceof Error ? error.message : String(error)}`,
         );
       } finally {
         this.activeRequests.delete(requestId);
@@ -291,7 +377,10 @@ export class BestPracticeLegalMCPServer {
     });
   }
 
-  private async executeToolWithMiddleware(request: CallToolRequest, requestId: string): Promise<CallToolResult> {
+  private async executeToolWithMiddleware(
+    request: CallToolRequest,
+    requestId: string,
+  ): Promise<CallToolResult> {
     const startTime = Date.now();
     const context: RequestContext = {
       requestId,
@@ -319,7 +408,7 @@ export class BestPracticeLegalMCPServer {
           maxAttempts: 3,
           baseDelay: 750,
           maxDelay: 5_000,
-        })
+        }),
       );
 
       const duration = Date.now() - startTime;
@@ -330,18 +419,36 @@ export class BestPracticeLegalMCPServer {
         // Try to extract a human-friendly error message from the text content
         let message = `Tool ${request.params.name} failed`;
         try {
-          const text: unknown = (result as any)?.content?.[0]?.text;
-          if (typeof text === 'string') {
-            const parsed = JSON.parse(text);
-            if (parsed?.error) message = parsed.error;
-            else if (typeof parsed === 'string') message = parsed;
-            else message = text;
+          const errorResult = result as CallToolResult;
+          if (
+            errorResult.content &&
+            Array.isArray(errorResult.content) &&
+            errorResult.content.length > 0
+          ) {
+            const firstContent = errorResult.content[0];
+            if (firstContent.type === 'text' && typeof firstContent.text === 'string') {
+              try {
+                const parsed = JSON.parse(firstContent.text);
+                if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+                  message = String(parsed.error);
+                } else if (typeof parsed === 'string') {
+                  message = parsed;
+                } else {
+                  message = firstContent.text;
+                }
+              } catch {
+                message = firstContent.text;
+              }
+            }
           }
         } catch {
           // ignore JSON parse issues, keep default message
         }
 
-        this.logger.toolExecution(request.params.name, duration, false, { requestId, error: message });
+        this.logger.toolExecution(request.params.name, duration, false, {
+          requestId,
+          error: message,
+        });
         throw new Error(message);
       }
 
@@ -362,12 +469,18 @@ export class BestPracticeLegalMCPServer {
   private buildToolDefinitions(): Tool[] {
     const baseDefinitions = this.toolRegistry.getToolDefinitions();
 
-    return baseDefinitions.map(tool => {
+    return baseDefinitions.map((tool) => {
       const metadata = this.enhancedToolMetadata.get(tool.name);
+      // Ensure inputSchema has the required 'type' field for MCP Tool format
+      const inputSchema =
+        tool.inputSchema && typeof tool.inputSchema === 'object' && 'type' in tool.inputSchema
+          ? tool.inputSchema
+          : { type: 'object' as const, properties: tool.inputSchema || {} };
+
       return {
-        ...tool,
+        name: tool.name,
         description: metadata?.description ?? tool.description,
-        inputSchema: tool.inputSchema,
+        inputSchema: inputSchema as Tool['inputSchema'],
         // Extra metadata is provided separately so MCP clients remain spec-compliant
       } satisfies Tool;
     });

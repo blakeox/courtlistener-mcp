@@ -42,16 +42,16 @@ export class PerClientRateLimiter {
 
   constructor(
     private config: RateLimitConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child('RateLimiter');
-    
+
     if (this.config.enabled) {
       this.setupCleanup();
       this.logger.info('Per-client rate limiting enabled', {
         maxRequestsPerMinute: this.config.maxRequestsPerMinute,
         clientIdentification: this.config.clientIdentification,
-        whitelistedClients: this.config.whitelistedClients.length
+        whitelistedClients: this.config.whitelistedClients.length,
       });
     }
   }
@@ -62,7 +62,7 @@ export class PerClientRateLimiter {
   checkLimit(
     clientId: string,
     headers: Record<string, string> = {},
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): RateLimitResult {
     if (!this.config.enabled) {
       return {
@@ -70,7 +70,7 @@ export class PerClientRateLimiter {
         remaining: this.config.maxRequestsPerMinute,
         resetTime: Date.now() + this.config.windowSizeMs,
         clientId,
-        windowUsage: 0
+        windowUsage: 0,
       };
     }
 
@@ -79,15 +79,15 @@ export class PerClientRateLimiter {
     // Check if client is whitelisted
     if (this.config.whitelistedClients.includes(resolvedClientId)) {
       this.logger.debug('Request allowed for whitelisted client', {
-        clientId: resolvedClientId
+        clientId: resolvedClientId,
       });
-      
+
       return {
         allowed: true,
         remaining: this.config.maxRequestsPerMinute,
         resetTime: Date.now() + this.config.windowSizeMs,
         clientId: resolvedClientId,
-        windowUsage: 0
+        windowUsage: 0,
       };
     }
 
@@ -101,7 +101,7 @@ export class PerClientRateLimiter {
 
     // Calculate effective limit (including penalties)
     const effectiveLimit = this.calculateEffectiveLimit(stats);
-    
+
     // Check if request should be allowed
     if (stats.requests >= effectiveLimit) {
       const resetTime = stats.windowStart + this.config.windowSizeMs;
@@ -112,7 +112,7 @@ export class PerClientRateLimiter {
         requests: stats.requests,
         effectiveLimit,
         penalties: stats.penalties,
-        retryAfter
+        retryAfter,
       });
 
       // Apply penalty for exceeding limit
@@ -124,7 +124,7 @@ export class PerClientRateLimiter {
         resetTime,
         retryAfter,
         clientId: resolvedClientId,
-        windowUsage: stats.requests / effectiveLimit
+        windowUsage: stats.requests / effectiveLimit,
       };
     }
 
@@ -137,7 +137,7 @@ export class PerClientRateLimiter {
       clientId: resolvedClientId,
       requests: stats.requests,
       effectiveLimit,
-      remaining: effectiveLimit - stats.requests
+      remaining: effectiveLimit - stats.requests,
     });
 
     return {
@@ -145,29 +145,26 @@ export class PerClientRateLimiter {
       remaining: effectiveLimit - stats.requests,
       resetTime: stats.windowStart + this.config.windowSizeMs,
       clientId: resolvedClientId,
-      windowUsage: stats.requests / effectiveLimit
+      windowUsage: stats.requests / effectiveLimit,
     };
   }
 
   /**
    * Resolve client ID from various sources
    */
-  private resolveClientId(
-    providedId: string,
-    headers: Record<string, string>
-  ): string {
+  private resolveClientId(providedId: string, headers: Record<string, string>): string {
     switch (this.config.clientIdentification) {
       case 'api-key':
         const apiKey = headers['x-api-key'] || headers['authorization'];
         if (apiKey) {
           // Use first 8 characters for identification
-          const keyId = apiKey.startsWith('Bearer ') ? 
-                       apiKey.substring(7, 15) : 
-                       apiKey.substring(0, 8);
+          const keyId = apiKey.startsWith('Bearer ')
+            ? apiKey.substring(7, 15)
+            : apiKey.substring(0, 8);
           return `api-key:${keyId}`;
         }
         break;
-        
+
       case 'header':
         if (this.config.identificationHeader) {
           const headerValue = headers[this.config.identificationHeader.toLowerCase()];
@@ -176,7 +173,7 @@ export class PerClientRateLimiter {
           }
         }
         break;
-        
+
       case 'ip':
       default:
         // Fall through to use provided ID (usually IP)
@@ -197,7 +194,7 @@ export class PerClientRateLimiter {
         lastRequest: now,
         windowStart: now,
         penalties: 0,
-        totalRequests: 0
+        totalRequests: 0,
       });
     }
 
@@ -210,7 +207,7 @@ export class PerClientRateLimiter {
   private resetClientWindow(stats: ClientStats, now: number): void {
     stats.requests = 0;
     stats.windowStart = now;
-    
+
     // Reduce penalties over time (forgiveness)
     if (stats.penalties > 0) {
       stats.penalties = Math.max(0, stats.penalties - 1);
@@ -223,7 +220,7 @@ export class PerClientRateLimiter {
   private calculateEffectiveLimit(stats: ClientStats): number {
     const baseLimit = this.config.maxRequestsPerMinute;
     const penaltyReduction = stats.penalties * this.config.penaltyMultiplier;
-    
+
     return Math.max(1, baseLimit - penaltyReduction);
   }
 
@@ -232,7 +229,7 @@ export class PerClientRateLimiter {
    */
   private setupCleanup(): void {
     const cleanupIntervalMs = this.config.windowSizeMs * 2; // Cleanup every 2 windows
-    
+
     this.cleanupInterval = setInterval(() => {
       this.cleanupOldClients();
     }, cleanupIntervalMs);
@@ -256,7 +253,7 @@ export class PerClientRateLimiter {
     if (cleaned > 0) {
       this.logger.debug('Cleaned up inactive clients', {
         cleaned,
-        activeClients: this.clients.size
+        activeClients: this.clients.size,
       });
     }
   }
@@ -275,7 +272,7 @@ export class PerClientRateLimiter {
       .map(([clientId, stats]) => ({
         clientId,
         requests: stats.totalRequests,
-        penalties: stats.penalties
+        penalties: stats.penalties,
       }))
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 10);
@@ -285,7 +282,7 @@ export class PerClientRateLimiter {
       activeClients: this.clients.size,
       totalClients: this.clients.size,
       config: this.config,
-      topClients
+      topClients,
     };
   }
 
@@ -322,10 +319,11 @@ export function createPerClientRateLimiter(logger: Logger): PerClientRateLimiter
     windowSizeMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
     clientIdentification: (process.env.RATE_LIMIT_CLIENT_ID as any) || 'ip',
     identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
-    whitelistedClients: process.env.RATE_LIMIT_WHITELIST ? 
-                        process.env.RATE_LIMIT_WHITELIST.split(',').map(c => c.trim()) : [],
+    whitelistedClients: process.env.RATE_LIMIT_WHITELIST
+      ? process.env.RATE_LIMIT_WHITELIST.split(',').map((c) => c.trim())
+      : [],
     penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
-    persistStorage: process.env.RATE_LIMIT_PERSIST === 'true'
+    persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
   };
 
   return new PerClientRateLimiter(config, logger);

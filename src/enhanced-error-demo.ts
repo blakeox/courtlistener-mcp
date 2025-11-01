@@ -12,8 +12,8 @@ const config = {
   log: {
     level: 'info' as const,
     format: 'json' as const,
-    enabled: true
-  }
+    enabled: true,
+  },
 };
 
 async function runEnhancedDemo() {
@@ -22,42 +22,41 @@ async function runEnhancedDemo() {
   // Initialize core services
   const logger = new Logger(config.log, 'EnhancedDemo');
   const metrics = new MetricsCollector(logger);
-  const circuitBreaker = new CircuitBreaker('demo-service', {
-    enabled: true,
-    failureThreshold: 5,
-    successThreshold: 3,
-    timeout: 5000,
-    resetTimeout: 60000,
-    monitoringWindow: 60000
-  }, logger);
+  const circuitBreaker = new CircuitBreaker(
+    'demo-service',
+    {
+      enabled: true,
+      failureThreshold: 5,
+      successThreshold: 3,
+      timeout: 5000,
+      resetTimeout: 60000,
+      monitoringWindow: 60000,
+    },
+    logger,
+  );
 
   // Create enhanced Express server
-  const server = new EnhancedExpressServer(
-    logger,
-    metrics,
-    circuitBreaker,
-    {
-      port: 3001,
-      enableErrorReporting: true,
-      enableDocumentation: true,
-      enableHealthChecks: true,
-      enableMetrics: true,
-      errorHandling: {
-        enableStackTrace: true,
-        enableDetailedErrors: true,
-        alertThresholds: {
-          criticalErrorsPerMinute: 3,
-          highErrorsPerMinute: 10,
-          totalErrorsPerMinute: 50
-        }
-      }
-    }
-  );
+  const server = new EnhancedExpressServer(logger, metrics, circuitBreaker, {
+    port: 3001,
+    enableErrorReporting: true,
+    enableDocumentation: true,
+    enableHealthChecks: true,
+    enableMetrics: true,
+    errorHandling: {
+      enableStackTrace: true,
+      enableDetailedErrors: true,
+      alertThresholds: {
+        criticalErrorsPerMinute: 3,
+        highErrorsPerMinute: 10,
+        totalErrorsPerMinute: 50,
+      },
+    },
+  });
 
   try {
     // Start the server
     await server.start();
-    
+
     console.log('✅ Enhanced Express Server started successfully!');
     console.log('🌐 Available endpoints:');
     console.log('   📋 Root: http://localhost:3001/');
@@ -65,7 +64,7 @@ async function runEnhancedDemo() {
     console.log('   💖 Health Check: http://localhost:3001/health');
     console.log('   📊 Metrics: http://localhost:3001/metrics');
     console.log('   🛠️  Admin Dashboard: http://localhost:3001/admin');
-    
+
     console.log('\n🎯 Demo API Endpoints:');
     console.log('   ✅ Success: http://localhost:3001/api/success');
     console.log('   🔍 Validation: POST http://localhost:3001/api/validate');
@@ -74,13 +73,13 @@ async function runEnhancedDemo() {
     console.log('   ⏱️  Rate Limited: http://localhost:3001/api/rate-limited');
     console.log('   🔧 Circuit Breaker: http://localhost:3001/api/circuit-breaker');
     console.log('   💥 Error Demo: http://localhost:3001/api/error');
-    
+
     console.log('\n📊 Error Reporting Endpoints:');
     console.log('   📈 Error Reports: http://localhost:3001/admin/errors');
     console.log('   📉 Error Trends: http://localhost:3001/admin/errors/trends');
     console.log('   📋 Error Metrics: http://localhost:3001/admin/errors/metrics');
     console.log('   💾 Export Reports: http://localhost:3001/admin/errors/export');
-    
+
     console.log('\n🧪 Test the error handling by making requests to the demo endpoints:');
     console.log('');
     console.log('# Test validation error:');
@@ -100,34 +99,35 @@ async function runEnhancedDemo() {
     console.log('# View error reports:');
     console.log('curl http://localhost:3001/admin/errors');
     console.log('');
-    
+
     // Demonstrate error reporting
     setTimeout(async () => {
       console.log('🔬 Demonstrating error reporting...');
-      
+
       try {
         // Simulate some errors for demonstration
-        const { ValidationError, AuthenticationError } = await import('./infrastructure/error-types.js');
+        const { ValidationError, AuthenticationError } = await import(
+          './infrastructure/error-types.js'
+        );
         const errorHandler = server.getErrorHandler();
         const services = errorHandler.getServices();
-        
+
         // Report some demo errors
         const demoErrors = [
           new ValidationError('Demo validation error', [
-            { field: 'email', message: 'Invalid email format', value: 'invalid-email' }
+            { field: 'email', message: 'Invalid email format', value: 'invalid-email' },
           ]),
           new AuthenticationError('Demo authentication error'),
           new ValidationError('Another validation error', [
-            { field: 'age', message: 'Age must be positive', value: -5 }
-          ])
+            { field: 'age', message: 'Age must be positive', value: -5 },
+          ]),
         ];
-        
-        demoErrors.forEach(error => {
+
+        demoErrors.forEach((error) => {
           services.reporting.reportError(error);
         });
-        
+
         console.log('📊 Generated demo error reports. Check http://localhost:3001/admin/errors');
-        
       } catch (error) {
         console.warn('⚠️  Error demonstration failed:', error);
       }
@@ -147,7 +147,6 @@ async function runEnhancedDemo() {
       console.log('✅ Server stopped gracefully');
       process.exit(0);
     });
-
   } catch (error) {
     logger.error('Failed to start enhanced demo', error as Error);
     process.exit(1);

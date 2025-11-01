@@ -11,10 +11,15 @@ import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
 
 const visualizationSchema = z
   .object({
-    data_type: z.enum(['court_distribution', 'case_timeline', 'citation_network', 'judge_statistics']),
+    data_type: z.enum([
+      'court_distribution',
+      'case_timeline',
+      'citation_network',
+      'judge_statistics',
+    ]),
     opinion_id: z
       .union([z.string(), z.number()])
-      .transform(value => Number(value))
+      .transform((value) => Number(value))
       .optional(),
     depth: z.number().int().min(1).max(5).optional(),
     limit: z.number().int().min(1).max(200).optional(),
@@ -23,7 +28,10 @@ const visualizationSchema = z
     court_id: z.string().optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.data_type === 'citation_network' && (value.opinion_id === undefined || Number.isNaN(value.opinion_id))) {
+    if (
+      value.data_type === 'citation_network' &&
+      (value.opinion_id === undefined || Number.isNaN(value.opinion_id))
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'opinion_id is required for citation_network visualizations',
@@ -47,11 +55,11 @@ const bankruptcySchema = z.object({
 });
 
 const comprehensiveJudgeSchema = z.object({
-  judge_id: z.union([z.string(), z.number()]).transform(value => Number(value)),
+  judge_id: z.union([z.string(), z.number()]).transform((value) => Number(value)),
 });
 
 const comprehensiveCaseSchema = z.object({
-  cluster_id: z.union([z.string(), z.number()]).transform(value => Number(value)),
+  cluster_id: z.union([z.string(), z.number()]).transform((value) => Number(value)),
 });
 
 const disclosureDetailsSchema = z
@@ -68,7 +76,7 @@ const disclosureDetailsSchema = z
     ]),
     judge: z
       .union([z.string(), z.number()])
-      .transform(value => String(value))
+      .transform((value) => String(value))
       .optional(),
     year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
     page: z.number().int().min(1).optional().default(1),
@@ -157,7 +165,10 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof visualizationSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof visualizationSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_visualization_data');
 
     try {
@@ -213,11 +224,14 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
   private async generateCourtDistribution() {
     const courts = await this.apiClient.getCourts({ in_use: true });
 
-    const distribution = courts.results.reduce((acc: Record<string, number>, court: any) => {
-      const jurisdiction = court.jurisdiction || 'Unknown';
-      acc[jurisdiction] = (acc[jurisdiction] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const distribution = courts.results.reduce(
+      (acc: Record<string, number>, court: any) => {
+        const jurisdiction = court.jurisdiction || 'Unknown';
+        acc[jurisdiction] = (acc[jurisdiction] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       type: 'court_distribution',
@@ -266,11 +280,14 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
       data: {
         total_judges: judges.count,
         active_judges: judges.results.filter((j: any) => j.date_termination === null).length,
-        by_court: judges.results.reduce((acc: Record<string, number>, judge: any) => {
-          const court = judge.court || 'Unknown';
-          acc[court] = (acc[court] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
+        by_court: judges.results.reduce(
+          (acc: Record<string, number>, judge: any) => {
+            const court = judge.court || 'Unknown';
+            acc[court] = (acc[court] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
       },
       chart_type: 'bar',
     };
@@ -315,7 +332,10 @@ export class GetBulkDataHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof bulkDataSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof bulkDataSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_bulk_data');
 
     try {
@@ -379,8 +399,14 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
         court: { type: 'string', description: 'Specific court identifier to filter by' },
         case_name: { type: 'string', description: 'Filter by case name keywords' },
         docket_number: { type: 'string', description: 'Filter by docket number' },
-        date_filed_after: { type: 'string', description: 'Return cases filed after this date (YYYY-MM-DD)' },
-        date_filed_before: { type: 'string', description: 'Return cases filed before this date (YYYY-MM-DD)' },
+        date_filed_after: {
+          type: 'string',
+          description: 'Return cases filed after this date (YYYY-MM-DD)',
+        },
+        date_filed_before: {
+          type: 'string',
+          description: 'Return cases filed before this date (YYYY-MM-DD)',
+        },
         page: { type: 'number', minimum: 1, description: 'Page number for pagination', default: 1 },
         page_size: {
           type: 'number',
@@ -394,12 +420,15 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof bankruptcySchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof bankruptcySchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_bankruptcy_data');
 
     try {
       const params = Object.fromEntries(
-        Object.entries(input).filter(([_, value]) => value !== undefined && value !== null)
+        Object.entries(input).filter(([_, value]) => value !== undefined && value !== null),
       );
 
       const cacheKey = 'bankruptcy_data';
@@ -454,7 +483,8 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
 
 export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
   readonly name = 'get_comprehensive_judge_profile';
-  readonly description = 'Retrieve an enriched judicial profile with positions, education, and analytics';
+  readonly description =
+    'Retrieve an enriched judicial profile with positions, education, and analytics';
   readonly category = 'analysis';
 
   constructor(private apiClient: CourtListenerAPI) {
@@ -483,7 +513,10 @@ export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof comprehensiveJudgeSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof comprehensiveJudgeSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_comprehensive_judge_profile');
 
     try {
@@ -513,7 +546,8 @@ export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
 
 export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
   readonly name = 'get_comprehensive_case_analysis';
-  readonly description = 'Retrieve an enriched case analysis including docket entries, parties, and tags';
+  readonly description =
+    'Retrieve an enriched case analysis including docket entries, parties, and tags';
   readonly category = 'analysis';
 
   constructor(private apiClient: CourtListenerAPI) {
@@ -542,7 +576,10 @@ export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof comprehensiveCaseSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof comprehensiveCaseSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_comprehensive_case_analysis');
 
     try {
@@ -632,7 +669,10 @@ export class GetFinancialDisclosureDetailsHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof disclosureDetailsSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof disclosureDetailsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_financial_disclosure_details');
 
     try {
@@ -721,7 +761,10 @@ export class ValidateCitationsHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof validateCitationsSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof validateCitationsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('validate_citations');
 
     try {
@@ -780,7 +823,10 @@ export class GetEnhancedRECAPDataHandler extends BaseToolHandler {
     };
   }
 
-  async execute(input: z.infer<typeof enhancedRecapSchema>, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof enhancedRecapSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
     const timer = context.logger.startTimer('get_enhanced_recap_data');
 
     try {

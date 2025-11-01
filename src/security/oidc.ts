@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
+import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 
 type Fetcher = typeof fetch;
 

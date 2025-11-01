@@ -25,23 +25,20 @@ export class EnhancedHttpServer {
     private logger: Logger,
     private metrics: MetricsCollector,
     private cache: CacheManager,
-    private apiClient: CourtListenerAPI
+    private apiClient: CourtListenerAPI,
   ) {
     this.app = express();
     this.server = http.createServer(this.app);
-    
+
     // Initialize health checking
     this.healthChecker = new HealthCheckManager(
       this.logger,
       this.metrics,
       this.cache,
-      this.apiClient
+      this.apiClient,
     );
-    
-    this.healthEndpoints = new HealthEndpoints(
-      this.healthChecker,
-      this.logger
-    );
+
+    this.healthEndpoints = new HealthEndpoints(this.healthChecker, this.logger);
 
     // Initialize documentation service
     this.documentationService = new DocumentationService(this.logger);
@@ -59,13 +56,14 @@ export class EnhancedHttpServer {
     this.app.use('/api/docs', (req, res, next) => {
       res.removeHeader('X-Content-Type-Options');
       res.removeHeader('X-Frame-Options');
-      res.header('Content-Security-Policy', 
+      res.header(
+        'Content-Security-Policy',
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.redoc.ly; " +
-        "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; " +
-        "font-src 'self' https://fonts.gstatic.com; " +
-        "img-src 'self' data:; " +
-        "connect-src 'self';"
+          "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.redoc.ly; " +
+          "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; " +
+          "font-src 'self' https://fonts.gstatic.com; " +
+          "img-src 'self' data:; " +
+          "connect-src 'self';",
       );
       next();
     });
@@ -74,8 +72,11 @@ export class EnhancedHttpServer {
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-      
+      res.header(
+        'Access-Control-Allow-Headers',
+        'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+      );
+
       if (req.method === 'OPTIONS') {
         res.sendStatus(200);
       } else {
@@ -86,7 +87,7 @@ export class EnhancedHttpServer {
     // Request logging middleware
     this.app.use((req, res, next) => {
       const start = Date.now();
-      
+
       res.on('finish', () => {
         const duration = Date.now() - start;
         this.logger.info('HTTP Request', {
@@ -94,9 +95,9 @@ export class EnhancedHttpServer {
           url: req.url,
           statusCode: res.statusCode,
           duration: `${duration}ms`,
-          userAgent: req.get('User-Agent')
+          userAgent: req.get('User-Agent'),
         });
-        
+
         // Record metrics
         if (res.statusCode >= 400) {
           this.metrics.recordFailure(duration);
@@ -104,7 +105,7 @@ export class EnhancedHttpServer {
           this.metrics.recordRequest(duration);
         }
       });
-      
+
       next();
     });
   }
@@ -131,7 +132,7 @@ export class EnhancedHttpServer {
         timestamp: new Date().toISOString(),
         availableEndpoints: [
           'GET /health',
-          'GET /health/ready', 
+          'GET /health/ready',
           'GET /health/live',
           'GET /metrics',
           'GET /status',
@@ -139,22 +140,24 @@ export class EnhancedHttpServer {
           'GET /api/docs/docs - Swagger UI',
           'GET /api/docs/openapi.json - OpenAPI Spec',
           'GET /cache',
-          'GET /config'
-        ]
+          'GET /config',
+        ],
       });
     });
 
     // Error handler
-    this.app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      this.logger.error('Express error handler', error);
-      
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
-        timestamp: new Date().toISOString(),
-        requestId: req.get('X-Request-ID') || 'unknown'
-      });
-    });
+    this.app.use(
+      (error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+        this.logger.error('Express error handler', error);
+
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
+          timestamp: new Date().toISOString(),
+          requestId: req.get('X-Request-ID') || 'unknown',
+        });
+      },
+    );
   }
 
   private setupLegacyEndpoints(): void {
@@ -165,13 +168,13 @@ export class EnhancedHttpServer {
         res.json({
           status: 'success',
           timestamp: new Date().toISOString(),
-          cache: cacheStats
+          cache: cacheStats,
         });
       } catch (error) {
         this.logger.error('Cache stats error', error as Error);
         res.status(500).json({
           error: 'Failed to retrieve cache statistics',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }
     });
@@ -183,26 +186,26 @@ export class EnhancedHttpServer {
           server: {
             port: this.port,
             environment: process.env.NODE_ENV || 'development',
-            nodeVersion: process.version
+            nodeVersion: process.version,
           },
           features: {
             caching: true,
             metrics: true,
             healthChecks: true,
-            rateLimit: false // Will be true when rate limiting is implemented
-          }
+            rateLimit: false, // Will be true when rate limiting is implemented
+          },
         };
-        
+
         res.json({
           status: 'success',
           timestamp: new Date().toISOString(),
-          config
+          config,
         });
       } catch (error) {
         this.logger.error('Config endpoint error', error as Error);
         res.status(500).json({
           error: 'Failed to retrieve configuration',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }
     });
@@ -212,7 +215,7 @@ export class EnhancedHttpServer {
       res.json({
         status: 'pong',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
       });
     });
   }
@@ -233,8 +236,8 @@ export class EnhancedHttpServer {
             '/status - Detailed status information',
             '/cache - Cache statistics',
             '/config - Server configuration',
-            '/ping - Simple ping test'
-          ]
+            '/ping - Simple ping test',
+          ],
         });
         resolve();
       });
@@ -253,7 +256,7 @@ export class EnhancedHttpServer {
     return new Promise((resolve, reject) => {
       // Stop health checking
       this.healthChecker.stop();
-      
+
       // Close server
       this.server.close((error) => {
         if (error) {
@@ -273,7 +276,7 @@ export class EnhancedHttpServer {
   getServerInfo(): { port: number; isListening: boolean } {
     return {
       port: this.port,
-      isListening: this.server.listening
+      isListening: this.server.listening,
     };
   }
 }

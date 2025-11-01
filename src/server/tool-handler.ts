@@ -10,7 +10,7 @@ import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ServerConfig } from '../types.js';
 
-export interface ToolHandler {
+export interface ToolHandler<TInput = unknown, TOutput = unknown> {
   readonly name: string;
   readonly description: string;
   readonly category: string;
@@ -18,17 +18,17 @@ export interface ToolHandler {
   /**
    * Validate tool input parameters
    */
-  validate(input: any): Result<any, Error>;
+  validate(input: unknown): Result<TInput, Error>;
 
   /**
    * Execute the tool
    */
-  execute(input: any, context: ToolContext): Promise<CallToolResult>;
+  execute(input: TInput, context: ToolContext): Promise<CallToolResult>;
 
   /**
-   * Get tool schema definition
+   * Get tool schema definition for MCP
    */
-  getSchema(): any;
+  getSchema(): Record<string, unknown>;
 }
 
 export interface ToolContext {
@@ -76,7 +76,7 @@ export class ToolHandlerRegistry {
    */
   getToolsByCategory(category: string): ToolHandler[] {
     const toolNames = this.categories.get(category) || new Set();
-    return Array.from(toolNames).map(name => this.handlers.get(name)!);
+    return Array.from(toolNames).map((name) => this.handlers.get(name)!);
   }
 
   /**
@@ -89,8 +89,12 @@ export class ToolHandlerRegistry {
   /**
    * Get tool definitions for MCP
    */
-  getToolDefinitions(): any[] {
-    return Array.from(this.handlers.values()).map(handler => ({
+  getToolDefinitions(): Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+  }> {
+    return Array.from(this.handlers.values()).map((handler) => ({
       name: handler.name,
       description: handler.description,
       inputSchema: handler.getSchema(),
@@ -127,19 +131,21 @@ export class ToolHandlerRegistry {
 /**
  * Base class for tool handlers
  */
-export abstract class BaseToolHandler implements ToolHandler {
+export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
+  implements ToolHandler<TInput, TOutput>
+{
   abstract readonly name: string;
   abstract readonly description: string;
   abstract readonly category: string;
 
-  abstract validate(input: any): Result<any, Error>;
-  abstract execute(input: any, context: ToolContext): Promise<CallToolResult>;
-  abstract getSchema(): any;
+  abstract validate(input: unknown): Result<TInput, Error>;
+  abstract execute(input: TInput, context: ToolContext): Promise<CallToolResult>;
+  abstract getSchema(): Record<string, unknown>;
 
   /**
    * Helper method to create success result
    */
-  protected success(content: any): CallToolResult {
+  protected success(content: string | Record<string, unknown> | Array<unknown>): CallToolResult {
     return {
       content: [
         {
@@ -153,7 +159,10 @@ export abstract class BaseToolHandler implements ToolHandler {
   /**
    * Helper method to create error result
    */
-  protected error(message: string, details?: any): CallToolResult {
+  protected error(
+    message: string,
+    details?: Record<string, unknown> | string | number | boolean | null,
+  ): CallToolResult {
     return {
       content: [
         {
@@ -164,7 +173,7 @@ export abstract class BaseToolHandler implements ToolHandler {
               details: details || null,
             },
             null,
-            2
+            2,
           ),
         },
       ],
