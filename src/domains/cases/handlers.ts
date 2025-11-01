@@ -1,69 +1,68 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { Result } from '../../common/types.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+
+/**
+ * Zod schemas for cases handlers
+ */
+const getCaseDetailsSchema = z
+  .object({
+    cluster_id: z.union([z.coerce.number().int(), z.string()]).optional(),
+    id: z.union([z.coerce.number().int(), z.string()]).optional(),
+  })
+  .refine((data) => data.cluster_id !== undefined || data.id !== undefined, {
+    message: 'cluster_id (or legacy id) is required',
+    path: ['cluster_id'],
+  })
+  .transform((data) => {
+    const raw = (data.cluster_id ?? data.id) as string | number;
+    const num = Number(raw);
+    if (!Number.isFinite(num) || num <= 0) {
+      throw new Error('cluster_id must be a positive integer');
+    }
+    return { cluster_id: String(num) };
+  });
+
+const getRelatedCasesSchema = z
+  .object({
+    opinion_id: z.union([z.string(), z.number()]).optional(),
+    cluster_id: z.union([z.string(), z.number()]).optional(),
+    case_id: z.union([z.string(), z.number()]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  })
+  .refine((data) => data.opinion_id ?? data.cluster_id ?? data.case_id, {
+    message: 'opinion_id or cluster_id is required to look up related cases',
+    path: ['opinion_id'],
+  })
+  .transform((data) => ({
+    opinion_id: Number(data.opinion_id ?? data.cluster_id ?? data.case_id),
+    limit: data.limit,
+  }));
+
+const analyzeCaseAuthoritiesSchema = z.object({
+  case_id: z.union([z.string(), z.number()]).transform(String),
+  include_citations: z.boolean().optional().default(true),
+  depth: z.number().min(1).max(3).optional().default(1),
+});
 
 /**
  * Handler for case-related operations
  */
-export class GetCaseDetailsHandler extends BaseToolHandler {
+export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetailsSchema> {
   readonly name = 'get_case_details';
   readonly description = 'Get detailed information about a specific case';
   readonly category = 'cases';
+  protected readonly schema = getCaseDetailsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z
-        .object({
-          // Accept integers (including negatives) and strings, we'll enforce positivity in transform
-          cluster_id: z.union([z.coerce.number().int(), z.string()]).optional(),
-          id: z.union([z.coerce.number().int(), z.string()]).optional(),
-        })
-        .refine((data) => data.cluster_id !== undefined || data.id !== undefined, {
-          message: 'cluster_id (or legacy id) is required',
-          path: ['cluster_id'],
-        })
-        .transform((data) => {
-          const raw = (data.cluster_id ?? data.id) as string | number;
-          const num = Number(raw);
-          if (!Number.isFinite(num) || num <= 0) {
-            // Include phrase the test suite checks for
-            throw new Error('cluster_id must be a positive integer');
-          }
-          return { cluster_id: String(num) };
-        });
-
-      const validated = schema.parse(input ?? {});
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        cluster_id: {
-          type: ['string', 'number'],
-          description: 'Case cluster ID (preferred). Use search_cases to discover IDs.',
-        },
-        id: {
-          type: ['string', 'number'],
-          description: 'Legacy case ID alias (deprecated).',
-        },
-      },
-      anyOf: [{ required: ['cluster_id'] }, { required: ['id'] }],
-      additionalProperties: false,
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getCaseDetailsSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting case details', {
         clusterId: input.cluster_id,
@@ -91,72 +90,20 @@ export class GetCaseDetailsHandler extends BaseToolHandler {
 /**
  * Handler for getting related cases
  */
-export class GetRelatedCasesHandler extends BaseToolHandler {
+export class GetRelatedCasesHandler extends TypedToolHandler<typeof getRelatedCasesSchema> {
   readonly name = 'get_related_cases';
   readonly description = 'Find cases related to a specific case';
   readonly category = 'cases';
+  protected readonly schema = getRelatedCasesSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z
-        .object({
-          opinion_id: z.union([z.string(), z.number()]).optional(),
-          cluster_id: z.union([z.string(), z.number()]).optional(),
-          case_id: z.union([z.string(), z.number()]).optional(),
-          limit: z.coerce.number().int().min(1).max(100).optional().default(10),
-        })
-        .refine((data) => data.opinion_id ?? data.cluster_id ?? data.case_id, {
-          message: 'opinion_id or cluster_id is required to look up related cases',
-          path: ['opinion_id'],
-        })
-        .transform((data) => ({
-          opinion_id: Number(data.opinion_id ?? data.cluster_id ?? data.case_id),
-          limit: data.limit,
-        }));
-
-      const validated = schema.parse(input ?? {});
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        opinion_id: {
-          type: ['string', 'number'],
-          description: 'Opinion ID to find related opinions/cases for',
-        },
-        cluster_id: {
-          type: ['string', 'number'],
-          description: 'Case cluster ID (alias for opinion-based lookups)',
-        },
-        case_id: {
-          type: ['string', 'number'],
-          description: 'Legacy case identifier (treated like cluster_id)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of related cases to return',
-          default: 10,
-        },
-      },
-      anyOf: [
-        { required: ['opinion_id'] },
-        { required: ['cluster_id'] },
-        { required: ['case_id'] },
-      ],
-      additionalProperties: false,
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof getRelatedCasesSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Getting related cases', {
         opinionId: input.opinion_id,
@@ -182,56 +129,22 @@ export class GetRelatedCasesHandler extends BaseToolHandler {
 /**
  * Handler for case citations and authorities analysis
  */
-export class AnalyzeCaseAuthoritiesHandler extends BaseToolHandler {
+export class AnalyzeCaseAuthoritiesHandler extends TypedToolHandler<
+  typeof analyzeCaseAuthoritiesSchema
+> {
   readonly name = 'analyze_case_authorities';
   readonly description = 'Analyze the legal authorities cited in a case';
   readonly category = 'cases';
+  protected readonly schema = analyzeCaseAuthoritiesSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        case_id: z.union([z.string(), z.number()]).transform(String),
-        include_citations: z.boolean().optional().default(true),
-        depth: z.number().min(1).max(3).optional().default(1),
-      });
-
-      const validated = schema.parse(input);
-      return { success: true, data: validated };
-    } catch (error) {
-      return { success: false, error: error as Error };
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        case_id: {
-          type: ['string', 'number'],
-          description: 'Case ID to analyze authorities for',
-        },
-        include_citations: {
-          type: 'boolean',
-          description: 'Whether to include citation analysis',
-          default: true,
-        },
-        depth: {
-          type: 'number',
-          description: 'Analysis depth (1-3)',
-          minimum: 1,
-          maximum: 3,
-          default: 1,
-        },
-      },
-      required: ['case_id'],
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof analyzeCaseAuthoritiesSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Analyzing case authorities', {
         caseId: input.case_id,
