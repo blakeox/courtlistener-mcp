@@ -88,7 +88,7 @@ export class GetOralArgumentHandler extends TypedToolHandler<typeof getOralArgum
         requestId: context.requestId,
       });
 
-      const response = await this.apiClient.getOralArgument(input.oral_argument_id);
+      const response = await this.apiClient.getOralArgument(parseInt(input.oral_argument_id));
 
       return this.success({
         summary: `Retrieved details for oral argument ${input.oral_argument_id}`,
