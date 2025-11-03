@@ -154,14 +154,12 @@ export class EnhancedCache {
   getStats(): {
     size: number;
     maxSize: number;
-    hitRate: number;
     warmupInProgress: number;
   } {
     const baseStats = this.cache.getStats();
     return {
       size: baseStats.validEntries,
       maxSize: baseStats.maxSize,
-      hitRate: baseStats.hitRate,
       warmupInProgress: this.warmupKeys.size,
     };
   }
