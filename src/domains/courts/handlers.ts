@@ -2,6 +2,7 @@ import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for courts handlers
@@ -38,34 +39,28 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof listCourtsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Listing courts', {
-        jurisdiction: input.jurisdiction,
-        courtType: input.court_type,
-        requestId: context.requestId,
-      });
+    context.logger.info('Listing courts', {
+      jurisdiction: input.jurisdiction,
+      courtType: input.court_type,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.listCourts(input);
+    const response = await this.apiClient.listCourts(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} courts`,
-        courts: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to list courts', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message);
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} courts`,
+      courts: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -82,34 +77,28 @@ export class GetJudgesHandler extends TypedToolHandler<typeof getJudgesSchema> {
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getJudgesSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting judges', {
-        court: input.court,
-        name: input.name,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting judges', {
+      court: input.court,
+      name: input.name,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getJudges(input);
+    const response = await this.apiClient.getJudges(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} judges`,
-        judges: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to get judges', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message);
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} judges`,
+      judges: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -126,28 +115,21 @@ export class GetJudgeHandler extends TypedToolHandler<typeof getJudgeSchema> {
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getJudgeSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting judge details', {
-        judgeId: input.judge_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting judge details', {
+      judgeId: input.judge_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getJudge(parseInt(input.judge_id));
+    const response = await this.apiClient.getJudge(parseInt(input.judge_id));
 
-      return this.success({
-        summary: `Retrieved details for judge ${input.judge_id}`,
-        judge: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get judge details', error as Error, {
-        judgeId: input.judge_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { judgeId: input.judge_id });
-    }
+    return this.success({
+      summary: `Retrieved details for judge ${input.judge_id}`,
+      judge: response,
+    });
   }
 }
