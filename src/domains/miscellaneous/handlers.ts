@@ -2,6 +2,7 @@ import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for miscellaneous handlers
@@ -46,34 +47,28 @@ export class GetFinancialDisclosuresHandler extends TypedToolHandler<
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getFinancialDisclosuresSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting financial disclosures', {
-        judgeId: input.judge_id,
-        year: input.year,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting financial disclosures', {
+      judgeId: input.judge_id,
+      year: input.year,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getFinancialDisclosures(input);
+    const response = await this.apiClient.getFinancialDisclosures(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} financial disclosures`,
-        disclosures: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to get financial disclosures', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message);
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} financial disclosures`,
+      disclosures: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -92,29 +87,22 @@ export class GetFinancialDisclosureHandler extends TypedToolHandler<
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getFinancialDisclosureSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting financial disclosure', {
-        disclosureId: input.disclosure_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting financial disclosure', {
+      disclosureId: input.disclosure_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getFinancialDisclosure(parseInt(input.disclosure_id));
+    const response = await this.apiClient.getFinancialDisclosure(parseInt(input.disclosure_id));
 
-      return this.success({
-        summary: `Retrieved financial disclosure ${input.disclosure_id}`,
-        disclosure: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get financial disclosure', error as Error, {
-        disclosureId: input.disclosure_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { disclosureId: input.disclosure_id });
-    }
+    return this.success({
+      summary: `Retrieved financial disclosure ${input.disclosure_id}`,
+      disclosure: response,
+    });
   }
 }
 
@@ -133,29 +121,22 @@ export class GetPartiesAndAttorneysHandler extends TypedToolHandler<
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getPartiesAndAttorneysSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting parties and attorneys', {
-        docketId: input.docket_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting parties and attorneys', {
+      docketId: input.docket_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getPartiesAndAttorneys(input);
+    const response = await this.apiClient.getPartiesAndAttorneys(input);
 
-      return this.success({
-        summary: `Retrieved parties and attorneys for docket ${input.docket_id}`,
-        data: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get parties and attorneys', error as Error, {
-        docketId: input.docket_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { docketId: input.docket_id });
-    }
+    return this.success({
+      summary: `Retrieved parties and attorneys for docket ${input.docket_id}`,
+      data: response,
+    });
   }
 }
 
@@ -172,29 +153,22 @@ export class ManageAlertsHandler extends TypedToolHandler<typeof manageAlertsSch
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof manageAlertsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Managing alerts', {
-        action: input.action,
-        alertId: input.alert_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Managing alerts', {
+      action: input.action,
+      alertId: input.alert_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.manageAlerts(input);
+    const response = await this.apiClient.manageAlerts(input);
 
-      return this.success({
-        summary: `Successfully ${input.action}d alert`,
-        result: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to manage alerts', error as Error, {
-        action: input.action,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { action: input.action });
-    }
+    return this.success({
+      summary: `Successfully ${input.action}d alert`,
+      result: response,
+    });
   }
 }
