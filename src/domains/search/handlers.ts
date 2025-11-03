@@ -7,6 +7,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for search handlers
@@ -126,57 +127,49 @@ export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinion
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof searchOpinionsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Searching opinions', {
-        query: input.query,
-        page: input.page,
-        requestId: context.requestId,
-      });
+    context.logger.info('Searching opinions', {
+      query: input.query,
+      page: input.page,
+      requestId: context.requestId,
+    });
 
-      const searchParams: Record<string, unknown> = {
+    const searchParams: Record<string, unknown> = {
+      page: input.page,
+      page_size: input.page_size,
+      order_by: input.order_by,
+    };
+
+    if (input.query) searchParams.q = input.query;
+    if (input.court) searchParams.court = input.court;
+    if (input.judge) searchParams.judge = input.judge;
+    if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
+    if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
+
+    const response = await this.apiClient.searchOpinions(searchParams);
+
+    return this.success({
+      summary: `Found ${response.count ?? 0} opinions`,
+      results: response.results,
+      pagination: {
         page: input.page,
-        page_size: input.page_size,
+        totalPages: Math.ceil((response.count ?? 0) / input.page_size),
+        totalCount: response.count ?? 0,
+        pageSize: input.page_size,
+      },
+      search_parameters: {
+        query: input.query,
+        court: input.court,
+        judge: input.judge,
+        date_filed_after: input.date_filed_after,
+        date_filed_before: input.date_filed_before,
         order_by: input.order_by,
-      };
-
-      if (input.query) searchParams.q = input.query;
-      if (input.court) searchParams.court = input.court;
-      if (input.judge) searchParams.judge = input.judge;
-      if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
-      if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
-
-      const response = await this.apiClient.searchOpinions(searchParams);
-
-      return this.success({
-        summary: `Found ${response.count ?? 0} opinions`,
-        results: response.results,
-        pagination: {
-          page: input.page,
-          totalPages: Math.ceil((response.count ?? 0) / input.page_size),
-          totalCount: response.count ?? 0,
-          pageSize: input.page_size,
-        },
-        search_parameters: {
-          query: input.query,
-          court: input.court,
-          judge: input.judge,
-          date_filed_after: input.date_filed_after,
-          date_filed_before: input.date_filed_before,
-          order_by: input.order_by,
-        },
-      });
-    } catch (error) {
-      context.logger.error('Opinion search failed', error as Error, {
-        query: input.query,
-        requestId: context.requestId,
-      });
-
-      return this.error('Failed to search opinions', { message: (error as Error).message });
-    }
+      },
+    });
   }
 }
 
@@ -190,20 +183,11 @@ export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearc
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof advancedSearchSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    const cacheKey = 'advanced_search';
-    const cached = context.cache?.get<unknown>(cacheKey, input);
-    if (cached) {
-      context.logger.info('Advanced search served from cache', {
-        requestId: context.requestId,
-        searchType: input.type,
-      });
-      return this.success(cached as Record<string, unknown>);
-    }
-
     context.logger.info('Performing advanced search', {
       requestId: context.requestId,
       type: input.type,
@@ -222,7 +206,7 @@ export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearc
       oa: 'Oral Arguments',
     };
 
-    const responseData = {
+    return this.success({
       search_type: searchTypeLabels[input.type] || 'Opinions',
       search_parameters: input,
       total_results: results.count ?? 0,
@@ -241,11 +225,7 @@ export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearc
         'Combine jurisdiction and status filters for precise dockets.',
         'Leverage multi-type searches to assemble comprehensive briefs.',
       ],
-    };
-
-    context.cache?.set(cacheKey, input, responseData, 3600);
-
-    return this.success(responseData);
+    });
   }
 }
 
