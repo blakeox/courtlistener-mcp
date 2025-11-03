@@ -2,6 +2,7 @@ import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for oral arguments handlers
@@ -34,34 +35,28 @@ export class GetOralArgumentsHandler extends TypedToolHandler<typeof getOralArgu
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOralArgumentsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting oral arguments', {
-        court: input.court,
-        caseName: input.case_name,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting oral arguments', {
+      court: input.court,
+      caseName: input.case_name,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getOralArguments(input);
+    const response = await this.apiClient.getOralArguments(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} oral arguments`,
-        oralArguments: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to get oral arguments', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message);
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} oral arguments`,
+      oralArguments: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -78,28 +73,21 @@ export class GetOralArgumentHandler extends TypedToolHandler<typeof getOralArgum
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOralArgumentSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting oral argument details', {
-        oralArgumentId: input.oral_argument_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting oral argument details', {
+      oralArgumentId: input.oral_argument_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getOralArgument(parseInt(input.oral_argument_id));
+    const response = await this.apiClient.getOralArgument(parseInt(input.oral_argument_id));
 
-      return this.success({
-        summary: `Retrieved details for oral argument ${input.oral_argument_id}`,
-        oralArgument: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get oral argument details', error as Error, {
-        oralArgumentId: input.oral_argument_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { oralArgumentId: input.oral_argument_id });
-    }
+    return this.success({
+      summary: `Retrieved details for oral argument ${input.oral_argument_id}`,
+      oralArgument: response,
+    });
   }
 }
