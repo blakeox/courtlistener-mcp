@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for cases handlers
@@ -59,31 +60,24 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getCaseDetailsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting case details', {
-        clusterId: input.cluster_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting case details', {
+      clusterId: input.cluster_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getCaseDetails({
-        clusterId: Number(input.cluster_id),
-      });
+    const response = await this.apiClient.getCaseDetails({
+      clusterId: Number(input.cluster_id),
+    });
 
-      return this.success({
-        summary: `Retrieved details for case ${input.cluster_id}`,
-        case: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get case details', error as Error, {
-        clusterId: input.cluster_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { clusterId: input.cluster_id });
-    }
+    return this.success({
+      summary: `Retrieved details for case ${input.cluster_id}`,
+      case: response,
+    });
   }
 }
 
@@ -100,29 +94,22 @@ export class GetRelatedCasesHandler extends TypedToolHandler<typeof getRelatedCa
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRelatedCasesSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting related cases', {
-        opinionId: input.opinion_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting related cases', {
+      opinionId: input.opinion_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getRelatedCases(input.opinion_id);
+    const response = await this.apiClient.getRelatedCases(input.opinion_id);
 
-      return this.success({
-        summary: `Found ${response.length || 0} related cases/opinions`,
-        relatedCases: Array.isArray(response) ? response.slice(0, input.limit) : response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get related cases', error as Error, {
-        opinionId: input.opinion_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { opinionId: input.opinion_id });
-    }
+    return this.success({
+      summary: `Found ${response.length || 0} related cases/opinions`,
+      relatedCases: Array.isArray(response) ? response.slice(0, input.limit) : response,
+    });
   }
 }
 
@@ -141,28 +128,21 @@ export class AnalyzeCaseAuthoritiesHandler extends TypedToolHandler<
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof analyzeCaseAuthoritiesSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Analyzing case authorities', {
-        caseId: input.case_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Analyzing case authorities', {
+      caseId: input.case_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.analyzeCaseAuthorities(input);
+    const response = await this.apiClient.analyzeCaseAuthorities(input);
 
-      return this.success({
-        summary: `Analyzed authorities for case ${input.case_id}`,
-        analysis: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to analyze case authorities', error as Error, {
-        caseId: input.case_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { caseId: input.case_id });
-    }
+    return this.success({
+      summary: `Analyzed authorities for case ${input.case_id}`,
+      analysis: response,
+    });
   }
 }

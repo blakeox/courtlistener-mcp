@@ -14,7 +14,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "downlevelIteration": true,
-    "types": ["node"]
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "test"]
