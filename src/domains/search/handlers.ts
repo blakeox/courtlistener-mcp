@@ -5,56 +5,131 @@
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { failure, Result, success } from '../../common/types.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 
-export class SearchOpinionsHandler extends BaseToolHandler {
+/**
+ * Zod schemas for search handlers
+ */
+const searchOpinionsSchema = z
+  .object({
+    query: z.string().optional(),
+    q: z.string().optional(),
+    court: z.string().optional(),
+    judge: z.string().optional(),
+    dateAfter: z.string().optional(),
+    dateBefore: z.string().optional(),
+    date_filed_after: z.string().optional(),
+    date_filed_before: z.string().optional(),
+    orderBy: z.string().optional(),
+    order_by: z.string().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    page_size: z.coerce.number().int().min(1).max(100).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform((parsed) => ({
+    query: parsed.query ?? parsed.q,
+    court: parsed.court,
+    judge: parsed.judge,
+    date_filed_after: parsed.date_filed_after ?? parsed.dateAfter,
+    date_filed_before: parsed.date_filed_before ?? parsed.dateBefore,
+    order_by: parsed.order_by ?? parsed.orderBy ?? 'relevance',
+    page: parsed.page ?? 1,
+    page_size: parsed.page_size ?? parsed.pageSize ?? 20,
+  }));
+
+const advancedSearchSchema = z
+  .object({
+    type: z.enum(['o', 'r', 'p', 'oa']).default('o'),
+    query: z.string().min(1).optional(),
+    court: z.string().optional(),
+    judge: z.string().optional(),
+    case_name: z.string().optional(),
+    citation: z.string().optional(),
+    docket_number: z.string().optional(),
+    date_filed_after: z.string().optional(),
+    date_filed_before: z.string().optional(),
+    precedential_status: z.string().optional(),
+    cited_lt: z.number().optional(),
+    cited_gt: z.number().optional(),
+    status: z.string().optional(),
+    nature_of_suit: z.string().optional(),
+    order_by: z.string().optional(),
+    page: z.number().int().min(1).optional(),
+    page_size: z.number().int().min(1).max(100).optional().default(20),
+  })
+  .superRefine((value, ctx) => {
+    const meaningfulKeys = [
+      'query',
+      'court',
+      'judge',
+      'case_name',
+      'citation',
+      'docket_number',
+      'date_filed_after',
+      'date_filed_before',
+      'precedential_status',
+      'cited_lt',
+      'cited_gt',
+      'status',
+      'nature_of_suit',
+    ] as const;
+
+    const hasSearchInput = meaningfulKeys.some((key) => {
+      const field = value[key];
+      return field !== undefined && field !== null && field !== '';
+    });
+
+    if (!hasSearchInput) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one search parameter must be provided (e.g., query, court, citation).',
+      });
+    }
+  });
+
+const searchCasesSchema = z
+  .object({
+    query: z.string().optional(),
+    q: z.string().optional(),
+    court: z.string().optional(),
+    judge: z.string().optional(),
+    case_name: z.string().optional(),
+    citation: z.string().optional(),
+    date_filed_after: z.string().optional(),
+    date_filed_before: z.string().optional(),
+    precedential_status: z.string().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    page_size: z.coerce.number().int().min(1).max(100).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform((parsed) => ({
+    query: parsed.query ?? parsed.q,
+    court: parsed.court,
+    judge: parsed.judge,
+    case_name: parsed.case_name,
+    citation: parsed.citation,
+    date_filed_after: parsed.date_filed_after,
+    date_filed_before: parsed.date_filed_before,
+    precedential_status: parsed.precedential_status,
+    page: parsed.page ?? 1,
+    page_size: parsed.page_size ?? parsed.pageSize ?? 20,
+  }));
+
+export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinionsSchema> {
   readonly name = 'search_opinions';
   readonly description = 'Search for legal opinions with various filters and parameters';
   readonly category = 'search';
+  protected readonly schema = searchOpinionsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        query: z.string().optional(),
-        q: z.string().optional(),
-        court: z.string().optional(),
-        judge: z.string().optional(),
-        dateAfter: z.string().optional(),
-        dateBefore: z.string().optional(),
-        date_filed_after: z.string().optional(),
-        date_filed_before: z.string().optional(),
-        orderBy: z.string().optional(),
-        order_by: z.string().optional(),
-        page: z.coerce.number().int().min(1).optional(),
-        page_size: z.coerce.number().int().min(1).max(100).optional(),
-        pageSize: z.coerce.number().int().min(1).max(100).optional(),
-      });
-
-      const parsed = schema.parse(input ?? {});
-      const normalized = {
-        query: parsed.query ?? parsed.q,
-        court: parsed.court,
-        judge: parsed.judge,
-        date_filed_after: parsed.date_filed_after ?? parsed.dateAfter,
-        date_filed_before: parsed.date_filed_before ?? parsed.dateBefore,
-        order_by: parsed.order_by ?? parsed.orderBy ?? 'relevance',
-        page: parsed.page ?? 1,
-        page_size: parsed.page_size ?? parsed.pageSize ?? 20,
-      };
-
-      return success(normalized);
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof searchOpinionsSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Searching opinions', {
         query: input.query,
@@ -103,213 +178,30 @@ export class SearchOpinionsHandler extends BaseToolHandler {
       return this.error('Failed to search opinions', { message: (error as Error).message });
     }
   }
-
-  getSchema() {
-    return {
-      type: 'object',
-      properties: {
-        q: {
-          type: 'string',
-          description: 'Search query for opinions',
-        },
-        page: {
-          type: 'number',
-          description: 'Page number (default: 1)',
-          minimum: 1,
-        },
-        pageSize: {
-          type: 'number',
-          description: 'Number of results per page (default: 20, max: 100)',
-          minimum: 1,
-          maximum: 100,
-        },
-        court: {
-          type: 'string',
-          description: 'Filter by court identifier',
-        },
-        judge: {
-          type: 'string',
-          description: 'Filter by judge name',
-        },
-        dateAfter: {
-          type: 'string',
-          description: 'Filter opinions after this date (YYYY-MM-DD)',
-        },
-        dateBefore: {
-          type: 'string',
-          description: 'Filter opinions before this date (YYYY-MM-DD)',
-        },
-        orderBy: {
-          type: 'string',
-          enum: ['relevance', 'date', 'name'],
-          description: 'Sort order (default: relevance)',
-        },
-      },
-    };
-  }
 }
 
-export class AdvancedSearchHandler extends BaseToolHandler {
+export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearchSchema> {
   readonly name = 'advanced_search';
   readonly description = 'Execute advanced legal research queries with multi-parameter filtering';
   readonly category = 'search';
-
-  private static readonly schema = z
-    .object({
-      type: z.enum(['o', 'r', 'p', 'oa']).default('o'),
-      query: z.string().min(1).optional(),
-      court: z.string().optional(),
-      judge: z.string().optional(),
-      case_name: z.string().optional(),
-      citation: z.string().optional(),
-      docket_number: z.string().optional(),
-      date_filed_after: z.string().optional(),
-      date_filed_before: z.string().optional(),
-      precedential_status: z.string().optional(),
-      cited_lt: z.number().optional(),
-      cited_gt: z.number().optional(),
-      status: z.string().optional(),
-      nature_of_suit: z.string().optional(),
-      order_by: z.string().optional(),
-      page: z.number().int().min(1).optional(),
-      page_size: z.number().int().min(1).max(100).optional().default(20),
-    })
-    .superRefine((value, ctx) => {
-      const meaningfulKeys = [
-        'query',
-        'court',
-        'judge',
-        'case_name',
-        'citation',
-        'docket_number',
-        'date_filed_after',
-        'date_filed_before',
-        'precedential_status',
-        'cited_lt',
-        'cited_gt',
-        'status',
-        'nature_of_suit',
-      ] as const;
-
-      const hasSearchInput = meaningfulKeys.some((key) => {
-        const field = value[key];
-        return field !== undefined && field !== null && field !== '';
-      });
-
-      if (!hasSearchInput) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'At least one search parameter must be provided (e.g., query, court, citation).',
-        });
-      }
-    });
+  protected readonly schema = advancedSearchSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const parsed = AdvancedSearchHandler.schema.parse(input || {});
-      return success(parsed);
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        type: {
-          type: 'string',
-          enum: ['o', 'r', 'p', 'oa'],
-          description:
-            'Search index type: opinions (o), RECAP documents (r), people/judges (p), oral arguments (oa)',
-          default: 'o',
-        },
-        query: {
-          type: 'string',
-          description: 'Primary keyword search across case metadata',
-        },
-        court: {
-          type: 'string',
-          description: 'Filter results to a specific court ID',
-        },
-        judge: {
-          type: 'string',
-          description: 'Filter by judge name',
-        },
-        case_name: {
-          type: 'string',
-          description: 'Search by case caption',
-        },
-        citation: {
-          type: 'string',
-          description: 'Match a particular citation value',
-        },
-        docket_number: {
-          type: 'string',
-          description: 'Search by docket number',
-        },
-        date_filed_after: {
-          type: 'string',
-          description: 'Filter by filing date lower bound (YYYY-MM-DD)',
-        },
-        date_filed_before: {
-          type: 'string',
-          description: 'Filter by filing date upper bound (YYYY-MM-DD)',
-        },
-        precedential_status: {
-          type: 'string',
-          description: 'Restrict to a specific precedential status',
-        },
-        cited_lt: {
-          type: 'number',
-          description: 'Return results cited fewer than this count',
-        },
-        cited_gt: {
-          type: 'number',
-          description: 'Return results cited more than this count',
-        },
-        status: {
-          type: 'string',
-          description: 'Filter docket status (e.g., open, closed)',
-        },
-        nature_of_suit: {
-          type: 'string',
-          description: 'Filter by nature of suit classification',
-        },
-        order_by: {
-          type: 'string',
-          description: 'Sort results by the supplied field',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of results per page (max 100)',
-          default: 20,
-        },
-      },
-      additionalProperties: false,
-    };
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof advancedSearchSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     const cacheKey = 'advanced_search';
-    const cached = context.cache?.get<any>(cacheKey, input);
+    const cached = context.cache?.get<unknown>(cacheKey, input);
     if (cached) {
       context.logger.info('Advanced search served from cache', {
         requestId: context.requestId,
         searchType: input.type,
       });
-      return this.success(cached);
+      return this.success(cached as Record<string, unknown>);
     }
 
     context.logger.info('Performing advanced search', {
@@ -357,53 +249,20 @@ export class AdvancedSearchHandler extends BaseToolHandler {
   }
 }
 
-export class SearchCasesHandler extends BaseToolHandler {
+export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchema> {
   readonly name = 'search_cases';
   readonly description = 'Search for legal cases and dockets';
   readonly category = 'search';
+  protected readonly schema = searchCasesSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
   }
 
-  validate(input: any): Result<any, Error> {
-    try {
-      const schema = z.object({
-        query: z.string().optional(),
-        q: z.string().optional(),
-        court: z.string().optional(),
-        judge: z.string().optional(),
-        case_name: z.string().optional(),
-        citation: z.string().optional(),
-        date_filed_after: z.string().optional(),
-        date_filed_before: z.string().optional(),
-        precedential_status: z.string().optional(),
-        page: z.coerce.number().int().min(1).optional(),
-        page_size: z.coerce.number().int().min(1).max(100).optional(),
-        pageSize: z.coerce.number().int().min(1).max(100).optional(),
-      });
-
-      const parsed = schema.parse(input ?? {});
-      const normalized = {
-        query: parsed.query ?? parsed.q,
-        court: parsed.court,
-        judge: parsed.judge,
-        case_name: parsed.case_name,
-        citation: parsed.citation,
-        date_filed_after: parsed.date_filed_after,
-        date_filed_before: parsed.date_filed_before,
-        precedential_status: parsed.precedential_status,
-        page: parsed.page ?? 1,
-        page_size: parsed.page_size ?? parsed.pageSize ?? 20,
-      };
-
-      return success(normalized);
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  async execute(input: any, context: ToolContext): Promise<CallToolResult> {
+  async execute(
+    input: z.infer<typeof searchCasesSchema>,
+    context: ToolContext
+  ): Promise<CallToolResult> {
     try {
       context.logger.info('Searching cases', {
         query: input.query,
@@ -454,40 +313,5 @@ export class SearchCasesHandler extends BaseToolHandler {
 
       return this.error('Failed to search cases', { message: (error as Error).message });
     }
-  }
-
-  getSchema() {
-    return {
-      type: 'object',
-      properties: {
-        q: {
-          type: 'string',
-          description: 'Search query for cases',
-        },
-        page: {
-          type: 'number',
-          description: 'Page number (default: 1)',
-          minimum: 1,
-        },
-        pageSize: {
-          type: 'number',
-          description: 'Number of results per page (default: 20, max: 100)',
-          minimum: 1,
-          maximum: 100,
-        },
-        court: {
-          type: 'string',
-          description: 'Filter by court identifier',
-        },
-        dateAfter: {
-          type: 'string',
-          description: 'Filter cases after this date (YYYY-MM-DD)',
-        },
-        dateBefore: {
-          type: 'string',
-          description: 'Filter cases before this date (YYYY-MM-DD)',
-        },
-      },
-    };
   }
 }
