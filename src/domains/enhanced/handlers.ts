@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
+import { createPaginationInfo } from '../../common/pagination-utils.js';
 
 const visualizationSchema = z
   .object({
@@ -282,11 +283,7 @@ export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcy
     return this.success({
       search_params: params,
       bankruptcy_cases: bankruptcyDockets,
-      pagination: {
-        page: params.page ?? 1,
-        page_size: params.page_size ?? 20,
-        total_results: bankruptcyDockets.count || 0,
-      },
+      pagination: createPaginationInfo(bankruptcyDockets, Number(params.page ?? 1), Number(params.page_size ?? 20)),
       data_notes: [
         'Bankruptcy data includes cases from U.S. Bankruptcy Courts',
         'Use specific court codes for targeted searches',
