@@ -5,8 +5,8 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { TimingContext } from '../../infrastructure/logger.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 const visualizationSchema = z
   .object({
@@ -93,15 +93,7 @@ const enhancedRecapSchema = z
   })
   .passthrough();
 
-function recordSuccess(context: ToolContext, timer: TimingContext, fromCache: boolean) {
-  const duration = timer.end(true, { cacheHit: fromCache });
-  context.metrics?.recordRequest(duration, fromCache);
-}
-
-function recordFailure(context: ToolContext, timer: TimingContext, error: Error) {
-  const duration = timer.endWithError(error);
-  context.metrics?.recordFailure(duration);
-}
+// Helper functions removed - now handled by @withDefaults decorator!
 
 export class GetVisualizationDataHandler extends TypedToolHandler<typeof visualizationSchema> {
   readonly name = 'get_visualization_data';
@@ -113,60 +105,35 @@ export class GetVisualizationDataHandler extends TypedToolHandler<typeof visuali
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof visualizationSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_visualization_data');
+    context.logger.info('Generating visualization dataset', {
+      dataType: input.data_type,
+      requestId: context.requestId,
+    });
 
-    try {
-      const cacheKey = 'visualization_data';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        context.logger.info('Visualization data served from cache', {
-          dataType: input.data_type,
-          requestId: context.requestId,
-        });
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      context.logger.info('Generating visualization dataset', {
-        dataType: input.data_type,
-        requestId: context.requestId,
-      });
-
-      let result: any;
-      switch (input.data_type) {
-        case 'court_distribution':
-          result = await this.generateCourtDistribution();
-          break;
-        case 'case_timeline':
-          result = this.generateCaseTimeline(input);
-          break;
-        case 'citation_network':
-          result = await this.generateCitationNetwork(input);
-          break;
-        case 'judge_statistics':
-          result = await this.generateJudgeStatistics(input);
-          break;
-        default:
-          throw new Error(`Unsupported visualization type: ${input.data_type}`);
-      }
-
-      context.cache?.set(cacheKey, input, result, 3600);
-      recordSuccess(context, timer, false);
-      return this.success(result);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to generate visualization data', error as Error, {
-        dataType: input.data_type,
-        requestId: context.requestId,
-      });
-      return this.error('Failed to generate visualization data', {
-        message: (error as Error).message,
-      });
+    let result: any;
+    switch (input.data_type) {
+      case 'court_distribution':
+        result = await this.generateCourtDistribution();
+        break;
+      case 'case_timeline':
+        result = this.generateCaseTimeline(input);
+        break;
+      case 'citation_network':
+        result = await this.generateCitationNetwork(input);
+        break;
+      case 'judge_statistics':
+        result = await this.generateJudgeStatistics(input);
+        break;
+      default:
+        throw new Error(`Unsupported visualization type: ${input.data_type}`);
     }
+
+    return this.success(result);
   }
 
   private async generateCourtDistribution() {
@@ -252,46 +219,34 @@ export class GetBulkDataHandler extends TypedToolHandler<typeof bulkDataSchema> 
     super();
   }
 
+  @withDefaults({ cache: { ttl: 7200 } })
   async execute(
     input: z.infer<typeof bulkDataSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_bulk_data');
+    const result: Record<string, any> = {
+      data_type: input.data_type,
+      status: 'bulk_data_available',
+      message: "Bulk data access is provided through CourtListener's official bulk data API",
+      available_formats: ['JSON', 'CSV', 'XML'],
+      recommended_approach: "Use CourtListener's official bulk data downloads",
+      bulk_data_url: 'https://www.courtlistener.com/help/api/bulk-data/',
+      note: 'For large datasets, consider using pagination parameters in regular API calls',
+    };
 
-    try {
-      const result: Record<string, any> = {
-        data_type: input.data_type,
-        status: 'bulk_data_available',
-        message: "Bulk data access is provided through CourtListener's official bulk data API",
-        available_formats: ['JSON', 'CSV', 'XML'],
-        recommended_approach: "Use CourtListener's official bulk data downloads",
-        bulk_data_url: 'https://www.courtlistener.com/help/api/bulk-data/',
-        note: 'For large datasets, consider using pagination parameters in regular API calls',
+    if (input.data_type === 'sample') {
+      const sampleCases = await this.apiClient.searchOpinions({
+        page_size: Math.min(input.sample_size ?? 10, 50),
+      });
+
+      result.sample_data = {
+        type: 'opinion_clusters',
+        count: sampleCases.results?.length || 0,
+        data: sampleCases.results?.slice(0, 5) || [],
       };
-
-      if (input.data_type === 'sample') {
-        const sampleCases = await this.apiClient.searchOpinions({
-          page_size: Math.min(input.sample_size ?? 10, 50),
-        });
-
-        result.sample_data = {
-          type: 'opinion_clusters',
-          count: sampleCases.results?.length || 0,
-          data: sampleCases.results?.slice(0, 5) || [],
-        };
-      }
-
-      recordSuccess(context, timer, false);
-      return this.success(result);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to prepare bulk data guidance', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error('Failed to provide bulk data guidance', {
-        message: (error as Error).message,
-      });
     }
+
+    return this.success(result);
   }
 }
 
@@ -305,64 +260,39 @@ export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcy
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof bankruptcySchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_bankruptcy_data');
+    const params = Object.fromEntries(
+      Object.entries(input).filter(([_, value]) => value !== undefined && value !== null),
+    );
 
-    try {
-      const params = Object.fromEntries(
-        Object.entries(input).filter(([_, value]) => value !== undefined && value !== null),
-      );
+    context.logger.info('Fetching bankruptcy dockets', {
+      requestId: context.requestId,
+      filters: params,
+    });
 
-      const cacheKey = 'bankruptcy_data';
-      const cached = context.cache?.get<any>(cacheKey, params);
-      if (cached) {
-        context.logger.info('Bankruptcy data served from cache', {
-          requestId: context.requestId,
-        });
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
+    const bankruptcyDockets = await this.apiClient.getDockets({
+      ...params,
+      court__jurisdiction: 'FB',
+    });
 
-      context.logger.info('Fetching bankruptcy dockets', {
-        requestId: context.requestId,
-        filters: params,
-      });
-
-      const bankruptcyDockets = await this.apiClient.getDockets({
-        ...params,
-        court__jurisdiction: 'FB',
-      });
-
-      const result = {
-        search_params: params,
-        bankruptcy_cases: bankruptcyDockets,
-        pagination: {
-          page: params.page ?? 1,
-          page_size: params.page_size ?? 20,
-          total_results: bankruptcyDockets.count || 0,
-        },
-        data_notes: [
-          'Bankruptcy data includes cases from U.S. Bankruptcy Courts',
-          'Use specific court codes for targeted searches',
-          'RECAP documents may be available for detailed case information',
-        ],
-      };
-
-      context.cache?.set(cacheKey, params, result, 1800);
-      recordSuccess(context, timer, false);
-      return this.success(result);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to fetch bankruptcy data', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error('Failed to fetch bankruptcy data', {
-        message: (error as Error).message,
-      });
-    }
+    return this.success({
+      search_params: params,
+      bankruptcy_cases: bankruptcyDockets,
+      pagination: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 20,
+        total_results: bankruptcyDockets.count || 0,
+      },
+      data_notes: [
+        'Bankruptcy data includes cases from U.S. Bankruptcy Courts',
+        'Use specific court codes for targeted searches',
+        'RECAP documents may be available for detailed case information',
+      ],
+    });
   }
 }
 
@@ -377,34 +307,13 @@ export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<typeof
     super();
   }
 
+  @withDefaults({ cache: { ttl: 86400 } })
   async execute(
     input: z.infer<typeof comprehensiveJudgeSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_comprehensive_judge_profile');
-
-    try {
-      const cacheKey = 'comprehensive_judge_profile';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      const profile = await this.apiClient.getComprehensiveJudgeProfile(input.judge_id);
-      context.cache?.set(cacheKey, input, profile, 86400);
-      recordSuccess(context, timer, false);
-      return this.success(profile);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to fetch comprehensive judge profile', error as Error, {
-        judgeId: input.judge_id,
-        requestId: context.requestId,
-      });
-      return this.error('Failed to fetch comprehensive judge profile', {
-        message: (error as Error).message,
-      });
-    }
+    const profile = await this.apiClient.getComprehensiveJudgeProfile(input.judge_id);
+    return this.success(profile);
   }
 }
 
@@ -419,34 +328,13 @@ export class GetComprehensiveCaseAnalysisHandler extends TypedToolHandler<typeof
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof comprehensiveCaseSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_comprehensive_case_analysis');
-
-    try {
-      const cacheKey = 'comprehensive_case_analysis';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      const analysis = await this.apiClient.getComprehensiveCaseAnalysis(input.cluster_id);
-      context.cache?.set(cacheKey, input, analysis, 3600);
-      recordSuccess(context, timer, false);
-      return this.success(analysis);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to fetch comprehensive case analysis', error as Error, {
-        clusterId: input.cluster_id,
-        requestId: context.requestId,
-      });
-      return this.error('Failed to fetch comprehensive case analysis', {
-        message: (error as Error).message,
-      });
-    }
+    const analysis = await this.apiClient.getComprehensiveCaseAnalysis(input.cluster_id);
+    return this.success(analysis);
   }
 }
 
@@ -460,64 +348,44 @@ export class GetFinancialDisclosureDetailsHandler extends TypedToolHandler<typeo
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof disclosureDetailsSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_financial_disclosure_details');
+    const { disclosure_type, ...params } = input;
+    let result: any;
 
-    try {
-      const cacheKey = 'financial_disclosure_details';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      const { disclosure_type, ...params } = input;
-      let result: any;
-
-      switch (disclosure_type) {
-        case 'investments':
-          result = await this.apiClient.getFinancialInvestments(params);
-          break;
-        case 'debts':
-          result = await this.apiClient.getFinancialDebts(params);
-          break;
-        case 'gifts':
-          result = await this.apiClient.getFinancialGifts(params);
-          break;
-        case 'agreements':
-          result = await this.apiClient.getFinancialAgreements(params);
-          break;
-        case 'positions':
-          result = await this.apiClient.getDisclosurePositions(params);
-          break;
-        case 'reimbursements':
-          result = await this.apiClient.getReimbursements(params);
-          break;
-        case 'spouse_incomes':
-          result = await this.apiClient.getSpouseIncomes(params);
-          break;
-        case 'non_investment_incomes':
-          result = await this.apiClient.getNonInvestmentIncomes(params);
-          break;
-        default:
-          throw new Error(`Unknown disclosure type: ${disclosure_type}`);
-      }
-
-      context.cache?.set(cacheKey, input, result, 3600);
-      recordSuccess(context, timer, false);
-      return this.success(result);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to get financial disclosure details', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error('Failed to get financial disclosure details', {
-        message: (error as Error).message,
-      });
+    switch (disclosure_type) {
+      case 'investments':
+        result = await this.apiClient.getFinancialInvestments(params);
+        break;
+      case 'debts':
+        result = await this.apiClient.getFinancialDebts(params);
+        break;
+      case 'gifts':
+        result = await this.apiClient.getFinancialGifts(params);
+        break;
+      case 'agreements':
+        result = await this.apiClient.getFinancialAgreements(params);
+        break;
+      case 'positions':
+        result = await this.apiClient.getDisclosurePositions(params);
+        break;
+      case 'reimbursements':
+        result = await this.apiClient.getReimbursements(params);
+        break;
+      case 'spouse_incomes':
+        result = await this.apiClient.getSpouseIncomes(params);
+        break;
+      case 'non_investment_incomes':
+        result = await this.apiClient.getNonInvestmentIncomes(params);
+        break;
+      default:
+        throw new Error(`Unknown disclosure type: ${disclosure_type}`);
     }
+
+    return this.success(result);
   }
 }
 
@@ -531,33 +399,13 @@ export class ValidateCitationsHandler extends TypedToolHandler<typeof validateCi
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof validateCitationsSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('validate_citations');
-
-    try {
-      const cacheKey = 'validate_citations';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      const validation = await this.apiClient.validateCitations(input.text);
-      context.cache?.set(cacheKey, input, validation, 1800);
-      recordSuccess(context, timer, false);
-      return this.success(validation);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to validate citations', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error('Failed to validate citations', {
-        message: (error as Error).message,
-      });
-    }
+    const validation = await this.apiClient.validateCitations(input.text);
+    return this.success(validation);
   }
 }
 
@@ -571,49 +419,28 @@ export class GetEnhancedRECAPDataHandler extends TypedToolHandler<typeof enhance
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof enhancedRecapSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const timer = context.logger.startTimer('get_enhanced_recap_data');
+    const { action, ...params } = input;
+    let result: any;
 
-    try {
-      const cacheKey = 'enhanced_recap_data';
-      const cached = context.cache?.get<any>(cacheKey, input);
-      if (cached) {
-        recordSuccess(context, timer, true);
-        return this.success(cached);
-      }
-
-      const { action, ...params } = input;
-      let result: any;
-
-      switch (action) {
-        case 'fetch':
-          result = await this.apiClient.getRECAPFetch(params);
-          break;
-        case 'query':
-          result = await this.apiClient.getRECAPQuery(params);
-          break;
-        case 'email':
-          result = await this.apiClient.getRECAPEmail(params);
-          break;
-        default:
-          throw new Error(`Unknown RECAP action: ${action}`);
-      }
-
-      context.cache?.set(cacheKey, input, result, 1800);
-      recordSuccess(context, timer, false);
-      return this.success(result);
-    } catch (error) {
-      recordFailure(context, timer, error as Error);
-      context.logger.error('Failed to retrieve enhanced RECAP data', error as Error, {
-        requestId: context.requestId,
-        action: input.action,
-      });
-      return this.error('Failed to retrieve enhanced RECAP data', {
-        message: (error as Error).message,
-      });
+    switch (action) {
+      case 'fetch':
+        result = await this.apiClient.getRECAPFetch(params);
+        break;
+      case 'query':
+        result = await this.apiClient.getRECAPQuery(params);
+        break;
+      case 'email':
+        result = await this.apiClient.getRECAPEmail(params);
+        break;
+      default:
+        throw new Error(`Unknown RECAP action: ${action}`);
     }
+
+    return this.success(result);
   }
 }
