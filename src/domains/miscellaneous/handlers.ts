@@ -3,6 +3,7 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
+import { createPaginationInfo } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for miscellaneous handlers
@@ -63,11 +64,7 @@ export class GetFinancialDisclosuresHandler extends TypedToolHandler<
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} financial disclosures`,
       disclosures: response.results,
-      pagination: {
-        page: input.page,
-        count: response.count,
-        total_pages: Math.ceil((response.count || 0) / input.page_size),
-      },
+      pagination: createPaginationInfo(response, input.page, input.page_size),
     });
   }
 }
