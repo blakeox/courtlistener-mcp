@@ -4,10 +4,9 @@
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { failure, Result, success } from '../../common/types.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TimingContext } from '../../infrastructure/logger.js';
-import { BaseToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 
 const visualizationSchema = z
   .object({
@@ -104,65 +103,14 @@ function recordFailure(context: ToolContext, timer: TimingContext, error: Error)
   context.metrics?.recordFailure(duration);
 }
 
-export class GetVisualizationDataHandler extends BaseToolHandler {
+export class GetVisualizationDataHandler extends TypedToolHandler<typeof visualizationSchema> {
   readonly name = 'get_visualization_data';
   readonly description = 'Generate visualization-ready legal analytics datasets';
   readonly category = 'analytics';
+  protected readonly schema = visualizationSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(visualizationSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        data_type: {
-          type: 'string',
-          enum: ['court_distribution', 'case_timeline', 'citation_network', 'judge_statistics'],
-          description: 'Visualization type to generate',
-        },
-        opinion_id: {
-          type: ['string', 'number'],
-          description: 'Opinion ID required for citation network data',
-        },
-        depth: {
-          type: 'number',
-          minimum: 1,
-          maximum: 5,
-          description: 'Depth for network traversal (citation_network only)',
-        },
-        limit: {
-          type: 'number',
-          minimum: 1,
-          maximum: 200,
-          description: 'Limit for judge statistics (judge_statistics only)',
-          default: 50,
-        },
-        start_date: {
-          type: 'string',
-          description: 'Start date for timeline visualizations (YYYY-MM-DD)',
-        },
-        end_date: {
-          type: 'string',
-          description: 'End date for timeline visualizations (YYYY-MM-DD)',
-        },
-        court_id: {
-          type: 'string',
-          description: 'Court identifier for timeline visualizations',
-        },
-      },
-      required: ['data_type'],
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -294,42 +242,14 @@ export class GetVisualizationDataHandler extends BaseToolHandler {
   }
 }
 
-export class GetBulkDataHandler extends BaseToolHandler {
+export class GetBulkDataHandler extends TypedToolHandler<typeof bulkDataSchema> {
   readonly name = 'get_bulk_data';
   readonly description = 'Provide guidance and samples for CourtListener bulk data access';
   readonly category = 'analytics';
+  protected readonly schema = bulkDataSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(bulkDataSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        data_type: {
-          type: 'string',
-          description: 'Type of bulk data requested ("sample" returns a demonstration payload)',
-        },
-        sample_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 50,
-          description: 'Sample size when requesting sample data',
-          default: 10,
-        },
-      },
-      required: ['data_type'],
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -375,49 +295,14 @@ export class GetBulkDataHandler extends BaseToolHandler {
   }
 }
 
-export class GetBankruptcyDataHandler extends BaseToolHandler {
+export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcySchema> {
   readonly name = 'get_bankruptcy_data';
   readonly description = 'Retrieve bankruptcy-related docket data with contextual insights';
   readonly category = 'analytics';
+  protected readonly schema = bankruptcySchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(bankruptcySchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        court: { type: 'string', description: 'Specific court identifier to filter by' },
-        case_name: { type: 'string', description: 'Filter by case name keywords' },
-        docket_number: { type: 'string', description: 'Filter by docket number' },
-        date_filed_after: {
-          type: 'string',
-          description: 'Return cases filed after this date (YYYY-MM-DD)',
-        },
-        date_filed_before: {
-          type: 'string',
-          description: 'Return cases filed before this date (YYYY-MM-DD)',
-        },
-        page: { type: 'number', minimum: 1, description: 'Page number for pagination', default: 1 },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of results per page',
-          default: 20,
-        },
-      },
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -481,36 +366,15 @@ export class GetBankruptcyDataHandler extends BaseToolHandler {
   }
 }
 
-export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
+export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<typeof comprehensiveJudgeSchema> {
   readonly name = 'get_comprehensive_judge_profile';
   readonly description =
     'Retrieve an enriched judicial profile with positions, education, and analytics';
   readonly category = 'analysis';
+  protected readonly schema = comprehensiveJudgeSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(comprehensiveJudgeSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        judge_id: {
-          type: ['string', 'number'],
-          description: 'Judge identifier to retrieve a comprehensive profile for',
-        },
-      },
-      required: ['judge_id'],
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -544,36 +408,15 @@ export class GetComprehensiveJudgeProfileHandler extends BaseToolHandler {
   }
 }
 
-export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
+export class GetComprehensiveCaseAnalysisHandler extends TypedToolHandler<typeof comprehensiveCaseSchema> {
   readonly name = 'get_comprehensive_case_analysis';
   readonly description =
     'Retrieve an enriched case analysis including docket entries, parties, and tags';
   readonly category = 'analysis';
+  protected readonly schema = comprehensiveCaseSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(comprehensiveCaseSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        cluster_id: {
-          type: ['string', 'number'],
-          description: 'Case cluster ID to analyze',
-        },
-      },
-      required: ['cluster_id'],
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -607,66 +450,14 @@ export class GetComprehensiveCaseAnalysisHandler extends BaseToolHandler {
   }
 }
 
-export class GetFinancialDisclosureDetailsHandler extends BaseToolHandler {
+export class GetFinancialDisclosureDetailsHandler extends TypedToolHandler<typeof disclosureDetailsSchema> {
   readonly name = 'get_financial_disclosure_details';
   readonly description = 'Retrieve detailed financial disclosure data across multiple categories';
   readonly category = 'financial';
+  protected readonly schema = disclosureDetailsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(disclosureDetailsSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        disclosure_type: {
-          type: 'string',
-          enum: [
-            'investments',
-            'debts',
-            'gifts',
-            'agreements',
-            'positions',
-            'reimbursements',
-            'spouse_incomes',
-            'non_investment_incomes',
-          ],
-          description: 'Category of financial disclosure data to retrieve',
-        },
-        judge: {
-          type: ['string', 'number'],
-          description: 'Filter by judge identifier',
-        },
-        year: {
-          type: 'number',
-          description: 'Filter disclosures by year',
-        },
-        page: {
-          type: 'number',
-          minimum: 1,
-          description: 'Page number for pagination',
-          default: 1,
-        },
-        page_size: {
-          type: 'number',
-          minimum: 1,
-          maximum: 100,
-          description: 'Number of results per page',
-          default: 20,
-        },
-      },
-      required: ['disclosure_type'],
-      additionalProperties: true,
-    };
   }
 
   async execute(
@@ -730,35 +521,14 @@ export class GetFinancialDisclosureDetailsHandler extends BaseToolHandler {
   }
 }
 
-export class ValidateCitationsHandler extends BaseToolHandler {
+export class ValidateCitationsHandler extends TypedToolHandler<typeof validateCitationsSchema> {
   readonly name = 'validate_citations';
   readonly description = 'Validate legal citations within a body of text';
   readonly category = 'analysis';
+  protected readonly schema = validateCitationsSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(validateCitationsSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          description: 'Text containing legal citations to validate',
-        },
-      },
-      required: ['text'],
-      additionalProperties: false,
-    };
   }
 
   async execute(
@@ -791,36 +561,14 @@ export class ValidateCitationsHandler extends BaseToolHandler {
   }
 }
 
-export class GetEnhancedRECAPDataHandler extends BaseToolHandler {
+export class GetEnhancedRECAPDataHandler extends TypedToolHandler<typeof enhancedRecapSchema> {
   readonly name = 'get_enhanced_recap_data';
   readonly description = 'Access advanced RECAP datasets and utilities';
   readonly category = 'dockets';
+  protected readonly schema = enhancedRecapSchema;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();
-  }
-
-  validate(input: any): Result<any, Error> {
-    try {
-      return success(enhancedRecapSchema.parse(input ?? {}));
-    } catch (error) {
-      return failure(error as Error);
-    }
-  }
-
-  getSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['fetch', 'query', 'email'],
-          description: 'RECAP action to perform',
-        },
-      },
-      required: ['action'],
-      additionalProperties: true,
-    };
   }
 
   async execute(
