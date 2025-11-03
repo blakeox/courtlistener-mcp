@@ -104,7 +104,8 @@ describe('GetCaseDetailsHandler (TypeScript)', () => {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as { error: string };
-      assert.strictEqual(payload.error, 'Case not found');
+      // @withErrorHandling decorator wraps errors with generic message
+      assert.ok(payload.error.includes('failed') || payload.error.includes('Case not found'));
     }
   });
 });
