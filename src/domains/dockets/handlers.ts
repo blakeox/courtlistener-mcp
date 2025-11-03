@@ -195,6 +195,7 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof getDocketEntriesSchema>,
     context: ToolContext
@@ -208,52 +209,21 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
       page_size: input.page_size,
     };
 
-    const timer = context.logger.startTimer('get_docket_entries');
+    context.logger.info('Fetching docket entries', {
+      docketId: params.docket,
+      requestId: context.requestId,
+    });
 
-    try {
-      const cacheKey = 'docket_entries';
-      const cached = context.cache?.get<unknown>(cacheKey, params);
-      if (cached) {
-        context.logger.info('Returning cached docket entries', {
-          docketId: params.docket,
-          requestId: context.requestId,
-        });
-        context.metrics?.recordRequest(timer.end(true), true);
-        return this.success(cached as Record<string, unknown>);
-      }
+    const entries = await this.apiClient.getDocketEntries(params);
 
-      context.logger.info('Fetching docket entries', {
-        docketId: params.docket,
-        requestId: context.requestId,
-      });
-
-      const entries = await this.apiClient.getDocketEntries(params);
-
-      const result = {
-        docket_id: params.docket,
-        docket_entries: entries,
-        pagination: {
-          page: params.page,
-          page_size: params.page_size,
-          total_results: entries.count ?? 0,
-        },
-      };
-
-      context.cache?.set(cacheKey, params, result, 1800);
-      context.metrics?.recordRequest(timer.end(true), false);
-
-      return this.success(result);
-    } catch (error) {
-      const duration = timer.endWithError(error as Error);
-      context.metrics?.recordFailure(duration);
-      context.logger.error('Failed to fetch docket entries', error as Error, {
-        docketId: params.docket,
-        requestId: context.requestId,
-      });
-
-      return this.error('Failed to retrieve docket entries', {
-        message: (error as Error).message,
-      });
-    }
+    return this.success({
+      docket_id: params.docket,
+      docket_entries: entries,
+      pagination: {
+        page: params.page,
+        page_size: params.page_size,
+        total_results: entries.count ?? 0,
+      },
+    });
   }
 }
