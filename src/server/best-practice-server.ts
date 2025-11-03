@@ -23,6 +23,7 @@ import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { getEnhancedToolDefinitions } from '../tool-definitions.js';
 import { ServerConfig } from '../types.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
+import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
 
 interface ToolMetadata {
   name: string;
@@ -84,6 +85,8 @@ export class BestPracticeLegalMCPServer {
   private transport?: StdioServerTransport;
   private isShuttingDown = false;
   private readonly activeRequests = new Set<string>();
+  private heartbeatInterval?: NodeJS.Timeout;
+  private sessionProperties: Map<string, unknown> = new Map();
   private readonly enhancedToolMetadata = this.buildEnhancedMetadata();
 
   /**
@@ -114,10 +117,16 @@ export class BestPracticeLegalMCPServer {
 
     this.setupHealthServer();
     this.setupHandlers();
+    this.setupLifecycleHooks();
 
     // Configure graceful shutdown with default environment settings
     this.gracefulShutdown = createGracefulShutdown(this.logger.child('Shutdown'));
     this.registerShutdownHooks();
+    
+    // Log protocol configuration
+    logConfiguration({
+      info: (message: string, meta: unknown) => this.logger.info(message, meta as Record<string, unknown>)
+    });
   }
 
   /**
@@ -328,6 +337,59 @@ export class BestPracticeLegalMCPServer {
       this.cache,
       this.circuitBreakers,
     );
+  }
+
+  /**
+   * Setup MCP lifecycle hooks for initialize, shutdown, and heartbeat
+   * Phase 1: MCP Modernization
+   */
+  private setupLifecycleHooks(): void {
+    // Store server info in session properties
+    const serverInfo = getServerInfo();
+    this.sessionProperties.set('serverInfo', serverInfo);
+    this.sessionProperties.set('startTime', new Date().toISOString());
+    
+    // Start heartbeat if enabled
+    if (SESSION.KEEPALIVE_ENABLED) {
+      this.startHeartbeat();
+    }
+    
+    this.logger.info('Lifecycle hooks configured', {
+      heartbeat: SESSION.KEEPALIVE_ENABLED,
+      interval: SESSION.HEARTBEAT_INTERVAL_MS,
+    });
+  }
+
+  /**
+   * Start server heartbeat emissions
+   */
+  private startHeartbeat(): void {
+    this.heartbeatInterval = setInterval(() => {
+      this.logger.debug('Server heartbeat', {
+        activeRequests: this.activeRequests.size,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+      });
+      
+      this.metrics.recordRequest(0, false); // Track heartbeat
+    }, SESSION.HEARTBEAT_INTERVAL_MS);
+  }
+
+  /**
+   * Stop server heartbeat
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
+  }
+
+  /**
+   * Get session properties for DI/introspection
+   */
+  public getSessionProperties(): ReadonlyMap<string, unknown> {
+    return this.sessionProperties;
   }
 
   private setupHandlers(): void {
