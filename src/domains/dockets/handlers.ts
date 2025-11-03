@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
+import { createPaginationInfo } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for dockets handlers
@@ -71,11 +72,7 @@ export class GetDocketsHandler extends TypedToolHandler<typeof getDocketsSchema>
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} dockets`,
       dockets: response.results,
-      pagination: {
-        page: input.page,
-        count: response.count,
-        total_pages: Math.ceil((response.count || 0) / input.page_size),
-      },
+      pagination: createPaginationInfo(response, input.page, input.page_size),
     });
   }
 }
@@ -141,11 +138,7 @@ export class GetRecapDocumentsHandler extends TypedToolHandler<typeof getRecapDo
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} RECAP documents for docket ${input.docket_id}`,
       documents: response.results,
-      pagination: {
-        page: input.page,
-        count: response.count,
-        total_pages: Math.ceil((response.count || 0) / input.page_size),
-      },
+      pagination: createPaginationInfo(response, input.page, input.page_size),
     });
   }
 }
@@ -219,11 +212,7 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
     return this.success({
       docket_id: params.docket,
       docket_entries: entries,
-      pagination: {
-        page: params.page,
-        page_size: params.page_size,
-        total_results: entries.count ?? 0,
-      },
+      pagination: createPaginationInfo(entries, params.page, params.page_size),
     });
   }
 }
