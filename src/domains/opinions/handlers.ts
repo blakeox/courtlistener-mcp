@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for opinions handlers
@@ -26,33 +27,26 @@ export class GetOpinionTextHandler extends TypedToolHandler<typeof getOpinionTex
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOpinionTextSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting opinion text', {
-        opinionId: input.opinion_id,
-        format: input.format,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting opinion text', {
+      opinionId: input.opinion_id,
+      format: input.format,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getOpinionText({
-        opinionId: input.opinion_id,
-        format: input.format,
-      });
+    const response = await this.apiClient.getOpinionText({
+      opinionId: input.opinion_id,
+      format: input.format,
+    });
 
-      return this.success({
-        summary: `Retrieved ${input.format} text for opinion ${input.opinion_id}`,
-        opinion: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get opinion text', error as Error, {
-        opinionId: input.opinion_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { opinionId: input.opinion_id });
-    }
+    return this.success({
+      summary: `Retrieved ${input.format} text for opinion ${input.opinion_id}`,
+      opinion: response,
+    });
   }
 }
 
@@ -79,34 +73,27 @@ export class AnalyzeLegalArgumentHandler extends TypedToolHandler<
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof analyzeLegalArgumentSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Analyzing legal argument', {
-        argument: input.argument,
-        query: input.search_query,
-        requestId: context.requestId,
-      });
+    context.logger.info('Analyzing legal argument', {
+      argument: input.argument,
+      query: input.search_query,
+      requestId: context.requestId,
+    });
 
-      // For now, synthesize a simple analysis object consistent with tests
-      const response = await this.apiClient.analyzeLegalArgument(input);
+    // For now, synthesize a simple analysis object consistent with tests
+    const response = await this.apiClient.analyzeLegalArgument(input);
 
-      // Ensure shape includes analysis.top_cases; coerce strings to object
-      const analysis =
-        typeof response?.analysis === 'object' && response.analysis
-          ? response.analysis
-          : { top_cases: [] };
+    // Ensure shape includes analysis.top_cases; coerce strings to object
+    const analysis =
+      typeof response?.analysis === 'object' && response.analysis
+        ? response.analysis
+        : { top_cases: [] };
 
-      return this.success({ analysis });
-    } catch (error) {
-      context.logger.error('Failed to analyze legal argument', error as Error, {
-        argument: input.argument,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { argument: input.argument });
-    }
+    return this.success({ analysis });
   }
 }
 
@@ -130,35 +117,28 @@ export class GetCitationNetworkHandler extends TypedToolHandler<typeof getCitati
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getCitationNetworkSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting citation network', {
-        opinionId: input.opinion_id,
-        depth: input.depth,
-        direction: input.direction,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting citation network', {
+      opinionId: input.opinion_id,
+      depth: input.depth,
+      direction: input.direction,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getCitationNetwork(parseInt(input.opinion_id), {
-        depth: input.depth,
-        direction: input.direction,
-        limit: input.limit,
-      });
+    const response = await this.apiClient.getCitationNetwork(parseInt(input.opinion_id), {
+      depth: input.depth,
+      direction: input.direction,
+      limit: input.limit,
+    });
 
-      return this.success({
-        summary: `Retrieved citation network for opinion ${input.opinion_id}`,
-        network: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get citation network', error as Error, {
-        opinionId: input.opinion_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { opinionId: input.opinion_id });
-    }
+    return this.success({
+      summary: `Retrieved citation network for opinion ${input.opinion_id}`,
+      network: response,
+    });
   }
 }
 
@@ -181,28 +161,21 @@ export class LookupCitationHandler extends TypedToolHandler<typeof lookupCitatio
     super();
   }
 
+  @withDefaults({ cache: { ttl: 7200 } })
   async execute(
     input: z.infer<typeof lookupCitationSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Looking up citation', {
-        citation: input.citation,
-        requestId: context.requestId,
-      });
+    context.logger.info('Looking up citation', {
+      citation: input.citation,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.searchCitations(input.citation);
+    const response = await this.apiClient.searchCitations(input.citation);
 
-      return this.success({
-        summary: `Found cases for citation: ${input.citation}`,
-        results: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to lookup citation', error as Error, {
-        citation: input.citation,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { citation: input.citation });
-    }
+    return this.success({
+      summary: `Found cases for citation: ${input.citation}`,
+      results: response,
+    });
   }
 }
