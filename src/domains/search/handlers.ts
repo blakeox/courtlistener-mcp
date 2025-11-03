@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
+import { createPaginationInfoCamelCase } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for search handlers
@@ -155,12 +156,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinion
     return this.success({
       summary: `Found ${response.count ?? 0} opinions`,
       results: response.results,
-      pagination: {
-        page: input.page,
-        totalPages: Math.ceil((response.count ?? 0) / input.page_size),
-        totalCount: response.count ?? 0,
-        pageSize: input.page_size,
-      },
+      pagination: createPaginationInfoCamelCase(response, input.page, input.page_size),
       search_parameters: {
         query: input.query,
         court: input.court,
@@ -268,12 +264,7 @@ export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchem
     return this.success({
       summary: `Found ${response.count ?? 0} cases`,
       results: response.results,
-      pagination: {
-        page: input.page,
-        totalPages: Math.ceil((response.count ?? 0) / input.page_size),
-        totalCount: response.count ?? 0,
-        page_size: input.page_size,
-      },
+      pagination: createPaginationInfoCamelCase(response, input.page, input.page_size),
       search_parameters: {
         query: input.query,
         court: input.court,
