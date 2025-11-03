@@ -239,59 +239,51 @@ export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchem
     super();
   }
 
+  @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof searchCasesSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Searching cases', {
-        query: input.query,
-        requestId: context.requestId,
-      });
+    context.logger.info('Searching cases', {
+      query: input.query,
+      requestId: context.requestId,
+    });
 
-      const searchParams: Record<string, unknown> = {
+    const searchParams: Record<string, unknown> = {
+      page: input.page,
+      page_size: input.page_size,
+    };
+
+    if (input.query) searchParams.q = input.query;
+    if (input.court) searchParams.court = input.court;
+    if (input.judge) searchParams.judge = input.judge;
+    if (input.case_name) searchParams.case_name = input.case_name;
+    if (input.citation) searchParams.citation = input.citation;
+    if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
+    if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
+    if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
+
+    const response = await this.apiClient.searchCases(searchParams);
+
+    return this.success({
+      summary: `Found ${response.count ?? 0} cases`,
+      results: response.results,
+      pagination: {
         page: input.page,
+        totalPages: Math.ceil((response.count ?? 0) / input.page_size),
+        totalCount: response.count ?? 0,
         page_size: input.page_size,
-      };
-
-      if (input.query) searchParams.q = input.query;
-      if (input.court) searchParams.court = input.court;
-      if (input.judge) searchParams.judge = input.judge;
-      if (input.case_name) searchParams.case_name = input.case_name;
-      if (input.citation) searchParams.citation = input.citation;
-      if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
-      if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
-      if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
-
-      const response = await this.apiClient.searchCases(searchParams);
-
-      return this.success({
-        summary: `Found ${response.count ?? 0} cases`,
-        results: response.results,
-        pagination: {
-          page: input.page,
-          totalPages: Math.ceil((response.count ?? 0) / input.page_size),
-          totalCount: response.count ?? 0,
-          page_size: input.page_size,
-        },
-        search_parameters: {
-          query: input.query,
-          court: input.court,
-          judge: input.judge,
-          case_name: input.case_name,
-          citation: input.citation,
-          date_filed_after: input.date_filed_after,
-          date_filed_before: input.date_filed_before,
-          precedential_status: input.precedential_status,
-        },
-      });
-    } catch (error) {
-      context.logger.error('Case search failed', error as Error, {
+      },
+      search_parameters: {
         query: input.query,
-        requestId: context.requestId,
-      });
-
-      return this.error('Failed to search cases', { message: (error as Error).message });
-    }
+        court: input.court,
+        judge: input.judge,
+        case_name: input.case_name,
+        citation: input.citation,
+        date_filed_after: input.date_filed_after,
+        date_filed_before: input.date_filed_before,
+        precedential_status: input.precedential_status,
+      },
+    });
   }
 }
