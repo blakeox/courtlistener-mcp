@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import { withDefaults } from '../../server/handler-decorators.js';
 
 /**
  * Zod schemas for dockets handlers
@@ -54,34 +55,28 @@ export class GetDocketsHandler extends TypedToolHandler<typeof getDocketsSchema>
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getDocketsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting dockets', {
-        court: input.court,
-        caseName: input.case_name,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting dockets', {
+      court: input.court,
+      caseName: input.case_name,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getDockets(input);
+    const response = await this.apiClient.getDockets(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} dockets`,
-        dockets: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to get dockets', error as Error, {
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message);
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} dockets`,
+      dockets: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -98,29 +93,22 @@ export class GetDocketHandler extends TypedToolHandler<typeof getDocketSchema> {
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getDocketSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting docket details', {
-        docketId: input.docket_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting docket details', {
+      docketId: input.docket_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getDocket(parseInt(input.docket_id));
+    const response = await this.apiClient.getDocket(parseInt(input.docket_id));
 
-      return this.success({
-        summary: `Retrieved details for docket ${input.docket_id}`,
-        docket: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get docket details', error as Error, {
-        docketId: input.docket_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { docketId: input.docket_id });
-    }
+    return this.success({
+      summary: `Retrieved details for docket ${input.docket_id}`,
+      docket: response,
+    });
   }
 }
 
@@ -137,35 +125,28 @@ export class GetRecapDocumentsHandler extends TypedToolHandler<typeof getRecapDo
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRecapDocumentsSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting RECAP documents', {
-        docketId: input.docket_id,
-        documentType: input.document_type,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting RECAP documents', {
+      docketId: input.docket_id,
+      documentType: input.document_type,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getRECAPDocuments(input);
+    const response = await this.apiClient.getRECAPDocuments(input);
 
-      return this.success({
-        summary: `Retrieved ${response.results?.length || 0} RECAP documents for docket ${input.docket_id}`,
-        documents: response.results,
-        pagination: {
-          page: input.page,
-          count: response.count,
-          total_pages: Math.ceil((response.count || 0) / input.page_size),
-        },
-      });
-    } catch (error) {
-      context.logger.error('Failed to get RECAP documents', error as Error, {
-        docketId: input.docket_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { docketId: input.docket_id });
-    }
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} RECAP documents for docket ${input.docket_id}`,
+      documents: response.results,
+      pagination: {
+        page: input.page,
+        count: response.count,
+        total_pages: Math.ceil((response.count || 0) / input.page_size),
+      },
+    });
   }
 }
 
@@ -182,29 +163,22 @@ export class GetRecapDocumentHandler extends TypedToolHandler<typeof getRecapDoc
     super();
   }
 
+  @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRecapDocumentSchema>,
     context: ToolContext
   ): Promise<CallToolResult> {
-    try {
-      context.logger.info('Getting RECAP document', {
-        documentId: input.document_id,
-        requestId: context.requestId,
-      });
+    context.logger.info('Getting RECAP document', {
+      documentId: input.document_id,
+      requestId: context.requestId,
+    });
 
-      const response = await this.apiClient.getRECAPDocument(parseInt(input.document_id));
+    const response = await this.apiClient.getRECAPDocument(parseInt(input.document_id));
 
-      return this.success({
-        summary: `Retrieved RECAP document ${input.document_id}`,
-        document: response,
-      });
-    } catch (error) {
-      context.logger.error('Failed to get RECAP document', error as Error, {
-        documentId: input.document_id,
-        requestId: context.requestId,
-      });
-      return this.error((error as Error).message, { documentId: input.document_id });
-    }
+    return this.success({
+      summary: `Retrieved RECAP document ${input.document_id}`,
+      document: response,
+    });
   }
 }
 
