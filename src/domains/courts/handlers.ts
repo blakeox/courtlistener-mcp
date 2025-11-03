@@ -3,6 +3,7 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
+import { createPaginationInfo } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for courts handlers
@@ -55,11 +56,7 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} courts`,
       courts: response.results,
-      pagination: {
-        page: input.page,
-        count: response.count,
-        total_pages: Math.ceil((response.count || 0) / input.page_size),
-      },
+      pagination: createPaginationInfo(response, input.page, input.page_size),
     });
   }
 }
@@ -93,11 +90,7 @@ export class GetJudgesHandler extends TypedToolHandler<typeof getJudgesSchema> {
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} judges`,
       judges: response.results,
-      pagination: {
-        page: input.page,
-        count: response.count,
-        total_pages: Math.ceil((response.count || 0) / input.page_size),
-      },
+      pagination: createPaginationInfo(response, input.page, input.page_size),
     });
   }
 }
