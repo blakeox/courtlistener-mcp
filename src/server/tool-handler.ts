@@ -262,6 +262,23 @@ export abstract class TypedToolHandler<
   protected abstract readonly schema: TSchema;
 
   /**
+   * Optional: Tool metadata for enriched definitions
+   * Phase 2: MCP Modernization
+   */
+  protected metadata?: {
+    complexity?: 'simple' | 'moderate' | 'complex';
+    rateLimitWeight?: number;
+    examples?: Array<{
+      name: string;
+      description: string;
+      arguments: Record<string, unknown>;
+    }>;
+    tags?: string[];
+    deprecated?: boolean;
+    requiresAuth?: boolean;
+  };
+
+  /**
    * Validate input using the defined Zod schema
    * This is automatically implemented - no need to override
    */
