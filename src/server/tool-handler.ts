@@ -90,17 +90,51 @@ export class ToolHandlerRegistry {
 
   /**
    * Get tool definitions for MCP
+   * Phase 2: Enhanced with metadata from handlers
    */
   getToolDefinitions(): Array<{
     name: string;
     description: string;
     inputSchema: Record<string, unknown>;
+    metadata?: {
+      category?: string;
+      complexity?: string;
+      rateLimitWeight?: number;
+      examples?: Array<{ name: string; description: string; arguments: Record<string, unknown> }>;
+      tags?: string[];
+      deprecated?: boolean;
+      requiresAuth?: boolean;
+    };
   }> {
-    return Array.from(this.handlers.values()).map((handler) => ({
-      name: handler.name,
-      description: handler.description,
-      inputSchema: handler.getSchema(),
-    }));
+    return Array.from(this.handlers.values()).map((handler) => {
+      const baseDefinition = {
+        name: handler.name,
+        description: handler.description,
+        inputSchema: handler.getSchema(),
+      };
+
+      // Add enriched metadata if handler is TypedToolHandler
+      if (handler instanceof TypedToolHandler) {
+        const handlerMetadata = handler.getMetadata();
+        if (handlerMetadata) {
+          return {
+            ...baseDefinition,
+            metadata: {
+              category: handler.category,
+              ...handlerMetadata,
+            },
+          };
+        }
+      }
+
+      // Fallback: just category
+      return {
+        ...baseDefinition,
+        metadata: {
+          category: handler.category,
+        },
+      };
+    });
   }
 
   /**
