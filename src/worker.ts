@@ -10,6 +10,7 @@
 
 import { LegalMCPServer } from './index.js';
 import { verifyAccessToken } from './security/oidc.js';
+import { getServerInfo, FEATURE_FLAGS } from './infrastructure/protocol-constants.js';
 
 // Typed access to augmented global properties used by the Worker
 type OidcCfg = {
@@ -264,24 +265,22 @@ async function handleMCPRequest(request: Request): Promise<Response> {
       let response: unknown;
 
       switch (message.method) {
-        case 'initialize':
+        case 'initialize': {
+          const serverInfo = getServerInfo();
           response = {
             jsonrpc: '2.0',
             id: message.id,
             result: {
-              protocolVersion: '2024-11-05',
-              capabilities: {
-                tools: {},
-                resources: {},
-                prompts: {},
-              },
+              protocolVersion: serverInfo.protocolVersion,
+              capabilities: serverInfo.capabilities,
               serverInfo: {
-                name: 'Legal MCP Server',
-                version: '1.0.0',
+                name: serverInfo.name,
+                version: serverInfo.version,
               },
             },
           };
           break;
+        }
 
         case 'tools/list': {
           const tools = await server.listTools();
@@ -427,11 +426,16 @@ export default {
 
       // Health check endpoint
       if (url.pathname === '/health') {
+        const serverInfo = getServerInfo();
         return new Response(
           JSON.stringify({
             status: 'ok',
-            service: 'legal-mcp',
-            version: '1.0.0',
+            service: serverInfo.name,
+            version: serverInfo.version,
+            protocolVersion: serverInfo.protocolVersion,
+            capabilities: Object.keys(serverInfo.capabilities).filter(
+              k => serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined
+            ),
             timestamp: new Date().toISOString(),
           }),
           {
@@ -446,11 +450,16 @@ export default {
 
       // API documentation endpoint
       if ((url.pathname === '/' && request.method === 'GET') || url.pathname === '/docs') {
+        const serverInfo = getServerInfo();
         return new Response(
           JSON.stringify({
-            service: 'Legal MCP Server',
-            version: '1.0.0',
-            description: 'API for legal research using CourtListener database',
+            service: serverInfo.name,
+            version: serverInfo.version,
+            description: 'Model Context Protocol server for CourtListener legal database',
+            protocolVersion: serverInfo.protocolVersion,
+            capabilities: Object.keys(serverInfo.capabilities).filter(
+              k => serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined
+            ),
             endpoints: {
               '/health': 'Health check',
               '/sse': 'MCP over SSE endpoint for remote clients',
