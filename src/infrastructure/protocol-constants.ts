@@ -1,10 +1,10 @@
 /**
  * Protocol Constants - Single Source of Truth
  * Phase 1: MCP Modernization
- * 
+ *
  * Centralized protocol version, feature flags, and capability definitions
  * shared across CLI, Worker, and Server entry points.
- * 
+ *
  * NOTE: This file is Workers-compatible (no filesystem access)
  */
 
@@ -19,14 +19,14 @@ function getPackageVersion(): string {
     // Workers environment - use env or default
     return '0.1.0';
   }
-  
+
   // Node.js environment - try to read package.json
   try {
     // Dynamic import only in Node.js
     const { readFileSync } = require('fs') as typeof import('fs');
     const { join, dirname } = require('path') as typeof import('path');
     const { fileURLToPath } = require('url') as typeof import('url');
-    
+
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const packageJsonPath = join(__dirname, '../../package.json');
@@ -59,12 +59,12 @@ export const FEATURE_FLAGS = {
   // Core features (always enabled)
   TOOLS: true,
   LOGGING: true,
-  
+
   // New features (enable gradually)
   RESOURCES: process.env.ENABLE_MCP_RESOURCES === 'true',
   PROMPTS: process.env.ENABLE_MCP_PROMPTS === 'true',
   SAMPLING: process.env.ENABLE_MCP_SAMPLING === 'true',
-  
+
   // Response format features
   STREAMING: process.env.ENABLE_MCP_STREAMING === 'true',
   STRUCTURED_CONTENT: process.env.ENABLE_STRUCTURED_CONTENT === 'true',
@@ -76,18 +76,22 @@ export const FEATURE_FLAGS = {
  */
 export const SERVER_CAPABILITIES = {
   tools: FEATURE_FLAGS.TOOLS ? {} : undefined,
-  
-  resources: FEATURE_FLAGS.RESOURCES ? {
-    subscribe: true,
-    listChanged: true,
-  } : undefined,
-  
-  prompts: FEATURE_FLAGS.PROMPTS ? {
-    listChanged: true,
-  } : undefined,
-  
+
+  resources: FEATURE_FLAGS.RESOURCES
+    ? {
+        subscribe: true,
+        listChanged: true,
+      }
+    : undefined,
+
+  prompts: FEATURE_FLAGS.PROMPTS
+    ? {
+        listChanged: true,
+      }
+    : undefined,
+
   logging: FEATURE_FLAGS.LOGGING ? {} : undefined,
-  
+
   sampling: FEATURE_FLAGS.SAMPLING ? {} : undefined,
 } as const;
 
@@ -128,7 +132,7 @@ export const ERROR_CODES = {
   METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602,
   INTERNAL_ERROR: -32603,
-  
+
   // Application error codes
   TOOL_NOT_FOUND: -32001,
   TOOL_EXECUTION_ERROR: -32002,
@@ -171,9 +175,8 @@ export function logConfiguration(logger: { info: (message: string, meta: unknown
     protocol: PROTOCOL_VERSION,
     features: FEATURE_FLAGS,
     capabilities: Object.keys(SERVER_CAPABILITIES).filter(
-      (key) => SERVER_CAPABILITIES[key as keyof typeof SERVER_CAPABILITIES] !== undefined
+      (key) => SERVER_CAPABILITIES[key as keyof typeof SERVER_CAPABILITIES] !== undefined,
     ),
     limits: LIMITS,
   });
 }
-
