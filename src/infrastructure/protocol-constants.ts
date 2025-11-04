@@ -4,22 +4,32 @@
  * 
  * Centralized protocol version, feature flags, and capability definitions
  * shared across CLI, Worker, and Server entry points.
+ * 
+ * NOTE: This file is Workers-compatible (no filesystem access)
  */
-
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-// Get package.json path (works in ESM)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJsonPath = join(__dirname, '../../package.json');
 
 /**
- * Get version from package.json
+ * Get version
+ * In Workers environment, use env var or default
+ * In Node.js, this will be injected at build time
  */
 function getPackageVersion(): string {
+  // Check if running in Cloudflare Workers
+  if (typeof process === 'undefined' || typeof process.versions === 'undefined') {
+    // Workers environment - use env or default
+    return '0.1.0';
+  }
+  
+  // Node.js environment - try to read package.json
   try {
+    // Dynamic import only in Node.js
+    const { readFileSync } = require('fs') as typeof import('fs');
+    const { join, dirname } = require('path') as typeof import('path');
+    const { fileURLToPath } = require('url') as typeof import('url');
+    
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packageJsonPath = join(__dirname, '../../package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     return packageJson.version || '0.1.0';
   } catch {
