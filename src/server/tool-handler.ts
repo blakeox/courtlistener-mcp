@@ -288,4 +288,29 @@ export abstract class TypedToolHandler<
       $refStrategy: 'none',
     }) as Record<string, unknown>;
   }
+
+  /**
+   * Get enriched tool metadata
+   * Phase 2: MCP Modernization
+   */
+  getMetadata(): {
+    complexity?: 'simple' | 'moderate' | 'complex';
+    rateLimitWeight?: number;
+    examples?: Array<{
+      name: string;
+      description: string;
+      arguments: Record<string, unknown>;
+    }>;
+    tags?: string[];
+    deprecated?: boolean;
+    requiresAuth?: boolean;
+  } | undefined {
+    return this.metadata;
+  }
+
+  /**
+   * Execute the tool
+   * Override this in your subclass with your business logic
+   */
+  abstract execute(input: TInput, context: ToolContext): Promise<CallToolResult>;
 }
