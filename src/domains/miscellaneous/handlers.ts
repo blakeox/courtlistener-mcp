@@ -1,9 +1,9 @@
-import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
-import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { withDefaults } from '../../server/handler-decorators.js';
 import { createPaginationInfo } from '../../common/pagination-utils.js';
+import { CourtListenerAPI } from '../../courtlistener.js';
+import { withDefaults } from '../../server/handler-decorators.js';
+import { ToolContext, TypedToolHandler } from '../../server/tool-handler.js';
 
 /**
  * Zod schemas for miscellaneous handlers
@@ -51,7 +51,7 @@ export class GetFinancialDisclosuresHandler extends TypedToolHandler<
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getFinancialDisclosuresSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting financial disclosures', {
       judgeId: input.judge_id,
@@ -87,7 +87,7 @@ export class GetFinancialDisclosureHandler extends TypedToolHandler<
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getFinancialDisclosureSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting financial disclosure', {
       disclosureId: input.disclosure_id,
@@ -121,7 +121,7 @@ export class GetPartiesAndAttorneysHandler extends TypedToolHandler<
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getPartiesAndAttorneysSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting parties and attorneys', {
       docketId: input.docket_id,
@@ -153,7 +153,7 @@ export class ManageAlertsHandler extends TypedToolHandler<typeof manageAlertsSch
   @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof manageAlertsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Managing alerts', {
       action: input.action,

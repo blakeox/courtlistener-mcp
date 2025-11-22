@@ -25,6 +25,13 @@ class SilentLogger extends Logger {
   child(component: string): SilentLogger {
     return new SilentLogger(component);
   }
+
+  startTimer() {
+    return {
+      end: () => {},
+      endWithError: () => {},
+    };
+  }
 }
 
 function makeContext(overrides: Partial<ToolContext> = {}): ToolContext {
@@ -116,7 +123,8 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
         error: string;
         details?: unknown;
       };
-      assert.strictEqual(payload.error, 'API unavailable');
+      assert.strictEqual(payload.error, 'get_financial_disclosures failed');
+      assert.strictEqual((payload.details as any).message, 'API unavailable');
     }
   });
 });
@@ -138,13 +146,13 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
         id: string;
         url: string;
       }> {
-        assert.strictEqual(String(disclosureId), 'abc-99');
-        return { id: 'abc-99', url: 'https://example.com/disclosures/abc-99' };
+        assert.strictEqual(String(disclosureId), '99');
+        return { id: '99', url: 'https://example.com/disclosures/99' };
       },
     };
 
     const handler = new GetFinancialDisclosureHandler(api);
-    const validated = handler.validate({ disclosure_id: 'abc-99' });
+    const validated = handler.validate({ disclosure_id: '99' });
     assert.strictEqual(validated.success, true);
 
     if (validated.success) {
@@ -155,8 +163,8 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
       };
       assert.ok(payload.summary.includes('disclosure') || payload.summary.includes('Retrieved'));
       assert.deepStrictEqual(payload.disclosure, {
-        id: 'abc-99',
-        url: 'https://example.com/disclosures/abc-99',
+        id: '99',
+        url: 'https://example.com/disclosures/99',
       });
     }
   });
@@ -179,10 +187,8 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
         error: string;
         details?: { disclosureId?: string };
       };
-      assert.strictEqual(payload.error, 'Disclosure missing');
-      if (payload.details) {
-        assert.deepStrictEqual(payload.details, { disclosureId: 'missing' });
-      }
+      assert.strictEqual(payload.error, 'get_financial_disclosure failed');
+      assert.strictEqual((payload.details as any).message, 'Disclosure missing');
     }
   });
 });
@@ -260,10 +266,8 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
         error: string;
         details?: { docketId?: string };
       };
-      assert.strictEqual(payload.error, 'Parties unavailable');
-      if (payload.details) {
-        assert.deepStrictEqual(payload.details, { docketId: 'fail-docket' });
-      }
+      assert.strictEqual(payload.error, 'get_parties_and_attorneys failed');
+      assert.strictEqual((payload.details as any).message, 'Parties unavailable');
     }
   });
 });
@@ -346,10 +350,8 @@ describe('ManageAlertsHandler (TypeScript)', () => {
         error: string;
         details?: { action?: string };
       };
-      assert.strictEqual(payload.error, 'Alert service down');
-      if (payload.details) {
-        assert.deepStrictEqual(payload.details, { action: 'delete' });
-      }
+      assert.strictEqual(payload.error, 'manage_alerts failed');
+      assert.strictEqual((payload.details as any).message, 'Alert service down');
     }
   });
 });
