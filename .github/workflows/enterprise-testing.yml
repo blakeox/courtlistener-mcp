@@ -249,7 +249,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           
     - name: 🐳 Build Docker Image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/amd64,linux/arm64
@@ -299,7 +299,7 @@ jobs:
           type=raw,value=latest
           
     - name: 🚀 Build and Push Docker Image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/amd64,linux/arm64
