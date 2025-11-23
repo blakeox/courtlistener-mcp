@@ -19,7 +19,17 @@ import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
 import { ResourceHandlerRegistry } from '../server/resource-handler.js';
+import { PromptHandlerRegistry } from '../server/prompt-handler.js';
 import { OpinionResourceHandler } from '../resources/opinion.js';
+import { SchemaResourceHandler } from '../resources/schema.js';
+import { LegalAssistantPromptHandler } from '../prompts/legal-assistant.js';
+import {
+  SummarizeStatutePromptHandler,
+  ComparePrecedentsPromptHandler,
+  AnalyzeCasePromptHandler,
+  DraftBriefSectionPromptHandler,
+  IdentifyIssuesPromptHandler,
+} from '../prompts/legal-prompts.js';
 
 // Import all domain handlers
 import {
@@ -179,11 +189,20 @@ export function bootstrapServices(): void {
     singleton: true,
   });
 
+  // Register prompt registry
+  container.register('promptRegistry', {
+    factory: () => new PromptHandlerRegistry(),
+    singleton: true,
+  });
+
   // Register tool handlers
   registerToolHandlers();
 
   // Register resource handlers
   registerResourceHandlers();
+
+  // Register prompt handlers
+  registerPromptHandlers();
 }
 
 function registerResourceHandlers(): void {
@@ -191,6 +210,18 @@ function registerResourceHandlers(): void {
   const courtListenerApi = container.get<CourtListenerAPI>('courtListenerApi');
 
   resourceRegistry.register(new OpinionResourceHandler(courtListenerApi));
+  resourceRegistry.register(new SchemaResourceHandler());
+}
+
+function registerPromptHandlers(): void {
+  const promptRegistry = container.get<PromptHandlerRegistry>('promptRegistry');
+
+  promptRegistry.register(new LegalAssistantPromptHandler());
+  promptRegistry.register(new SummarizeStatutePromptHandler());
+  promptRegistry.register(new ComparePrecedentsPromptHandler());
+  promptRegistry.register(new AnalyzeCasePromptHandler());
+  promptRegistry.register(new DraftBriefSectionPromptHandler());
+  promptRegistry.register(new IdentifyIssuesPromptHandler());
 }
 
 function registerToolHandlers(): void {

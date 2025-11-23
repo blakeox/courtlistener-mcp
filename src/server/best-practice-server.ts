@@ -9,6 +9,10 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   ReadResourceResult,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+  GetPromptResult,
+  Prompt,
   Resource,
   McpError,
   Tool,
@@ -28,6 +32,7 @@ import { getEnhancedToolDefinitions } from '../tool-definitions.js';
 import { ServerConfig } from '../types.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
 import { ResourceHandlerRegistry } from './resource-handler.js';
+import { PromptHandlerRegistry } from './prompt-handler.js';
 import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
 
 interface ToolMetadata {
@@ -81,6 +86,7 @@ export class BestPracticeLegalMCPServer {
   private readonly metrics: MetricsCollector;
   private readonly toolRegistry: ToolHandlerRegistry;
   private readonly resourceRegistry: ResourceHandlerRegistry;
+  private readonly promptRegistry: PromptHandlerRegistry;
   private readonly middlewareFactory: MiddlewareFactory;
   private readonly config: ServerConfig;
   private readonly circuitBreakers: CircuitBreakerManager;
@@ -114,6 +120,7 @@ export class BestPracticeLegalMCPServer {
     this.metrics = container.get<MetricsCollector>('metrics');
     this.toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
     this.resourceRegistry = container.get<ResourceHandlerRegistry>('resourceRegistry');
+    this.promptRegistry = container.get<PromptHandlerRegistry>('promptRegistry');
     this.middlewareFactory = container.get<MiddlewareFactory>('middlewareFactory');
     this.config = container.get<ServerConfig>('config');
     this.circuitBreakers = container.get<CircuitBreakerManager>('circuitBreakerManager');
@@ -471,6 +478,50 @@ export class BestPracticeLegalMCPServer {
           logger: this.logger,
           requestId: generateId(),
         });
+
+        const duration = timer.end(true);
+        this.metrics.recordRequest(duration, false);
+        return result;
+      } catch (error) {
+        const duration = timer.endWithError(error as Error);
+        this.metrics.recordFailure(duration);
+        throw error;
+      }
+    });
+
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      const timer = this.logger.startTimer('list_prompts');
+      try {
+        const prompts = this.promptRegistry.getAllPrompts();
+        const duration = timer.end(true, { promptCount: prompts.length });
+        this.metrics.recordRequest(duration, false);
+        return { prompts };
+      } catch (error) {
+        const duration = timer.endWithError(error as Error);
+        this.metrics.recordFailure(duration);
+        throw error;
+      }
+    });
+
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const timer = this.logger.startTimer('get_prompt');
+      const name = request.params.name;
+      const args = request.params.arguments || {};
+
+      try {
+        const handler = this.promptRegistry.findHandler(name);
+        if (!handler) {
+          throw new McpError(ErrorCode.InvalidRequest, `Prompt not found: ${name}`);
+        }
+
+        // Convert arguments to Record<string, string> as expected by PromptHandler
+        // Note: This is a simplification, in a real app we might need better type conversion
+        const stringArgs: Record<string, string> = {};
+        for (const [key, value] of Object.entries(args)) {
+          stringArgs[key] = String(value);
+        }
+
+        const result = await handler.getMessages(stringArgs);
 
         const duration = timer.end(true);
         this.metrics.recordRequest(duration, false);

@@ -230,14 +230,14 @@ This roadmap outlines the comprehensive modernization of the CourtListener MCP i
 **Estimated Time**: 6-8 hours
 
 **Tasks**:
-- [ ] Implement `resources/list` endpoint
-- [ ] Implement `resources/read` endpoint
-- [ ] Expose:
+- [x] Implement `resources/list` endpoint
+- [x] Implement `resources/read` endpoint
+- [x] Expose:
   - Schemas
   - Sample opinions
   - Policy documents
-- [ ] Add cached fetches
-- [ ] Create resource handlers
+- [x] Add cached fetches
+- [x] Create resource handlers
 
 **Files**:
 - `src/domains/` (new resource handlers)
@@ -255,13 +255,13 @@ This roadmap outlines the comprehensive modernization of the CourtListener MCP i
 **Estimated Time**: 4-6 hours
 
 **Tasks**:
-- [ ] Create curated prompts:
+- [x] Create curated prompts:
   - Statute summarization
   - Precedent comparison
   - Case analysis
-- [ ] Implement `prompts/list`
-- [ ] Implement `prompts/get`
-- [ ] Add supporting tests
+- [x] Implement `prompts/list`
+- [x] Implement `prompts/get`
+- [x] Add supporting tests
 
 **Files**:
 - `src/tool-definitions.ts` (line 15)
