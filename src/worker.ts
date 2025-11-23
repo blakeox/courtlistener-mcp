@@ -19,8 +19,8 @@ type OidcCfg = {
   jwksUrl?: string;
   requiredScope?: string;
 };
-type LimitsCfg = { maxTotal?: number; maxPerIp?: number };
-type Counters = { total: number; perIp: Map<string, number> };
+type LimitsCfg = { maxTotal?: number; maxPerIp?: number }
+type Counters = { total: number; perIp: Map<string, number> }
 function g() {
   return globalThis as unknown as {
     __SSE_AUTH_TOKEN__?: string;
@@ -288,6 +288,41 @@ async function handleMCPRequest(request: Request): Promise<Response> {
             jsonrpc: '2.0',
             id: message.id,
             result: tools,
+          };
+          break;
+        }
+
+        case 'resources/list': {
+          const resources = await server.listResources();
+          response = {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: { resources },
+          };
+          break;
+        }
+
+        case 'resources/read': {
+          const params = (message.params ?? {}) as Record<string, unknown>;
+          const uri = params.uri;
+          
+          if (typeof uri !== 'string') {
+             response = {
+              jsonrpc: '2.0',
+              id: message.id,
+              error: {
+                code: -32602,
+                message: 'Invalid params: uri is required',
+              },
+            };
+            break;
+          }
+
+          const result = await server.readResource(uri);
+          response = {
+            jsonrpc: '2.0',
+            id: message.id,
+            result,
           };
           break;
         }

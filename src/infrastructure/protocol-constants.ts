@@ -61,7 +61,7 @@ export const FEATURE_FLAGS = {
   LOGGING: true,
 
   // New features (enable gradually)
-  RESOURCES: process.env.ENABLE_MCP_RESOURCES === 'true',
+  RESOURCES: true,
   PROMPTS: process.env.ENABLE_MCP_PROMPTS === 'true',
   SAMPLING: process.env.ENABLE_MCP_SAMPLING === 'true',
 

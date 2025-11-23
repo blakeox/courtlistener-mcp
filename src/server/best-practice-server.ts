@@ -6,6 +6,10 @@ import {
   CallToolResult,
   ErrorCode,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ReadResourceResult,
+  Resource,
   McpError,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -23,6 +27,7 @@ import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { getEnhancedToolDefinitions } from '../tool-definitions.js';
 import { ServerConfig } from '../types.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
+import { ResourceHandlerRegistry } from './resource-handler.js';
 import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
 
 interface ToolMetadata {
@@ -75,6 +80,7 @@ export class BestPracticeLegalMCPServer {
   private readonly logger: Logger;
   private readonly metrics: MetricsCollector;
   private readonly toolRegistry: ToolHandlerRegistry;
+  private readonly resourceRegistry: ResourceHandlerRegistry;
   private readonly middlewareFactory: MiddlewareFactory;
   private readonly config: ServerConfig;
   private readonly circuitBreakers: CircuitBreakerManager;
@@ -107,6 +113,7 @@ export class BestPracticeLegalMCPServer {
     this.logger = container.get<Logger>('logger');
     this.metrics = container.get<MetricsCollector>('metrics');
     this.toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
+    this.resourceRegistry = container.get<ResourceHandlerRegistry>('resourceRegistry');
     this.middlewareFactory = container.get<MiddlewareFactory>('middlewareFactory');
     this.config = container.get<ServerConfig>('config');
     this.circuitBreakers = container.get<CircuitBreakerManager>('circuitBreakerManager');
@@ -122,10 +129,11 @@ export class BestPracticeLegalMCPServer {
     // Configure graceful shutdown with default environment settings
     this.gracefulShutdown = createGracefulShutdown(this.logger.child('Shutdown'));
     this.registerShutdownHooks();
-    
+
     // Log protocol configuration
     logConfiguration({
-      info: (message: string, meta: unknown) => this.logger.info(message, meta as Record<string, unknown>)
+      info: (message: string, meta: unknown) =>
+        this.logger.info(message, meta as Record<string, unknown>),
     });
   }
 
@@ -262,6 +270,27 @@ export class BestPracticeLegalMCPServer {
   }
 
   /**
+   * Direct access to list resources
+   */
+  async listResources(): Promise<Resource[]> {
+    return this.resourceRegistry.getAllResources();
+  }
+
+  /**
+   * Direct access to read resource
+   */
+  async readResource(uri: string): Promise<ReadResourceResult> {
+    const handler = this.resourceRegistry.findHandler(uri);
+    if (!handler) {
+      throw new McpError(ErrorCode.InvalidRequest, `Resource not found: ${uri}`);
+    }
+    return handler.read(uri, {
+      logger: this.logger,
+      requestId: generateId(),
+    });
+  }
+
+  /**
    * Execute a tool call outside of the transport layer for worker/demo usage
    */
   async handleToolCall(
@@ -348,12 +377,12 @@ export class BestPracticeLegalMCPServer {
     const serverInfo = getServerInfo();
     this.sessionProperties.set('serverInfo', serverInfo);
     this.sessionProperties.set('startTime', new Date().toISOString());
-    
+
     // Start heartbeat if enabled
     if (SESSION.KEEPALIVE_ENABLED) {
       this.startHeartbeat();
     }
-    
+
     this.logger.info('Lifecycle hooks configured', {
       heartbeat: SESSION.KEEPALIVE_ENABLED,
       interval: SESSION.HEARTBEAT_INTERVAL_MS,
@@ -370,7 +399,7 @@ export class BestPracticeLegalMCPServer {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
       });
-      
+
       this.metrics.recordRequest(0, false); // Track heartbeat
     }, SESSION.HEARTBEAT_INTERVAL_MS);
   }
@@ -407,6 +436,45 @@ export class BestPracticeLegalMCPServer {
             categories: this.toolRegistry.getCategories(),
           },
         };
+      } catch (error) {
+        const duration = timer.endWithError(error as Error);
+        this.metrics.recordFailure(duration);
+        throw error;
+      }
+    });
+
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      const timer = this.logger.startTimer('list_resources');
+      try {
+        const resources = this.resourceRegistry.getAllResources();
+        const duration = timer.end(true, { resourceCount: resources.length });
+        this.metrics.recordRequest(duration, false);
+        return { resources };
+      } catch (error) {
+        const duration = timer.endWithError(error as Error);
+        this.metrics.recordFailure(duration);
+        throw error;
+      }
+    });
+
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const timer = this.logger.startTimer('read_resource');
+      const uri = request.params.uri;
+
+      try {
+        const handler = this.resourceRegistry.findHandler(uri);
+        if (!handler) {
+          throw new McpError(ErrorCode.InvalidRequest, `Resource not found: ${uri}`);
+        }
+
+        const result = await handler.read(uri, {
+          logger: this.logger,
+          requestId: generateId(),
+        });
+
+        const duration = timer.end(true);
+        this.metrics.recordRequest(duration, false);
+        return result;
       } catch (error) {
         const duration = timer.endWithError(error as Error);
         this.metrics.recordFailure(duration);

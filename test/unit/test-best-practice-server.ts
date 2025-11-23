@@ -7,7 +7,7 @@
 
 import assert from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from '../../src/infrastructure/logger.js';
 import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
@@ -100,19 +100,14 @@ class StubRegistry {
     return this.defs;
   }
 
-  async execute(
-    request: { params: { name: string } },
-    _ctx: unknown
-  ): Promise<{ content: Array<{ type: string; text: string }> }> {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ ran: true, name: request.params.name }),
-        },
-      ],
-    };
+  async execute(name: string, args: unknown): Promise<CallToolResult> {
+    return { content: [{ type: 'text', text: 'success' }] };
   }
+}
+
+class StubResourceRegistry {
+  getAllResources() { return []; }
+  findHandler() { return undefined; }
 }
 
 function installTestDI(): void {
@@ -138,6 +133,11 @@ function installTestDI(): void {
     });
     registerOrReplace.call(container, 'toolRegistry', {
       factory: () => new StubRegistry(),
+      singleton: true,
+    });
+    registerOrReplace.call(container, 'resourceRegistry', {
+      factory: () => new StubResourceRegistry(),
+      singleton: true,
     });
     registerOrReplace.call(container, 'middlewareFactory', {
       factory: () => new StubMiddlewareFactory(),
@@ -201,6 +201,11 @@ function installTestDI(): void {
     });
     registerService('toolRegistry', {
       factory: () => new StubRegistry(),
+      singleton: true,
+    });
+    registerService('resourceRegistry', {
+      factory: () => new StubResourceRegistry(),
+      singleton: true,
     });
     registerService('middlewareFactory', {
       factory: () => new StubMiddlewareFactory(),
@@ -229,7 +234,7 @@ function installTestDI(): void {
   }
 }
 
-describe('BestPracticeLegalMCPServer (TypeScript)', () => {
+describe('BestPracticeLegalMCPServer', () => {
   beforeEach(() => installTestDI());
   afterEach(() => {
     if (typeof (container as { clearAll?: () => void }).clearAll === 'function') {

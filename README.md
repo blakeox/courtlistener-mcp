@@ -48,6 +48,7 @@ This server strictly follows the
 - ✅ **Pure MCP Implementation** - No external APIs or separate applications
 - ✅ **Official SDK Patterns** - Uses `@modelcontextprotocol/sdk` with
   recommended patterns
+- ✅ **Resources Support** - Implements dynamic resources for direct data access
 - ✅ **Proper Error Handling** - Implements McpError with appropriate ErrorCodes
 - ✅ **JSON Schema Validation** - Enhanced input schemas with validation
   patterns

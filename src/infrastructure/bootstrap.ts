@@ -18,6 +18,8 @@ import { MetricsCollector as MetricsCollectorClass } from '../infrastructure/met
 import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
+import { ResourceHandlerRegistry } from '../server/resource-handler.js';
+import { OpinionResourceHandler } from '../resources/opinion.js';
 
 // Import all domain handlers
 import {
@@ -171,8 +173,24 @@ export function bootstrapServices(): void {
     singleton: true,
   });
 
+  // Register resource registry
+  container.register('resourceRegistry', {
+    factory: () => new ResourceHandlerRegistry(),
+    singleton: true,
+  });
+
   // Register tool handlers
   registerToolHandlers();
+
+  // Register resource handlers
+  registerResourceHandlers();
+}
+
+function registerResourceHandlers(): void {
+  const resourceRegistry = container.get<ResourceHandlerRegistry>('resourceRegistry');
+  const courtListenerApi = container.get<CourtListenerAPI>('courtListenerApi');
+
+  resourceRegistry.register(new OpinionResourceHandler(courtListenerApi));
 }
 
 function registerToolHandlers(): void {
