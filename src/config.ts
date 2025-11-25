@@ -59,17 +59,22 @@ const defaultConfig: ServerConfig = {
       ? process.env.AUDIT_SENSITIVE_FIELDS.split(',')
           .map((f) => f.trim())
           .filter((f) => f.length > 0)
-      : ['password', 'token', 'secret', 'key', 'auth'],
+      : ['password', 'token', 'apiKey', 'secret'],
   },
   circuitBreaker: {
-    enabled: process.env.CIRCUIT_BREAKER_ENABLED === 'true',
+    enabled: process.env.CIRCUIT_BREAKER_ENABLED !== 'false',
     failureThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5, 1),
-    successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 3, 1),
-    timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1),
-    resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
+    successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 2, 1),
+    timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1000),
+    resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 30000, 1000),
+  },
+  sampling: {
+    enabled: process.env.SAMPLING_ENABLED !== 'false',
+    maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
+    defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
   },
   compression: {
-    enabled: process.env.COMPRESSION_ENABLED === 'true',
+    enabled: process.env.COMPRESSION_ENABLED !== 'false',
     threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
     level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 1, 9),
   },

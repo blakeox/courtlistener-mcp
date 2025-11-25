@@ -61,6 +61,11 @@ export interface ServerConfig {
     threshold: number;
     level: number;
   };
+  sampling: {
+    enabled: boolean;
+    maxTokens: number;
+    defaultModel?: string;
+  };
 }
 
 // CourtListener API Response Types

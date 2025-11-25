@@ -9,7 +9,8 @@
  */
 
 import { LegalMCPServer } from './index.js';
-import { verifyAccessToken } from './security/oidc.js';
+import { CloudflareSseTransport } from './server/cloudflare-transport.js';
+import { UnifiedAuthMiddleware } from './middleware/unified-auth.js';
 import { getServerInfo, FEATURE_FLAGS } from './infrastructure/protocol-constants.js';
 
 // Typed access to augmented global properties used by the Worker
@@ -21,12 +22,18 @@ type OidcCfg = {
 };
 type LimitsCfg = { maxTotal?: number; maxPerIp?: number }
 type Counters = { total: number; perIp: Map<string, number> }
+type McpSession = {
+  transport: CloudflareSseTransport;
+  server: LegalMCPServer;
+}
+
 function g() {
   return globalThis as unknown as {
     __SSE_AUTH_TOKEN__?: string;
     __OIDC?: OidcCfg;
     __LIMITS?: LimitsCfg;
     __SSE_COUNTERS__?: Counters;
+    __MCP_SESSIONS__?: Map<string, McpSession>;
   };
 }
 
@@ -51,70 +58,38 @@ async function handleMCPRequest(request: Request): Promise<Response> {
     });
   }
 
+  // Unified Authentication
+  const oidcConfig = g().__OIDC;
+  const authMiddleware = new UnifiedAuthMiddleware({
+    oidc: (oidcConfig?.issuer) ? {
+      issuer: oidcConfig.issuer,
+      audience: oidcConfig.audience,
+      jwksUrl: oidcConfig.jwksUrl,
+      requiredScope: oidcConfig.requiredScope
+    } : undefined,
+    staticToken: g().__SSE_AUTH_TOKEN__
+  });
+  
+  const authResult = await authMiddleware.authenticate(request);
+  if (!authResult.isAuthenticated && authResult.error) {
+    return new Response(authResult.error.message, {
+      status: authResult.error.status,
+      headers: {
+        'Content-Type': 'text/plain',
+        'Access-Control-Allow-Origin': '*',
+        ...authResult.error.headers
+      }
+    });
+  }
+
+  const url = new URL(request.url);
+
   // For SSE connections, return a basic SSE stream
-  if (request.method === 'GET') {
+  if (request.method === 'GET' && url.pathname === '/sse') {
     // Connection limiting configuration
     const limits = g().__LIMITS || {};
     const maxTotal = Number.isFinite(limits.maxTotal) ? Number(limits.maxTotal) : 100; // default
     const maxPerIp = Number.isFinite(limits.maxPerIp) ? Number(limits.maxPerIp) : 5; // default
-
-    // Optional auth:
-    // 1) OAuth 2.0/OIDC: if issuer configured, validate Bearer token (preferred)
-    // 2) Static token: if SSE_AUTH_TOKEN configured, accept Bearer or ?access_token=
-
-    const oidcCfg = g().__OIDC;
-    const expectedToken: string | undefined = g().__SSE_AUTH_TOKEN__;
-
-    const urlObj = new URL(request.url);
-    const authHeader = request.headers.get('authorization');
-    const lowerAuth = authHeader?.toLowerCase() ?? '';
-    const headerToken = lowerAuth.startsWith('bearer ') ? authHeader!.slice(7).trim() : undefined;
-    const queryToken = urlObj.searchParams.get('access_token') ?? undefined;
-
-    if (oidcCfg?.issuer) {
-      const presented = headerToken || queryToken; // header preferred; query allowed for clients that lack header support
-      if (!presented) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: {
-            'Content-Type': 'text/plain',
-            'Access-Control-Allow-Origin': '*',
-            'WWW-Authenticate':
-              'Bearer realm="mcp", error="invalid_request", error_description="missing_token"',
-          },
-        });
-      }
-      try {
-        const issuer = oidcCfg.issuer;
-        await verifyAccessToken(presented, {
-          issuer,
-          audience: oidcCfg.audience,
-          jwksUrl: oidcCfg.jwksUrl,
-          requiredScope: oidcCfg.requiredScope,
-        });
-      } catch (e) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: {
-            'Content-Type': 'text/plain',
-            'Access-Control-Allow-Origin': '*',
-            'WWW-Authenticate': 'Bearer realm="mcp", error="invalid_token"',
-          },
-        });
-      }
-    } else if (expectedToken) {
-      const provided = headerToken || queryToken || '';
-      if (!provided || provided !== expectedToken) {
-        return new Response('Unauthorized', {
-          status: 401,
-          headers: {
-            'Content-Type': 'text/plain',
-            'Access-Control-Allow-Origin': '*',
-            'WWW-Authenticate': 'Bearer realm="mcp", error="invalid_token"',
-          },
-        });
-      }
-    }
 
     const sessionId =
       request.headers.get('mcp-session-id') || Math.random().toString(36).substring(7);
@@ -138,12 +113,21 @@ async function handleMCPRequest(request: Request): Promise<Response> {
       });
     }
 
+    // Create Transport and Server
+    const transport = new CloudflareSseTransport(sessionId);
+    const server = new LegalMCPServer();
+    
+    // Store session
+    const sessions = (g().__MCP_SESSIONS__ ||= new Map());
+    sessions.set(sessionId, { transport, server });
+    
+    // Start server (connects to transport)
+    await server.start(transport);
+
     // Create SSE stream using ReadableStream
     let cleanup: (() => void) | undefined;
     const stream = new ReadableStream({
       start(controller) {
-        const encoder = new TextEncoder();
-
         // Increment counters on start
         counters.total += 1;
         counters.perIp.set(clientIp, currentPerIp + 1);
@@ -162,21 +146,24 @@ async function handleMCPRequest(request: Request): Promise<Response> {
           const nowPerIp = (counters.perIp.get(clientIp) || 1) - 1;
           if (nowPerIp > 0) counters.perIp.set(clientIp, nowPerIp);
           else counters.perIp.delete(clientIp);
+          
+          // Remove session
+          sessions.delete(sessionId);
         };
         cleanup = release;
 
-        // Send initial connection confirmation
-        controller.enqueue(
-          encoder.encode(
-            'data: {"jsonrpc":"2.0","method":"notifications/initialized","params":{}}\n\n',
-          ),
-        );
+        // Start the transport stream
+        transport.startStream(controller);
 
         // Keep connection alive with periodic pings
+        // Note: CloudflareSseTransport handles messages, but we can send keepalives manually if needed.
+        // The official transport doesn't seem to send keepalives automatically?
+        // We can inject a comment to keep the connection alive.
+        const encoder = new TextEncoder();
         keepAliveRef.id = setInterval(() => {
           try {
             controller.enqueue(encoder.encode(': keepalive\n\n'));
-          } catch (error) {
+          } catch {
             if (keepAliveRef.id) clearInterval(keepAliveRef.id);
             release();
           }
@@ -186,8 +173,8 @@ async function handleMCPRequest(request: Request): Promise<Response> {
         closeTimeoutRef.id = setTimeout(() => {
           if (keepAliveRef.id) clearInterval(keepAliveRef.id);
           try {
-            controller.close();
-          } catch (error) {
+            transport.close(); // This will close the controller
+          } catch {
             // Ignore errors when closing
           } finally {
             release();
@@ -197,6 +184,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
       cancel() {
         // On client disconnect, run cleanup to clear timers and decrement counters
         try {
+          transport.close();
           if (cleanup) cleanup();
         } catch {
           // ignore
@@ -216,8 +204,20 @@ async function handleMCPRequest(request: Request): Promise<Response> {
     });
   }
 
-  // Handle POST requests with MCP messages
-  if (request.method === 'POST') {
+  // Handle POST requests with MCP messages (via SSE transport)
+  if (request.method === 'POST' && url.pathname === '/message') {
+      const sessionId = url.searchParams.get('sessionId');
+      if (!sessionId) return new Response('Missing sessionId', { status: 400 });
+      
+      const session = g().__MCP_SESSIONS__?.get(sessionId);
+      if (!session) return new Response('Session not found', { status: 404 });
+      
+      await session.transport.handlePostMessage(request);
+      return new Response('Accepted', { status: 202 });
+  }
+
+  // Handle POST requests (JSON-RPC) - Legacy/Direct
+  if (request.method === 'POST' && url.pathname === '/') {
     try {
       // Parse JSON-RPC request safely
       const raw = await request.text();
@@ -379,7 +379,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
           'Access-Control-Expose-Headers': 'mcp-session-id',
         },
       });
-    } catch (error) {
+    } catch {
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
@@ -427,6 +427,11 @@ export default {
 
       // Handle MCP requests to root endpoint
       if (url.pathname === '/' && request.method === 'POST') {
+        return handleMCPRequest(request);
+      }
+
+      // MCP Message endpoint
+      if (url.pathname === '/message' && request.method === 'POST') {
         return handleMCPRequest(request);
       }
 
@@ -564,7 +569,7 @@ export default {
             } else {
               arguments_ = undefined;
             }
-          } catch (error) {
+          } catch {
             return new Response(
               JSON.stringify({
                 error: 'Invalid JSON in request body',
@@ -611,6 +616,34 @@ export default {
             },
           );
         }
+      }
+
+      // Serve Manifest
+      if (request.method === 'GET' && url.pathname === '/manifest.json') {
+        const server = new LegalMCPServer();
+        const tools = await server.listTools();
+        const resources = await server.listResources();
+        const prompts = await server.listPrompts();
+        
+        const manifest = {
+          server: {
+            name: "courtlistener-mcp",
+            version: "0.1.0",
+            description: "Legal research MCP server providing comprehensive access to CourtListener legal database"
+          },
+          capabilities: {
+            tools,
+            resources,
+            prompts
+          }
+        };
+        
+        return new Response(JSON.stringify(manifest, null, 2), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
       }
 
       // 404 for unknown endpoints
