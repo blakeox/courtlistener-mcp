@@ -119,10 +119,9 @@ describe('SearchCasesHandler (TypeScript)', () => {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
-      assert.ok(payload.error.includes('Failed to search') || payload.error.includes('API down'));
-      if (payload.details?.message) {
-        assert.ok(payload.details.message.includes('API down'));
-      }
+      // withErrorHandling via withDefaults wraps errors with handler name
+      assert.strictEqual(payload.error, 'search_cases failed');
+      assert.ok(payload.details?.message?.includes('API down'));
     }
   });
 });
@@ -235,8 +234,10 @@ describe('SearchOpinionsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string };
-      assert.strictEqual(payload.error, 'Failed to search opinions');
+      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      // withErrorHandling via withDefaults wraps errors with handler name
+      assert.strictEqual(payload.error, 'search_opinions failed');
+      assert.ok(payload.details?.message?.includes('Search unavailable'));
     }
   });
 });

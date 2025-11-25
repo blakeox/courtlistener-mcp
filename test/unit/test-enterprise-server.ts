@@ -153,8 +153,16 @@ class MockTransport {
 let mcpServer: InstanceType<typeof LegalMCPServer>;
 let mockTransport: MockTransport;
 
+// Save original signal handlers to restore after tests
+let originalSigIntListeners: NodeJS.SignalsListener[];
+let originalSigTermListeners: NodeJS.SignalsListener[];
+
 describe('Enterprise MCP Server Testing (TypeScript)', () => {
   beforeEach(async () => {
+    // Save original signal listeners
+    originalSigIntListeners = process.listeners('SIGINT') as NodeJS.SignalsListener[];
+    originalSigTermListeners = process.listeners('SIGTERM') as NodeJS.SignalsListener[];
+
     // Initialize mock transport
     mockTransport = new MockTransport();
     // Clear all registrations before bootstrap to avoid conflicts
@@ -195,6 +203,16 @@ describe('Enterprise MCP Server Testing (TypeScript)', () => {
 
     if (typeof (container as DIContainer).clear === 'function') {
       (container as DIContainer).clear();
+    }
+
+    // Restore original signal listeners to prevent test hangs
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('SIGTERM');
+    for (const listener of originalSigIntListeners) {
+      process.on('SIGINT', listener);
+    }
+    for (const listener of originalSigTermListeners) {
+      process.on('SIGTERM', listener);
     }
   });
 

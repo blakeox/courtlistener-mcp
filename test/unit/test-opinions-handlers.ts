@@ -100,12 +100,11 @@ describe('GetOpinionTextHandler (TypeScript)', () => {
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as {
         error: string;
-        details?: { opinionId?: string };
+        details?: { message?: string; name?: string };
       };
-      assert.strictEqual(payload.error, 'Opinion unavailable');
-      if (payload.details) {
-        assert.strictEqual(payload.details.opinionId, 'fail');
-      }
+      // withErrorHandling returns 'handler_name failed' as error, original message in details
+      assert.strictEqual(payload.error, 'get_opinion_text failed');
+      assert.strictEqual(payload.details?.message, 'Opinion unavailable');
     }
   });
 });
@@ -168,8 +167,10 @@ describe('AnalyzeLegalArgumentHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string };
-      assert.strictEqual(payload.error, 'Analysis timeout');
+      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      // withErrorHandling returns 'handler_name failed' as error, original message in details
+      assert.strictEqual(payload.error, 'analyze_legal_argument failed');
+      assert.strictEqual(payload.details?.message, 'Analysis timeout');
     }
   });
 });
@@ -236,12 +237,11 @@ describe('GetCitationNetworkHandler (TypeScript)', () => {
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as {
         error: string;
-        details?: { opinionId?: string };
+        details?: { message?: string; name?: string };
       };
-      assert.strictEqual(payload.error, 'Network unavailable');
-      if (payload.details) {
-        assert.strictEqual(payload.details.opinionId, 'fail');
-      }
+      // withErrorHandling returns 'handler_name failed' as error, original message in details
+      assert.strictEqual(payload.error, 'get_citation_network failed');
+      assert.strictEqual(payload.details?.message, 'Network unavailable');
     }
   });
 });
@@ -307,12 +307,11 @@ describe('LookupCitationHandler (TypeScript)', () => {
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as {
         error: string;
-        details?: { citation?: string };
+        details?: { message?: string; name?: string };
       };
-      assert.strictEqual(payload.error, 'Lookup failed');
-      if (payload.details) {
-        assert.strictEqual(payload.details.citation, 'bad cite');
-      }
+      // withErrorHandling returns 'handler_name failed' as error, original message in details
+      assert.strictEqual(payload.error, 'lookup_citation failed');
+      assert.strictEqual(payload.details?.message, 'Lookup failed');
     }
   });
 });

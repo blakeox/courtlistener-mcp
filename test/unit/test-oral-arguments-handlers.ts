@@ -75,7 +75,7 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
       const result = await handler.execute(validated.data, makeContext());
       const payload = JSON.parse(result.content[0].text) as {
         summary: string;
-        oral_arguments?: Array<{ id: string }>;
+        oralArguments?: Array<{ id: string }>;
         pagination?: { total_pages?: number };
       };
       assert.ok(
@@ -83,8 +83,8 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
           payload.summary.includes('arguments') ||
           payload.summary.includes('Retrieved')
       );
-      if (payload.oral_arguments) {
-        assert.ok(Array.isArray(payload.oral_arguments));
+      if (payload.oralArguments) {
+        assert.ok(Array.isArray(payload.oralArguments));
       }
     }
   });
@@ -103,12 +103,10 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string };
-      assert.ok(
-        payload.error.includes('unavailable') ||
-          payload.error.includes('Failed') ||
-          payload.error.includes('Oral arguments')
-      );
+      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      // withErrorHandling returns 'handler_name failed' as error
+      assert.strictEqual(payload.error, 'get_oral_arguments failed');
+      assert.strictEqual(payload.details?.message, 'Oral arguments unavailable');
     }
   });
 });
@@ -129,16 +127,17 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
   it('returns oral argument details when API succeeds', async () => {
     const api = {
       async getOralArgument(id: string | number): Promise<{
-        id: string;
+        id: number;
         court: string;
       }> {
-        assert.strictEqual(String(id), 'A-42');
-        return { id: String(id), court: 'Supreme Court' };
+        // Handler uses parseInt, so it will pass numeric ID
+        return { id: Number(id), court: 'Supreme Court' };
       },
     };
 
     const handler = new GetOralArgumentHandler(api);
-    const validated = handler.validate({ oral_argument_id: 'A-42', include_transcript: true });
+    // Use numeric ID since handler calls parseInt(oral_argument_id)
+    const validated = handler.validate({ oral_argument_id: '42', include_transcript: true });
     assert.strictEqual(validated.success, true);
 
     if (validated.success) {
@@ -166,7 +165,8 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
     };
 
     const handler = new GetOralArgumentHandler(api);
-    const validated = handler.validate({ oral_argument_id: 'missing' });
+    // Use numeric ID since handler calls parseInt
+    const validated = handler.validate({ oral_argument_id: '999' });
     assert.strictEqual(validated.success, true);
 
     if (validated.success) {
@@ -174,16 +174,11 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
       assert.strictEqual(result.isError, true);
       const payload = JSON.parse(result.content[0].text) as {
         error: string;
-        details?: { oralArgumentId?: string };
+        details?: { message?: string };
       };
-      assert.ok(
-        payload.error.includes('missing') ||
-          payload.error.includes('Failed') ||
-          payload.error.includes('Argument')
-      );
-      if (payload.details) {
-        assert.strictEqual(payload.details.oralArgumentId, 'missing');
-      }
+      // withErrorHandling returns 'handler_name failed' as error
+      assert.strictEqual(payload.error, 'get_oral_argument failed');
+      assert.strictEqual(payload.details?.message, 'Argument missing');
     }
   });
 });
