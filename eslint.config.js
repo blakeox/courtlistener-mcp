@@ -9,7 +9,8 @@ export default [
       'dist/**',
       'build/**',
       '*.js',
-      'scripts/**/*.js',
+      'scripts/**',
+      'src/legacy/**',
       'test/**/*.js',
       'coverage/**',
       '.github/**'
