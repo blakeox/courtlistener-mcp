@@ -12,12 +12,10 @@ import type { Logger } from '../../src/infrastructure/logger.js';
 import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
 
-// Import compiled server and dependencies
-const { BestPracticeLegalMCPServer } = await import(
-  '../../dist/server/best-practice-server.js'
-);
-const { container } = await import('../../dist/infrastructure/container.js');
-const { Logger: LoggerClass } = await import('../../dist/infrastructure/logger.js');
+// Import source files directly
+import { BestPracticeLegalMCPServer } from '../../src/server/best-practice-server.js';
+import { container } from '../../src/infrastructure/container.js';
+import { Logger as LoggerClass } from '../../src/infrastructure/logger.js';
 
 // Lightweight stubs for DI
 class StubMetrics implements Partial<MetricsCollector> {
@@ -110,6 +108,11 @@ class StubResourceRegistry {
   findHandler() { return undefined; }
 }
 
+class StubPromptRegistry {
+  getAllPrompts() { return []; }
+  findHandler() { return undefined; }
+}
+
 function installTestDI(): void {
   // Clear all registrations and instances to avoid bleed from other tests
   if (typeof (container as { clearAll?: () => void }).clearAll === 'function') {
@@ -137,6 +140,10 @@ function installTestDI(): void {
     });
     registerOrReplace.call(container, 'resourceRegistry', {
       factory: () => new StubResourceRegistry(),
+      singleton: true,
+    });
+    registerOrReplace.call(container, 'promptRegistry', {
+      factory: () => new StubPromptRegistry(),
       singleton: true,
     });
     registerOrReplace.call(container, 'middlewareFactory', {
@@ -207,6 +214,10 @@ function installTestDI(): void {
       factory: () => new StubResourceRegistry(),
       singleton: true,
     });
+    registerService('promptRegistry', {
+      factory: () => new StubPromptRegistry(),
+      singleton: true,
+    });
     registerService('middlewareFactory', {
       factory: () => new StubMiddlewareFactory(),
     });
@@ -235,8 +246,36 @@ function installTestDI(): void {
 }
 
 describe('BestPracticeLegalMCPServer', () => {
-  beforeEach(() => installTestDI());
+  let originalSigIntListeners: NodeJS.SignalsListener[];
+  let originalSigTermListeners: NodeJS.SignalsListener[];
+  let originalSigQuitListeners: NodeJS.SignalsListener[];
+  let originalUncaughtExceptionListeners: NodeJS.UncaughtExceptionListener[];
+  let originalUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[];
+
+  beforeEach(() => {
+    originalSigIntListeners = process.listeners('SIGINT');
+    originalSigTermListeners = process.listeners('SIGTERM');
+    originalSigQuitListeners = process.listeners('SIGQUIT');
+    originalUncaughtExceptionListeners = process.listeners('uncaughtException');
+    originalUnhandledRejectionListeners = process.listeners('unhandledRejection');
+    installTestDI();
+  });
+
   afterEach(() => {
+    // Remove all listeners added during the test
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGQUIT');
+    process.removeAllListeners('uncaughtException');
+    process.removeAllListeners('unhandledRejection');
+    
+    // Restore original listeners
+    originalSigIntListeners.forEach(l => process.on('SIGINT', l));
+    originalSigTermListeners.forEach(l => process.on('SIGTERM', l));
+    originalSigQuitListeners.forEach(l => process.on('SIGQUIT', l));
+    originalUncaughtExceptionListeners.forEach(l => process.on('uncaughtException', l));
+    originalUnhandledRejectionListeners.forEach(l => process.on('unhandledRejection', l));
+
     if (typeof (container as { clearAll?: () => void }).clearAll === 'function') {
       (container as { clearAll: () => void }).clearAll();
     } else if (typeof container.clear === 'function') {
@@ -256,6 +295,8 @@ describe('BestPracticeLegalMCPServer', () => {
     assert.ok(Array.isArray(tools));
     assert.ok(Array.isArray(metadata.categories));
     assert.ok(tools.length >= 0);
+
+    await server.stop();
   });
 
   it('handles tool execution requests', async () => {
@@ -272,19 +313,21 @@ describe('BestPracticeLegalMCPServer', () => {
     const content = result.content;
     assert.ok(Array.isArray(content));
     assert.ok(content.length > 0);
+
+    await server.stop();
   });
 
   it('provides tool definitions in correct format', async () => {
     const server = new BestPracticeLegalMCPServer();
-    const result = await server.listTools();
+    // @ts-ignore - accessing private method for testing
+    const tools = server.buildToolDefinitions();
 
-    const tools = result.tools as Tool[];
-    if (tools.length > 0) {
-      const tool = tools[0];
-      assert.ok('name' in tool);
-      assert.ok('description' in tool);
-      assert.ok('inputSchema' in tool);
-    }
+    assert.ok(Array.isArray(tools));
+    assert.strictEqual(tools.length, 1);
+    assert.strictEqual(tools[0].name, 'stub_tool');
+    assert.strictEqual(tools[0].inputSchema.type, 'object');
+
+    await server.stop();
   });
 });
 

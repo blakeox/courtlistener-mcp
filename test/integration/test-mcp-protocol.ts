@@ -11,7 +11,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SERVER_URL = 'https://courtlistener-mcp.blakeopowell.workers.dev/sse';
+const SERVER_URL = 'https://courtlistener-mcp.blakeoxford.workers.dev/sse';
 
 interface TestCase {
   name: string;
@@ -29,7 +29,7 @@ interface TestCase {
   };
   validate: (
     result: unknown,
-    response?: { error?: { code?: number; message?: string } }
+    response?: { error?: { code?: number; message?: string } },
   ) => boolean;
 }
 
@@ -67,8 +67,7 @@ async function testMCPServer(): Promise<boolean> {
           typeof result === 'object' &&
           result !== null &&
           'serverInfo' in result &&
-          (result as { serverInfo?: { name?: string } }).serverInfo?.name ===
-            'Legal MCP Server'
+          (result as { serverInfo?: { name?: string } }).serverInfo?.name === 'Legal MCP Server'
         );
       },
     },
@@ -90,10 +89,42 @@ async function testMCPServer(): Promise<boolean> {
       },
     },
     {
-      name: 'List Federal Courts',
+      name: 'List Resources',
       payload: {
         jsonrpc: '2.0',
         id: 3,
+        method: 'resources/list',
+      },
+      validate: (result) => {
+        return (
+          typeof result === 'object' &&
+          result !== null &&
+          'resources' in result &&
+          Array.isArray((result as { resources?: unknown[] }).resources)
+        );
+      },
+    },
+    {
+      name: 'List Prompts',
+      payload: {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'prompts/list',
+      },
+      validate: (result) => {
+        return (
+          typeof result === 'object' &&
+          result !== null &&
+          'prompts' in result &&
+          Array.isArray((result as { prompts?: unknown[] }).prompts)
+        );
+      },
+    },
+    {
+      name: 'List Federal Courts',
+      payload: {
+        jsonrpc: '2.0',
+        id: 5,
         method: 'tools/call',
         params: {
           name: 'list_courts',
@@ -114,7 +145,7 @@ async function testMCPServer(): Promise<boolean> {
       name: 'Search Privacy Cases',
       payload: {
         jsonrpc: '2.0',
-        id: 4,
+        id: 6,
         method: 'tools/call',
         params: {
           name: 'search_cases',
@@ -139,14 +170,12 @@ async function testMCPServer(): Promise<boolean> {
       name: 'Invalid Method Test',
       payload: {
         jsonrpc: '2.0',
-        id: 5,
+        id: 7,
         method: 'invalid/method',
       },
       validate: (_result, response) => {
         return (
-          response !== undefined &&
-          response.error !== undefined &&
-          response.error.code === -32601
+          response !== undefined && response.error !== undefined && response.error.code === -32601
         );
       },
     },
@@ -185,7 +214,7 @@ async function testMCPServer(): Promise<boolean> {
         }
         if (jsonResponse.result?.serverInfo) {
           console.log(
-            `     🖥️ Server: ${jsonResponse.result.serverInfo.name} v${jsonResponse.result.serverInfo.version}`
+            `     🖥️ Server: ${jsonResponse.result.serverInfo.name} v${jsonResponse.result.serverInfo.version}`,
           );
         }
         if (jsonResponse.error) {
@@ -215,7 +244,7 @@ async function testMCPServer(): Promise<boolean> {
 // Additional function to test specific functionality
 async function testSpecificFunction(
   toolName: string,
-  args: Record<string, unknown> = {}
+  args: Record<string, unknown> = {},
 ): Promise<boolean> {
   console.log(`\n🎯 Testing specific function: ${toolName}`);
 
@@ -278,4 +307,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 }
-
