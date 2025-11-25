@@ -1,6 +1,6 @@
 {
   "name": "courtlistener-mcp",
   "compatibility_date": "2025-07-25",
-  "main": "dist/worker.js",
+  "main": "src/worker.ts",
   "compatibility_flags": ["nodejs_compat"]
 }

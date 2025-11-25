@@ -1,15 +1,16 @@
 {
   "mcpServers": {
-    "legal-mcp-local": {
+    "courtlistener-local": {
       "command": "node",
-      "args": ["dist/worker.js"],
+      "args": ["dist/index.js"],
       "env": {
-        "NODE_ENV": "development"
+        "COURTLISTENER_API_KEY": "YOUR_API_KEY_HERE"
       }
     },
-    "legal-mcp-remote": {
-      "type": "sse",
-      "url": "https://courtlistener-mcp.blakeoxford.workers.dev/sse"
+    "courtlistener-remote": {
+      "command": "node",
+      "args": ["scripts/dev/mcp-remote.js"],
+      "env": {}
     }
   }
 }

@@ -49,4 +49,4 @@ ENV NODE_ENV=production \
     METRICS_PORT=3001
 
 # Start the server
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]

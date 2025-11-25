@@ -10,7 +10,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "tsc && npm run generate:manifest",
+    "generate:manifest": "npx tsx scripts/generate-manifest.ts",
+    "deploy": "wrangler deploy",
     "start": "node dist/index.js",
     "mcp": "node dist/index.js",
     "test": "npm run test:unit && npm run test:integration",
