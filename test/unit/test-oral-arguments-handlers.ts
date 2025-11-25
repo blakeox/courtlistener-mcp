@@ -51,7 +51,7 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
 
     assert.strictEqual(res.success, false);
     if (!res.success) {
-      assert.match(res.error.message, /Number must be greater than or equal to 1/);
+      assert.match(res.error.message, /Too small.*>=1|Number must be greater than or equal to 1/);
     }
   });
 

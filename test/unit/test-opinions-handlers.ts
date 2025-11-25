@@ -53,7 +53,7 @@ describe('GetOpinionTextHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error.message, /Number must be greater than 0/);
+      assert.match(result.error.message, /Too small.*>0|Number must be greater than 0/);
     }
   });
 
@@ -264,7 +264,7 @@ describe('LookupCitationHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error.message, /String must contain at least 1 character/);
+      assert.match(result.error.message, /Too small.*>=1 characters|String must contain at least 1 character/);
     }
   });
 

@@ -62,7 +62,7 @@ describe('GetDocketsHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error.message, /Number must be greater than or equal to 1/);
+      assert.match(result.error.message, /Too small.*>=1|Number must be greater than or equal to 1/);
     }
   });
 

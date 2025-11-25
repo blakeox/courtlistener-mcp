@@ -291,7 +291,7 @@ export abstract class TypedToolHandler<
       return success(validated);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const message = error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ');
         return failure(new Error(`Validation failed: ${message}`));
       }
       return failure(error as Error);

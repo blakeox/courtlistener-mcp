@@ -43,10 +43,10 @@ export const CacheConfigSchema = z.object({
  */
 export const LogConfigSchema = z.object({
   level: z.enum(['debug', 'info', 'warn', 'error'], {
-    errorMap: () => ({ message: 'Log level must be one of: debug, info, warn, error' }),
+    message: 'Log level must be one of: debug, info, warn, error',
   }),
   format: z.enum(['json', 'text'], {
-    errorMap: () => ({ message: 'Log format must be either json or text' }),
+    message: 'Log format must be either json or text',
   }),
   enabled: z.boolean(),
 });
@@ -201,7 +201,7 @@ export function validateConfigSafe(
  * @returns Formatted error messages
  */
 export function formatValidationErrors(error: z.ZodError): string[] {
-  return error.errors.map((err) => {
+  return error.issues.map((err: z.ZodIssue) => {
     const path = err.path.join('.');
     const message = err.message;
     return path ? `[${path}] ${message}` : message;
