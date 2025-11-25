@@ -40,14 +40,19 @@ interface AuthComponent {
     clientId?: string;
     reason?: string;
   }>;
-  getSession(sessionId: string): { credentials: string; created: number; lastAccess: number } | undefined;
+  getSession(
+    sessionId: string,
+  ): { credentials: string; created: number; lastAccess: number } | undefined;
 }
 
 interface RateLimitComponent {
   type: string;
   clientLimits: Map<string, { requests: Array<{ timestamp: number }>; count: number }>;
   maxRequests: number;
-  checkLimit(clientId: string, limit?: number): Promise<{
+  checkLimit(
+    clientId: string,
+    limit?: number,
+  ): Promise<{
     allowed: boolean;
     remaining: number;
     resetTime: number;
@@ -63,7 +68,10 @@ interface AuditComponent {
     [key: string]: unknown;
   }>;
   log(entry: Record<string, unknown>): Promise<string>;
-  getLogs(filter?: { clientId?: string; startTime?: string }): Promise<Array<Record<string, unknown>>>;
+  getLogs(filter?: {
+    clientId?: string;
+    startTime?: string;
+  }): Promise<Array<Record<string, unknown>>>;
 }
 
 interface SanitizationComponent {
@@ -96,7 +104,10 @@ interface CircuitBreakerComponent {
 
 interface CompressionComponent {
   type: string;
-  compress(data: unknown, threshold?: number): Promise<{
+  compress(
+    data: unknown,
+    threshold?: number,
+  ): Promise<{
     compressed: boolean;
     originalSize: number;
     compressedSize?: number;
@@ -186,17 +197,13 @@ class EnhancedEndToEndTests {
       console.log(`  ✅ ${testName}`);
       this.passedTests++;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`  ❌ ${testName}: ${errorMessage}`);
       this.failedTests++;
     }
   }
 
-  private async runAsyncTest(
-    testName: string,
-    testFn: () => Promise<void>
-  ): Promise<void> {
+  private async runAsyncTest(testName: string, testFn: () => Promise<void>): Promise<void> {
     this.testCount++;
     try {
       await testFn();
@@ -304,7 +311,7 @@ class EnhancedEndToEndTests {
 
         this.state = 'starting';
         console.log(
-          `    🚀 Starting Legal MCP Server on ${this.config.server.host}:${this.config.server.port}`
+          `    🚀 Starting Legal MCP Server on ${this.config.server.host}:${this.config.server.port}`,
         );
 
         // Initialize enterprise components
@@ -347,8 +354,7 @@ class EnhancedEndToEndTests {
         }
 
         // Wait for in-flight requests to complete
-        const timeout =
-          this.config.enterprise?.gracefulShutdown?.timeout || 30000;
+        const timeout = this.config.enterprise?.gracefulShutdown?.timeout || 30000;
         await this.waitForRequestsToComplete(timeout);
 
         // Close connections
@@ -398,17 +404,14 @@ class EnhancedEndToEndTests {
         }
 
         console.log(
-          `    📦 Initialized ${Object.keys(this.components).length} enterprise components`
+          `    📦 Initialized ${Object.keys(this.components).length} enterprise components`,
         );
       },
 
       createAuthComponent(): AuthComponent {
         return {
           type: 'authentication',
-          validCredentials: new Set([
-            'legal-api-key-123',
-            'enterprise-token-456',
-          ]),
+          validCredentials: new Set(['legal-api-key-123', 'enterprise-token-456']),
           sessions: new Map(),
 
           async validate(credentials: string) {
@@ -435,8 +438,7 @@ class EnhancedEndToEndTests {
       },
 
       createRateLimitComponent(): RateLimitComponent {
-        const maxRequests =
-          this.config.enterprise?.rateLimit?.maxRequests || 100;
+        const maxRequests = this.config.enterprise?.rateLimit?.maxRequests || 100;
         return {
           type: 'rateLimit',
           clientLimits: new Map(),
@@ -454,7 +456,7 @@ class EnhancedEndToEndTests {
 
             // Clean old requests
             clientData.requests = clientData.requests.filter(
-              (req) => now - req.timestamp < windowMs
+              (req) => now - req.timestamp < windowMs,
             );
             clientData.count = clientData.requests.length;
 
@@ -505,15 +507,12 @@ class EnhancedEndToEndTests {
             let filtered: Array<Record<string, unknown>> = [...this.logs];
 
             if (filter.clientId) {
-              filtered = filtered.filter(
-                (log) => log.clientId === filter.clientId
-              );
+              filtered = filtered.filter((log) => log.clientId === filter.clientId);
             }
 
             if (filter.startTime) {
               filtered = filtered.filter(
-                (log) =>
-                  new Date(log.timestamp as string) >= new Date(filter.startTime!)
+                (log) => new Date(log.timestamp as string) >= new Date(filter.startTime!),
               );
             }
 
@@ -527,8 +526,7 @@ class EnhancedEndToEndTests {
           type: 'sanitization',
           patterns: {
             xss: /<script[^>]*>.*?<\/script>/gi,
-            sqlInjection:
-              /(union|select|insert|update|delete|drop|create|alter)\s+/gi,
+            sqlInjection: /(union|select|insert|update|delete|drop|create|alter)\s+/gi,
             commandInjection: /[;&|`$(){}[\]]/g,
           },
 
@@ -561,10 +559,7 @@ class EnhancedEndToEndTests {
                 severity: 'high',
                 pattern: 'sql keywords',
               });
-              sanitized = sanitized.replace(
-                this.patterns.sqlInjection,
-                '[SQL_BLOCKED]'
-              );
+              sanitized = sanitized.replace(this.patterns.sqlInjection, '[SQL_BLOCKED]');
             }
 
             // Check for command injection
@@ -664,7 +659,7 @@ class EnhancedEndToEndTests {
 
       setupRequestHandling() {
         // Simulate request handling setup
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+
         this.handleRequest = this.handleRequest.bind(this);
       },
 
@@ -722,8 +717,7 @@ class EnhancedEndToEndTests {
 
           const fullError = {
             type: errorResult.type || 'UNKNOWN_ERROR',
-            message:
-              errorResult.message || 'Unknown error occurred',
+            message: errorResult.message || 'Unknown error occurred',
             requestId,
             duration,
             ...(errorResult.violations && { violations: errorResult.violations }),
@@ -737,16 +731,13 @@ class EnhancedEndToEndTests {
         }
       },
 
-      async processLegalQuery(
-        request: LegalRequest,
-        requestId: string
-      ): Promise<unknown> {
+      async processLegalQuery(request: LegalRequest, requestId: string): Promise<unknown> {
         const context: Record<string, unknown> = { requestId, request };
 
         // 1. Input Sanitization
         if (this.components.sanitization) {
           const sanitization = await this.components.sanitization.sanitize(
-            (request.query as string) || ''
+            (request.query as string) || '',
           );
           if (sanitization.violations.length > 0) {
             const error = new Error('Input sanitization failed') as Error & {
@@ -766,9 +757,7 @@ class EnhancedEndToEndTests {
 
         // 2. Authentication
         if (this.components.auth) {
-          const auth = await this.components.auth.validate(
-            (request.credentials as string) || ''
-          );
+          const auth = await this.components.auth.validate((request.credentials as string) || '');
           if (!auth.valid) {
             const error = new Error('Authentication failed') as Error & {
               type: string;
@@ -785,7 +774,7 @@ class EnhancedEndToEndTests {
         // 3. Rate Limiting
         if (this.components.rateLimit) {
           const rateLimit = await this.components.rateLimit.checkLimit(
-            (context.clientId as string) || 'anonymous'
+            (context.clientId as string) || 'anonymous',
           );
           if (!rateLimit.allowed) {
             const error = new Error('Rate limit exceeded') as Error & {
@@ -804,13 +793,10 @@ class EnhancedEndToEndTests {
 
         // 5. Response Compression
         if (this.components.compression) {
-          const compression = await this.components.compression.compress(
-            queryResult
-          );
+          const compression = await this.components.compression.compress(queryResult);
           context.compressionInfo = compression;
           if (typeof queryResult === 'object' && queryResult !== null) {
-            (queryResult as Record<string, unknown>).compressed =
-              compression.compressed;
+            (queryResult as Record<string, unknown>).compressed = compression.compressed;
           }
         }
 
@@ -830,9 +816,7 @@ class EnhancedEndToEndTests {
 
       async executeLegalQuery(context: Record<string, unknown>): Promise<unknown> {
         const query =
-          (context.sanitizedQuery as string) ||
-          (context.request as LegalRequest).query ||
-          '';
+          (context.sanitizedQuery as string) || (context.request as LegalRequest).query || '';
 
         // Simulate legal database queries
         if (query.includes('case law')) {
@@ -897,8 +881,7 @@ class EnhancedEndToEndTests {
         const totalResponses = this.metrics.totalRequests;
         const currentErrorRate = success ? 0 : 1;
         this.metrics.errorRate =
-          (this.metrics.errorRate * (totalResponses - 1) + currentErrorRate) /
-          totalResponses;
+          (this.metrics.errorRate * (totalResponses - 1) + currentErrorRate) / totalResponses;
 
         // Update active connections
         this.metrics.activeConnections = this.requestsInFlight.size;
@@ -929,19 +912,14 @@ class EnhancedEndToEndTests {
       async waitForRequestsToComplete(timeout: number): Promise<void> {
         const start = Date.now();
 
-        while (
-          this.requestsInFlight.size > 0 &&
-          Date.now() - start < timeout
-        ) {
-          console.log(
-            `    ⏳ Waiting for ${this.requestsInFlight.size} requests to complete...`
-          );
+        while (this.requestsInFlight.size > 0 && Date.now() - start < timeout) {
+          console.log(`    ⏳ Waiting for ${this.requestsInFlight.size} requests to complete...`);
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
         if (this.requestsInFlight.size > 0) {
           console.log(
-            `    ⚠️ Forcibly terminating ${this.requestsInFlight.size} remaining requests`
+            `    ⚠️ Forcibly terminating ${this.requestsInFlight.size} remaining requests`,
           );
         }
       },
@@ -949,10 +927,7 @@ class EnhancedEndToEndTests {
       getMetrics(): Record<string, unknown> {
         return {
           ...this.metrics,
-          uptime:
-            this.state === 'running'
-              ? Date.now() - this.metrics.uptime
-              : this.metrics.uptime,
+          uptime: this.state === 'running' ? Date.now() - this.metrics.uptime : this.metrics.uptime,
           state: this.state,
           components: Object.keys(this.components),
           requestsInFlight: this.requestsInFlight.size,
@@ -970,14 +945,8 @@ class EnhancedEndToEndTests {
         // Check component health
         for (const [name, component] of Object.entries(this.components)) {
           try {
-            if (
-              component &&
-              'type' in component &&
-              component.type === 'circuitBreaker'
-            ) {
-              health.components[name] = (
-                component as CircuitBreakerComponent
-              ).getState();
+            if (component && 'type' in component && component.type === 'circuitBreaker') {
+              health.components[name] = (component as CircuitBreakerComponent).getState();
             } else {
               health.components[name] = {
                 status: 'healthy',
@@ -985,8 +954,7 @@ class EnhancedEndToEndTests {
               };
             }
           } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
             health.components[name] = {
               status: 'unhealthy',
               error: errorMessage,
@@ -1014,10 +982,7 @@ class EnhancedEndToEndTests {
 
       console.assert(startResult.success === true, 'Should start successfully');
       console.assert(startResult.port === 3000, 'Should use configured port');
-      console.assert(
-        startResult.components.length > 0,
-        'Should initialize components'
-      );
+      console.assert(startResult.components.length > 0, 'Should initialize components');
       console.assert(server.state === 'running', 'Should be in running state');
 
       await server.stop();
@@ -1051,12 +1016,12 @@ class EnhancedEndToEndTests {
       console.assert(result.success === true, 'Should process successfully');
       console.assert(
         (result.result as { type?: string })?.type === 'case_law_search',
-        'Should identify as case law search'
+        'Should identify as case law search',
       );
       console.assert(
         (result.result as { results?: unknown[] })?.results &&
           (result.result as { results: unknown[] }).results.length > 0,
-        'Should return case law results'
+        'Should return case law results',
       );
       console.assert(result.duration > 0, 'Should track processing duration');
 
@@ -1077,12 +1042,12 @@ class EnhancedEndToEndTests {
       console.assert(result.success === true, 'Should process successfully');
       console.assert(
         (result.result as { type?: string })?.type === 'statute_search',
-        'Should identify as statute search'
+        'Should identify as statute search',
       );
       console.assert(
         (result.result as { results?: unknown[] })?.results &&
           (result.result as { results: unknown[] }).results.length > 0,
-        'Should return statute results'
+        'Should return statute results',
       );
 
       await server.stop();
@@ -1102,7 +1067,7 @@ class EnhancedEndToEndTests {
       console.assert(result.success === true, 'Should process successfully');
       console.assert(
         (result.result as { type?: string })?.type === 'regulation_search',
-        'Should identify as regulation search'
+        'Should identify as regulation search',
       );
 
       await server.stop();
@@ -1125,14 +1090,8 @@ class EnhancedEndToEndTests {
         console.assert(false, 'Should block malicious query');
       } catch (error) {
         const err = error as { type?: string; violations?: unknown[] };
-        console.assert(
-          err.type === 'SANITIZATION_ERROR',
-          'Should be sanitization error'
-        );
-        console.assert(
-          err.violations && err.violations.length > 0,
-          'Should report violations'
-        );
+        console.assert(err.type === 'SANITIZATION_ERROR', 'Should be sanitization error');
+        console.assert(err.violations && err.violations.length > 0, 'Should report violations');
       }
 
       await server.stop();
@@ -1224,11 +1183,11 @@ class EnhancedEndToEndTests {
       const cbState = server.components.circuitBreaker?.getState();
       console.assert(
         cbState?.state === 'OPEN',
-        `Circuit breaker should be open, but is ${cbState?.state}`
+        `Circuit breaker should be open, but is ${cbState?.state}`,
       );
       console.assert(
         (cbState?.failureCount || 0) >= 5,
-        `Should track failure count, got ${cbState?.failureCount}`
+        `Should track failure count, got ${cbState?.failureCount}`,
       );
 
       // Test that circuit breaker blocks new requests
@@ -1239,7 +1198,7 @@ class EnhancedEndToEndTests {
         const err = error as { message?: string };
         console.assert(
           err.message?.includes('Circuit breaker is OPEN'),
-          'Should indicate circuit is open'
+          'Should indicate circuit is open',
         );
       }
 
@@ -1270,7 +1229,7 @@ class EnhancedEndToEndTests {
           server.handleRequest({
             credentials: validCredentials[i % validCredentials.length],
             query: `case law search ${i}`,
-          })
+          }),
         );
 
       const results = await Promise.all(promises);
@@ -1279,14 +1238,12 @@ class EnhancedEndToEndTests {
       console.assert(results.length === concurrentQueries, 'Should complete all queries');
       console.assert(
         results.every((r) => r.success),
-        'All queries should succeed'
+        'All queries should succeed',
       );
       console.assert(duration < 2000, 'Should complete concurrent queries efficiently');
 
       const avgTime = duration / concurrentQueries;
-      console.log(
-        `    ⚡ Average concurrent query time: ${avgTime.toFixed(2)}ms`
-      );
+      console.log(`    ⚡ Average concurrent query time: ${avgTime.toFixed(2)}ms`);
 
       await server.stop();
     });
@@ -1321,24 +1278,24 @@ class EnhancedEndToEndTests {
 
       const start = Date.now();
       const results = await Promise.all(
-        workloadQueries.map((query) => server.handleRequest(query))
+        workloadQueries.map((query) => server.handleRequest(query)),
       );
       const duration = Date.now() - start;
 
       console.assert(results.length === 10, 'Should complete all mixed queries');
       console.assert(
         results.every((r) => r.success),
-        'All mixed queries should succeed'
+        'All mixed queries should succeed',
       );
 
       const caseResults = results.filter(
-        (r) => (r.result as { type?: string })?.type === 'case_law_search'
+        (r) => (r.result as { type?: string })?.type === 'case_law_search',
       );
       const statuteResults = results.filter(
-        (r) => (r.result as { type?: string })?.type === 'statute_search'
+        (r) => (r.result as { type?: string })?.type === 'statute_search',
       );
       const regResults = results.filter(
-        (r) => (r.result as { type?: string })?.type === 'regulation_search'
+        (r) => (r.result as { type?: string })?.type === 'regulation_search',
       );
 
       console.assert(caseResults.length === 5, 'Should process case law queries');
@@ -1363,21 +1320,12 @@ class EnhancedEndToEndTests {
 
       const health = await server.healthCheck();
 
-      console.assert(
-        (health.status as string) === 'running',
-        'Should report running status'
-      );
+      console.assert((health.status as string) === 'running', 'Should report running status');
       console.assert(health.components !== undefined, 'Should include component health');
       console.assert(health.metrics !== undefined, 'Should include metrics');
       const metrics = health.metrics as { totalRequests?: number; avgResponseTime?: number };
-      console.assert(
-        (metrics.totalRequests || 0) > 0,
-        'Should track total requests'
-      );
-      console.assert(
-        (metrics.avgResponseTime || 0) > 0,
-        'Should track response time'
-      );
+      console.assert((metrics.totalRequests || 0) > 0, 'Should track total requests');
+      console.assert((metrics.avgResponseTime || 0) > 0, 'Should track response time');
 
       await server.stop();
     });
@@ -1389,7 +1337,7 @@ class EnhancedEndToEndTests {
       const initialMetrics = server.getMetrics();
       console.assert(
         (initialMetrics.totalRequests as number) === 0,
-        'Should start with zero requests'
+        'Should start with zero requests',
       );
 
       // Process successful request
@@ -1409,18 +1357,9 @@ class EnhancedEndToEndTests {
       }
 
       const finalMetrics = server.getMetrics();
-      console.assert(
-        (finalMetrics.totalRequests as number) === 2,
-        'Should track total requests'
-      );
-      console.assert(
-        (finalMetrics.errorRate as number) > 0,
-        'Should track error rate'
-      );
-      console.assert(
-        (finalMetrics.avgResponseTime as number) > 0,
-        'Should track response time'
-      );
+      console.assert((finalMetrics.totalRequests as number) === 2, 'Should track total requests');
+      console.assert((finalMetrics.errorRate as number) > 0, 'Should track error rate');
+      console.assert((finalMetrics.avgResponseTime as number) > 0, 'Should track response time');
 
       await server.stop();
     });
@@ -1451,10 +1390,7 @@ class EnhancedEndToEndTests {
 
       console.assert((auditLogs?.length || 0) >= 1, 'Should log activities'); // Only successful requests logged
       if (auditLogs && auditLogs.length > 0) {
-        console.assert(
-          auditLogs[0].requestId !== undefined,
-          'Should include request ID'
-        );
+        console.assert(auditLogs[0].requestId !== undefined, 'Should include request ID');
         console.assert(auditLogs[0].clientId !== undefined, 'Should include client ID');
         console.assert(auditLogs[0].query !== undefined, 'Should include query');
       }
@@ -1472,22 +1408,18 @@ class EnhancedEndToEndTests {
     console.log('='.repeat(80));
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`Passed: ${this.passedTests} ✅`);
-    console.log(
-      `Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`
-    );
+    console.log(`Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`);
     if (this.testCount > 0) {
-      console.log(
-        `Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`
-      );
+      console.log(`Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`);
     }
 
     if (this.failedTests === 0) {
       console.log(
-        '\n🎉 All end-to-end enterprise tests passed! Complete Legal MCP Server workflow is functioning correctly.'
+        '\n🎉 All end-to-end enterprise tests passed! Complete Legal MCP Server workflow is functioning correctly.',
       );
     } else {
       console.log(
-        `\n💥 ${this.failedTests} test(s) failed. Please review end-to-end implementation.`
+        `\n💥 ${this.failedTests} test(s) failed. Please review end-to-end implementation.`,
       );
       process.exit(1);
     }
@@ -1502,4 +1434,3 @@ endToEndTests.runComprehensiveTests().catch((error) => {
   console.error('Fatal error in end-to-end tests:', error);
   process.exit(1);
 });
-
