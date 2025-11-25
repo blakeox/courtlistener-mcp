@@ -70,9 +70,14 @@ const defaultConfig: ServerConfig = {
     resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
   },
   compression: {
-    enabled: process.env.COMPRESSION_ENABLED === 'true',
+    enabled: process.env.COMPRESSION_ENABLED !== 'false',
     threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
-    level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 1, 9),
+    level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 0, 9),
+  },
+  sampling: {
+    enabled: process.env.SAMPLING_ENABLED === 'true',
+    maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
+    defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
   },
 };
 

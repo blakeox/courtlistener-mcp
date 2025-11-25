@@ -28,6 +28,8 @@ export class MCPServerFactory implements ServerFactory {
       {
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
           logging: config.logging.enabled ? {} : undefined,
         },
       },

@@ -58,6 +58,7 @@ import {
   GetFinancialDisclosureDetailsHandler,
   GetVisualizationDataHandler,
   ValidateCitationsHandler,
+  SmartSearchHandler,
 } from '../domains/enhanced/handlers.js';
 import {
   GetFinancialDisclosureHandler,
@@ -275,6 +276,7 @@ function registerToolHandlers(): void {
   toolRegistry.register(new GetFinancialDisclosureDetailsHandler(courtListenerApi));
   toolRegistry.register(new ValidateCitationsHandler(courtListenerApi));
   toolRegistry.register(new GetEnhancedRECAPDataHandler(courtListenerApi));
+  toolRegistry.register(new SmartSearchHandler(courtListenerApi));
 }
 
 export function getServiceContainer() {

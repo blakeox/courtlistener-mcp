@@ -115,6 +115,15 @@ export const CompressionConfigSchema = z.object({
 });
 
 /**
+ * Zod schema for Sampling configuration
+ */
+export const SamplingConfigSchema = z.object({
+  enabled: z.boolean(),
+  maxTokens: z.number().int().positive('Max tokens must be positive'),
+  defaultModel: z.string().optional(),
+});
+
+/**
  * Complete Server Configuration Schema
  */
 export const ServerConfigSchema = z.object({
@@ -125,6 +134,7 @@ export const ServerConfigSchema = z.object({
   security: SecurityConfigSchema,
   audit: AuditConfigSchema,
   circuitBreaker: CircuitBreakerConfigSchema,
+  sampling: SamplingConfigSchema,
   compression: CompressionConfigSchema,
 });
 
