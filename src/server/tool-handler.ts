@@ -33,6 +33,8 @@ export interface ToolHandler<TInput = unknown, TOutput = unknown> {
   getSchema(): Record<string, unknown>;
 }
 
+import { SamplingService } from './sampling-service.js';
+
 export interface ToolContext {
   logger: Logger;
   requestId: string;
@@ -40,6 +42,7 @@ export interface ToolContext {
   metrics?: MetricsCollector;
   config?: ServerConfig;
   userId?: string;
+  sampling?: SamplingService;
 }
 
 export class ToolHandlerRegistry {

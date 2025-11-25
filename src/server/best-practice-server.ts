@@ -1,4 +1,5 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequest,
@@ -33,6 +34,7 @@ import { ServerConfig } from '../types.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
 import { ResourceHandlerRegistry } from './resource-handler.js';
 import { PromptHandlerRegistry } from './prompt-handler.js';
+import { SamplingService } from './sampling-service.js';
 import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
 
 interface ToolMetadata {
@@ -92,9 +94,10 @@ export class BestPracticeLegalMCPServer {
   private readonly circuitBreakers: CircuitBreakerManager;
   private readonly gracefulShutdown: GracefulShutdown;
   private readonly cache: CacheManager;
+  private readonly samplingService: SamplingService;
 
   private healthServer?: HealthServer;
-  private transport?: StdioServerTransport;
+  private transport?: Transport;
   private isShuttingDown = false;
   private readonly activeRequests = new Set<string>();
   private heartbeatInterval?: NodeJS.Timeout;
@@ -128,6 +131,8 @@ export class BestPracticeLegalMCPServer {
 
     const serverFactory = container.get<MCPServerFactory>('serverFactory');
     this.server = serverFactory.createServer(this.config);
+
+    this.samplingService = new SamplingService(this.server, this.config, this.logger);
 
     this.setupHealthServer();
     this.setupHandlers();
@@ -176,13 +181,13 @@ export class BestPracticeLegalMCPServer {
    * // Server is now ready to accept MCP requests
    * ```
    */
-  async start(): Promise<void> {
+  async start(transport?: Transport): Promise<void> {
     this.logger.info('Starting Legal MCP Server (best-practice profile)...', {
       toolCount: this.toolRegistry.getToolNames().length,
       features: this.getFeatureFlags(),
     });
 
-    this.transport = new StdioServerTransport();
+    this.transport = transport || new StdioServerTransport();
     await this.server.connect(this.transport);
 
     if (this.healthServer) {
@@ -243,6 +248,11 @@ export class BestPracticeLegalMCPServer {
       });
     }
 
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
+
     await this.server.close();
 
     if (this.healthServer) {
@@ -250,6 +260,20 @@ export class BestPracticeLegalMCPServer {
     }
 
     this.logger.info('Legal MCP Server stopped');
+  }
+
+  /**
+   * Destroy the server instance for cleanup (useful in tests)
+   * 
+   * This method stops all background tasks without requiring a full shutdown.
+   * Use this in tests to clean up server instances and prevent hanging.
+   */
+  destroy(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
+    this.isShuttingDown = true;
   }
 
   /**
@@ -279,8 +303,9 @@ export class BestPracticeLegalMCPServer {
   /**
    * Direct access to list resources
    */
-  async listResources(): Promise<Resource[]> {
-    return this.resourceRegistry.getAllResources();
+  async listResources(): Promise<{ resources: Resource[] }> {
+    const resources = await this.resourceRegistry.getAllResources();
+    return { resources };
   }
 
   /**
@@ -295,6 +320,25 @@ export class BestPracticeLegalMCPServer {
       logger: this.logger,
       requestId: generateId(),
     });
+  }
+
+  /**
+   * Direct access to list prompts
+   */
+  async listPrompts(): Promise<{ prompts: Prompt[] }> {
+    const prompts = await this.promptRegistry.getAllPrompts();
+    return { prompts };
+  }
+
+  /**
+   * Direct access to get prompt
+   */
+  async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
+    const handler = this.promptRegistry.findHandler(name);
+    if (!handler) {
+      throw new McpError(ErrorCode.InvalidRequest, `Prompt not found: ${name}`);
+    }
+    return handler.getMessages(args || {});
   }
 
   /**
@@ -581,6 +625,7 @@ export class BestPracticeLegalMCPServer {
         cache: this.cache,
         metrics: this.metrics,
         config: this.config,
+        sampling: this.samplingService,
       });
 
     try {
