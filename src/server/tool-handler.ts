@@ -303,10 +303,9 @@ export abstract class TypedToolHandler<
    * This is automatically implemented - no need to override
    */
   getSchema(): Record<string, unknown> {
-    return zodToJsonSchema(this.schema, {
-      target: 'openApi3',
-      $refStrategy: 'none',
-    }) as Record<string, unknown>;
+    // Use explicit unknown to avoid deep type instantiation issues with zod-to-json-schema
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return zodToJsonSchema(this.schema as any) as Record<string, unknown>;
   }
 
   /**

@@ -23,7 +23,6 @@ export class MCPServerFactory implements ServerFactory {
       {
         name: 'legal-mcp-server',
         version: '1.0.0',
-        description: 'Legal research MCP server with CourtListener integration',
       },
       {
         capabilities: {
