@@ -51,7 +51,6 @@
     "dev": "tsc --watch --preserveWatchOutput",
     "lint": "eslint . --ext .ts",
     "lint:src": "eslint src --ext .ts",
-    "lint:critical": "eslint src/worker.ts src/security/oidc.ts --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -75,7 +74,8 @@
     "coverage": "c8 --config .c8rc.json npm run test:unit",
     "coverage:unit": "c8 --config .c8rc.json npm run test:unit",
     "coverage:check": "c8 --config .c8rc.json --check-coverage --branches=50 --functions=50 --lines=50 --statements=50 npm run test:unit",
-    "test:analysis": "npx tsx test/analysis/analyze-untested-code.ts"
+    "test:analysis": "npx tsx test/analysis/analyze-untested-code.ts",
+    "prepare": "husky"
   },
   "keywords": [
     "mcp",
@@ -114,7 +114,9 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^9.1.7",
     "jose": "^6.1.2",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.6.2",
     "sinon": "^21.0.0",
     "tsx": "^4.20.6",
