@@ -97,7 +97,7 @@ This server strictly follows the
 - **Bulk Operations**: Efficient handling of large datasets
 - **Research Insights**: Built-in analysis suggestions and tips
 
-## Available Tools (25 Total)
+## Available Tools (33 Total)
 
 ### Core Research (7 tools)
 
