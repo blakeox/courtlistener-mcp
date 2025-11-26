@@ -122,7 +122,9 @@ export class ErrorBoundaryMiddleware {
   /**
    * Async error wrapper for route handlers
    */
-  public wrapAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+  public wrapAsync = (
+    fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+  ) => {
     return (req: Request, res: Response, next: NextFunction) => {
       Promise.resolve(fn(req, res, next)).catch(next);
     };
@@ -417,7 +419,7 @@ export class ErrorBoundaryMiddleware {
       return; // Response already sent
     }
 
-    const response: any = {
+    const response: Record<string, unknown> = {
       error: error.category,
       message: error.message,
       errorId: error.errorId,

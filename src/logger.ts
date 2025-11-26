@@ -12,7 +12,7 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   component?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   requestId?: string;
   duration?: number;
   error?: {
@@ -41,33 +41,35 @@ export class Logger {
   /**
    * Debug level logging
    */
-  debug(message: string, metadata?: Record<string, any>): void {
+  debug(message: string, metadata?: Record<string, unknown>): void {
     this.log('debug', message, metadata);
   }
 
   /**
    * Info level logging
    */
-  info(message: string, metadata?: Record<string, any>): void {
+  info(message: string, metadata?: Record<string, unknown>): void {
     this.log('info', message, metadata);
   }
 
   /**
    * Warning level logging
    */
-  warn(message: string, metadata?: Record<string, any>): void {
+  warn(message: string, metadata?: Record<string, unknown>): void {
     this.log('warn', message, metadata);
   }
 
   /**
    * Error level logging
    */
-  error(message: string, error?: Error, metadata?: Record<string, any>): void {
-    const errorData = error ? {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    } : undefined;
+  error(message: string, error?: Error, metadata?: Record<string, unknown>): void {
+    const errorData = error
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        }
+      : undefined;
 
     this.log('error', message, metadata, errorData);
   }
@@ -80,16 +82,16 @@ export class Logger {
     endpoint: string,
     duration: number,
     status: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>,
   ): void {
     const level: LogLevel = status >= 400 ? 'error' : status >= 300 ? 'warn' : 'info';
-    
+
     this.log(level, `API ${method} ${endpoint}`, {
       ...metadata,
       duration,
       status,
       endpoint,
-      method
+      method,
     });
   }
 
@@ -100,15 +102,15 @@ export class Logger {
     toolName: string,
     duration: number,
     success: boolean,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>,
   ): void {
     const level: LogLevel = success ? 'info' : 'error';
-    
+
     this.log(level, `Tool execution: ${toolName}`, {
       ...metadata,
       toolName,
       duration,
-      success
+      success,
     });
   }
 
@@ -118,8 +120,8 @@ export class Logger {
   private log(
     level: LogLevel,
     message: string,
-    metadata?: Record<string, any>,
-    error?: { name: string; message: string; stack?: string }
+    metadata?: Record<string, unknown>,
+    error?: { name: string; message: string; stack?: string },
   ): void {
     if (!this.config.enabled) return;
     if (!this.shouldLog(level)) return;
@@ -130,12 +132,10 @@ export class Logger {
       message,
       component: this.component,
       ...(metadata && { metadata }),
-      ...(error && { error })
+      ...(error && { error }),
     };
 
-    const output = this.config.format === 'json' 
-      ? JSON.stringify(entry)
-      : this.formatText(entry);
+    const output = this.config.format === 'json' ? JSON.stringify(entry) : this.formatText(entry);
 
     // Route all logging to stderr to avoid interfering with MCP protocol on stdout
     console.error(output);
@@ -149,7 +149,7 @@ export class Logger {
       debug: 0,
       info: 1,
       warn: 2,
-      error: 3
+      error: 3,
     };
 
     return levels[level] >= levels[this.config.level];
@@ -194,7 +194,7 @@ export class TimingContext {
 
   constructor(
     private logger: Logger,
-    private operation: string
+    private operation: string,
   ) {
     this.startTime = Date.now();
     this.logger.debug(`Started: ${this.operation}`);
@@ -203,20 +203,20 @@ export class TimingContext {
   /**
    * End timing and log duration
    */
-  end(success = true, metadata?: Record<string, any>): number {
+  end(success = true, metadata?: Record<string, unknown>): number {
     const duration = Date.now() - this.startTime;
-    
+
     if (success) {
       this.logger.debug(`Completed: ${this.operation}`, {
         ...metadata,
         duration,
-        success
+        success,
       });
     } else {
       this.logger.warn(`Completed: ${this.operation}`, {
         ...metadata,
         duration,
-        success
+        success,
       });
     }
 
@@ -226,12 +226,12 @@ export class TimingContext {
   /**
    * End timing with error
    */
-  endWithError(error: Error, metadata?: Record<string, any>): number {
+  endWithError(error: Error, metadata?: Record<string, unknown>): number {
     const duration = Date.now() - this.startTime;
-    
+
     this.logger.error(`Failed: ${this.operation}`, error, {
       ...metadata,
-      duration
+      duration,
     });
 
     return duration;

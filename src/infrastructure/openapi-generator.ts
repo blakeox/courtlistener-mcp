@@ -5,6 +5,26 @@
 
 import { Logger } from './logger.js';
 
+// OpenAPI types
+export interface OpenAPIParameter {
+  name: string;
+  in: string;
+  description?: string;
+  required?: boolean;
+  schema?: Record<string, unknown>;
+  example?: unknown;
+}
+
+export interface OpenAPIOperation {
+  summary?: string;
+  description?: string;
+  operationId?: string;
+  tags?: string[];
+  parameters?: OpenAPIParameter[];
+  requestBody?: Record<string, unknown>;
+  responses?: Record<string, unknown>;
+}
+
 export interface OpenAPISpec {
   openapi: string;
   info: {
@@ -25,12 +45,12 @@ export interface OpenAPISpec {
     url: string;
     description: string;
   }>;
-  paths: Record<string, any>;
+  paths: Record<string, Record<string, OpenAPIOperation>>;
   components: {
-    schemas: Record<string, any>;
-    responses: Record<string, any>;
-    parameters: Record<string, any>;
-    securitySchemes: Record<string, any>;
+    schemas: Record<string, unknown>;
+    responses: Record<string, unknown>;
+    parameters: Record<string, unknown>;
+    securitySchemes: Record<string, unknown>;
   };
   tags: Array<{
     name: string;
@@ -155,7 +175,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     };
   }
 
-  private generateSchemas(): Record<string, any> {
+  private generateSchemas(): Record<string, unknown> {
     return {
       HealthStatus: {
         type: 'object',
@@ -425,7 +445,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     };
   }
 
-  private generateResponses(): Record<string, any> {
+  private generateResponses(): Record<string, unknown> {
     return {
       Success: {
         description: 'Operation successful',
@@ -524,7 +544,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     };
   }
 
-  private generateParameters(): Record<string, any> {
+  private generateParameters(): Record<string, unknown> {
     return {
       PageParam: {
         name: 'page',
@@ -572,7 +592,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     };
   }
 
-  public addPath(path: string, method: string, operation: any): void {
+  public addPath(path: string, method: string, operation: Record<string, unknown>): void {
     if (!this.spec.paths[path]) {
       this.spec.paths[path] = {};
     }
@@ -833,7 +853,7 @@ Powered by [CourtListener](https://www.courtlistener.com/), the most comprehensi
     return this.convertToYaml(spec, 0);
   }
 
-  private convertToYaml(obj: any, indent: number): string {
+  private convertToYaml(obj: unknown, indent: number): string {
     const spaces = '  '.repeat(indent);
     let yaml = '';
 

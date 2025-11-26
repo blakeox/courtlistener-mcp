@@ -4,8 +4,33 @@
  */
 
 import { Request, Response, Router } from 'express';
-import { OpenAPIGenerator } from '../infrastructure/openapi-generator.js';
+import {
+  OpenAPIGenerator,
+  OpenAPISpec,
+  OpenAPIOperation,
+  OpenAPIParameter,
+} from '../infrastructure/openapi-generator.js';
 import { Logger } from '../infrastructure/logger.js';
+
+// Postman collection types
+interface PostmanCollection {
+  info: {
+    name: string;
+    description: string;
+    version: string;
+    schema: string;
+  };
+  auth: Record<string, unknown>;
+  variable: Array<{ key: string; value: string; type: string }>;
+  item: Array<Record<string, unknown>>;
+}
+
+interface PostmanQueryParam {
+  key: string;
+  value: string;
+  description: string;
+  disabled: boolean;
+}
 
 export class DocumentationService {
   private openAPIGenerator: OpenAPIGenerator;
@@ -283,8 +308,8 @@ export class DocumentationService {
     }
   }
 
-  private convertOpenAPIToPostman(spec: any): any {
-    const collection: any = {
+  private convertOpenAPIToPostman(spec: OpenAPISpec): PostmanCollection {
+    const collection: PostmanCollection = {
       info: {
         name: spec.info.title,
         description: spec.info.description,
@@ -328,7 +353,9 @@ export class DocumentationService {
 
     // Convert OpenAPI paths to Postman requests
     for (const [path, methods] of Object.entries(spec.paths)) {
-      for (const [method, operation] of Object.entries(methods as Record<string, any>)) {
+      for (const [method, operation] of Object.entries(
+        methods as Record<string, OpenAPIOperation>,
+      )) {
         const operationData = operation;
 
         const request = {
@@ -359,12 +386,12 @@ export class DocumentationService {
     return collection;
   }
 
-  private extractQueryParams(parameters: any[]): any[] {
+  private extractQueryParams(parameters: OpenAPIParameter[]): PostmanQueryParam[] {
     return parameters
       .filter((param) => param.in === 'query')
       .map((param) => ({
         key: param.name,
-        value: param.example || '',
+        value: String(param.example ?? ''),
         description: param.description || '',
         disabled: !param.required,
       }));

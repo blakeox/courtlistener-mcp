@@ -12,7 +12,7 @@ export interface ValidationResult {
 }
 
 export interface ConfigValidator {
-  validate(config: any): ValidationResult;
+  validate(config: unknown): ValidationResult;
 }
 
 export class CourtListenerConfigValidator implements ConfigValidator {
@@ -127,7 +127,7 @@ export class ServerConfigValidator implements ConfigValidator {
 
     // Validate each section
     for (const [section, validator] of this.validators) {
-      const sectionConfig = (config as any)[section];
+      const sectionConfig = (config as unknown as Record<string, unknown>)[section];
       if (!sectionConfig) {
         allErrors.push(`Configuration section '${section}' is missing`);
         continue;

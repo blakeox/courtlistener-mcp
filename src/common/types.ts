@@ -63,7 +63,7 @@ export interface LogContext {
   userId?: string;
   requestId?: string;
   duration?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Logger {
@@ -79,7 +79,7 @@ export interface DomainEvent {
   id: string;
   type: string;
   timestamp: Date;
-  data: any;
+  data: unknown;
 }
 
 export interface EventHandler<T extends DomainEvent> {

@@ -8,9 +8,7 @@ import { withDefaults } from '../../server/handler-decorators.js';
  * Zod schemas for opinions handlers
  */
 const getOpinionTextSchema = z.object({
-  opinion_id: z
-    .union([z.coerce.number().int().positive(), z.string()])
-    .transform((v) => String(v)),
+  opinion_id: z.union([z.coerce.number().int().positive(), z.string()]).transform((v) => String(v)),
   format: z.enum(['text', 'html', 'pdf']).optional().default('text'),
 });
 
@@ -30,7 +28,7 @@ export class GetOpinionTextHandler extends TypedToolHandler<typeof getOpinionTex
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOpinionTextSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting opinion text', {
       opinionId: input.opinion_id,
@@ -76,7 +74,7 @@ export class AnalyzeLegalArgumentHandler extends TypedToolHandler<
   @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof analyzeLegalArgumentSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Analyzing legal argument', {
       argument: input.argument,
@@ -85,12 +83,13 @@ export class AnalyzeLegalArgumentHandler extends TypedToolHandler<
     });
 
     // For now, synthesize a simple analysis object consistent with tests
-    const response = await this.apiClient.analyzeLegalArgument(input);
+    const response = (await this.apiClient.analyzeLegalArgument(input)) as Record<string, unknown>;
 
     // Ensure shape includes analysis.top_cases; coerce strings to object
+    const responseAnalysis = response?.analysis as Record<string, unknown> | undefined;
     const analysis =
-      typeof response?.analysis === 'object' && response.analysis
-        ? response.analysis
+      typeof responseAnalysis === 'object' && responseAnalysis
+        ? responseAnalysis
         : { top_cases: [] };
 
     return this.success({ analysis });
@@ -120,7 +119,7 @@ export class GetCitationNetworkHandler extends TypedToolHandler<typeof getCitati
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getCitationNetworkSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting citation network', {
       opinionId: input.opinion_id,
@@ -164,7 +163,7 @@ export class LookupCitationHandler extends TypedToolHandler<typeof lookupCitatio
   @withDefaults({ cache: { ttl: 7200 } })
   async execute(
     input: z.infer<typeof lookupCitationSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Looking up citation', {
       citation: input.citation,

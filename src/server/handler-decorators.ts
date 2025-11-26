@@ -3,6 +3,9 @@
  * Phase 2: Reduce Duplication
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: any type required for TypeScript decorator patterns
+
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, TypedToolHandler } from './tool-handler.js';
 
@@ -30,7 +33,7 @@ export interface TimingConfig {
 
 /**
  * Decorator to add automatic caching to handler execute methods
- * 
+ *
  * @example
  * ```typescript
  * class MyHandler extends TypedToolHandler<typeof mySchema> {
@@ -45,7 +48,7 @@ export function withCache(config: CacheConfig = {}) {
   return function <T extends TypedToolHandler<any>>(
     target: T,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
     const ttl = config.ttl ?? 3600;
@@ -54,16 +57,19 @@ export function withCache(config: CacheConfig = {}) {
     descriptor.value = async function (
       this: T,
       input: unknown,
-      context: ToolContext
+      context: ToolContext,
     ): Promise<CallToolResult> {
       if (!enabled || !context.cache) {
         return originalMethod.call(this, input, context);
       }
 
       const cacheKey = config.key ?? this.name;
-      
+
       // Try to get from cache
-      const cached = context.cache.get<Record<string, unknown>>(cacheKey, input as Record<string, unknown>);
+      const cached = context.cache.get<Record<string, unknown>>(
+        cacheKey,
+        input as Record<string, unknown>,
+      );
       if (cached) {
         context.logger?.info(`${this.name} served from cache`, {
           requestId: context.requestId,
@@ -96,7 +102,7 @@ export function withCache(config: CacheConfig = {}) {
 
 /**
  * Decorator to add automatic timing/metrics to handler execute methods
- * 
+ *
  * @example
  * ```typescript
  * class MyHandler extends TypedToolHandler<typeof mySchema> {
@@ -111,7 +117,7 @@ export function withTiming(config: TimingConfig = {}) {
   return function <T extends TypedToolHandler<any>>(
     target: T,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
     const enabled = config.enabled ?? true;
@@ -119,7 +125,7 @@ export function withTiming(config: TimingConfig = {}) {
     descriptor.value = async function (
       this: T,
       input: unknown,
-      context: ToolContext
+      context: ToolContext,
     ): Promise<CallToolResult> {
       if (!enabled || !context.logger) {
         return originalMethod.call(this, input, context);
@@ -130,7 +136,7 @@ export function withTiming(config: TimingConfig = {}) {
 
       try {
         const result = await originalMethod.call(this, input, context);
-        
+
         // Record success or failure based on result
         timer.end();
         if (result.isError) {
@@ -152,7 +158,7 @@ export function withTiming(config: TimingConfig = {}) {
 
 /**
  * Decorator to add automatic error handling to handler execute methods
- * 
+ *
  * @example
  * ```typescript
  * class MyHandler extends TypedToolHandler<typeof mySchema> {
@@ -167,20 +173,20 @@ export function withErrorHandling(errorMessage?: string) {
   return function <T extends TypedToolHandler<any>>(
     target: T,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (
       this: T,
       input: unknown,
-      context: ToolContext
+      context: ToolContext,
     ): Promise<CallToolResult> {
       try {
         return await originalMethod.call(this, input, context);
       } catch (error) {
         const message = errorMessage ?? `${this.name} failed`;
-        
+
         context.logger?.error(message, error as Error, {
           requestId: context.requestId,
           input,
@@ -200,7 +206,7 @@ export function withErrorHandling(errorMessage?: string) {
 /**
  * Combine multiple decorators into one
  * Applies caching, timing, and error handling automatically
- * 
+ *
  * @example
  * ```typescript
  * class MyHandler extends TypedToolHandler<typeof mySchema> {
@@ -212,22 +218,23 @@ export function withErrorHandling(errorMessage?: string) {
  * }
  * ```
  */
-export function withDefaults(config: {
-  cache?: CacheConfig;
-  timing?: TimingConfig;
-  errorMessage?: string;
-} = {}) {
+export function withDefaults(
+  config: {
+    cache?: CacheConfig;
+    timing?: TimingConfig;
+    errorMessage?: string;
+  } = {},
+) {
   return function <T extends TypedToolHandler<any>>(
     target: T,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     // Apply decorators in reverse order (they wrap from inside out)
     withErrorHandling(config.errorMessage)(target, propertyKey, descriptor);
     withTiming(config.timing)(target, propertyKey, descriptor);
     withCache(config.cache)(target, propertyKey, descriptor);
-    
+
     return descriptor;
   };
 }
-

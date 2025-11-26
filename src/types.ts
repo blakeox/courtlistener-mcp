@@ -69,7 +69,7 @@ export interface ServerConfig {
 }
 
 // CourtListener API Response Types
-export interface CourtListenerResponse<T = any> {
+export interface CourtListenerResponse<T = unknown> {
   count?: number;
   next?: string | null;
   previous?: string | null;
@@ -162,11 +162,11 @@ export interface Judge {
   how_selected_id?: string;
   has_inferred_values?: boolean;
   school?: string;
-  educations?: any[];
-  positions?: any[];
-  aba_ratings?: any[];
-  political_affiliations?: any[];
-  sources?: any[];
+  educations?: unknown[];
+  positions?: unknown[];
+  aba_ratings?: unknown[];
+  political_affiliations?: unknown[];
+  sources?: unknown[];
 }
 
 export interface Docket {
@@ -238,8 +238,8 @@ export interface PaginatedResponse {
     next_url?: string;
     previous_url?: string;
   };
-  search_parameters: any;
-  results: any[];
+  search_parameters: Record<string, unknown>;
+  results: unknown[];
   endpoint_info: {
     api_endpoint: string;
     documentation: string;
@@ -257,7 +257,7 @@ export interface ApiError {
 }
 
 // Cache Types
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   data: T;
   timestamp: number;
   expiresAt: number;
@@ -279,11 +279,11 @@ export interface Metrics {
 export interface EnhancedTool {
   name: string;
   description: string;
-  inputSchema: any;
+  inputSchema: Record<string, unknown>;
   examples?: Array<{
     name: string;
     description: string;
-    arguments: any;
+    arguments: Record<string, unknown>;
   }>;
   category: 'search' | 'details' | 'analysis' | 'monitoring' | 'reference';
   complexity: 'simple' | 'intermediate' | 'advanced';

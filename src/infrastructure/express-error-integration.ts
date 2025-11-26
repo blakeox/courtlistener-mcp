@@ -17,6 +17,9 @@ import {
   NotFoundError,
   RateLimitError,
   ErrorContextBuilder,
+  ErrorCategory,
+  ErrorSeverity,
+  ErrorContext,
 } from './error-types.js';
 
 export interface ErrorHandlingConfig {
@@ -210,7 +213,7 @@ export class ExpressErrorHandler {
   /**
    * Convert standard errors to BaseError instances
    */
-  private convertToBaseError(error: Error, context: any): BaseError {
+  private convertToBaseError(error: Error, context: Partial<ErrorContext> | undefined): BaseError {
     // Handle specific error types
     if (error.name === 'ValidationError' || error.message.toLowerCase().includes('validation')) {
       return new ValidationError(
@@ -228,7 +231,7 @@ export class ExpressErrorHandler {
     }
 
     if (error.name === 'NotFoundError' || error.message.toLowerCase().includes('not found')) {
-      return new NotFoundError(error.message, context);
+      return new NotFoundError(error.message, undefined, undefined, context);
     }
 
     if (
@@ -248,8 +251,8 @@ export class ExpressErrorHandler {
       constructor() {
         super(
           error.message || 'An unexpected error occurred',
-          'INTERNAL' as any,
-          'HIGH' as any,
+          'INTERNAL' as ErrorCategory,
+          'HIGH' as ErrorSeverity,
           500,
           context,
           true,
@@ -268,8 +271,8 @@ export class ExpressErrorHandler {
       '/admin/errors',
       this.boundary.wrapAsync(async (req: Request, res: Response) => {
         const filters = {
-          severity: req.query.severity as any,
-          category: req.query.category as any,
+          severity: req.query.severity as ErrorSeverity | undefined,
+          category: req.query.category as ErrorCategory | undefined,
           status: req.query.status as string,
           limit: parseInt(req.query.limit as string) || 50,
           offset: parseInt(req.query.offset as string) || 0,

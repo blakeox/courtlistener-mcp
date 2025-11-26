@@ -2,7 +2,7 @@
  * Enhanced CourtListener API client with rate limiting, caching, and error handling
  */
 
-import fetch from 'node-fetch';
+import fetch, { Response } from 'node-fetch';
 import {
   CourtListenerConfig,
   CourtListenerResponse,
@@ -41,7 +41,7 @@ export class CourtListenerAPI {
    */
   private async makeRequest<T>(
     endpoint: string,
-    params?: Record<string, any>,
+    params?: object,
     options: { useCache?: boolean; cacheTtlOverride?: number } = {},
   ): Promise<T> {
     const timer = this.logger.startTimer(`API ${endpoint}`);
@@ -103,7 +103,7 @@ export class CourtListenerAPI {
   /**
    * Build URL with query parameters
    */
-  private buildUrl(endpoint: string, params?: Record<string, unknown>): string {
+  private buildUrl(endpoint: string, params?: object): string {
     const baseUrl = `${this.config.baseUrl}${endpoint}`;
 
     if (!params || Object.keys(params).length === 0) {
@@ -111,7 +111,9 @@ export class CourtListenerAPI {
     }
 
     // Filter out undefined, null, and empty string values
-    const cleanParams = Object.entries(params)
+    // Cast to Record for iteration since we accept any object type
+    const paramsRecord = params as Record<string, unknown>;
+    const cleanParams = Object.entries(paramsRecord)
       .filter(([, value]) => value !== undefined && value !== null && value !== '')
       .reduce<Record<string, string>>(
         (obj, [key, value]) => ({ ...obj, [key]: String(value) }),
@@ -129,7 +131,7 @@ export class CourtListenerAPI {
   /**
    * Execute HTTP request with timeout and retry logic
    */
-  private async executeRequest(url: string): Promise<any> {
+  private async executeRequest(url: string): Promise<Response> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
@@ -171,7 +173,7 @@ export class CourtListenerAPI {
   /**
    * Create structured API error
    */
-  private createApiError(response: any, endpoint: string, body: string): Error {
+  private createApiError(response: Response, endpoint: string, body: string): Error {
     const suggestions: Record<number, string[]> = {
       400: [
         'Check that all parameters are valid and properly formatted',
@@ -210,8 +212,8 @@ export class CourtListenerAPI {
       `Response: ${body}`;
 
     const error = new Error(message);
-    (error as any).status = response.status;
-    (error as any).endpoint = endpoint;
+    // Extend error with additional properties
+    Object.assign(error, { status: response.status, endpoint });
     return error;
   }
 
@@ -276,11 +278,11 @@ export class CourtListenerAPI {
     return this.makeRequest<Opinion>(`/opinions/${opinionId}/`);
   }
 
-  async getCourts(params?: any): Promise<CourtListenerResponse<Court>> {
+  async getCourts(params?: Record<string, unknown>): Promise<CourtListenerResponse<Court>> {
     return this.makeRequest<CourtListenerResponse<Court>>('/courts/', params);
   }
 
-  async getJudges(params?: any): Promise<CourtListenerResponse<Judge>> {
+  async getJudges(params?: Record<string, unknown>): Promise<CourtListenerResponse<Judge>> {
     return this.makeRequest<CourtListenerResponse<Judge>>('/people/', params);
   }
 
@@ -288,7 +290,7 @@ export class CourtListenerAPI {
     return this.makeRequest<Judge>(`/people/${judgeId}/`);
   }
 
-  async getDockets(params?: any): Promise<CourtListenerResponse<Docket>> {
+  async getDockets(params?: Record<string, unknown>): Promise<CourtListenerResponse<Docket>> {
     return this.makeRequest<CourtListenerResponse<Docket>>('/dockets/', params);
   }
 
@@ -296,113 +298,115 @@ export class CourtListenerAPI {
     return this.makeRequest<Docket>(`/dockets/${docketId}/`);
   }
 
-  async advancedSearch(params: AdvancedSearchParams): Promise<CourtListenerResponse<any>> {
-    return this.makeRequest<CourtListenerResponse<any>>('/search/', params);
+  async advancedSearch(params: AdvancedSearchParams): Promise<CourtListenerResponse<unknown>> {
+    return this.makeRequest<CourtListenerResponse<unknown>>('/search/', params);
   }
 
   // Utility methods for backward compatibility
-  async searchCitations(citation: string): Promise<any> {
+  async searchCitations(citation: string): Promise<unknown> {
     return this.searchOpinions({ citation });
   }
 
-  async getRelatedCases(opinionId: number): Promise<any> {
+  async getRelatedCases(opinionId: number): Promise<unknown> {
     return this.makeRequest(`/opinions/${opinionId}/cited-by/`);
   }
 
-  async getCitationNetwork(opinionId: number, params: any): Promise<any> {
+  async getCitationNetwork(opinionId: number, params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest(`/opinions/${opinionId}/citations/`, params);
   }
 
-  async getOpinionCitations(opinionId: number): Promise<any> {
+  async getOpinionCitations(opinionId: number): Promise<unknown> {
     return this.makeRequest(`/opinions/${opinionId}/citations/`);
   }
 
-  async getAuthorities(opinionId: number): Promise<any> {
+  async getAuthorities(opinionId: number): Promise<unknown> {
     return this.makeRequest(`/opinions/${opinionId}/authorities/`);
   }
 
-  async getFinancialDisclosures(params: any): Promise<any> {
+  async getFinancialDisclosures(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/financial-disclosures/', params);
   }
 
-  async getFinancialDisclosure(disclosureId: number): Promise<any> {
+  async getFinancialDisclosure(disclosureId: number): Promise<unknown> {
     return this.makeRequest(`/financial-disclosures/${disclosureId}/`);
   }
 
-  async getParties(params: any): Promise<any> {
+  async getParties(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/parties/', params);
   }
 
-  async getAttorneys(params: any): Promise<any> {
+  async getAttorneys(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/attorneys/', params);
   }
 
-  async getRECAPDocuments(params: any): Promise<any> {
+  async getRECAPDocuments(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/recap/', params);
   }
 
-  async getRECAPDocument(documentId: number): Promise<any> {
+  async getRECAPDocument(documentId: number): Promise<unknown> {
     return this.makeRequest(`/recap/${documentId}/`);
   }
 
-  async createAlert(params: any): Promise<any> {
+  async createAlert(params: Record<string, unknown>): Promise<unknown> {
     // Note: This would typically be a POST request
     return this.makeRequest('/alerts/', params, { useCache: false });
   }
 
-  async getAlerts(params: any): Promise<any> {
+  async getAlerts(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/alerts/', params);
   }
 
-  async getOralArguments(params: any): Promise<any> {
+  async getOralArguments(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/audio/', params);
   }
 
-  async getOralArgument(audioId: number): Promise<any> {
+  async getOralArgument(audioId: number): Promise<unknown> {
     return this.makeRequest(`/audio/${audioId}/`);
   }
 
   // Additional methods to support enterprise server functionality
 
   // Search cases (alias for searchOpinions)
-  async searchCases(params: any): Promise<any> {
+  async searchCases(params: Record<string, unknown>): Promise<unknown> {
     return this.searchOpinions(params);
   }
 
   // Get case details (alias for getOpinionCluster)
-  async getCaseDetails(args: any): Promise<any> {
-    if (args.clusterId) {
-      return this.getOpinionCluster(args.clusterId);
+  async getCaseDetails(args: Record<string, unknown>): Promise<unknown> {
+    const clusterId = args.clusterId ?? args.id;
+    if (typeof clusterId === 'number') {
+      return this.getOpinionCluster(clusterId);
     }
-    if (args.id) {
-      return this.getOpinionCluster(args.id);
+    if (typeof clusterId === 'string') {
+      return this.getOpinionCluster(parseInt(clusterId, 10));
     }
     throw new Error('clusterId or id required for getCaseDetails');
   }
 
   // Get opinion text
-  async getOpinionText(args: any): Promise<any> {
-    if (args.opinionId) {
-      return this.getOpinion(args.opinionId);
+  async getOpinionText(args: Record<string, unknown>): Promise<unknown> {
+    const opinionId = args.opinionId ?? args.id;
+    if (typeof opinionId === 'number') {
+      return this.getOpinion(opinionId);
     }
-    if (args.id) {
-      return this.getOpinion(args.id);
+    if (typeof opinionId === 'string') {
+      return this.getOpinion(parseInt(opinionId, 10));
     }
     throw new Error('opinionId or id required for getOpinionText');
   }
 
   // Lookup citation using citation-lookup endpoint
-  async lookupCitation(args: any): Promise<any> {
+  async lookupCitation(args: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/citation-lookup/', args);
   }
 
   // List courts (alias for getCourts)
-  async listCourts(args: any): Promise<any> {
+  async listCourts(args: Record<string, unknown>): Promise<unknown> {
     return this.getCourts(args);
   }
 
   // Analyze legal argument - placeholder method
-  async analyzeLegalArgument(args: any): Promise<any> {
+  async analyzeLegalArgument(args: Record<string, unknown>): Promise<unknown> {
     // This would require custom implementation or external service
     return {
       analysis: 'Legal argument analysis not yet implemented',
@@ -411,7 +415,7 @@ export class CourtListenerAPI {
   }
 
   // Get parties and attorneys combined
-  async getPartiesAndAttorneys(args: any): Promise<any> {
+  async getPartiesAndAttorneys(args: Record<string, unknown>): Promise<unknown> {
     const [parties, attorneys] = await Promise.all([
       this.getParties(args),
       this.getAttorneys(args),
@@ -420,7 +424,7 @@ export class CourtListenerAPI {
   }
 
   // Manage alerts (using alerts endpoint)
-  async manageAlerts(args: any): Promise<any> {
+  async manageAlerts(args: Record<string, unknown>): Promise<unknown> {
     if (args.action === 'create') {
       return this.createAlert(args);
     }
@@ -428,17 +432,17 @@ export class CourtListenerAPI {
   }
 
   // Analyze case authorities - using opinions-cited endpoint
-  async analyzeCaseAuthorities(args: any): Promise<any> {
+  async analyzeCaseAuthorities(args: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/opinions-cited/', args);
   }
 
   // Get visualization data
-  async getVisualizationData(args: any): Promise<any> {
+  async getVisualizationData(args: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/visualizations/json/', args);
   }
 
   // Get bulk data - placeholder for bulk operations
-  async getBulkData(args: any): Promise<any> {
+  async getBulkData(args: Record<string, unknown>): Promise<unknown> {
     // This would typically require special bulk API endpoints
     return {
       message: 'Bulk data operations not yet implemented',
@@ -447,141 +451,144 @@ export class CourtListenerAPI {
   }
 
   // Get bankruptcy data - using fjc-integrated-database for bankruptcy info
-  async getBankruptcyData(args: any): Promise<any> {
+  async getBankruptcyData(args: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/fjc-integrated-database/', args);
   }
 
   // Enhanced REST API Methods for missing endpoints
 
   // Docket entries - individual court filings and orders
-  async getDocketEntries(params: any): Promise<any> {
+  async getDocketEntries(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/docket-entries/', params);
   }
 
-  async getDocketEntry(entryId: number): Promise<any> {
+  async getDocketEntry(entryId: number): Promise<unknown> {
     return this.makeRequest(`/docket-entries/${entryId}/`);
   }
 
   // Judicial positions and appointments
-  async getJudicialPositions(params: any): Promise<any> {
+  async getJudicialPositions(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/positions/', params);
   }
 
-  async getJudicialPosition(positionId: number): Promise<any> {
+  async getJudicialPosition(positionId: number): Promise<unknown> {
     return this.makeRequest(`/positions/${positionId}/`);
   }
 
   // Judge education history
-  async getJudgeEducations(params: any): Promise<any> {
+  async getJudgeEducations(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/educations/', params);
   }
 
   // Judge political affiliations
-  async getJudgePoliticalAffiliations(params: any): Promise<any> {
+  async getJudgePoliticalAffiliations(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/political-affiliations/', params);
   }
 
   // ABA ratings for judges
-  async getABARatings(params: any): Promise<any> {
+  async getABARatings(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/aba-ratings/', params);
   }
 
   // Judicial retention events
-  async getRetentionEvents(params: any): Promise<any> {
+  async getRetentionEvents(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/retention-events/', params);
   }
 
   // Educational institutions
-  async getSchools(params: any): Promise<any> {
+  async getSchools(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/schools/', params);
   }
 
   // Enhanced financial disclosure endpoints
-  async getFinancialAgreements(params: any): Promise<any> {
+  async getFinancialAgreements(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/agreements/', params);
   }
 
-  async getFinancialDebts(params: any): Promise<any> {
+  async getFinancialDebts(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/debts/', params);
   }
 
-  async getFinancialGifts(params: any): Promise<any> {
+  async getFinancialGifts(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/gifts/', params);
   }
 
-  async getFinancialInvestments(params: any): Promise<any> {
+  async getFinancialInvestments(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/investments/', params);
   }
 
-  async getNonInvestmentIncomes(params: any): Promise<any> {
+  async getNonInvestmentIncomes(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/non-investment-incomes/', params);
   }
 
-  async getDisclosurePositions(params: any): Promise<any> {
+  async getDisclosurePositions(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/disclosure-positions/', params);
   }
 
-  async getReimbursements(params: any): Promise<any> {
+  async getReimbursements(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/reimbursements/', params);
   }
 
-  async getSpouseIncomes(params: any): Promise<any> {
+  async getSpouseIncomes(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/spouse-incomes/', params);
   }
 
   // Enhanced RECAP functionality
-  async getRECAPFetch(params: any): Promise<any> {
+  async getRECAPFetch(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/recap-fetch/', params);
   }
 
-  async getRECAPQuery(params: any): Promise<any> {
+  async getRECAPQuery(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/recap-query/', params);
   }
 
-  async getRECAPEmail(params: any): Promise<any> {
+  async getRECAPEmail(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/recap-email/', params);
   }
 
   // Originating court information for appeals
-  async getOriginatingCourtInfo(params: any): Promise<any> {
+  async getOriginatingCourtInfo(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/originating-court-information/', params);
   }
 
   // Tagging system
-  async getTags(params: any): Promise<any> {
+  async getTags(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/tags/', params);
   }
 
-  async getDocketTags(params: any): Promise<any> {
+  async getDocketTags(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/docket-tags/', params);
   }
 
   // Docket-specific alerts
-  async getDocketAlerts(params: any): Promise<any> {
+  async getDocketAlerts(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/docket-alerts/', params);
   }
 
-  async createDocketAlert(params: any): Promise<any> {
+  async createDocketAlert(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/docket-alerts/', params, { useCache: false });
   }
 
   // Professional memberships
-  async getMemberships(params: any): Promise<any> {
+  async getMemberships(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/memberships/', params);
   }
 
   // Citation parsing and validation
-  async validateCitations(text: string): Promise<any> {
+  async validateCitations(text: string): Promise<unknown> {
     return this.makeRequest('/citation-lookup/', { text });
   }
 
   // Enhanced visualization endpoints
-  async getVisualizationMetadata(params: any): Promise<any> {
+  async getVisualizationMetadata(params: Record<string, unknown>): Promise<unknown> {
     return this.makeRequest('/visualizations/', params);
   }
 
   // Comprehensive judge research combining multiple endpoints
-  async getComprehensiveJudgeProfile(judgeId: number): Promise<any> {
+  async getComprehensiveJudgeProfile(judgeId: number): Promise<unknown> {
+    // Helper type for API responses with results array
+    type ApiListResponse = { results?: unknown[] };
+
     const [
       judge,
       positions,
@@ -592,43 +599,54 @@ export class CourtListenerAPI {
       financialDisclosures,
     ] = await Promise.all([
       this.getJudge(judgeId),
-      this.getJudicialPositions({ person: judgeId }),
-      this.getJudgeEducations({ person: judgeId }),
-      this.getJudgePoliticalAffiliations({ person: judgeId }),
-      this.getABARatings({ person: judgeId }),
-      this.getRetentionEvents({ person: judgeId }),
-      this.getFinancialDisclosures({ person: judgeId }),
+      this.getJudicialPositions({ person: judgeId }) as Promise<ApiListResponse>,
+      this.getJudgeEducations({ person: judgeId }) as Promise<ApiListResponse>,
+      this.getJudgePoliticalAffiliations({ person: judgeId }) as Promise<ApiListResponse>,
+      this.getABARatings({ person: judgeId }) as Promise<ApiListResponse>,
+      this.getRetentionEvents({ person: judgeId }) as Promise<ApiListResponse>,
+      this.getFinancialDisclosures({ person: judgeId }) as Promise<ApiListResponse>,
     ]);
 
     return {
       judge,
-      positions: positions.results || [],
-      educations: educations.results || [],
-      politicalAffiliations: politicalAffiliations.results || [],
-      abaRatings: abaRatings.results || [],
-      retentionEvents: retentionEvents.results || [],
-      financialDisclosures: financialDisclosures.results || [],
+      positions: positions.results ?? [],
+      educations: educations.results ?? [],
+      politicalAffiliations: politicalAffiliations.results ?? [],
+      abaRatings: abaRatings.results ?? [],
+      retentionEvents: retentionEvents.results ?? [],
+      financialDisclosures: financialDisclosures.results ?? [],
     };
   }
 
   // Enhanced case analysis with all related data
-  async getComprehensiveCaseAnalysis(clusterId: number): Promise<any> {
+  async getComprehensiveCaseAnalysis(clusterId: number): Promise<unknown> {
+    // Helper type for API responses with results array
+    type ApiListResponse = { results?: unknown[] };
+
     const [cluster, docket, docketEntries, parties, attorneys, tags] = await Promise.all([
       this.getOpinionCluster(clusterId),
       this.getDocket(clusterId).catch(() => null),
-      this.getDocketEntries({ docket: clusterId }).catch(() => ({ results: [] })),
-      this.getParties({ docket: clusterId }).catch(() => ({ results: [] })),
-      this.getAttorneys({ docket: clusterId }).catch(() => ({ results: [] })),
-      this.getDocketTags({ docket: clusterId }).catch(() => ({ results: [] })),
+      this.getDocketEntries({ docket: clusterId }).catch(() => ({
+        results: [],
+      })) as Promise<ApiListResponse>,
+      this.getParties({ docket: clusterId }).catch(() => ({
+        results: [],
+      })) as Promise<ApiListResponse>,
+      this.getAttorneys({ docket: clusterId }).catch(() => ({
+        results: [],
+      })) as Promise<ApiListResponse>,
+      this.getDocketTags({ docket: clusterId }).catch(() => ({
+        results: [],
+      })) as Promise<ApiListResponse>,
     ]);
 
     return {
       cluster,
       docket,
-      docketEntries: docketEntries.results || [],
-      parties: parties.results || [],
-      attorneys: attorneys.results || [],
-      tags: tags.results || [],
+      docketEntries: docketEntries.results ?? [],
+      parties: parties.results ?? [],
+      attorneys: attorneys.results ?? [],
+      tags: tags.results ?? [],
     };
   }
 }

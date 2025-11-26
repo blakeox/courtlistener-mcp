@@ -3,6 +3,9 @@
  * Phase 5: Performance Optimizations
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: any types used intentionally for internal cache access that lacks proper typing
+
 import { CacheManager } from './cache.js';
 import { Logger } from './logger.js';
 
@@ -12,7 +15,10 @@ import { Logger } from './logger.js';
 export class EnhancedCache {
   private warmupKeys: Set<string> = new Set();
 
-  constructor(private cache: CacheManager, private logger: Logger) {}
+  constructor(
+    private cache: CacheManager,
+    private logger: Logger,
+  ) {}
 
   /**
    * Get value with stale-while-revalidate pattern
@@ -22,16 +28,16 @@ export class EnhancedCache {
     key: string,
     params: Record<string, unknown>,
     revalidate: () => Promise<T>,
-    ttl: number = 3600
+    ttl: number = 3600,
   ): { data: T | null; stale: boolean } {
     const value = this.cache.get<T>(key, params);
-    
+
     if (value) {
       // Trigger background revalidation (simplified - no age checking for now)
       this.revalidateInBackground(key, params, revalidate, ttl);
       return { data: value, stale: false };
     }
-    
+
     return { data: null, stale: false };
   }
 
@@ -42,7 +48,7 @@ export class EnhancedCache {
     key: string,
     params: Record<string, unknown>,
     fetcher: () => Promise<T>,
-    ttl: number
+    ttl: number,
   ): Promise<void> {
     try {
       const fresh = await fetcher();
@@ -71,10 +77,10 @@ export class EnhancedCache {
     key: string,
     params: Record<string, unknown>,
     fetcher: () => Promise<unknown>,
-    ttl: number
+    ttl: number,
   ): Promise<void> {
     const fullKey = JSON.stringify({ key, params });
-    
+
     if (this.warmupKeys.has(fullKey)) {
       this.logger.debug('Cache warmup already in progress', { key });
       return;
@@ -100,14 +106,14 @@ export class EnhancedCache {
    * Batch get multiple cache entries
    */
   getMultiple<T>(
-    keys: Array<{ key: string; params: Record<string, unknown> }>
+    keys: Array<{ key: string; params: Record<string, unknown> }>,
   ): Map<string, T | null> {
     const results = new Map<string, T | null>();
-    
+
     for (const { key, params } of keys) {
       results.set(key, this.cache.get<T>(key, params));
     }
-    
+
     return results;
   }
 
@@ -120,7 +126,7 @@ export class EnhancedCache {
       params: Record<string, unknown>;
       value: unknown;
       ttl: number;
-    }>
+    }>,
   ): void {
     for (const { key, params, value, ttl } of entries) {
       this.cache.set(key, params, value, ttl);
@@ -132,19 +138,19 @@ export class EnhancedCache {
    */
   invalidatePattern(pattern: RegExp): number {
     let count = 0;
-    
+
     for (const [key] of (this as any).cache.entries()) {
       if (pattern.test(key)) {
         (this as any).cache.delete(key);
         count++;
       }
     }
-    
+
     (this as any).logger.info('Invalidated cache entries by pattern', {
       pattern: pattern.source,
       count,
     });
-    
+
     return count;
   }
 
@@ -180,10 +186,10 @@ export class PaginationCache {
     pageSize: number,
     data: T[],
     totalCount: number,
-    ttl: number = 3600
+    ttl: number = 3600,
   ): void {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
-    
+
     (this.baseCache as any).set(
       pageKey,
       {},
@@ -194,7 +200,7 @@ export class PaginationCache {
         totalCount,
         totalPages: Math.ceil(totalCount / pageSize),
       },
-      ttl
+      ttl,
     );
   }
 
@@ -204,7 +210,7 @@ export class PaginationCache {
   getPaginatedResult<T>(
     baseKey: string,
     page: number,
-    pageSize: number
+    pageSize: number,
   ): { data: T[]; page: number; pageSize: number; totalCount: number; totalPages: number } | null {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
     return (this.baseCache as any).get(pageKey, {});
@@ -215,7 +221,7 @@ export class PaginationCache {
    */
   invalidateAllPages(baseKey: string): void {
     const pattern = new RegExp(`^${baseKey}:page:`);
-    
+
     if (this.baseCache instanceof EnhancedCache) {
       this.baseCache.invalidatePattern(pattern);
     }
@@ -229,7 +235,7 @@ export class PaginationCache {
     currentPage: number,
     pageSize: number,
     fetcher: (page: number) => Promise<{ data: T[]; totalCount: number }>,
-    ttl: number = 3600
+    ttl: number = 3600,
   ): Promise<void> {
     const pagesToPrefetch = [currentPage + 1, currentPage - 1].filter((p) => p > 0);
 
@@ -244,8 +250,7 @@ export class PaginationCache {
             // Prefetch failure is non-critical
           }
         }
-      })
+      }),
     );
   }
 }
-

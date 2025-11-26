@@ -48,7 +48,7 @@ export class CompressionMiddleware {
    * Compress response data if applicable
    */
   async compressResponse(
-    data: any,
+    data: unknown,
     contentType: string = 'application/json',
     acceptEncoding: string = '',
   ): Promise<CompressionResult> {

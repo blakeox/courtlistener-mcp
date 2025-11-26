@@ -62,7 +62,7 @@ export class PerClientRateLimiter {
   checkLimit(
     clientId: string,
     headers: Record<string, string> = {},
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): RateLimitResult {
     if (!this.config.enabled) {
       return {
@@ -317,7 +317,8 @@ export function createPerClientRateLimiter(logger: Logger): PerClientRateLimiter
     maxRequestsPerHour: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR || '1000'),
     maxRequestsPerDay: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY || '10000'),
     windowSizeMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
-    clientIdentification: (process.env.RATE_LIMIT_CLIENT_ID as any) || 'ip',
+    clientIdentification:
+      (process.env.RATE_LIMIT_CLIENT_ID as RateLimitConfig['clientIdentification']) || 'ip',
     identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
     whitelistedClients: process.env.RATE_LIMIT_WHITELIST
       ? process.env.RATE_LIMIT_WHITELIST.split(',').map((c) => c.trim())

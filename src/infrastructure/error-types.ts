@@ -13,7 +13,7 @@ export interface ErrorContext {
   method?: string;
   timestamp: string;
   stackTrace?: string;
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
   correlationId?: string;
   sessionId?: string;
 }
@@ -128,12 +128,12 @@ export class ValidationError extends BaseError {
   public readonly validationErrors: Array<{
     field: string;
     message: string;
-    value?: any;
+    value?: unknown;
   }>;
 
   constructor(
     message: string,
-    validationErrors: Array<{ field: string; message: string; value?: any }> = [],
+    validationErrors: Array<{ field: string; message: string; value?: unknown }> = [],
     context: Partial<ErrorContext> = {},
   ) {
     super(message, ErrorCategory.VALIDATION, ErrorSeverity.LOW, 400, context, true, false);
@@ -251,13 +251,13 @@ export class RateLimitError extends BaseError {
 export class ExternalAPIError extends BaseError {
   public readonly apiName: string;
   public readonly apiStatusCode?: number;
-  public readonly apiResponse?: any;
+  public readonly apiResponse?: unknown;
 
   constructor(
     apiName: string,
     message: string,
     apiStatusCode?: number,
-    apiResponse?: any,
+    apiResponse?: unknown,
     context: Partial<ErrorContext> = {},
   ) {
     const isRetryable = apiStatusCode ? apiStatusCode >= 500 || apiStatusCode === 429 : true;
@@ -418,7 +418,7 @@ export class ErrorContextBuilder {
     return this;
   }
 
-  public addData(key: string, value: any): this {
+  public addData(key: string, value: unknown): this {
     if (!this.context.additionalData) {
       this.context.additionalData = {};
     }
@@ -446,7 +446,7 @@ export class ErrorFactory {
 
   public static createValidationError(
     message: string,
-    validationErrors?: Array<{ field: string; message: string; value?: any }>,
+    validationErrors?: Array<{ field: string; message: string; value?: unknown }>,
     additionalContext?: Partial<ErrorContext>,
   ): ValidationError {
     return new ValidationError(message, validationErrors, {
@@ -471,7 +471,7 @@ export class ErrorFactory {
     apiName: string,
     message: string,
     statusCode?: number,
-    response?: any,
+    response?: unknown,
     additionalContext?: Partial<ErrorContext>,
   ): ExternalAPIError {
     return new ExternalAPIError(apiName, message, statusCode, response, {

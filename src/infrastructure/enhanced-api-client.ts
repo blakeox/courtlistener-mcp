@@ -247,14 +247,19 @@ export class EnhancedCourtListenerAPIClient {
 
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      let errorDetails: any = {};
+      let errorDetails: Record<string, unknown> = {};
 
       try {
         const errorBody = await response.text();
         if (errorBody) {
           try {
             errorDetails = JSON.parse(errorBody);
-            errorMessage = errorDetails.detail || errorDetails.message || errorMessage;
+            const detail = errorDetails.detail;
+            const message = errorDetails.message;
+            errorMessage =
+              (typeof detail === 'string' ? detail : undefined) ||
+              (typeof message === 'string' ? message : undefined) ||
+              errorMessage;
           } catch {
             // If not JSON, use text as error message
             errorMessage = errorBody;
@@ -342,7 +347,7 @@ export class EnhancedCourtListenerAPIClient {
   }
 
   // Convenience methods for common endpoints
-  async searchOpinions(params: any, priority: number = 0): Promise<any> {
+  async searchOpinions(params: Record<string, unknown>, priority: number = 0): Promise<unknown> {
     return this.request(
       '/api/rest/v4/search/',
       {
@@ -354,7 +359,7 @@ export class EnhancedCourtListenerAPIClient {
     );
   }
 
-  async searchCases(params: any, priority: number = 0): Promise<any> {
+  async searchCases(params: Record<string, unknown>, priority: number = 0): Promise<unknown> {
     return this.request(
       '/api/rest/v4/search/',
       {
@@ -366,7 +371,7 @@ export class EnhancedCourtListenerAPIClient {
     );
   }
 
-  async getOpinion(id: string, priority: number = 0): Promise<any> {
+  async getOpinion(id: string, priority: number = 0): Promise<unknown> {
     return this.request(
       `/api/rest/v4/opinions/${id}/`,
       {
@@ -377,7 +382,7 @@ export class EnhancedCourtListenerAPIClient {
     );
   }
 
-  async getCase(id: string, priority: number = 0): Promise<any> {
+  async getCase(id: string, priority: number = 0): Promise<unknown> {
     return this.request(
       `/api/rest/v4/dockets/${id}/`,
       {
@@ -388,7 +393,7 @@ export class EnhancedCourtListenerAPIClient {
     );
   }
 
-  async getCourts(priority: number = 0): Promise<any> {
+  async getCourts(priority: number = 0): Promise<unknown> {
     return this.request(
       '/api/rest/v4/courts/',
       {
@@ -407,7 +412,7 @@ export class APIError extends Error {
   constructor(
     message: string,
     public status: number,
-    public details: any = {},
+    public details: unknown = {},
   ) {
     super(message);
     this.name = 'APIError';
@@ -417,16 +422,16 @@ export class APIError extends Error {
 // Type definitions
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  params?: Record<string, any>;
-  body?: any;
+  params?: Record<string, unknown>;
+  body?: unknown;
   headers?: Record<string, string>;
   cacheTtl?: number; // Cache TTL in milliseconds, 0 = no cache
 }
 
 export interface EnhancedAPIStats {
-  connectionPool: any;
-  requestQueue: any;
-  circuitBreaker?: any;
+  connectionPool: unknown;
+  requestQueue: unknown;
+  circuitBreaker?: unknown;
   metrics: {
     cacheHits: number;
     requestsSuccess: number;

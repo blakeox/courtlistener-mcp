@@ -3,6 +3,9 @@
  * Advanced patterns for improved performance and concurrency
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: any types required for generic Promise/Queue patterns that can't be typed more strictly
+
 import { Logger } from './logger.js';
 
 /**

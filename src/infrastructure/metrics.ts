@@ -113,14 +113,14 @@ export class MetricsCollector {
    */
   getHealth(): {
     status: 'healthy' | 'warning' | 'critical';
-    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: any }>;
+    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }>;
     metrics: Metrics;
   } {
     const metrics = this.getMetrics();
     const failureRate = this.getFailureRate();
     const cacheHitRate = this.getCacheHitRate();
 
-    const checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: any }> = {
+    const checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }> = {
       uptime: {
         status: metrics.uptime_seconds > 0 ? 'pass' : 'fail',
         message: `Server has been running for ${metrics.uptime_seconds} seconds`,

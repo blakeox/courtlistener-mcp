@@ -396,7 +396,10 @@ export class ErrorReportingService {
   /**
    * Send webhook alert
    */
-  private async sendWebhookAlert(webhook: string, alertData: any): Promise<void> {
+  private async sendWebhookAlert(
+    webhook: string,
+    alertData: Record<string, unknown>,
+  ): Promise<void> {
     // Implementation would use fetch or http client
     this.logger.debug('Webhook alert would be sent', { webhook, alertData });
   }
@@ -404,7 +407,10 @@ export class ErrorReportingService {
   /**
    * Send Slack alert
    */
-  private async sendSlackAlert(slackWebhook: string, alertData: any): Promise<void> {
+  private async sendSlackAlert(
+    slackWebhook: string,
+    alertData: Record<string, unknown>,
+  ): Promise<void> {
     // Implementation would format for Slack and send
     this.logger.debug('Slack alert would be sent', { slackWebhook, alertData });
   }

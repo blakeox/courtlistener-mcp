@@ -24,7 +24,7 @@ export class MetricsCollector {
       cache_misses: 0,
       average_response_time: 0,
       last_request_time: '',
-      uptime_seconds: 0
+      uptime_seconds: 0,
     };
   }
 
@@ -35,7 +35,7 @@ export class MetricsCollector {
     this.metrics.requests_total++;
     this.metrics.requests_successful++;
     this.metrics.last_request_time = new Date().toISOString();
-    
+
     if (fromCache) {
       this.metrics.cache_hits++;
     } else {
@@ -43,11 +43,11 @@ export class MetricsCollector {
     }
 
     this.updateResponseTime(responseTime);
-    
+
     this.logger.debug('Request recorded', {
       responseTime,
       fromCache,
-      totalRequests: this.metrics.requests_total
+      totalRequests: this.metrics.requests_total,
     });
   }
 
@@ -58,13 +58,13 @@ export class MetricsCollector {
     this.metrics.requests_total++;
     this.metrics.requests_failed++;
     this.metrics.last_request_time = new Date().toISOString();
-    
+
     this.updateResponseTime(responseTime);
-    
+
     this.logger.debug('Failed request recorded', {
       responseTime,
       totalRequests: this.metrics.requests_total,
-      failureRate: this.getFailureRate()
+      failureRate: this.getFailureRate(),
     });
   }
 
@@ -87,14 +87,14 @@ export class MetricsCollector {
    */
   private updateResponseTime(responseTime: number): void {
     this.responseTimes.push(responseTime);
-    
+
     // Keep only recent samples
     if (this.responseTimes.length > this.maxResponseTimesSamples) {
       this.responseTimes = this.responseTimes.slice(-this.maxResponseTimesSamples);
     }
-    
+
     // Calculate average
-    this.metrics.average_response_time = 
+    this.metrics.average_response_time =
       this.responseTimes.reduce((sum, time) => sum + time, 0) / this.responseTimes.length;
   }
 
@@ -104,7 +104,7 @@ export class MetricsCollector {
   getMetrics(): Metrics {
     return {
       ...this.metrics,
-      uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000)
+      uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000),
     };
   }
 
@@ -113,39 +113,39 @@ export class MetricsCollector {
    */
   getHealth(): {
     status: 'healthy' | 'warning' | 'critical';
-    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: any }>;
+    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }>;
     metrics: Metrics;
   } {
     const metrics = this.getMetrics();
     const failureRate = this.getFailureRate();
     const cacheHitRate = this.getCacheHitRate();
-    
-    const checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: any }> = {
+
+    const checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }> = {
       uptime: {
         status: metrics.uptime_seconds > 0 ? 'pass' : 'fail',
         message: `Server has been running for ${metrics.uptime_seconds} seconds`,
-        value: metrics.uptime_seconds
+        value: metrics.uptime_seconds,
       },
       failure_rate: {
         status: failureRate < 0.25 ? 'pass' : 'fail',
         message: `Request failure rate is ${(failureRate * 100).toFixed(1)}%`,
-        value: failureRate
+        value: failureRate,
       },
       response_time: {
         status: metrics.average_response_time < 3000 ? 'pass' : 'fail',
         message: `Average response time is ${metrics.average_response_time.toFixed(0)}ms`,
-        value: metrics.average_response_time
+        value: metrics.average_response_time,
       },
       cache_performance: {
         status: 'pass', // Cache is optional, so always pass
         message: `Cache hit rate is ${(cacheHitRate * 100).toFixed(1)}%`,
-        value: cacheHitRate
-      }
+        value: cacheHitRate,
+      },
     };
 
-    const failedChecks = Object.values(checks).filter(check => check.status === 'fail');
-    const status = failedChecks.length === 0 ? 'healthy' : 
-                  failedChecks.length <= 1 ? 'warning' : 'critical';
+    const failedChecks = Object.values(checks).filter((check) => check.status === 'fail');
+    const status =
+      failedChecks.length === 0 ? 'healthy' : failedChecks.length <= 1 ? 'warning' : 'critical';
 
     return { status, checks, metrics };
   }
@@ -178,28 +178,28 @@ export class MetricsCollector {
   } {
     const metrics = this.getMetrics();
     const uptimeMinutes = metrics.uptime_seconds / 60;
-    
+
     const requestRate = uptimeMinutes > 0 ? metrics.requests_total / uptimeMinutes : 0;
-    const successRate = this.metrics.requests_total > 0 ? 
-      this.metrics.requests_successful / this.metrics.requests_total : 1;
+    const successRate =
+      this.metrics.requests_total > 0
+        ? this.metrics.requests_successful / this.metrics.requests_total
+        : 1;
     const cacheEffectiveness = this.getCacheHitRate();
-    
+
     // Calculate performance grade
     let score = 0;
     score += successRate * 40; // 40% weight on success rate
     score += Math.min(cacheEffectiveness * 2, 1) * 20; // 20% weight on cache effectiveness
     score += Math.min(1000 / (metrics.average_response_time || 1000), 1) * 40; // 40% weight on response time
-    
-    const performanceGrade = score >= 90 ? 'A' : 
-                            score >= 80 ? 'B' : 
-                            score >= 70 ? 'C' : 
-                            score >= 60 ? 'D' : 'F';
+
+    const performanceGrade =
+      score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 
     return {
       requestRate,
       successRate,
       cacheEffectiveness,
-      performanceGrade
+      performanceGrade,
     };
   }
 
@@ -215,11 +215,11 @@ export class MetricsCollector {
       cache_misses: 0,
       average_response_time: 0,
       last_request_time: '',
-      uptime_seconds: 0
+      uptime_seconds: 0,
     };
     this.responseTimes = [];
     this.startTime = Date.now();
-    
+
     this.logger.info('Metrics reset');
   }
 }

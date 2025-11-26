@@ -71,14 +71,15 @@ export class CacheManager {
   /**
    * Generate cache key from endpoint and parameters
    */
-  private generateKey(endpoint: string, params?: Record<string, unknown>): string {
+  private generateKey(endpoint: string, params?: object): string {
     if (!params || Object.keys(params).length === 0) return endpoint;
 
     // Sort parameters for consistent keys
-    const sortedParams = Object.keys(params)
+    const paramsRecord = params as Record<string, unknown>;
+    const sortedParams = Object.keys(paramsRecord)
       .sort()
       .reduce<Record<string, unknown>>((obj, key) => {
-        obj[key] = params[key];
+        obj[key] = paramsRecord[key];
         return obj;
       }, {});
 
@@ -88,7 +89,7 @@ export class CacheManager {
   /**
    * Get cached data
    */
-  get<T>(endpoint: string, params?: Record<string, unknown>): T | null {
+  get<T>(endpoint: string, params?: object): T | null {
     if (!this.config.enabled) return null;
 
     const key = this.generateKey(endpoint, params);
@@ -118,9 +119,9 @@ export class CacheManager {
   /**
    * Set cache data
    */
-  set<T>(endpoint: string, params: Record<string, unknown>, data: T): void;
-  set<T>(endpoint: string, params: Record<string, unknown>, data: T, customTtl: number): void;
-  set<T>(endpoint: string, params: Record<string, unknown>, data: T, customTtl?: number): void {
+  set<T>(endpoint: string, params: object, data: T): void;
+  set<T>(endpoint: string, params: object, data: T, customTtl: number): void;
+  set<T>(endpoint: string, params: object, data: T, customTtl?: number): void {
     if (!this.config.enabled) return;
 
     const key = this.generateKey(endpoint, params);

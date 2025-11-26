@@ -82,7 +82,7 @@ export class Logger {
     endpoint: string,
     duration: number,
     status: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): void {
     const level: LogLevel = status >= 400 ? 'error' : status >= 300 ? 'warn' : 'info';
 

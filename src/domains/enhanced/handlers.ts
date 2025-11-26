@@ -4,6 +4,7 @@
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { PaginatedApiResponse } from '../../common/pagination-utils.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { Judge } from '../../types.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
@@ -110,25 +111,27 @@ export class GetVisualizationDataHandler extends TypedToolHandler<typeof visuali
   @withDefaults()
   async execute(
     input: z.infer<typeof visualizationSchema>,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<CallToolResult> {
     let result: unknown;
 
     switch (input.data_type) {
       case 'court_distribution': {
-        const courts = await this.apiClient.listCourts({});
-        const distribution = courts.results.reduce(
+        const courts = (await this.apiClient.listCourts({})) as PaginatedApiResponse<{
+          type: string;
+        }>;
+        const distribution = (courts.results || []).reduce(
           (acc: Record<string, number>, court: { type: string }) => {
             const type = court.type || 'Unknown';
             acc[type] = (acc[type] || 0) + 1;
             return acc;
           },
-          {}
+          {},
         );
         result = {
-          total_courts: courts.count,
+          total_courts: courts.count ?? 0,
           distribution,
-          raw_data: courts.results.slice(0, 10), // Sample
+          raw_data: (courts.results || []).slice(0, 10), // Sample
         };
         break;
       }
@@ -164,7 +167,7 @@ export class GetVisualizationDataHandler extends TypedToolHandler<typeof visuali
               acc[president] = (acc[president] || 0) + 1;
               return acc;
             },
-            {}
+            {},
           ),
         };
         break;
@@ -195,7 +198,7 @@ export class GetBulkDataHandler extends TypedToolHandler<typeof bulkDataSchema> 
   @withDefaults()
   async execute(
     input: z.infer<typeof bulkDataSchema>,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<CallToolResult> {
     const result: Record<string, unknown> = {
       data_type: input.data_type,
@@ -228,7 +231,7 @@ export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcy
   @withDefaults()
   async execute(
     input: z.infer<typeof bankruptcySchema>,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<CallToolResult> {
     const result: Record<string, unknown> = {
       court: input.court,
@@ -248,7 +251,9 @@ export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcy
   }
 }
 
-export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<typeof comprehensiveJudgeSchema> {
+export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<
+  typeof comprehensiveJudgeSchema
+> {
   readonly name = 'get_comprehensive_judge_profile';
   readonly description =
     'Retrieve an enriched judicial profile with positions, education, and analytics';
@@ -262,7 +267,7 @@ export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<typeof
   @withDefaults()
   async execute(
     input: z.infer<typeof comprehensiveJudgeSchema>,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<CallToolResult> {
     try {
       const judge = await this.apiClient.getJudge(input.judge_id);
@@ -298,7 +303,9 @@ export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<typeof
   }
 }
 
-export class GetComprehensiveCaseAnalysisHandler extends TypedToolHandler<typeof comprehensiveCaseSchema> {
+export class GetComprehensiveCaseAnalysisHandler extends TypedToolHandler<
+  typeof comprehensiveCaseSchema
+> {
   readonly name = 'get_comprehensive_case_analysis';
   readonly description =
     'Retrieve an enriched case analysis including docket entries, parties, and tags';
@@ -314,12 +321,16 @@ export class GetComprehensiveCaseAnalysisHandler extends TypedToolHandler<typeof
     input: z.infer<typeof comprehensiveCaseSchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    const analysis = await this.apiClient.getComprehensiveCaseAnalysis(input.cluster_id);
+    const analysis = (await this.apiClient.getComprehensiveCaseAnalysis(
+      input.cluster_id,
+    )) as Record<string, unknown>;
     return this.success(analysis);
   }
 }
 
-export class GetFinancialDisclosureDetailsHandler extends TypedToolHandler<typeof disclosureDetailsSchema> {
+export class GetFinancialDisclosureDetailsHandler extends TypedToolHandler<
+  typeof disclosureDetailsSchema
+> {
   readonly name = 'get_financial_disclosure_details';
   readonly description = 'Retrieve detailed financial disclosure data across multiple categories';
   readonly category = 'financial';
@@ -385,7 +396,10 @@ export class ValidateCitationsHandler extends TypedToolHandler<typeof validateCi
     input: z.infer<typeof validateCitationsSchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    const validation = await this.apiClient.validateCitations(input.text);
+    const validation = (await this.apiClient.validateCitations(input.text)) as Record<
+      string,
+      unknown
+    >;
     return this.success(validation);
   }
 }

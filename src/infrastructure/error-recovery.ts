@@ -26,7 +26,7 @@ export interface RetryConfig {
 export interface FallbackConfig {
   enableFallbacks: boolean;
   cacheStaleDataMs: number;
-  defaultResponses: Record<string, any>;
+  defaultResponses: Record<string, unknown>;
   gracefulDegradation: boolean;
 }
 
@@ -130,7 +130,7 @@ export class ErrorRecoveryService {
     options: Partial<RecoveryOptions> = {},
   ): Promise<T> {
     const config = { ...this.retryConfig, ...options.retryConfig };
-    let lastError: any;
+    let lastError: unknown;
     let attempt = 0;
 
     while (attempt < config.maxAttempts) {
@@ -187,10 +187,14 @@ export class ErrorRecoveryService {
     }
 
     // All retries exhausted
-    this.logger.error(`Operation failed after ${config.maxAttempts} attempts`, lastError, {
-      operation: context.endpoint,
-      totalAttempts: config.maxAttempts,
-    });
+    this.logger.error(
+      `Operation failed after ${config.maxAttempts} attempts`,
+      lastError instanceof Error ? lastError : new Error(String(lastError)),
+      {
+        operation: context.endpoint,
+        totalAttempts: config.maxAttempts,
+      },
+    );
 
     throw lastError;
   }
@@ -198,7 +202,7 @@ export class ErrorRecoveryService {
   /**
    * Attempt fallback recovery strategies
    */
-  private async attemptFallback<T>(error: any, context: ErrorContext): Promise<T | null> {
+  private async attemptFallback<T>(error: unknown, context: ErrorContext): Promise<T | null> {
     this.logger.info(`Attempting fallback recovery`, {
       operation: context.endpoint,
       error: error instanceof Error ? error.message : String(error),
@@ -248,14 +252,17 @@ export class ErrorRecoveryService {
   /**
    * Check if error is retryable based on configuration
    */
-  private isRetryableError(error: any, config: RetryConfig): boolean {
+  private isRetryableError(error: unknown, config: RetryConfig): boolean {
     // Check if it's a BaseError with retryable flag
     if (error instanceof BaseError) {
       return error.retryable && config.retryableErrors.includes(error.category);
     }
 
+    // Type guard for error-like objects
+    const errorObj = error as Record<string, unknown>;
+
     // Check HTTP status codes for non-BaseError instances
-    if (error.status && config.retryableStatuses.includes(error.status)) {
+    if (typeof errorObj.status === 'number' && config.retryableStatuses.includes(errorObj.status)) {
       return true;
     }
 
@@ -267,13 +274,13 @@ export class ErrorRecoveryService {
       'ECONNRESET',
       'ETIMEDOUT',
     ];
-    if (error.name && retryableNames.includes(error.name)) {
+    if (typeof errorObj.name === 'string' && retryableNames.includes(errorObj.name)) {
       return true;
     }
 
     // Check error codes
     const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'];
-    if (error.code && retryableCodes.includes(error.code)) {
+    if (typeof errorObj.code === 'string' && retryableCodes.includes(errorObj.code)) {
       return true;
     }
 
@@ -341,7 +348,7 @@ export class ErrorRecoveryService {
   public createRecoveryContext(
     endpoint: string,
     method: string,
-    additionalData?: Record<string, any>,
+    additionalData?: Record<string, unknown>,
   ): ErrorContext {
     const builder = new ErrorContextBuilder()
       .setRequestId(`recovery_${Date.now()}`)
@@ -364,7 +371,7 @@ export class ErrorRecoveryService {
   /**
    * Register default fallback responses
    */
-  public registerDefaultResponse(endpoint: string, response: any): void {
+  public registerDefaultResponse(endpoint: string, response: unknown): void {
     this.fallbackConfig.defaultResponses[endpoint] = response;
   }
 

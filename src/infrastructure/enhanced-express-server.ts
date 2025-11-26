@@ -25,7 +25,7 @@ export interface EnhancedServerConfig {
   enableHealthChecks: boolean;
   enableMetrics: boolean;
   corsOptions?: cors.CorsOptions;
-  helmetOptions?: any;
+  helmetOptions?: Record<string, unknown>;
   errorHandling: {
     enableStackTrace: boolean;
     enableDetailedErrors: boolean;
@@ -42,7 +42,7 @@ export interface EnhancedServerConfig {
  */
 export class EnhancedExpressServer {
   private app: Application;
-  private server?: any;
+  private server?: ReturnType<Application['listen']>;
   private logger: Logger;
   private metrics: MetricsCollector;
   private circuitBreaker: CircuitBreaker;

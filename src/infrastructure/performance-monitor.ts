@@ -657,7 +657,7 @@ export interface Alert {
   severity: 'info' | 'warning' | 'critical';
   message: string;
   timestamp: string;
-  data?: any;
+  data?: unknown;
   count?: number;
   lastSeen?: string;
 }
@@ -672,7 +672,7 @@ export interface HealthCheck {
   status: 'pass' | 'fail';
   message: string;
   timestamp: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface HealthCheckContext {
@@ -700,7 +700,7 @@ export interface Trace {
   timestamp: string;
   duration: number;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TraceAnalysis {
@@ -714,12 +714,12 @@ export interface TraceAnalysis {
 
 export interface MonitoringReport {
   timestamp: string;
-  metrics: any;
+  metrics: unknown;
   health?: HealthCheckResult;
   resources?: ResourceUsage;
   traces: TraceAnalysis;
   alerts: Alert[];
-  performance: any;
+  performance: unknown;
 }
 
 export interface PerformanceMonitorStats {

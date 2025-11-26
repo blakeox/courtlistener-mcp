@@ -63,7 +63,7 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getCaseDetailsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting case details', {
       clusterId: input.cluster_id,
@@ -97,14 +97,14 @@ export class GetRelatedCasesHandler extends TypedToolHandler<typeof getRelatedCa
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRelatedCasesSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting related cases', {
       opinionId: input.opinion_id,
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getRelatedCases(input.opinion_id);
+    const response = (await this.apiClient.getRelatedCases(input.opinion_id)) as unknown[];
 
     return this.success({
       summary: `Found ${response.length || 0} related cases/opinions`,
@@ -131,7 +131,7 @@ export class AnalyzeCaseAuthoritiesHandler extends TypedToolHandler<
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof analyzeCaseAuthoritiesSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Analyzing case authorities', {
       caseId: input.case_id,

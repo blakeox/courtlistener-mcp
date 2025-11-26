@@ -3,7 +3,7 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfo } from '../../common/pagination-utils.js';
+import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for oral arguments handlers
@@ -39,7 +39,7 @@ export class GetOralArgumentsHandler extends TypedToolHandler<typeof getOralArgu
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOralArgumentsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting oral arguments', {
       court: input.court,
@@ -47,7 +47,7 @@ export class GetOralArgumentsHandler extends TypedToolHandler<typeof getOralArgu
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getOralArguments(input);
+    const response = (await this.apiClient.getOralArguments(input)) as PaginatedApiResponse;
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} oral arguments`,
@@ -73,7 +73,7 @@ export class GetOralArgumentHandler extends TypedToolHandler<typeof getOralArgum
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getOralArgumentSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting oral argument details', {
       oralArgumentId: input.oral_argument_id,

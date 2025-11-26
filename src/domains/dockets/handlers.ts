@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfo } from '../../common/pagination-utils.js';
+import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for dockets handlers
@@ -59,7 +59,7 @@ export class GetDocketsHandler extends TypedToolHandler<typeof getDocketsSchema>
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getDocketsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting dockets', {
       court: input.court,
@@ -93,7 +93,7 @@ export class GetDocketHandler extends TypedToolHandler<typeof getDocketSchema> {
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getDocketSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting docket details', {
       docketId: input.docket_id,
@@ -125,7 +125,7 @@ export class GetRecapDocumentsHandler extends TypedToolHandler<typeof getRecapDo
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRecapDocumentsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting RECAP documents', {
       docketId: input.docket_id,
@@ -133,7 +133,7 @@ export class GetRecapDocumentsHandler extends TypedToolHandler<typeof getRecapDo
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getRECAPDocuments(input);
+    const response = (await this.apiClient.getRECAPDocuments(input)) as PaginatedApiResponse;
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} RECAP documents for docket ${input.docket_id}`,
@@ -159,7 +159,7 @@ export class GetRecapDocumentHandler extends TypedToolHandler<typeof getRecapDoc
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getRecapDocumentSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting RECAP document', {
       documentId: input.document_id,
@@ -191,7 +191,7 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
   @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof getDocketEntriesSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     const params = {
       docket: input.docket,
@@ -207,7 +207,7 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
       requestId: context.requestId,
     });
 
-    const entries = await this.apiClient.getDocketEntries(params);
+    const entries = (await this.apiClient.getDocketEntries(params)) as PaginatedApiResponse;
 
     return this.success({
       docket_id: params.docket,

@@ -8,7 +8,10 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfoCamelCase } from '../../common/pagination-utils.js';
+import {
+  createPaginationInfoCamelCase,
+  PaginatedApiResponse,
+} from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for search handlers
@@ -131,7 +134,7 @@ export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinion
   @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof searchOpinionsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Searching opinions', {
       query: input.query,
@@ -182,7 +185,7 @@ export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearc
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof advancedSearchSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Performing advanced search', {
       requestId: context.requestId,
@@ -238,7 +241,7 @@ export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchem
   @withDefaults({ cache: { ttl: 1800 } })
   async execute(
     input: z.infer<typeof searchCasesSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Searching cases', {
       query: input.query,
@@ -259,7 +262,7 @@ export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchem
     if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
     if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
 
-    const response = await this.apiClient.searchCases(searchParams);
+    const response = (await this.apiClient.searchCases(searchParams)) as PaginatedApiResponse;
 
     return this.success({
       summary: `Found ${response.count ?? 0} cases`,

@@ -4,7 +4,11 @@
  */
 
 import { Request, Response } from 'express';
-import { HealthCheckManager } from '../infrastructure/health-check.js';
+import {
+  HealthCheckManager,
+  HealthStatus,
+  DependencyStatus,
+} from '../infrastructure/health-check.js';
 import { Logger } from '../infrastructure/logger.js';
 
 export class HealthEndpoints {
@@ -184,7 +188,7 @@ export class HealthEndpoints {
   /**
    * Format metrics in Prometheus text format
    */
-  private formatPrometheusMetrics(healthStatus: any): string {
+  private formatPrometheusMetrics(healthStatus: HealthStatus): string {
     const metrics = healthStatus.metrics;
     const timestamp = Date.now();
 
@@ -215,7 +219,7 @@ courtlistener_mcp_memory_usage_bytes{type="heapTotal"} ${metrics.memoryUsage.hea
 # TYPE courtlistener_mcp_dependency_status gauge
 ${healthStatus.dependencies
   .map(
-    (dep: any) =>
+    (dep: DependencyStatus) =>
       `courtlistener_mcp_dependency_status{dependency="${dep.name}"} ${dep.status === 'healthy' ? 1 : 0} ${timestamp}`,
   )
   .join('\n')}

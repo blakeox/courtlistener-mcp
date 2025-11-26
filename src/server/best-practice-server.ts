@@ -264,7 +264,7 @@ export class BestPracticeLegalMCPServer {
 
   /**
    * Destroy the server instance for cleanup (useful in tests)
-   * 
+   *
    * This method stops all background tasks without requiring a full shutdown.
    * Use this in tests to clean up server instances and prevent hanging.
    */
@@ -629,13 +629,16 @@ export class BestPracticeLegalMCPServer {
       });
 
     try {
-      const result = await this.middlewareFactory.executeMiddlewareStack(middlewares, context, () =>
-        retry(executeTool, {
-          maxAttempts: 3,
-          baseDelay: 750,
-          maxDelay: 5_000,
-        }),
-      );
+      const result = (await this.middlewareFactory.executeMiddlewareStack(
+        middlewares,
+        context,
+        () =>
+          retry(executeTool, {
+            maxAttempts: 3,
+            baseDelay: 750,
+            maxDelay: 5_000,
+          }),
+      )) as CallToolResult;
 
       const duration = Date.now() - startTime;
 

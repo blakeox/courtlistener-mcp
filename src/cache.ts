@@ -13,15 +13,18 @@ export class CacheManager {
   private logger: Logger;
   private cleanupInterval?: NodeJS.Timeout;
 
-  constructor(private config: CacheConfig, logger: Logger) {
+  constructor(
+    private config: CacheConfig,
+    logger: Logger,
+  ) {
     this.logger = logger;
-    
+
     if (this.config.enabled) {
       // Cleanup expired entries every minute
       this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
       this.logger.info('Cache manager initialized', {
         ttl: this.config.ttl,
-        maxSize: this.config.maxSize
+        maxSize: this.config.maxSize,
       });
     }
   }
@@ -29,24 +32,27 @@ export class CacheManager {
   /**
    * Generate cache key from endpoint and parameters
    */
-  private generateKey(endpoint: string, params?: any): string {
+  private generateKey(endpoint: string, params?: object): string {
     if (!params) return endpoint;
-    
+
     // Sort parameters for consistent keys
     const sortedParams = Object.keys(params)
       .sort()
-      .reduce((obj, key) => {
-        obj[key] = params[key];
-        return obj;
-      }, {} as any);
-    
+      .reduce(
+        (obj, key) => {
+          obj[key] = (params as Record<string, unknown>)[key];
+          return obj;
+        },
+        {} as Record<string, unknown>,
+      );
+
     return `${endpoint}:${JSON.stringify(sortedParams)}`;
   }
 
   /**
    * Get cached data
    */
-  get<T>(endpoint: string, params?: any): T | null {
+  get<T>(endpoint: string, params?: object): T | null {
     if (!this.config.enabled) return null;
 
     const key = this.generateKey(endpoint, params);
@@ -68,20 +74,20 @@ export class CacheManager {
     // Update access order for LRU
     this.accessOrder.set(key, ++this.accessCounter);
     this.logger.debug('Cache hit', { key });
-    
+
     return entry.data as T;
   }
 
   /**
    * Set cache data
    */
-  set<T>(endpoint: string, params: any, data: T): void;
-  set<T>(endpoint: string, params: any, data: T, customTtl: number): void;
-  set<T>(endpoint: string, params: any, data: T, customTtl?: number): void {
+  set<T>(endpoint: string, params: object, data: T): void;
+  set<T>(endpoint: string, params: object, data: T, customTtl: number): void;
+  set<T>(endpoint: string, params: object, data: T, customTtl?: number): void {
     if (!this.config.enabled) return;
 
     const key = this.generateKey(endpoint, params);
-    
+
     // Check if we need to evict entries
     if (this.cache.size >= this.config.maxSize) {
       this.evictLRU();
@@ -91,17 +97,17 @@ export class CacheManager {
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
-      expiresAt: Date.now() + (ttl * 1000)
+      expiresAt: Date.now() + ttl * 1000,
     };
 
     this.cache.set(key, entry);
     this.accessOrder.set(key, ++this.accessCounter);
-    
-    this.logger.debug('Cache set', { 
-      key, 
+
+    this.logger.debug('Cache set', {
+      key,
       size: this.cache.size,
       expiresAt: new Date(entry.expiresAt).toISOString(),
-      ttl: ttl
+      ttl: ttl,
     });
   }
 
@@ -132,9 +138,9 @@ export class CacheManager {
     }
 
     if (removedCount > 0) {
-      this.logger.debug('Cache cleanup completed', { 
-        removedCount, 
-        remainingEntries: this.cache.size 
+      this.logger.debug('Cache cleanup completed', {
+        removedCount,
+        remainingEntries: this.cache.size,
       });
     }
   }
@@ -182,7 +188,7 @@ export class CacheManager {
       expiredEntries,
       maxSize: this.config.maxSize,
       enabled: this.config.enabled,
-      ttl: this.config.ttl
+      ttl: this.config.ttl,
     };
   }
 

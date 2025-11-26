@@ -3,7 +3,7 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfo } from '../../common/pagination-utils.js';
+import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for courts handlers
@@ -43,7 +43,7 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof listCourtsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Listing courts', {
       jurisdiction: input.jurisdiction,
@@ -51,10 +51,10 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.listCourts(input);
+    const response = (await this.apiClient.listCourts(input)) as PaginatedApiResponse;
 
     return this.success({
-      summary: `Retrieved ${response.results?.length || 0} courts`,
+      summary: `Retrieved ${response.results?.length ?? 0} courts`,
       courts: response.results,
       pagination: createPaginationInfo(response, input.page, input.page_size),
     });
@@ -77,7 +77,7 @@ export class GetJudgesHandler extends TypedToolHandler<typeof getJudgesSchema> {
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getJudgesSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting judges', {
       court: input.court,
@@ -111,7 +111,7 @@ export class GetJudgeHandler extends TypedToolHandler<typeof getJudgeSchema> {
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getJudgeSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     context.logger.info('Getting judge details', {
       judgeId: input.judge_id,

@@ -1,6 +1,6 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { createPaginationInfo } from '../../common/pagination-utils.js';
+import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 import { ToolContext, TypedToolHandler } from '../../server/tool-handler.js';
@@ -59,7 +59,7 @@ export class GetFinancialDisclosuresHandler extends TypedToolHandler<
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getFinancialDisclosures(input);
+    const response = (await this.apiClient.getFinancialDisclosures(input)) as PaginatedApiResponse;
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} financial disclosures`,

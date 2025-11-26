@@ -8,14 +8,14 @@ import { ServerConfig } from '../types.js';
 
 export interface Middleware {
   name: string;
-  process(context: any, next: () => Promise<any>): Promise<any>;
+  process(context: unknown, next: () => Promise<unknown>): Promise<unknown>;
 }
 
 export interface RequestContext {
   requestId: string;
   userId?: string;
   startTime: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export class AuthenticationMiddleware implements Middleware {
@@ -26,7 +26,7 @@ export class AuthenticationMiddleware implements Middleware {
     private logger: Logger,
   ) {}
 
-  async process(context: RequestContext, next: () => Promise<any>): Promise<any> {
+  async process(context: RequestContext, next: () => Promise<unknown>): Promise<unknown> {
     if (!this.config.authEnabled) {
       return next();
     }
@@ -47,7 +47,7 @@ export class RateLimitMiddleware implements Middleware {
     private logger: Logger,
   ) {}
 
-  async process(context: RequestContext, next: () => Promise<any>): Promise<any> {
+  async process(context: RequestContext, next: () => Promise<unknown>): Promise<unknown> {
     if (!this.config.rateLimitEnabled) {
       return next();
     }
@@ -108,11 +108,11 @@ export class MiddlewareFactory {
   async executeMiddlewareStack(
     middlewares: Middleware[],
     context: RequestContext,
-    finalHandler: () => Promise<any>,
-  ): Promise<any> {
+    finalHandler: () => Promise<unknown>,
+  ): Promise<unknown> {
     let index = 0;
 
-    const next = async (): Promise<any> => {
+    const next = async (): Promise<unknown> => {
       if (index >= middlewares.length) {
         return finalHandler();
       }
