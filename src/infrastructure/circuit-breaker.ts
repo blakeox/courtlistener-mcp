@@ -71,9 +71,10 @@ export class CircuitBreaker {
 
     // Check if circuit is open
     if (this.state === CircuitState.OPEN) {
-      if (Date.now() < this.nextAttemptTime!) {
+      const nextAttemptTime = this.nextAttemptTime ?? 0;
+      if (Date.now() < nextAttemptTime) {
         const error = new Error(
-          `Circuit breaker '${this.name}' is OPEN. Next attempt at ${new Date(this.nextAttemptTime!)}`,
+          `Circuit breaker '${this.name}' is OPEN. Next attempt at ${new Date(nextAttemptTime)}`,
         );
         this.logger.debug('Circuit breaker blocking request', {
           name: this.name,
@@ -256,12 +257,13 @@ export class CircuitBreakerManager {
    * Get or create a circuit breaker
    */
   getBreaker(name: string, config: CircuitBreakerConfig): CircuitBreaker {
-    if (!this.breakers.has(name)) {
-      const breaker = new CircuitBreaker(name, config, this.logger);
+    let breaker = this.breakers.get(name);
+    if (!breaker) {
+      breaker = new CircuitBreaker(name, config, this.logger);
       this.breakers.set(name, breaker);
     }
 
-    return this.breakers.get(name)!;
+    return breaker;
   }
 
   /**

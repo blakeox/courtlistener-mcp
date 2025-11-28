@@ -5,7 +5,12 @@
 
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
-import { BaseError, ErrorSeverity, ErrorCategory, ErrorContext } from './error-types.js';
+import {
+  BaseError,
+  ErrorSeverity,
+  ErrorCategory,
+  ErrorContext as _ErrorContext,
+} from './error-types.js';
 
 export interface ErrorReport {
   id: string;

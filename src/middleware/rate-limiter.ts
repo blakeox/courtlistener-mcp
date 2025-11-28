@@ -62,7 +62,7 @@ export class PerClientRateLimiter {
   checkLimit(
     clientId: string,
     headers: Record<string, string> = {},
-    metadata?: Record<string, unknown>,
+    _metadata?: Record<string, unknown>,
   ): RateLimitResult {
     if (!this.config.enabled) {
       return {
@@ -187,18 +187,20 @@ export class PerClientRateLimiter {
    * Get or create client statistics
    */
   private getOrCreateClientStats(clientId: string): ClientStats {
-    if (!this.clients.has(clientId)) {
+    let stats = this.clients.get(clientId);
+    if (!stats) {
       const now = Date.now();
-      this.clients.set(clientId, {
+      stats = {
         requests: 0,
         lastRequest: now,
         windowStart: now,
         penalties: 0,
         totalRequests: 0,
-      });
+      };
+      this.clients.set(clientId, stats);
     }
 
-    return this.clients.get(clientId)!;
+    return stats;
   }
 
   /**

@@ -3,7 +3,7 @@
  * Provides comprehensive error types, context tracking, and structured responses
  */
 
-import { Logger } from './logger.js';
+import { Logger as _Logger } from './logger.js';
 
 // Base error context interface
 export interface ErrorContext {

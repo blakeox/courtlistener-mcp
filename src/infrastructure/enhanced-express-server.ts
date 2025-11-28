@@ -418,7 +418,7 @@ export class EnhancedExpressServer {
     router.get(
       '/error',
       this.errorHandler.wrapHandlerWithRecovery(
-        async (req: Request, res: Response) => {
+        async (_req: Request, _res: Response) => {
           // Simulate an unexpected error
           throw new Error('Simulated internal server error');
         },
@@ -462,7 +462,7 @@ export class EnhancedExpressServer {
       '/status',
       this.errorHandler.wrapHandlerWithRecovery(
         async (req: Request, res: Response) => {
-          const services = this.errorHandler.getServices();
+          const _services = this.errorHandler.getServices();
 
           res.json({
             status: 'operational',

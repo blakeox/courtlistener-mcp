@@ -30,7 +30,7 @@ export async function retry<T>(
 ): Promise<T> {
   const { maxAttempts = 3, baseDelay = 1000, maxDelay = 10000, backoffMultiplier = 2 } = options;
 
-  let lastError: Error;
+  let lastError: Error = new Error('Retry failed with unknown error');
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -47,7 +47,9 @@ export async function retry<T>(
     }
   }
 
-  throw lastError!;
+  // This point is unreachable since we either return or throw in the loop,
+  // but TypeScript can't infer that. Provide a fallback error.
+  throw lastError;
 }
 
 /**

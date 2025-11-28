@@ -84,7 +84,7 @@ export class ErrorBoundaryMiddleware {
   /**
    * Main error handling middleware
    */
-  public handleError = (error: Error, req: Request, res: Response, next: NextFunction): void => {
+  public handleError = (error: Error, req: Request, res: Response, _next: NextFunction): void => {
     const startTime = Date.now();
 
     try {

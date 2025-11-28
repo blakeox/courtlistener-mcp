@@ -7,7 +7,7 @@ import { Logger } from './logger.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import {
   BaseError,
-  ErrorSeverity,
+  ErrorSeverity as _ErrorSeverity,
   ErrorCategory,
   ErrorContext,
   ErrorContextBuilder,
@@ -290,7 +290,7 @@ export class ErrorRecoveryService {
   /**
    * Get cached data if available and not too stale
    */
-  private async getCachedData<T>(context: ErrorContext): Promise<T | null> {
+  private async getCachedData<T>(_context: ErrorContext): Promise<T | null> {
     // This would integrate with your cache service
     // For now, return null as placeholder
     return null;

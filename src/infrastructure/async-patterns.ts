@@ -23,13 +23,14 @@ export class ConnectionPoolManager {
   getPool(hostname: string, options: ConnectionPoolOptions = {}): ConnectionPool {
     const poolKey = `${hostname}:${options.port || 443}`;
 
-    if (!this.pools.has(poolKey)) {
+    let pool = this.pools.get(poolKey);
+    if (!pool) {
       this.logger.info('Creating new connection pool', { hostname, poolKey });
-      const pool = new ConnectionPool(hostname, options, this.logger);
+      pool = new ConnectionPool(hostname, options, this.logger);
       this.pools.set(poolKey, pool);
     }
 
-    return this.pools.get(poolKey)!;
+    return pool;
   }
 
   async closeAll(): Promise<void> {
@@ -120,9 +121,11 @@ export class ConnectionPool {
 
     // Process waiting requests
     if (this.waitQueue.length > 0) {
-      const request = this.waitQueue.shift()!;
-      this.activeConnections.add(connection);
-      request.resolve(connection);
+      const request = this.waitQueue.shift();
+      if (request) {
+        this.activeConnections.add(connection);
+        request.resolve(connection);
+      }
     }
 
     this.logger.debug('Released connection', {
@@ -249,13 +252,14 @@ export class RequestQueueManager {
   }
 
   getQueue(name: string, options: RequestQueueOptions = {}): RequestQueue {
-    if (!this.queues.has(name)) {
+    let queue = this.queues.get(name);
+    if (!queue) {
       this.logger.info('Creating new request queue', { name });
-      const queue = new RequestQueue(name, options, this.logger);
+      queue = new RequestQueue(name, options, this.logger);
       this.queues.set(name, queue);
     }
 
-    return this.queues.get(name)!;
+    return queue;
   }
 
   async closeAll(): Promise<void> {
@@ -372,7 +376,8 @@ export class RequestQueue {
           }
         }
 
-        const request = this.queue.shift()!;
+        const request = this.queue.shift();
+        if (!request) continue; // Queue was empty, shouldn't happen but handle gracefully
         this.lastExecution = Date.now();
 
         const processingPromise = this.processRequest(request);

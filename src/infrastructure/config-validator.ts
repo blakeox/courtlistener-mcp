@@ -194,7 +194,7 @@ export class EnvironmentConfigValidator {
 
     // Check environment variables
     const requiredEnvVars: string[] = [];
-    const optionalEnvVars = [
+    const _optionalEnvVars = [
       'COURTLISTENER_BASE_URL',
       'LOG_LEVEL',
       'CACHE_ENABLED',

@@ -45,7 +45,7 @@ export class CourtListenerAPI {
     options: { useCache?: boolean; cacheTtlOverride?: number } = {},
   ): Promise<T> {
     const timer = this.logger.startTimer(`API ${endpoint}`);
-    const { useCache = true, cacheTtlOverride } = options;
+    const { useCache = true, cacheTtlOverride: _cacheTtlOverride } = options;
 
     try {
       // Check cache first
@@ -249,7 +249,8 @@ export class CourtListenerAPI {
       }
 
       if (this.requestCount < this.config.rateLimitPerMinute) {
-        const resolve = this.rateLimitQueue.shift()!;
+        const resolve = this.rateLimitQueue.shift();
+        if (!resolve) return; // Queue was empty, shouldn't happen but handle gracefully
         this.requestCount++;
         resolve();
 

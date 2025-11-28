@@ -12,7 +12,7 @@ import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ServerConfig } from '../types.js';
 
-export interface ToolHandler<TInput = unknown, TOutput = unknown> {
+export interface ToolHandler<TInput = unknown> {
   readonly name: string;
   readonly description: string;
   readonly category: string;
@@ -56,10 +56,12 @@ export class ToolHandlerRegistry {
     this.handlers.set(handler.name, handler);
 
     // Track categories
-    if (!this.categories.has(handler.category)) {
-      this.categories.set(handler.category, new Set());
+    let categorySet = this.categories.get(handler.category);
+    if (!categorySet) {
+      categorySet = new Set();
+      this.categories.set(handler.category, categorySet);
     }
-    this.categories.get(handler.category)!.add(handler.name);
+    categorySet.add(handler.name);
   }
 
   /**
@@ -81,7 +83,9 @@ export class ToolHandlerRegistry {
    */
   getToolsByCategory(category: string): ToolHandler[] {
     const toolNames = this.categories.get(category) || new Set();
-    return Array.from(toolNames).map((name) => this.handlers.get(name)!);
+    return Array.from(toolNames)
+      .map((name) => this.handlers.get(name))
+      .filter((handler): handler is ToolHandler => handler !== undefined);
   }
 
   /**
@@ -170,8 +174,8 @@ export class ToolHandlerRegistry {
 /**
  * Base class for tool handlers
  */
-export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
-  implements ToolHandler<TInput, TOutput>
+export abstract class BaseToolHandler<TInput = unknown, _TOutput = unknown>
+  implements ToolHandler<TInput>
 {
   abstract readonly name: string;
   abstract readonly description: string;
@@ -223,13 +227,13 @@ export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
 
 /**
  * Typed Tool Handler with Automatic Validation and Schema Generation
- * 
+ *
  * This class provides:
  * - Automatic input validation from Zod schemas
  * - Type inference for input/output
  * - Auto-generated JSON schemas
  * - Reduced boilerplate
- * 
+ *
  * @example
  * ```typescript
  * const searchSchema = z.object({
@@ -237,13 +241,13 @@ export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
  *   court: z.string().optional(),
  *   page: z.number().int().min(1).default(1),
  * });
- * 
+ *
  * export class SearchHandler extends TypedToolHandler {
  *   readonly name = 'search';
  *   readonly description = 'Search cases';
  *   readonly category = 'search';
  *   protected readonly schema = searchSchema;
- *   
+ *
  *   // Input is automatically typed!
  *   async execute(input: z.infer<typeof searchSchema>, context: ToolContext) {
  *     // TypeScript knows input has query, court, page properties
@@ -256,7 +260,7 @@ export abstract class BaseToolHandler<TInput = unknown, TOutput = unknown>
 export abstract class TypedToolHandler<
   TSchema extends z.ZodTypeAny = z.ZodTypeAny,
   TInput = z.infer<TSchema>,
-  TOutput = unknown
+  TOutput = unknown,
 > extends BaseToolHandler<TInput, TOutput> {
   /**
    * Zod schema for input validation
@@ -291,7 +295,9 @@ export abstract class TypedToolHandler<
       return success(validated);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const message = error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const message = error.issues
+          .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
+          .join(', ');
         return failure(new Error(`Validation failed: ${message}`));
       }
       return failure(error as Error);
@@ -312,18 +318,20 @@ export abstract class TypedToolHandler<
    * Get enriched tool metadata
    * Phase 2: MCP Modernization
    */
-  getMetadata(): {
-    complexity?: 'simple' | 'moderate' | 'complex';
-    rateLimitWeight?: number;
-    examples?: Array<{
-      name: string;
-      description: string;
-      arguments: Record<string, unknown>;
-    }>;
-    tags?: string[];
-    deprecated?: boolean;
-    requiresAuth?: boolean;
-  } | undefined {
+  getMetadata():
+    | {
+        complexity?: 'simple' | 'moderate' | 'complex';
+        rateLimitWeight?: number;
+        examples?: Array<{
+          name: string;
+          description: string;
+          arguments: Record<string, unknown>;
+        }>;
+        tags?: string[];
+        deprecated?: boolean;
+        requiresAuth?: boolean;
+      }
+    | undefined {
     return this.metadata;
   }
 

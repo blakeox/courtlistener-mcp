@@ -193,7 +193,8 @@ export class AlertManager {
     if (this.options.disabled) return;
 
     // Memory usage alert
-    if (usage.memory.usagePercent > this.options.thresholds!.memoryUsage!) {
+    const memoryThreshold = this.options.thresholds?.memoryUsage ?? 0.9;
+    if (usage.memory.usagePercent > memoryThreshold) {
       this.triggerAlert({
         id: 'resource_memory',
         type: 'resource',
@@ -207,7 +208,8 @@ export class AlertManager {
     }
 
     // CPU usage alert
-    if (usage.cpu.usagePercent > this.options.thresholds!.cpuUsage!) {
+    const cpuThreshold = this.options.thresholds?.cpuUsage ?? 0.9;
+    if (usage.cpu.usagePercent > cpuThreshold) {
       this.triggerAlert({
         id: 'resource_cpu',
         type: 'resource',
@@ -225,14 +227,12 @@ export class AlertManager {
     if (this.options.disabled) return;
 
     // Response time alert
-    if (analysis.averageResponseTime > this.options.thresholds!.responseTime!) {
+    const responseTimeThreshold = this.options.thresholds?.responseTime ?? 5000;
+    if (analysis.averageResponseTime > responseTimeThreshold) {
       this.triggerAlert({
         id: 'performance_response_time',
         type: 'performance',
-        severity:
-          analysis.averageResponseTime > this.options.thresholds!.responseTime! * 2
-            ? 'critical'
-            : 'warning',
+        severity: analysis.averageResponseTime > responseTimeThreshold * 2 ? 'critical' : 'warning',
         message: `High response time: ${analysis.averageResponseTime.toFixed(0)}ms`,
         timestamp: new Date().toISOString(),
         data: { responseTime: analysis.averageResponseTime },
@@ -242,12 +242,12 @@ export class AlertManager {
     }
 
     // Error rate alert
-    if (analysis.errorRate > this.options.thresholds!.errorRate!) {
+    const errorRateThreshold = this.options.thresholds?.errorRate ?? 0.05;
+    if (analysis.errorRate > errorRateThreshold) {
       this.triggerAlert({
         id: 'performance_error_rate',
         type: 'performance',
-        severity:
-          analysis.errorRate > this.options.thresholds!.errorRate! * 2 ? 'critical' : 'warning',
+        severity: analysis.errorRate > errorRateThreshold * 2 ? 'critical' : 'warning',
         message: `High error rate: ${(analysis.errorRate * 100).toFixed(1)}%`,
         timestamp: new Date().toISOString(),
         data: { errorRate: analysis.errorRate },
@@ -258,9 +258,9 @@ export class AlertManager {
   }
 
   private triggerAlert(alert: Alert): void {
-    if (this.activeAlerts.has(alert.id)) {
+    const existing = this.activeAlerts.get(alert.id);
+    if (existing) {
       // Update existing alert
-      const existing = this.activeAlerts.get(alert.id)!;
       existing.count = (existing.count || 1) + 1;
       existing.lastSeen = alert.timestamp;
     } else {
@@ -282,14 +282,15 @@ export class AlertManager {
     this.alertHistory.push({ ...alert });
 
     // Trim history
-    if (this.alertHistory.length > this.options.alertHistory!) {
-      this.alertHistory = this.alertHistory.slice(-this.options.alertHistory!);
+    const maxHistory = this.options.alertHistory ?? 100;
+    if (this.alertHistory.length > maxHistory) {
+      this.alertHistory = this.alertHistory.slice(-maxHistory);
     }
   }
 
   private clearAlert(alertId: string): void {
-    if (this.activeAlerts.has(alertId)) {
-      const alert = this.activeAlerts.get(alertId)!;
+    const alert = this.activeAlerts.get(alertId);
+    if (alert) {
       this.activeAlerts.delete(alertId);
 
       this.logger.info('Alert cleared', {
@@ -477,10 +478,10 @@ export class ResourceMonitor {
       const memoryUsage = process.memoryUsage();
       const totalMemory = require('os').totalmem();
       const freeMemory = require('os').freemem();
-      const usedMemory = totalMemory - freeMemory;
+      const _usedMemory = totalMemory - freeMemory;
 
       // Simple CPU usage estimation (this is basic - for production use a proper CPU monitoring library)
-      const cpuUsage = process.cpuUsage();
+      const _cpuUsage = process.cpuUsage();
       const cpuPercent = 0; // Placeholder - would need historical data for accurate calculation
 
       this.lastUsage = {
@@ -537,12 +538,14 @@ export class TraceCollector {
     this.tracesCollected++;
 
     // Trim old traces
-    const cutoff = Date.now() - this.options.retentionTime!;
+    const retentionTime = this.options.retentionTime ?? 3600000;
+    const cutoff = Date.now() - retentionTime;
     this.traces = this.traces.filter((t) => new Date(t.timestamp).getTime() > cutoff);
 
     // Limit number of traces
-    if (this.traces.length > this.options.maxTraces!) {
-      this.traces = this.traces.slice(-this.options.maxTraces!);
+    const maxTraces = this.options.maxTraces ?? 1000;
+    if (this.traces.length > maxTraces) {
+      this.traces = this.traces.slice(-maxTraces);
     }
   }
 
@@ -591,7 +594,7 @@ export class TraceCollector {
       .slice(0, 10)
       .map((trace) => ({
         operation: trace.operation,
-        error: trace.error!,
+        error: trace.error ?? 'Unknown error',
         timestamp: trace.timestamp,
       }));
 

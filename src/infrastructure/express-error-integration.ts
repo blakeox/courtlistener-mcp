@@ -3,7 +3,7 @@
  * Integrates error boundaries, recovery, and reporting with Express HTTP server
  */
 
-import express, { Request, Response, NextFunction, Application } from 'express';
+import _express, { Request, Response, NextFunction, Application } from 'express';
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
 import { CircuitBreaker } from './circuit-breaker.js';
