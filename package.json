@@ -96,7 +96,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0",
+    "express": "^5.2.0",
     "helmet": "^8.1.0",
     "node-fetch": "^3.3.2",
     "zod": "^4.1.13",
