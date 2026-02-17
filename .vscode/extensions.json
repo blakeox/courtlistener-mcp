@@ -52,7 +52,7 @@
     
     // Performance & Monitoring
     "ms-vscode.vscode-node-azure-pack",
-    "pflannery.vscode-versionlens",
+    "legalfina.npm-version-lens",
     
     // Productivity & Navigation
     "formulahendry.code-runner",
