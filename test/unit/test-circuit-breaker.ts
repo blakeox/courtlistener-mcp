@@ -2,7 +2,7 @@
 
 /**
  * ✅ COMPREHENSIVE Unit Tests for Circuit Breaker (TypeScript)
- * Tests circuit breaker patterns, failure detection, and recovery
+ * Tests circuit breaker patterns, state transitions, failure detection, and recovery
  */
 
 import assert from 'node:assert';
@@ -11,594 +11,730 @@ import type { Logger } from '../../src/infrastructure/logger.js';
 import { createMockLogger } from '../utils/test-helpers.ts';
 
 // Import the actual CircuitBreaker components
-let CircuitBreaker: typeof import('../../dist/infrastructure/circuit-breaker.js').CircuitBreaker;
-let CircuitBreakerManager: typeof import('../../dist/infrastructure/circuit-breaker.js').CircuitBreakerManager;
-let CircuitState: typeof import('../../dist/infrastructure/circuit-breaker.js').CircuitState;
+const circuitBreakerModule = await import('../../dist/infrastructure/circuit-breaker.js');
+const { CircuitBreaker, CircuitBreakerManager, CircuitState, createCircuitBreakerConfig } =
+  circuitBreakerModule;
 
-try {
-  const circuitBreakerModule = await import(
-    '../../dist/infrastructure/circuit-breaker.js'
-  );
-  CircuitBreaker = circuitBreakerModule.CircuitBreaker;
-  CircuitBreakerManager = circuitBreakerModule.CircuitBreakerManager;
-  CircuitState = circuitBreakerModule.CircuitState;
-} catch (error) {
-  console.log('⚠️ Circuit breaker module not found, creating mock tests');
+type CBConfig = import('../../dist/infrastructure/circuit-breaker.js').CircuitBreakerConfig;
+
+// Helper to create an enabled config with short timings for fast tests
+function makeConfig(overrides: Partial<CBConfig> = {}): CBConfig {
+  return {
+    enabled: true,
+    failureThreshold: 3,
+    successThreshold: 2,
+    timeout: 500,
+    resetTimeout: 30,
+    monitoringWindow: 1000,
+    ...overrides,
+  };
 }
 
-interface CircuitBreakerConfig {
-  failureThreshold: number;
-  successThreshold: number;
-  timeout: number;
-  resetTimeout: number;
-  enabled?: boolean;
-  monitoringWindow?: number;
+// Helper: trip a breaker to OPEN state
+async function tripBreaker(
+  breaker: InstanceType<typeof CircuitBreaker>,
+  failures: number,
+): Promise<void> {
+  for (let i = 0; i < failures; i++) {
+    try {
+      await breaker.execute(async () => {
+        throw new Error(`trip-${i}`);
+      });
+    } catch {
+      /* expected */
+    }
+  }
 }
 
-describe('Circuit Breaker (TypeScript)', () => {
-  let circuitBreaker: InstanceType<typeof CircuitBreaker> | undefined;
-  let mockLogger: Logger;
+describe('CircuitBreaker', () => {
+  let mockLogger: ReturnType<typeof createMockLogger>;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
-
-    if (CircuitBreaker) {
-      const config: CircuitBreakerConfig = {
-        failureThreshold: 3,
-        successThreshold: 2,
-        timeout: 1000,
-        resetTimeout: 5000,
-      };
-
-      circuitBreaker = new CircuitBreaker('test-service', config, mockLogger);
-    }
   });
 
-  describe('Circuit Breaker States', () => {
-    it('should start in closed state', () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      assert.ok(circuitBreaker);
-      // Circuit breaker should start in closed state (allowing requests)
+  // ── Closed state ──────────────────────────────────────────────────
+  describe('Closed state', () => {
+    it('should start in CLOSED state', () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      const stats = cb.getStats();
+      assert.strictEqual(stats.state, CircuitState.CLOSED);
+      assert.strictEqual(stats.failureCount, 0);
+      assert.strictEqual(stats.successCount, 0);
     });
 
-    it('should transition to open state after failures', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      // Simulate failures to trip the circuit breaker
-      for (let i = 0; i < 3; i++) {
-        try {
-          await circuitBreaker!.execute(async () => {
-            throw new Error(`Failure ${i + 1}`);
-          });
-        } catch (error) {
-          // Expected failures
-        }
-      }
-
-      // Test that circuit breaker is now rejecting requests (open state)
-      const start = Date.now();
-      try {
-        await circuitBreaker!.execute(async () => {
-          return 'should be rejected';
-        });
-        assert.fail('Should have been rejected by open circuit breaker');
-      } catch (error) {
-        const duration = Date.now() - start;
-        // Should fail fast when circuit is open
-        assert.ok(duration < 100);
-      }
+    it('should pass requests through and return results', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      const result = await cb.execute(async () => 42);
+      assert.strictEqual(result, 42);
     });
 
-    it('should reject requests when open', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      // Trip the circuit breaker
-      for (let i = 0; i < 3; i++) {
-        try {
-          await circuitBreaker!.execute(async () => {
-            throw new Error('Trip failure');
-          });
-        } catch (error) {
-          // Expected
-        }
-      }
-
-      // Now try to execute - should be rejected quickly
-      const start = Date.now();
-      try {
-        await circuitBreaker!.execute(async () => {
-          return 'success';
-        });
-      } catch (error) {
-        const duration = Date.now() - start;
-        // Should fail fast (much less than timeout)
-        assert.ok(duration < 100);
-      }
+    it('should increment totalRequests on each call', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      await cb.execute(async () => 'a');
+      await cb.execute(async () => 'b');
+      assert.strictEqual(cb.getStats().totalRequests, 2);
     });
 
-    it('should transition to half-open state after timeout', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
+    it('should reset failureCount on success', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 3 }), mockLogger);
+      // 2 failures (below threshold)
+      await tripBreaker(cb, 2);
+      assert.strictEqual(cb.getStats().failureCount, 2);
 
-      // This test would require waiting for the reset timeout
-      // For unit tests, we'll just verify the circuit breaker exists
-      assert.ok(circuitBreaker);
-    });
-  });
-
-  describe('Circuit Breaker Execution', () => {
-    it('should execute successful operations', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const result = await circuitBreaker!.execute(async () => {
-        return 'success';
-      });
-
-      assert.strictEqual(result, 'success');
+      // success resets failure count
+      await cb.execute(async () => 'ok');
+      assert.strictEqual(cb.getStats().failureCount, 0);
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
     });
 
-    it('should handle operation failures', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      try {
-        await circuitBreaker!.execute(async () => {
-          throw new Error('Operation failed');
-        });
-        assert.fail('Should have thrown error');
-      } catch (error) {
-        assert.ok(error instanceof Error);
-        assert.strictEqual(error.message, 'Operation failed');
-      }
-    });
-
-    it('should handle operation timeouts', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const start = Date.now();
-
-      try {
-        await circuitBreaker!.execute(async () => {
-          // Simulate long-running operation (longer than 1000ms timeout)
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-          return 'should timeout';
-        });
-        assert.fail('Should have timed out');
-      } catch (error) {
-        const duration = Date.now() - start;
-
-        // Should timeout around 1500ms since operation takes that long
-        // Circuit breaker might not enforce timeout, so just verify it took expected time
-        assert.ok(
-          duration >= 1400 && duration < 1600,
-          `Operation duration ${duration}ms not within expected range`
-        );
-      }
-    });
-
-    it('should track success and failure counts', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      // Execute some successful operations
-      await circuitBreaker!.execute(async () => 'success1');
-      await circuitBreaker!.execute(async () => 'success2');
-
-      // Execute some failures
-      try {
-        await circuitBreaker!.execute(async () => {
-          throw new Error('failure1');
-        });
-      } catch (error) {
-        // Expected
-      }
-
-      // Should have tracked these operations
-      const logs = (mockLogger as ReturnType<typeof createMockLogger>).getLogs();
-      assert.ok(Array.isArray(logs.info) || Array.isArray(logs.debug));
-    });
-  });
-
-  describe('Circuit Breaker Edge Cases', () => {
-    const tinyConfig: CircuitBreakerConfig = {
-      enabled: true,
-      failureThreshold: 1,
-      successThreshold: 2,
-      timeout: 50,
-      resetTimeout: 20,
-      monitoringWindow: 100,
-    };
-
-    const singleSuccessConfig: CircuitBreakerConfig = {
-      enabled: true,
-      failureThreshold: 1,
-      successThreshold: 1,
-      timeout: 50,
-      resetTimeout: 20,
-      monitoringWindow: 100,
-    };
-
-    it('should close after consecutive successes in half-open state', async () => {
-      if (!CircuitBreaker || !CircuitState) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const shortLogger = createMockLogger();
-      const shortBreaker = new CircuitBreaker(
-        'half-open-success',
-        tinyConfig,
-        shortLogger
-      );
-
+    it('should propagate operation errors', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
       await assert.rejects(
         () =>
-          shortBreaker.execute(async () => {
-            throw new Error('fail-fast');
-          }),
-        /fail-fast/
-      );
-
-      const openStats = shortBreaker.getStats();
-      assert.strictEqual(openStats.state, CircuitState.OPEN);
-      assert.ok(
-        openStats.nextAttemptTime &&
-          openStats.nextAttemptTime > Date.now()
-      );
-
-      await new Promise((resolve) => setTimeout(resolve, 25));
-
-      const firstResult = await shortBreaker.execute(async () => 'recovered-1');
-      assert.strictEqual(firstResult, 'recovered-1');
-
-      const halfOpenStats = shortBreaker.getStats();
-      assert.strictEqual(halfOpenStats.state, CircuitState.HALF_OPEN);
-      assert.strictEqual(halfOpenStats.successCount, 1);
-
-      const secondResult = await shortBreaker.execute(async () => 'recovered-2');
-      assert.strictEqual(secondResult, 'recovered-2');
-
-      const closedStats = shortBreaker.getStats();
-      assert.strictEqual(closedStats.state, CircuitState.CLOSED);
-      assert.strictEqual(closedStats.successCount, 0);
-      assert.strictEqual(closedStats.failureCount, 0);
-      assert.strictEqual(closedStats.nextAttemptTime, undefined);
-    });
-
-    it('should reopen immediately if half-open execution fails', async () => {
-      if (!CircuitBreaker || !CircuitState) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const shortLogger = createMockLogger();
-      const breaker = new CircuitBreaker(
-        'half-open-failure',
-        tinyConfig,
-        shortLogger
-      );
-
-      await assert.rejects(
-        () =>
-          breaker.execute(async () => {
-            throw new Error('initial failure');
-          }),
-        /initial failure/
-      );
-
-      await new Promise((resolve) => setTimeout(resolve, 25));
-
-      await assert.rejects(
-        () =>
-          breaker.execute(async () => {
-            throw new Error('half-open failure');
-          }),
-        /half-open failure/
-      );
-
-      const reopenedStats = breaker.getStats();
-      assert.strictEqual(reopenedStats.state, CircuitState.OPEN);
-      assert.ok(
-        reopenedStats.nextAttemptTime &&
-          reopenedStats.nextAttemptTime > Date.now()
-      );
-      assert.strictEqual(reopenedStats.successCount, 0);
-    });
-
-    it('should report health status based on state and failure rate', async () => {
-      if (!CircuitBreaker || !CircuitState) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const healthLogger = createMockLogger();
-      const healthBreaker = new CircuitBreaker(
-        'health-check',
-        singleSuccessConfig,
-        healthLogger
-      );
-
-      assert.strictEqual(healthBreaker.isHealthy(), true);
-
-      await assert.rejects(
-        () =>
-          healthBreaker.execute(async () => {
+          cb.execute(async () => {
             throw new Error('boom');
           }),
-        /boom/
+        { message: 'boom' },
       );
+    });
+  });
 
-      assert.strictEqual(healthBreaker.isHealthy(), false);
+  // ── Failure threshold → OPEN ──────────────────────────────────────
+  describe('Failure threshold', () => {
+    it('should open after exactly failureThreshold consecutive failures', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 3 }), mockLogger);
 
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      await healthBreaker.execute(async () => 'recovery');
+      // 2 failures → still closed
+      await tripBreaker(cb, 2);
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
 
-      assert.strictEqual(healthBreaker.isHealthy(), true);
+      // 3rd failure → opens
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
     });
 
-    it('should reset state and counters when reset is called', async () => {
-      if (!CircuitBreaker || !CircuitState) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
+    it('should open with failureThreshold of 1', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 1 }), mockLogger);
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
+    });
+
+    it('should set nextAttemptTime when opening', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 50 }),
+        mockLogger,
+      );
+      const before = Date.now();
+      await tripBreaker(cb, 1);
+      const stats = cb.getStats();
+      assert.ok(stats.nextAttemptTime! >= before + 50);
+    });
+  });
+
+  // ── Open state ────────────────────────────────────────────────────
+  describe('Open state', () => {
+    it('should reject requests immediately (fail fast)', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+
+      const start = Date.now();
+      await assert.rejects(() => cb.execute(async () => 'nope'), /Circuit breaker 'svc' is OPEN/);
+      assert.ok(Date.now() - start < 50, 'should fail fast');
+    });
+
+    it('should include breaker name in rejection error', async () => {
+      const cb = new CircuitBreaker(
+        'my-api',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await assert.rejects(() => cb.execute(async () => 'nope'), /my-api/);
+    });
+
+    it('should still increment totalRequests when rejecting', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      const before = cb.getStats().totalRequests;
+      try {
+        await cb.execute(async () => 'x');
+      } catch {
+        /* expected */
       }
+      assert.strictEqual(cb.getStats().totalRequests, before + 1);
+    });
+  });
 
-      const resetLogger = createMockLogger();
-      const resetBreaker = new CircuitBreaker(
-        'manual-reset',
-        singleSuccessConfig,
-        resetLogger
+  // ── Cooldown → half-open ──────────────────────────────────────────
+  describe('Cooldown / half-open transition', () => {
+    it('should transition to HALF_OPEN after resetTimeout elapses', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20 }),
+        mockLogger,
       );
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
 
-      await assert.rejects(
-        () =>
-          resetBreaker.execute(async () => {
-            throw new Error('reset failure');
-          }),
-        /reset failure/
+      await new Promise((r) => setTimeout(r, 25));
+      // Next execute triggers half-open transition
+      const result = await cb.execute(async () => 'probe');
+      assert.strictEqual(result, 'probe');
+      // After success it may be HALF_OPEN or CLOSED depending on successThreshold
+    });
+  });
+
+  // ── Half-open state ───────────────────────────────────────────────
+  describe('Half-open state', () => {
+    it('should allow a probe request after cooldown', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 2 }),
+        mockLogger,
       );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
 
-      resetBreaker.reset();
+      const result = await cb.execute(async () => 'probe-ok');
+      assert.strictEqual(result, 'probe-ok');
+      assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+    });
 
-      const stats = resetBreaker.getStats();
+    it('should remain HALF_OPEN until successThreshold is met', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 3 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
+
+      await cb.execute(async () => 'ok1');
+      assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+      assert.strictEqual(cb.getStats().successCount, 1);
+
+      await cb.execute(async () => 'ok2');
+      assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+      assert.strictEqual(cb.getStats().successCount, 2);
+
+      await cb.execute(async () => 'ok3');
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
+    });
+  });
+
+  // ── Recovery ──────────────────────────────────────────────────────
+  describe('Recovery (half-open → closed)', () => {
+    it('should close and reset counters after enough successes in half-open', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 2 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
+
+      await cb.execute(async () => 'ok1');
+      await cb.execute(async () => 'ok2');
+
+      const stats = cb.getStats();
       assert.strictEqual(stats.state, CircuitState.CLOSED);
       assert.strictEqual(stats.failureCount, 0);
       assert.strictEqual(stats.successCount, 0);
       assert.strictEqual(stats.nextAttemptTime, undefined);
-      assert.strictEqual(resetBreaker.isHealthy(), true);
+      assert.strictEqual(stats.lastFailureTime, undefined);
     });
   });
 
-  describe('Circuit Breaker Statistics', () => {
-    it('should provide execution statistics', () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      // Check if stats method exists
-      if (typeof circuitBreaker!.getStats === 'function') {
-        const stats = circuitBreaker!.getStats();
-        assert.ok(typeof stats === 'object');
-      } else {
-        assert.ok(true, 'Stats method not implemented');
-      }
-    });
-
-    it('should track failure rate', async () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      // Mix of successes and failures
-      await circuitBreaker!.execute(async () => 'success');
-
-      try {
-        await circuitBreaker!.execute(async () => {
-          throw new Error('failure');
-        });
-      } catch (error) {
-        // Expected
-      }
-
-      // Should have tracked operations
-      const logs = (mockLogger as ReturnType<typeof createMockLogger>).getLogs();
-      assert.ok(Array.isArray(logs.info) || Array.isArray(logs.debug));
-    });
-  });
-
-  describe('Circuit Breaker Configuration', () => {
-    it('should respect failure threshold configuration', () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const config: CircuitBreakerConfig = {
-        failureThreshold: 5, // Different threshold
-        successThreshold: 2,
-        timeout: 1000,
-        resetTimeout: 5000,
-      };
-
-      const customBreaker = new CircuitBreaker('custom-service', config, mockLogger);
-      assert.ok(customBreaker);
-    });
-
-    it('should respect timeout configuration', () => {
-      if (!CircuitBreaker) {
-        assert.ok(true, 'Circuit breaker not available - skipping test');
-        return;
-      }
-
-      const config: CircuitBreakerConfig = {
-        failureThreshold: 3,
-        successThreshold: 2,
-        timeout: 500, // Shorter timeout
-        resetTimeout: 5000,
-      };
-
-      const fastBreaker = new CircuitBreaker('fast-service', config, mockLogger);
-      assert.ok(fastBreaker);
-    });
-  });
-});
-
-describe('Circuit Breaker Manager (TypeScript)', () => {
-  let manager: InstanceType<typeof CircuitBreakerManager> | undefined;
-  let mockLogger: Logger;
-
-  beforeEach(() => {
-    mockLogger = createMockLogger();
-
-    if (CircuitBreakerManager) {
-      manager = new CircuitBreakerManager(mockLogger);
-    }
-  });
-
-  describe('Breaker Management', () => {
-    it('should create and manage multiple circuit breakers', () => {
-      if (!CircuitBreakerManager) {
-        assert.ok(true, 'Circuit breaker manager not available - skipping test');
-        return;
-      }
-
-      const config: CircuitBreakerConfig = {
-        failureThreshold: 3,
-        successThreshold: 2,
-        timeout: 1000,
-        resetTimeout: 5000,
-      };
-
-      const breaker1 = manager!.getBreaker('service1', config);
-      const breaker2 = manager!.getBreaker('service2', config);
-
-      assert.ok(breaker1);
-      assert.ok(breaker2);
-      assert.notStrictEqual(breaker1, breaker2);
-    });
-
-    it('should return same breaker for same service name', () => {
-      if (!CircuitBreakerManager) {
-        assert.ok(true, 'Circuit breaker manager not available - skipping test');
-        return;
-      }
-
-      const config: CircuitBreakerConfig = {
-        failureThreshold: 3,
-        successThreshold: 2,
-        timeout: 1000,
-        resetTimeout: 5000,
-      };
-
-      const breaker1 = manager!.getBreaker('same-service', config);
-      const breaker2 = manager!.getBreaker('same-service', config);
-
-      assert.strictEqual(breaker1, breaker2);
-    });
-
-    it('should provide overall statistics', () => {
-      if (!CircuitBreakerManager) {
-        assert.ok(true, 'Circuit breaker manager not available - skipping test');
-        return;
-      }
-
-      // Check if stats method exists
-      if (typeof manager!.getStats === 'function') {
-        const stats = manager!.getStats();
-        assert.ok(typeof stats === 'object');
-      } else {
-        assert.ok(true, 'Manager stats method not implemented');
-      }
-    });
-
-    it('should reflect health status across managed breakers', async () => {
-      if (!CircuitBreakerManager || !CircuitBreaker) {
-        assert.ok(
-          true,
-          'Circuit breaker manager not available - skipping test'
-        );
-        return;
-      }
-
-      const config: CircuitBreakerConfig = {
-        enabled: true,
-        failureThreshold: 1,
-        successThreshold: 1,
-        timeout: 50,
-        resetTimeout: 20,
-        monitoringWindow: 100,
-      };
-
-      const healthyBreaker = manager!.getBreaker('healthy-service', config);
-      const unhealthyBreaker = manager!.getBreaker('unhealthy-service', config);
-
-      await healthyBreaker.execute(async () => 'ok');
+  // ── Re-open (half-open → open) ────────────────────────────────────
+  describe('Re-open (half-open failure)', () => {
+    it('should immediately reopen on failure in half-open state', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 2 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
 
       await assert.rejects(
         () =>
-          unhealthyBreaker.execute(async () => {
-            throw new Error('service failure');
+          cb.execute(async () => {
+            throw new Error('half-open fail');
           }),
-        /service failure/
+        /half-open fail/,
       );
 
-      assert.strictEqual(manager!.areAllHealthy(), false);
+      const stats = cb.getStats();
+      assert.strictEqual(stats.state, CircuitState.OPEN);
+      assert.ok(stats.nextAttemptTime! > Date.now());
+      assert.strictEqual(stats.successCount, 0);
+    });
 
-      manager!.resetAll();
-      assert.strictEqual(manager!.areAllHealthy(), true);
+    it('should reopen even if some successes preceded the failure in half-open', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 3 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
+
+      // 1 success in half-open, then failure
+      await cb.execute(async () => 'ok1');
+      assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+
+      await assert.rejects(
+        () =>
+          cb.execute(async () => {
+            throw new Error('fail-again');
+          }),
+        /fail-again/,
+      );
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
     });
   });
 
-  describe('Manager Configuration', () => {
-    it('should handle different configurations per service', () => {
-      if (!CircuitBreakerManager) {
-        assert.ok(true, 'Circuit breaker manager not available - skipping test');
-        return;
+  // ── Manual reset ──────────────────────────────────────────────────
+  describe('Manual reset', () => {
+    it('should return to CLOSED and clear all counters', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
+
+      cb.reset();
+
+      const stats = cb.getStats();
+      assert.strictEqual(stats.state, CircuitState.CLOSED);
+      assert.strictEqual(stats.failureCount, 0);
+      assert.strictEqual(stats.successCount, 0);
+      assert.strictEqual(stats.nextAttemptTime, undefined);
+    });
+
+    it('should allow requests again after reset', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      cb.reset();
+
+      const result = await cb.execute(async () => 'after-reset');
+      assert.strictEqual(result, 'after-reset');
+    });
+  });
+
+  // ── Statistics ────────────────────────────────────────────────────
+  describe('Statistics (getStats)', () => {
+    it('should track totalRequests across successes and failures', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 5 }), mockLogger);
+      await cb.execute(async () => 'ok');
+      try {
+        await cb.execute(async () => {
+          throw new Error('e');
+        });
+      } catch {
+        /* */
       }
+      await cb.execute(async () => 'ok2');
 
-      const config1: CircuitBreakerConfig = {
-        failureThreshold: 3,
-        successThreshold: 2,
-        timeout: 1000,
-        resetTimeout: 5000,
-      };
+      const stats = cb.getStats();
+      assert.strictEqual(stats.totalRequests, 3);
+      assert.strictEqual(stats.totalFailures, 1);
+    });
 
-      const config2: CircuitBreakerConfig = {
-        failureThreshold: 5,
-        successThreshold: 3,
-        timeout: 2000,
-        resetTimeout: 10000,
-      };
+    it('should track uptime', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      await new Promise((r) => setTimeout(r, 10));
+      assert.ok(cb.getStats().uptime >= 10);
+    });
 
-      const breaker1 = manager!.getBreaker('fast-service', config1);
-      const breaker2 = manager!.getBreaker('slow-service', config2);
+    it('should record lastFailureTime on failure', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 5 }), mockLogger);
+      const before = Date.now();
+      try {
+        await cb.execute(async () => {
+          throw new Error('e');
+        });
+      } catch {
+        /* */
+      }
+      const stats = cb.getStats();
+      assert.ok(stats.lastFailureTime! >= before);
+      assert.ok(stats.lastFailureTime! <= Date.now());
+    });
 
-      assert.ok(breaker1);
-      assert.ok(breaker2);
+    it('should return undefined lastFailureTime when no failures', () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      assert.strictEqual(cb.getStats().lastFailureTime, undefined);
+    });
+
+    it('should track totalFailures cumulatively (not reset by state changes)', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 1 }),
+        mockLogger,
+      );
+      // Trip once
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().totalFailures, 1);
+
+      // Recover
+      await new Promise((r) => setTimeout(r, 25));
+      await cb.execute(async () => 'ok');
+
+      // Trip again
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().totalFailures, 2);
+    });
+  });
+
+  // ── isHealthy ─────────────────────────────────────────────────────
+  describe('isHealthy', () => {
+    it('should be healthy when CLOSED', () => {
+      const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      assert.strictEqual(cb.isHealthy(), true);
+    });
+
+    it('should be unhealthy when OPEN', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 5000 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.isHealthy(), false);
+    });
+
+    it('should be healthy when HALF_OPEN with successes', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 3 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
+      await cb.execute(async () => 'probe');
+      assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+      assert.strictEqual(cb.isHealthy(), true);
+    });
+
+    it('should always return true when circuit breaker is disabled', () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ enabled: false }), mockLogger);
+      assert.strictEqual(cb.isHealthy(), true);
+    });
+  });
+
+  // ── Disabled circuit breaker ──────────────────────────────────────
+  describe('Disabled circuit breaker', () => {
+    it('should pass all requests through without tracking when disabled', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ enabled: false }), mockLogger);
+      const result = await cb.execute(async () => 'pass-through');
+      assert.strictEqual(result, 'pass-through');
+      assert.strictEqual(cb.getStats().totalRequests, 0);
+    });
+
+    it('should not open even after many failures when disabled', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ enabled: false, failureThreshold: 1 }),
+        mockLogger,
+      );
+      for (let i = 0; i < 5; i++) {
+        try {
+          await cb.execute(async () => {
+            throw new Error('e');
+          });
+        } catch {
+          /* */
+        }
+      }
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
+    });
+  });
+
+  // ── Configuration ─────────────────────────────────────────────────
+  describe('Configuration', () => {
+    it('should respect custom failureThreshold', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 5 }), mockLogger);
+      await tripBreaker(cb, 4);
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
+      await tripBreaker(cb, 1);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
+    });
+
+    it('should respect custom successThreshold for half-open recovery', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 20, successThreshold: 4 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+      await new Promise((r) => setTimeout(r, 25));
+
+      for (let i = 0; i < 3; i++) {
+        await cb.execute(async () => 'ok');
+        assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
+      }
+      await cb.execute(async () => 'ok4');
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
+    });
+
+    it('should respect custom resetTimeout', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ failureThreshold: 1, resetTimeout: 100 }),
+        mockLogger,
+      );
+      await tripBreaker(cb, 1);
+
+      // Too early — should still be open
+      await new Promise((r) => setTimeout(r, 30));
+      await assert.rejects(() => cb.execute(async () => 'too-early'), /OPEN/);
+
+      // Wait remaining time
+      await new Promise((r) => setTimeout(r, 80));
+      const result = await cb.execute(async () => 'now-ok');
+      assert.strictEqual(result, 'now-ok');
+    });
+  });
+
+  // ── Timeout handling ──────────────────────────────────────────────
+  describe('Timeout', () => {
+    it('should reject operations that exceed the configured timeout', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ timeout: 50 }), mockLogger);
+      const start = Date.now();
+      await assert.rejects(
+        () => cb.execute(() => new Promise((r) => setTimeout(() => r('late'), 200))),
+        /Operation timeout after 50ms/,
+      );
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < 150, `should timeout quickly, took ${elapsed}ms`);
+    });
+
+    it('should count a timeout as a failure', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({ timeout: 20, failureThreshold: 5 }),
+        mockLogger,
+      );
+      try {
+        await cb.execute(() => new Promise((r) => setTimeout(() => r('x'), 100)));
+      } catch {
+        /* */
+      }
+      assert.strictEqual(cb.getStats().failureCount, 1);
+      assert.strictEqual(cb.getStats().totalFailures, 1);
+    });
+  });
+
+  // ── Edge cases ────────────────────────────────────────────────────
+  describe('Edge cases', () => {
+    it('should handle rapid successive calls', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 3 }), mockLogger);
+      const promises = Array.from({ length: 5 }, (_, i) => cb.execute(async () => `result-${i}`));
+      const results = await Promise.all(promises);
+      assert.strictEqual(results.length, 5);
+      assert.strictEqual(cb.getStats().totalRequests, 5);
+    });
+
+    it('should handle mixed concurrent successes and failures', async () => {
+      const cb = new CircuitBreaker('svc', makeConfig({ failureThreshold: 10 }), mockLogger);
+      const ops = [
+        cb.execute(async () => 'ok').catch(() => 'caught'),
+        cb
+          .execute(async () => {
+            throw new Error('e');
+          })
+          .catch(() => 'caught'),
+        cb.execute(async () => 'ok2').catch(() => 'caught'),
+      ];
+      await Promise.all(ops);
+      assert.strictEqual(cb.getStats().totalRequests, 3);
+      assert.strictEqual(cb.getStats().totalFailures, 1);
+    });
+
+    it('should survive a full lifecycle: closed → open → half-open → closed → open', async () => {
+      const cb = new CircuitBreaker(
+        'svc',
+        makeConfig({
+          failureThreshold: 2,
+          resetTimeout: 20,
+          successThreshold: 1,
+        }),
+        mockLogger,
+      );
+
+      // closed → open
+      await tripBreaker(cb, 2);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
+
+      // open → half-open → closed
+      await new Promise((r) => setTimeout(r, 25));
+      await cb.execute(async () => 'recover');
+      assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
+
+      // closed → open again
+      await tripBreaker(cb, 2);
+      assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
     });
   });
 });
 
+// ── CircuitBreakerManager ───────────────────────────────────────────
+describe('CircuitBreakerManager', () => {
+  let mockLogger: ReturnType<typeof createMockLogger>;
+
+  beforeEach(() => {
+    mockLogger = createMockLogger();
+  });
+
+  it('should create and return distinct breakers for different names', () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig();
+    const a = mgr.getBreaker('a', cfg);
+    const b = mgr.getBreaker('b', cfg);
+    assert.ok(a);
+    assert.ok(b);
+    assert.notStrictEqual(a, b);
+  });
+
+  it('should return the same breaker instance for the same name', () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig();
+    const first = mgr.getBreaker('svc', cfg);
+    const second = mgr.getBreaker('svc', cfg);
+    assert.strictEqual(first, second);
+  });
+
+  it('should aggregate stats via getAllStats', async () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig();
+    const a = mgr.getBreaker('a', cfg);
+    const b = mgr.getBreaker('b', cfg);
+    await a.execute(async () => 'x');
+    await b.execute(async () => 'y');
+
+    const allStats = mgr.getAllStats();
+    assert.strictEqual(Object.keys(allStats).length, 2);
+    assert.strictEqual(allStats['a'].totalRequests, 1);
+    assert.strictEqual(allStats['b'].totalRequests, 1);
+  });
+
+  it('areAllHealthy returns true when all breakers are closed', async () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig();
+    mgr.getBreaker('a', cfg);
+    mgr.getBreaker('b', cfg);
+    assert.strictEqual(mgr.areAllHealthy(), true);
+  });
+
+  it('areAllHealthy returns false when any breaker is open', async () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig({ failureThreshold: 1, resetTimeout: 5000 });
+    mgr.getBreaker('healthy', cfg);
+    const sick = mgr.getBreaker('sick', cfg);
+    await tripBreaker(sick, 1);
+    assert.strictEqual(mgr.areAllHealthy(), false);
+  });
+
+  it('areAllHealthy returns true with no breakers', () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    assert.strictEqual(mgr.areAllHealthy(), true);
+  });
+
+  it('resetAll should reset every managed breaker', async () => {
+    const mgr = new CircuitBreakerManager(mockLogger);
+    const cfg = makeConfig({ failureThreshold: 1, resetTimeout: 5000 });
+    const a = mgr.getBreaker('a', cfg);
+    const b = mgr.getBreaker('b', cfg);
+    await tripBreaker(a, 1);
+    await tripBreaker(b, 1);
+    assert.strictEqual(mgr.areAllHealthy(), false);
+
+    mgr.resetAll();
+    assert.strictEqual(mgr.areAllHealthy(), true);
+    assert.strictEqual(a.getStats().state, CircuitState.CLOSED);
+    assert.strictEqual(b.getStats().state, CircuitState.CLOSED);
+  });
+});
+
+// ── createCircuitBreakerConfig ──────────────────────────────────────
+describe('createCircuitBreakerConfig', () => {
+  it('should return defaults when no env vars set', () => {
+    // Save and clear env vars
+    const saved: Record<string, string | undefined> = {};
+    const keys = [
+      'CIRCUIT_BREAKER_ENABLED',
+      'CIRCUIT_BREAKER_FAILURE_THRESHOLD',
+      'CIRCUIT_BREAKER_SUCCESS_THRESHOLD',
+      'CIRCUIT_BREAKER_TIMEOUT',
+      'CIRCUIT_BREAKER_RESET_TIMEOUT',
+      'CIRCUIT_BREAKER_MONITORING_WINDOW',
+    ];
+    for (const k of keys) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+
+    try {
+      const cfg = createCircuitBreakerConfig();
+      assert.strictEqual(cfg.enabled, false);
+      assert.strictEqual(cfg.failureThreshold, 5);
+      assert.strictEqual(cfg.successThreshold, 3);
+      assert.strictEqual(cfg.timeout, 10000);
+      assert.strictEqual(cfg.resetTimeout, 60000);
+      assert.strictEqual(cfg.monitoringWindow, 300000);
+    } finally {
+      for (const k of keys) {
+        if (saved[k] !== undefined) process.env[k] = saved[k];
+        else delete process.env[k];
+      }
+    }
+  });
+
+  it('should respect env var overrides', () => {
+    const saved: Record<string, string | undefined> = {};
+    const envs: Record<string, string> = {
+      CIRCUIT_BREAKER_ENABLED: 'true',
+      CIRCUIT_BREAKER_FAILURE_THRESHOLD: '10',
+      CIRCUIT_BREAKER_SUCCESS_THRESHOLD: '5',
+      CIRCUIT_BREAKER_TIMEOUT: '3000',
+      CIRCUIT_BREAKER_RESET_TIMEOUT: '30000',
+      CIRCUIT_BREAKER_MONITORING_WINDOW: '120000',
+    };
+    for (const [k, v] of Object.entries(envs)) {
+      saved[k] = process.env[k];
+      process.env[k] = v;
+    }
+
+    try {
+      const cfg = createCircuitBreakerConfig();
+      assert.strictEqual(cfg.enabled, true);
+      assert.strictEqual(cfg.failureThreshold, 10);
+      assert.strictEqual(cfg.successThreshold, 5);
+      assert.strictEqual(cfg.timeout, 3000);
+      assert.strictEqual(cfg.resetTimeout, 30000);
+      assert.strictEqual(cfg.monitoringWindow, 120000);
+    } finally {
+      for (const k of Object.keys(envs)) {
+        if (saved[k] !== undefined) process.env[k] = saved[k];
+        else delete process.env[k];
+      }
+    }
+  });
+});
