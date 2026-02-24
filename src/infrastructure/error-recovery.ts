@@ -12,7 +12,7 @@ import {
   ErrorCategory,
   ErrorContext,
   ErrorContextBuilder,
-} from './error-types.js';
+} from '../common/errors.js';
 
 export interface RetryConfig {
   maxAttempts: number;

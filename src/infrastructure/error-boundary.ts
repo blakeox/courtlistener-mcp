@@ -13,7 +13,7 @@ import {
   ErrorContext,
   InternalServerError,
   ErrorContextBuilder,
-} from './error-types.js';
+} from '../common/errors.js';
 
 export interface ErrorBoundaryConfig {
   enableStackTrace: boolean;

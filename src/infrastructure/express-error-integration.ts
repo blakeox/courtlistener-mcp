@@ -21,7 +21,7 @@ import {
   ErrorCategory,
   ErrorSeverity,
   ErrorContext,
-} from './error-types.js';
+} from '../common/errors.js';
 
 export interface ErrorHandlingConfig {
   boundary: Partial<ErrorBoundaryConfig>;

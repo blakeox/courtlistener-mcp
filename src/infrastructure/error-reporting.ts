@@ -11,7 +11,7 @@ import {
   ErrorSeverity,
   ErrorCategory,
   ErrorContext as _ErrorContext,
-} from './error-types.js';
+} from '../common/errors.js';
 
 export interface ErrorReport {
   id: string;

@@ -16,7 +16,7 @@ import {
   AuthenticationError,
   NotFoundError,
   RateLimitError,
-} from './error-types.js';
+} from '../common/errors.js';
 
 export interface EnhancedServerConfig {
   port: number;
