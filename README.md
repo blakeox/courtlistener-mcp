@@ -60,7 +60,22 @@ This server strictly follows the
 
 ## Quick Start
 
-### Option 1: npx (Recommended — Zero Install)
+### Option 1: Remote URL (Easiest — Nothing to Install)
+
+If someone has already deployed the server to Cloudflare Workers, you just add a
+single URL to your MCP client config — **no install, no API key, nothing**:
+
+```json
+{
+  "mcpServers": {
+    "courtlistener": {
+      "url": "https://courtlistener-mcp.<subdomain>.workers.dev/sse"
+    }
+  }
+}
+```
+
+### Option 2: npx (Recommended for Self-Hosting)
 
 ```bash
 npx courtlistener-mcp --setup
@@ -73,7 +88,7 @@ everything automatically. Alternatively, run directly:
 npx courtlistener-mcp
 ```
 
-### Option 2: Docker
+### Option 3: Docker
 
 ```bash
 # Copy the environment template
@@ -89,7 +104,7 @@ The Docker setup exposes:
 - **Port 3001**: Health check endpoint
 - **Port 3002**: HTTP/SSE transport for remote MCP clients
 
-### Option 3: From Source
+### Option 4: From Source
 
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
@@ -98,6 +113,30 @@ pnpm install
 pnpm build
 node dist/index.js
 ```
+
+### Deploy to Cloudflare Workers
+
+To host the MCP server on Cloudflare's edge network (so users only need a URL):
+
+```bash
+# Clone and install
+git clone https://github.com/blakeox/courtlistener-mcp.git
+cd courtlistener-mcp && pnpm install
+
+# Set your CourtListener API key as a Cloudflare secret
+wrangler secret put COURTLISTENER_API_KEY
+
+# Optional: restrict access with a bearer token
+wrangler secret put MCP_AUTH_TOKEN
+
+# Deploy
+wrangler deploy
+```
+
+Your server is now live at
+`https://courtlistener-mcp.<subdomain>.workers.dev/sse`. Share this URL with
+users — they add it to their MCP client and start querying legal data
+immediately.
 
 ## Configuration
 
@@ -549,55 +588,37 @@ through the CourtListener API:
 
 For complete tool documentation and parameters, use the MCP `tools/list` method
 
-## Remote SSE usage and optional auth
+## Remote Deployment (Cloudflare Workers)
 
-The Cloudflare Worker exposes an SSE endpoint at `/sse` for remote MCP clients.
+The server deploys to Cloudflare Workers using Durable Objects for per-session
+state management. Once deployed, users connect with a single URL — no local
+install required.
 
-- Health: `GET https://<your-worker-subdomain>/health`
-- SSE: `GET https://<your-worker-subdomain>/sse`
+- **Health**: `GET https://<subdomain>.workers.dev/health`
+- **MCP endpoint**: `https://<subdomain>.workers.dev/sse`
 
-Optional auth can be enabled by setting a Worker secret `SSE_AUTH_TOKEN` (or
-`MCP_SSE_AUTH_TOKEN` alias). When set, clients must provide a token via either:
+### Authentication
 
-- HTTP header: `Authorization: Bearer <token>`
-- Query string: `?access_token=<token>`
-
-### Cloudflare deployment (secure secrets)
-
-Configure Worker secrets:
+Optional bearer-token auth can be enabled by setting `MCP_AUTH_TOKEN`:
 
 ```bash
-# Upstream CourtListener key: server-side only
+wrangler secret put MCP_AUTH_TOKEN
+```
+
+When set, all MCP requests must include `Authorization: Bearer <token>`. When
+not set, the endpoint is open.
+
+### Deployment
+
+```bash
+# Set your CourtListener API key (stored server-side, never exposed to clients)
 wrangler secret put COURTLISTENER_API_KEY
-# Client auth token for /sse (choose one name)
-wrangler secret put SSE_AUTH_TOKEN
-# or
-wrangler secret put MCP_SSE_AUTH_TOKEN
-# Production environment examples
-wrangler secret put COURTLISTENER_API_KEY --env production
-wrangler secret put SSE_AUTH_TOKEN --env production
+
+# Deploy to Cloudflare
+wrangler deploy
 ```
 
-Never ship `COURTLISTENER_API_KEY` to ChatGPT/Claude/Desktop/any browser client.
-Clients should only use `MCP_SSE_TOKEN` (the value of `SSE_AUTH_TOKEN` or
-`MCP_SSE_AUTH_TOKEN`) when connecting to your `/sse` endpoint.
-
-Local wrapper for tools that need a "file to run":
-
-```bash
-# Uses scripts/dev/mcp-remote.js to proxy the remote SSE into a local stdio process
-# MCP_SSE_TOKEN should match your SSE_AUTH_TOKEN (not COURTLISTENER_API_KEY)
-MCP_REMOTE_URL="https://courtlistener-mcp.<your-subdomain>.workers.dev/sse" \
-MCP_SSE_TOKEN="your-token" \
-pnpm run mcp:remote
-```
-
-ChatGPT or Claude Desktop connection:
-
-- Use the SSE URL directly. If auth is enabled, send only the SSE token
-  (`SSE_AUTH_TOKEN`/`MCP_SSE_AUTH_TOKEN`) as `?access_token=your-token` or in a
-  Bearer header if supported; never send `COURTLISTENER_API_KEY`. See
-  [EXAMPLES.md](./EXAMPLES.md).
+The `COURTLISTENER_API_KEY` stays on the server — clients never see it.
 
 ## MCP Integration
 

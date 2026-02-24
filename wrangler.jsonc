@@ -2,5 +2,19 @@
   "name": "courtlistener-mcp",
   "compatibility_date": "2025-07-25",
   "main": "src/worker.ts",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CourtListenerMCP",
+        "class_name": "CourtListenerMCP"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["CourtListenerMCP"]
+    }
+  ]
 }

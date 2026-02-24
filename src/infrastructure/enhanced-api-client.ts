@@ -282,7 +282,7 @@ export class EnhancedCourtListenerAPIClient {
     }
 
     try {
-      const data = await response.json();
+      const data: T = await response.json();
 
       this.logger.debug('Response parsed successfully', {
         requestId,

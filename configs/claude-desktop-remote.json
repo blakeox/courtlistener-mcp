@@ -1,11 +1,7 @@
 {
   "mcpServers": {
     "courtlistener": {
-      "url": "https://courtlistener-mcp.<your-subdomain>.workers.dev/sse",
-      "transport": "sse",
-      "env": {
-        "MCP_SSE_TOKEN": "your-sse-token"
-      }
+      "url": "https://courtlistener-mcp.<your-subdomain>.workers.dev/sse"
     }
   }
 }
