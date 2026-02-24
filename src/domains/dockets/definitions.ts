@@ -51,5 +51,30 @@ export const docketToolDefinitions: EnhancedTool[] = [
       required: ['docket'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            results: { type: 'array' },
+            count: { type: 'number' },
+          },
+        },
+        metadata: { type: 'object' },
+        pagination: {
+          type: 'object',
+          properties: {
+            current_page: { type: 'number' },
+            total_pages: { type: 'number' },
+            total_results: { type: 'number' },
+            has_next: { type: 'boolean' },
+            has_previous: { type: 'boolean' },
+          },
+        },
+      },
+      required: ['success', 'data'],
+    },
   },
 ];

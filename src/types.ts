@@ -35,6 +35,7 @@ export interface ServerConfig {
     authEnabled: boolean;
     apiKeys: string[];
     allowAnonymous: boolean;
+    headerName: string;
     corsEnabled: boolean;
     corsOrigins: string[];
     rateLimitEnabled: boolean;
@@ -60,11 +61,57 @@ export interface ServerConfig {
     enabled: boolean;
     threshold: number;
     level: number;
+    types: string[];
   };
   sampling: {
     enabled: boolean;
     maxTokens: number;
     defaultModel?: string;
+  };
+  correlation?: {
+    enabled: boolean;
+    headerName: string;
+    generateId: boolean;
+  };
+  sanitization?: {
+    enabled: boolean;
+    maxStringLength: number;
+    maxArrayLength: number;
+    maxObjectDepth: number;
+  };
+  rateLimit?: {
+    enabled: boolean;
+    maxRequestsPerMinute: number;
+    maxRequestsPerHour: number;
+    maxRequestsPerDay: number;
+    windowSizeMs: number;
+    clientIdentification: string;
+    identificationHeader: string;
+    whitelistedClients: string[];
+    penaltyMultiplier: number;
+    persistStorage: boolean;
+  };
+  gracefulShutdown?: {
+    enabled: boolean;
+    timeout: number;
+    forceTimeout: number;
+    signals: string[];
+  };
+  httpTransport?: {
+    port: number;
+    host: string;
+    enableJsonResponse: boolean;
+    enableSessions: boolean;
+    enableResumability: boolean;
+    enableDnsRebindingProtection: boolean;
+    allowedOrigins?: string[];
+    allowedHosts?: string[];
+  };
+  oauth?: {
+    enabled: boolean;
+    issuerUrl?: string;
+    clientId?: string;
+    clientSecret?: string;
   };
 }
 
@@ -280,6 +327,11 @@ export interface EnhancedTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: {
+    type: 'object';
+    properties: Record<string, object>;
+    required?: string[];
+  };
   examples?: Array<{
     name: string;
     description: string;

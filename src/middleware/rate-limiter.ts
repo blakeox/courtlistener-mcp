@@ -4,6 +4,7 @@
  */
 
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 
 export interface RateLimitConfig {
   enabled: boolean;
@@ -310,23 +311,23 @@ export class PerClientRateLimiter {
 }
 
 /**
- * Create per-client rate limiter from environment configuration
+ * Create per-client rate limiter from centralized config
  */
 export function createPerClientRateLimiter(logger: Logger): PerClientRateLimiter {
+  const cfg = getConfig();
+  const rl = cfg.rateLimit;
   const config: RateLimitConfig = {
-    enabled: process.env.RATE_LIMIT_ENABLED === 'true',
-    maxRequestsPerMinute: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-    maxRequestsPerHour: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR || '1000'),
-    maxRequestsPerDay: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY || '10000'),
-    windowSizeMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
+    enabled: rl?.enabled ?? cfg.security.rateLimitEnabled,
+    maxRequestsPerMinute: rl?.maxRequestsPerMinute ?? cfg.security.maxRequestsPerMinute,
+    maxRequestsPerHour: rl?.maxRequestsPerHour ?? 1000,
+    maxRequestsPerDay: rl?.maxRequestsPerDay ?? 10000,
+    windowSizeMs: rl?.windowSizeMs ?? 60000,
     clientIdentification:
-      (process.env.RATE_LIMIT_CLIENT_ID as RateLimitConfig['clientIdentification']) || 'ip',
-    identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
-    whitelistedClients: process.env.RATE_LIMIT_WHITELIST
-      ? process.env.RATE_LIMIT_WHITELIST.split(',').map((c) => c.trim())
-      : [],
-    penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
-    persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
+      (rl?.clientIdentification as RateLimitConfig['clientIdentification']) ?? 'ip',
+    identificationHeader: rl?.identificationHeader ?? 'x-client-id',
+    whitelistedClients: rl?.whitelistedClients ?? [],
+    penaltyMultiplier: rl?.penaltyMultiplier ?? 0.1,
+    persistStorage: rl?.persistStorage ?? false,
   };
 
   return new PerClientRateLimiter(config, logger);

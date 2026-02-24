@@ -71,6 +71,7 @@ export const SecurityConfigSchema = z.object({
   authEnabled: z.boolean(),
   apiKeys: z.array(z.string().min(1, 'API keys cannot be empty')).default([]),
   allowAnonymous: z.boolean(),
+  headerName: z.string().default('x-api-key'),
   corsEnabled: z.boolean(),
   corsOrigins: z.array(z.string()).default(['*']),
   rateLimitEnabled: z.boolean(),
@@ -112,6 +113,9 @@ export const CompressionConfigSchema = z.object({
     .int()
     .min(1, 'Compression level must be at least 1')
     .max(9, 'Compression level must not exceed 9'),
+  types: z
+    .array(z.string())
+    .default(['application/json', 'text/plain', 'text/html', 'application/javascript']),
 });
 
 /**
@@ -121,6 +125,75 @@ export const SamplingConfigSchema = z.object({
   enabled: z.boolean(),
   maxTokens: z.number().int().positive('Max tokens must be positive'),
   defaultModel: z.string().optional(),
+});
+
+/**
+ * Zod schema for Correlation configuration
+ */
+export const CorrelationConfigSchema = z.object({
+  enabled: z.boolean(),
+  headerName: z.string().default('x-correlation-id'),
+  generateId: z.boolean(),
+});
+
+/**
+ * Zod schema for Sanitization configuration
+ */
+export const SanitizationConfigSchema = z.object({
+  enabled: z.boolean(),
+  maxStringLength: z.number().int().positive(),
+  maxArrayLength: z.number().int().positive(),
+  maxObjectDepth: z.number().int().positive(),
+});
+
+/**
+ * Zod schema for Rate Limit configuration
+ */
+export const RateLimitConfigSchema = z.object({
+  enabled: z.boolean(),
+  maxRequestsPerMinute: z.number().int().positive(),
+  maxRequestsPerHour: z.number().int().positive(),
+  maxRequestsPerDay: z.number().int().positive(),
+  windowSizeMs: z.number().int().positive(),
+  clientIdentification: z.string().default('ip'),
+  identificationHeader: z.string().default('x-client-id'),
+  whitelistedClients: z.array(z.string()).default([]),
+  penaltyMultiplier: z.number().min(0),
+  persistStorage: z.boolean(),
+});
+
+/**
+ * Zod schema for Graceful Shutdown configuration
+ */
+export const GracefulShutdownConfigSchema = z.object({
+  enabled: z.boolean(),
+  timeout: z.number().int().positive(),
+  forceTimeout: z.number().int().positive(),
+  signals: z.array(z.string()).default(['SIGTERM', 'SIGINT', 'SIGUSR2']),
+});
+
+/**
+ * Zod schema for HTTP Transport configuration
+ */
+export const HttpTransportConfigSchema = z.object({
+  port: z.number().int().min(1024).max(65535),
+  host: z.string().default('0.0.0.0'),
+  enableJsonResponse: z.boolean(),
+  enableSessions: z.boolean(),
+  enableResumability: z.boolean(),
+  enableDnsRebindingProtection: z.boolean(),
+  allowedOrigins: z.array(z.string()).optional(),
+  allowedHosts: z.array(z.string()).optional(),
+});
+
+/**
+ * Zod schema for OAuth configuration
+ */
+export const OAuthConfigSchema = z.object({
+  enabled: z.boolean(),
+  issuerUrl: z.string().optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
 });
 
 /**
@@ -136,6 +209,12 @@ export const ServerConfigSchema = z.object({
   circuitBreaker: CircuitBreakerConfigSchema,
   sampling: SamplingConfigSchema,
   compression: CompressionConfigSchema,
+  correlation: CorrelationConfigSchema.optional(),
+  sanitization: SanitizationConfigSchema.optional(),
+  rateLimit: RateLimitConfigSchema.optional(),
+  gracefulShutdown: GracefulShutdownConfigSchema.optional(),
+  httpTransport: HttpTransportConfigSchema.optional(),
+  oauth: OAuthConfigSchema.optional(),
 });
 
 /**

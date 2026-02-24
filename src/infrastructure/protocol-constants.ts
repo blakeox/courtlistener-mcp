@@ -62,7 +62,7 @@ export const FEATURE_FLAGS = {
 
   // New features (enable gradually)
   RESOURCES: true,
-  PROMPTS: process.env.ENABLE_MCP_PROMPTS === 'true',
+  PROMPTS: true,
   SAMPLING: process.env.ENABLE_MCP_SAMPLING === 'true',
 
   // Response format features

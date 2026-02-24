@@ -14,6 +14,7 @@ import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import { InMemoryEventStore } from '../infrastructure/event-store.js';
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 import { LegalOAuthProvider } from '../auth/oauth-provider.js';
 import { LegalOAuthClientsStore } from '../auth/oauth-clients-store.js';
 
@@ -34,16 +35,20 @@ export interface HttpTransportConfig {
   allowedHosts?: string[];
 }
 
-const DEFAULT_CONFIG: HttpTransportConfig = {
-  port: parseInt(process.env.MCP_HTTP_PORT || '3002', 10),
-  host: process.env.MCP_HTTP_HOST || '0.0.0.0',
-  enableJsonResponse: process.env.MCP_JSON_RESPONSE === 'true',
-  enableSessions: process.env.MCP_SESSIONS !== 'false',
-  enableResumability: process.env.MCP_RESUMABILITY === 'true',
-  enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
-  allowedOrigins: process.env.MCP_ALLOWED_ORIGINS?.split(',').map((o) => o.trim()),
-  allowedHosts: process.env.MCP_ALLOWED_HOSTS?.split(',').map((h) => h.trim()),
-};
+function getDefaultConfig(): HttpTransportConfig {
+  const cfg = getConfig();
+  const ht = cfg.httpTransport;
+  return {
+    port: ht?.port ?? 3002,
+    host: ht?.host ?? '0.0.0.0',
+    enableJsonResponse: ht?.enableJsonResponse ?? false,
+    enableSessions: ht?.enableSessions ?? true,
+    enableResumability: ht?.enableResumability ?? false,
+    enableDnsRebindingProtection: ht?.enableDnsRebindingProtection ?? false,
+    allowedOrigins: ht?.allowedOrigins,
+    allowedHosts: ht?.allowedHosts,
+  };
+}
 
 /**
  * Starts an HTTP server that exposes the MCP server via StreamableHTTPServerTransport.
@@ -58,7 +63,7 @@ export async function startHttpTransport(
   logger: Logger,
   config: Partial<HttpTransportConfig> = {},
 ): Promise<{ app: express.Application; close: () => Promise<void> }> {
-  const cfg = { ...DEFAULT_CONFIG, ...config };
+  const cfg = { ...getDefaultConfig(), ...config };
   const app = express();
 
   // Parse JSON bodies for POST requests
@@ -66,7 +71,8 @@ export async function startHttpTransport(
 
   // CORS headers for browser-based MCP clients
   app.use((_req, res, next) => {
-    const allowedOrigin = process.env.CORS_ALLOWED_ORIGINS || '*';
+    const serverConfig = getConfig();
+    const allowedOrigin = serverConfig.security.corsOrigins.join(',') || '*';
     res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, Authorization');
@@ -84,11 +90,12 @@ export async function startHttpTransport(
   });
 
   // OAuth setup — mount auth router before /mcp when enabled
-  const oauthEnabled = process.env.OAUTH_ENABLED === 'true';
+  const serverConfig = getConfig();
+  const oauthEnabled = serverConfig.oauth?.enabled ?? false;
   let oauthProvider: LegalOAuthProvider | undefined;
 
   if (oauthEnabled) {
-    const issuerUrl = new URL(process.env.OAUTH_ISSUER_URL || `http://${cfg.host}:${cfg.port}`);
+    const issuerUrl = new URL(serverConfig.oauth?.issuerUrl || `http://${cfg.host}:${cfg.port}`);
     const clientsStore = new LegalOAuthClientsStore();
     oauthProvider = new LegalOAuthProvider(clientsStore);
 

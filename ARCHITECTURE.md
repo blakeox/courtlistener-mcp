@@ -1,14 +1,16 @@
 # CourtListener MCP Architecture
 
 **Version**: 2.0 (Post-Refactoring)  
-**Date**: November 3, 2025  
+**Date**: November 3, 2025 (Updated: 2025)  
 **Status**: Production-Ready
 
 ---
 
 ## 🏗️ Overview
 
-The CourtListener MCP (Model Context Protocol) server provides type-safe, performant access to legal data through a modern, professional-grade architecture built on best practices including:
+The CourtListener MCP (Model Context Protocol) server provides type-safe,
+performant access to legal data through a modern, professional-grade
+architecture built on best practices including:
 
 - **100% TypeScript** with full type safety
 - **Decorator-based** cross-cutting concerns
@@ -16,6 +18,9 @@ The CourtListener MCP (Model Context Protocol) server provides type-safe, perfor
 - **Intelligent caching** with advanced strategies
 - **Fluent query builders** for clean API calls
 - **Comprehensive utilities** for common patterns
+- **HTTP transport** via StreamableHTTPServerTransport
+- **OAuth 2.1** with PKCE (scopes: legal:read, legal:search, legal:analyze)
+- **Multi-LLM client** configurations in `configs/`
 
 ---
 
@@ -29,7 +34,8 @@ The CourtListener MCP (Model Context Protocol) server provides type-safe, perfor
                        │
 ┌──────────────────────┴──────────────────────────────────────┐
 │                   Server Layer                              │
-│  • BestPracticeLegalMCPServer                              │
+│  • Server-Factory with centralized SERVER_INFO/             │
+│    SERVER_CAPABILITIES                                      │
 │  • Tool Registry & Handler Management                      │
 │  • Middleware Pipeline                                     │
 └──────────────────────┬──────────────────────────────────────┘
@@ -63,6 +69,40 @@ The CourtListener MCP (Model Context Protocol) server provides type-safe, perfor
 
 ---
 
+## 🌐 Transport Architecture
+
+### Stdio Transport
+
+- Used for CLI mode (`src/index.ts`)
+- Direct stdin/stdout communication
+
+### HTTP Transport
+
+- **StreamableHTTPServerTransport** mounted on `/mcp`
+- Used for remote/cloud deployments (`src/http-server.ts`)
+- Supports session management and keepalives
+
+### OAuth 2.1 Flow
+
+- PKCE-based authorization flow
+- Scopes: `legal:read`, `legal:search`, `legal:analyze`
+- Token validation middleware integrated into HTTP transport
+
+### Multi-LLM Client Support
+
+- Pre-built configurations in `configs/` directory for multiple LLM clients
+- Supports Claude Desktop, VS Code, and other MCP-compatible clients
+
+---
+
+## 🗑️ Legacy Code Removal
+
+The `src/legacy/` directory has been deleted (was 9 files, ~2,500 LOC of dead
+code). All functionality has been superseded by the modern architecture
+described below.
+
+---
+
 ## 🎯 Core Components
 
 ### 1. TypedToolHandler (Phase 1)
@@ -70,20 +110,24 @@ The CourtListener MCP (Model Context Protocol) server provides type-safe, perfor
 **Purpose**: Type-safe base class for all tool handlers
 
 **Features**:
+
 - Automatic Zod schema validation
 - Auto-generated JSON schemas
 - Full type inference for inputs/outputs
 - Eliminates manual `validate()` and `getSchema()` methods
 
 **Example**:
+
 ```typescript
-export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetailsSchema> {
+export class GetCaseDetailsHandler extends TypedToolHandler<
+  typeof getCaseDetailsSchema
+> {
   protected readonly schema = getCaseDetailsSchema;
-  
+
   // Input is automatically typed!
   async execute(
     input: z.infer<typeof getCaseDetailsSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     // Fully type-safe implementation
   }
@@ -101,25 +145,30 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
 **Decorators**:
 
 **`@withCache({ ttl?: number })`**
+
 - Automatic cache checking
 - Automatic cache storage
 - Configurable TTL per handler
 
 **`@withTiming()`**
+
 - Automatic performance tracking
 - Metrics collection
 - Request timing
 
 **`@withErrorHandling(message?)`**
+
 - Automatic error logging
 - Consistent error responses
 - Context preservation
 
 **`@withDefaults(config)`**
+
 - Combines all three decorators!
 - One-line solution for all cross-cutting concerns
 
 **Example**:
+
 ```typescript
 @withDefaults({ cache: { ttl: 3600 } })
 async execute(input: Input, context: ToolContext) {
@@ -138,6 +187,7 @@ async execute(input: Input, context: ToolContext) {
 **Purpose**: Reusable functions for common patterns
 
 **Pagination Utilities** (`pagination-utils.ts`):
+
 - `createPaginationInfo()` - Standard pagination format
 - `createPaginationInfoCamelCase()` - Alternative format
 - `calculatePagination()` - Metadata calculation
@@ -145,6 +195,7 @@ async execute(input: Input, context: ToolContext) {
 - `paginateResults()` - In-memory pagination
 
 **Response Utilities** (`response-utils.ts`):
+
 - `createSearchResponse()` - Search result formatting
 - `createEntityResponse()` - Single entity responses
 - `createListResponse()` - List formatting
@@ -154,6 +205,7 @@ async execute(input: Input, context: ToolContext) {
 - `formatActionSummary()` - Action messages
 
 **Example**:
+
 ```typescript
 // Before: 7 lines of pagination logic
 pagination: {
@@ -177,6 +229,7 @@ pagination: createPaginationInfo(response, input.page, input.page_size)
 **Purpose**: Type-safe fluent API for complex queries
 
 **Builders**:
+
 - `OpinionQueryBuilder` - Opinion searches
 - `CaseQueryBuilder` - Case searches
 - `DocketQueryBuilder` - Docket searches
@@ -184,6 +237,7 @@ pagination: createPaginationInfo(response, input.page, input.page_size)
 - `QueryBuilderFactory` - Convenient creation
 
 **Example**:
+
 ```typescript
 // Before: Loose object construction
 const params = {
@@ -214,6 +268,7 @@ const params = QueryBuilder.opinions()
 **Features**:
 
 **EnhancedCache**:
+
 - `getStaleWhileRevalidate()` - Instant responses with background updates
 - `getStale()` - Fallback to expired data during outages
 - `warmup()` - Pre-populate frequently accessed data
@@ -221,6 +276,7 @@ const params = QueryBuilder.opinions()
 - `invalidatePattern()` - Pattern-based invalidation
 
 **PaginationCache**:
+
 - `setPaginatedResult()` - Cache individual pages
 - `getPaginatedResult()` - Retrieve specific pages
 - `invalidateAllPages()` - Clear all pages for a query
@@ -268,7 +324,7 @@ const params = QueryBuilder.opinions()
 ```
 src/
 ├── server/
-│   ├── best-practice-server.ts    # Main MCP server
+│   ├── server-factory.ts              # Server factory (centralized SERVER_INFO/SERVER_CAPABILITIES)
 │   ├── tool-handler.ts             # TypedToolHandler base class
 │   ├── handler-decorators.ts       # @withDefaults & friends
 │   └── tool-registry.ts            # Handler registration
@@ -316,26 +372,31 @@ src/
 ## 🎨 Design Patterns
 
 ### 1. Dependency Injection
+
 - **DIContainer** manages all dependencies
 - Testable, mockable components
 - Lifecycle management
 
 ### 2. Decorator Pattern
+
 - `@withDefaults` for cross-cutting concerns
 - Non-invasive, composable
 - Centralized logic
 
 ### 3. Builder Pattern
+
 - `QueryBuilder` for fluent APIs
 - Type-safe construction
 - Self-documenting code
 
 ### 4. Template Method Pattern
+
 - `TypedToolHandler` defines structure
 - Subclasses implement `execute()`
 - Consistent handler interface
 
 ### 5. Strategy Pattern
+
 - Enhanced caching strategies
 - Pluggable cache implementations
 - Flexible, testable
@@ -345,11 +406,13 @@ src/
 ## 🔒 Type Safety
 
 ### Zero `any` Types in Handlers
+
 - **Before Refactoring**: 253 `any` types
 - **After Refactoring**: 0 `any` types
 - **Achievement**: 100% type safety!
 
 ### Type Inference Chain
+
 ```typescript
 // Schema defines input structure
 const schema = z.object({ cluster_id: z.string() });
@@ -358,19 +421,22 @@ const schema = z.object({ cluster_id: z.string() });
 class Handler extends TypedToolHandler<typeof schema> {
   // Input is automatically z.infer<typeof schema>!
   async execute(input, context) {
-    input.cluster_id // ← TypeScript knows this is string!
+    input.cluster_id; // ← TypeScript knows this is string!
   }
 }
 ```
 
 ### Branded Types for Safety
+
 ```typescript
 // Prevent ID mixups
 type CaseId = string & { __brand: 'CaseId' };
 type CourtId = string & { __brand: 'CourtId' };
 
 // Compiler error if you mix them up!
-function getCaseDetails(id: CaseId) { /* ... */ }
+function getCaseDetails(id: CaseId) {
+  /* ... */
+}
 getCaseDetails(courtId); // ← TypeScript error!
 ```
 
@@ -379,12 +445,14 @@ getCaseDetails(courtId); // ← TypeScript error!
 ## ⚡ Performance Optimizations
 
 ### Caching Strategy
+
 1. **Level 1**: `@withCache` decorator (automatic)
 2. **Level 2**: EnhancedCache with stale-while-revalidate
 3. **Level 3**: PaginationCache for per-page caching
 4. **Level 4**: Cache warming for popular queries
 
 ### Request Optimization
+
 - Automatic caching reduces API calls
 - Batch cache operations
 - Prefetching for adjacent pages
@@ -395,12 +463,14 @@ getCaseDetails(courtId); // ← TypeScript error!
 ## 🧪 Testing Strategy
 
 ### Test Coverage
+
 - Unit tests for handlers
 - Integration tests for server
 - Middleware tests
 - Infrastructure tests
 
 ### Mocking
+
 - MockLogger for testing
 - MockCache for isolation
 - MockMetrics for assertions
@@ -411,12 +481,14 @@ getCaseDetails(courtId); // ← TypeScript error!
 ## 📈 Metrics & Monitoring
 
 ### Automatic Metrics
+
 - Request count (total, successful, failed)
 - Response times (average, percentiles)
 - Cache performance (hits, misses, hit rate)
 - Error rates
 
 ### Structured Logging
+
 - Request/response logging
 - Error logging with context
 - Performance timing
@@ -457,7 +529,9 @@ const getCaseDetailsSchema = z.object({
 });
 
 // 2. Create handler (Phases 1-4)
-export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetailsSchema> {
+export class GetCaseDetailsHandler extends TypedToolHandler<
+  typeof getCaseDetailsSchema
+> {
   readonly name = 'get_case_details';
   readonly description = 'Get detailed information about a specific case';
   readonly category = 'cases';
@@ -471,13 +545,13 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
   @withDefaults({ cache: { ttl: 3600 } })
   async execute(
     input: z.infer<typeof getCaseDetailsSchema>, // ← Fully typed!
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     // 4. Pure business logic!
     const response = await this.apiClient.getCaseDetails({
       clusterId: Number(input.cluster_id),
     });
-    
+
     return this.success({
       summary: `Retrieved details for case ${input.cluster_id}`,
       case: response,
@@ -493,6 +567,7 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
 ## 📚 Complete Transformation Summary
 
 ### Before Refactoring
+
 - 253 `any` types
 - 60 lines per handler (95% boilerplate)
 - Manual validation
@@ -501,7 +576,8 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
 - Manual metrics
 - Scattered patterns
 
-### After Refactoring  
+### After Refactoring
+
 - 0 `any` types ✅
 - 11 lines per handler (100% business logic) ✅
 - Automatic validation ✅
@@ -517,30 +593,37 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
 ## 🎊 Refactoring Phases Completed
 
 ### ✅ Phase 1: Type Safety
+
 - TypedToolHandler architecture
 - ~960 lines removed
 
 ### ✅ Phase 2: Reduce Duplication
+
 - @withDefaults decorator system
 - ~360 lines removed
 
 ### ✅ Phase 3: Reduce Complexity
+
 - Pagination & response utilities
 - ~50 lines removed
 
 ### ✅ Phase 4: Advanced Improvements
+
 - Query builder system
 - +275 lines infrastructure
 
 ### ✅ Phase 5: Performance Optimizations
+
 - Enhanced caching strategies
 - +253 lines infrastructure
 
 ### ✅ Phase 6: Documentation & Polish
+
 - Comprehensive documentation
 - Final cleanup
 
-**Total Impact**: ~1,370 lines removed, +1,067 lines of infrastructure, Net -303 lines with professional-grade code!
+**Total Impact**: ~1,370 lines removed, +1,067 lines of infrastructure, Net -303
+lines with professional-grade code!
 
 ---
 
@@ -563,6 +646,5 @@ See `REFACTORING_ROADMAP.md` for complete refactoring history.
 
 ---
 
-*Architecture finalized: November 3, 2025*  
-*Status: Production-ready and deployed!*
-
+_Architecture finalized: November 3, 2025_  
+_Status: Production-ready and deployed!_

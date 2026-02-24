@@ -12,13 +12,22 @@ import type { CallToolRequest, CallToolResult, Tool } from '@modelcontextprotoco
 import { bootstrapServices } from './infrastructure/bootstrap.js';
 import { container } from './infrastructure/container.js';
 import { Logger } from './infrastructure/logger.js';
+import { initTelemetry } from './infrastructure/telemetry.js';
 import { BestPracticeLegalMCPServer } from './server/best-practice-server.js';
+
+const otelSdk = initTelemetry();
 
 async function main(): Promise<void> {
   bootstrapServices();
 
   const logger = container.get<Logger>('logger');
   const server = new BestPracticeLegalMCPServer();
+
+  process.on('SIGTERM', async () => {
+    if (otelSdk) {
+      await otelSdk.shutdown();
+    }
+  });
 
   try {
     await server.start();
@@ -28,6 +37,7 @@ async function main(): Promise<void> {
     try {
       await server.stop();
     } finally {
+      if (otelSdk) await otelSdk.shutdown();
       process.exit(1);
     }
   }

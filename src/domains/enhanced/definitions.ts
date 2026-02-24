@@ -27,6 +27,15 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
       required: ['judge_id'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
   {
     name: 'get_comprehensive_case_analysis',
@@ -53,6 +62,15 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
       },
       required: ['cluster_id'],
       additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
     },
   },
   {
@@ -105,6 +123,21 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
       required: ['disclosure_type'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            results: { type: 'array' },
+            count: { type: 'number' },
+          },
+        },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
   {
     name: 'get_enhanced_recap_data',
@@ -148,6 +181,15 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
       },
       required: ['action'],
       additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
     },
   },
 ];

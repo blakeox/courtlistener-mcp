@@ -22,6 +22,12 @@ import { ResourceHandlerRegistry } from '../server/resource-handler.js';
 import { PromptHandlerRegistry } from '../server/prompt-handler.js';
 import { OpinionResourceHandler } from '../resources/opinion.js';
 import { SchemaResourceHandler } from '../resources/schema.js';
+import { CaseResourceHandler } from '../resources/case.js';
+import { DocketResourceHandler } from '../resources/docket.js';
+import { CourtResourceHandler } from '../resources/court.js';
+import { JudgeResourceHandler } from '../resources/judge.js';
+import { RecentOpinionsResourceHandler } from '../resources/recent-opinions.js';
+import { ApiStatusResourceHandler } from '../resources/api-status.js';
 import { LegalAssistantPromptHandler } from '../prompts/legal-assistant.js';
 import {
   SummarizeStatutePromptHandler,
@@ -29,6 +35,12 @@ import {
   AnalyzeCasePromptHandler,
   DraftBriefSectionPromptHandler,
   IdentifyIssuesPromptHandler,
+  LegalResearchWorkflowPromptHandler,
+  CitationAnalysisPromptHandler,
+  JurisdictionComparisonPromptHandler,
+  CaseBriefPromptHandler,
+  MotionDraftingPromptHandler,
+  JudicialDueDiligencePromptHandler,
 } from '../prompts/legal-prompts.js';
 
 // Import all domain handlers
@@ -212,6 +224,15 @@ function registerResourceHandlers(): void {
 
   resourceRegistry.register(new OpinionResourceHandler(courtListenerApi));
   resourceRegistry.register(new SchemaResourceHandler());
+  resourceRegistry.register(new CaseResourceHandler(courtListenerApi));
+  resourceRegistry.register(new DocketResourceHandler(courtListenerApi));
+  resourceRegistry.register(new CourtResourceHandler(courtListenerApi));
+  resourceRegistry.register(new JudgeResourceHandler(courtListenerApi));
+  resourceRegistry.register(new RecentOpinionsResourceHandler(courtListenerApi));
+
+  const cache = container.get<CacheManager>('cache');
+  const metrics = container.get<MetricsCollector>('metrics');
+  resourceRegistry.register(new ApiStatusResourceHandler(cache, metrics));
 }
 
 function registerPromptHandlers(): void {
@@ -223,6 +244,12 @@ function registerPromptHandlers(): void {
   promptRegistry.register(new AnalyzeCasePromptHandler());
   promptRegistry.register(new DraftBriefSectionPromptHandler());
   promptRegistry.register(new IdentifyIssuesPromptHandler());
+  promptRegistry.register(new LegalResearchWorkflowPromptHandler());
+  promptRegistry.register(new CitationAnalysisPromptHandler());
+  promptRegistry.register(new JurisdictionComparisonPromptHandler());
+  promptRegistry.register(new CaseBriefPromptHandler());
+  promptRegistry.register(new MotionDraftingPromptHandler());
+  promptRegistry.register(new JudicialDueDiligencePromptHandler());
 }
 
 function registerToolHandlers(): void {

@@ -6,6 +6,7 @@
 import { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
 import { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
 import crypto from 'node:crypto';
+import { getConfig } from '../infrastructure/config.js';
 
 export class LegalOAuthClientsStore implements OAuthRegisteredClientsStore {
   private clients = new Map<string, OAuthClientInformationFull>();
@@ -15,8 +16,9 @@ export class LegalOAuthClientsStore implements OAuthRegisteredClientsStore {
   }
 
   private registerDefaultClient(): void {
-    const clientId = process.env.OAUTH_CLIENT_ID;
-    const clientSecret = process.env.OAUTH_CLIENT_SECRET;
+    const cfg = getConfig();
+    const clientId = cfg.oauth?.clientId;
+    const clientSecret = cfg.oauth?.clientSecret;
     if (!clientId) return;
 
     const client: OAuthClientInformationFull = {

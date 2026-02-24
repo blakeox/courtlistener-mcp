@@ -4,6 +4,7 @@
  */
 
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 import { AuthContext } from './authentication.js';
 import { cryptoId } from '../common/utils.js';
 
@@ -282,27 +283,27 @@ export class AuditLogger {
 }
 
 /**
- * Create correlation and audit components from environment
+ * Create correlation and audit components from centralized config
  */
 export function createAuditComponents(logger: Logger): {
   correlation: CorrelationConfig;
   audit: AuditLogger;
 } {
+  const cfg = getConfig();
+
   const correlationConfig: CorrelationConfig = {
-    enabled: process.env.CORRELATION_ENABLED !== 'false',
-    headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
-    generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
+    enabled: cfg.correlation?.enabled ?? true,
+    headerName: cfg.correlation?.headerName ?? 'x-correlation-id',
+    generateId: cfg.correlation?.generateId ?? true,
   };
 
   const auditConfig: AuditConfig = {
-    enabled: process.env.AUDIT_ENABLED === 'true',
-    logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
-    includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
-    includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
-    maxBodyLength: parseInt(process.env.AUDIT_MAX_BODY_LENGTH || '2000'),
-    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
-      ? process.env.AUDIT_SENSITIVE_FIELDS.split(',').map((f) => f.trim())
-      : ['password', 'token', 'secret', 'key', 'auth'],
+    enabled: cfg.audit.enabled,
+    logLevel: cfg.audit.logLevel,
+    includeRequestBody: cfg.audit.includeRequestBody,
+    includeResponseBody: cfg.audit.includeResponseBody,
+    maxBodyLength: cfg.audit.maxBodyLength,
+    sensitiveFields: cfg.audit.sensitiveFields,
   };
 
   const audit = new AuditLogger(logger, correlationConfig, auditConfig);

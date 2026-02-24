@@ -40,6 +40,7 @@ const defaultConfig: ServerConfig = {
           .filter((key) => key.length > 0)
       : [],
     allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
+    headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
     corsEnabled: process.env.CORS_ENABLED !== 'false',
     corsOrigins: process.env.CORS_ORIGINS
       ? process.env.CORS_ORIGINS.split(',')
@@ -73,45 +74,105 @@ const defaultConfig: ServerConfig = {
     enabled: process.env.COMPRESSION_ENABLED !== 'false',
     threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
     level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 0, 9),
+    types: process.env.COMPRESSION_TYPES
+      ? process.env.COMPRESSION_TYPES.split(',')
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+      : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
   },
   sampling: {
     enabled: process.env.SAMPLING_ENABLED === 'true',
     maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
     defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
   },
+  correlation: {
+    enabled: process.env.CORRELATION_ENABLED !== 'false',
+    headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
+    generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
+  },
+  sanitization: {
+    enabled: process.env.SANITIZATION_ENABLED !== 'false',
+    maxStringLength: parsePositiveInt(process.env.SANITIZATION_MAX_STRING_LENGTH, 10000, 1),
+    maxArrayLength: parsePositiveInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH, 1000, 1),
+    maxObjectDepth: parsePositiveInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH, 10, 1),
+  },
+  rateLimit: {
+    enabled: process.env.RATE_LIMIT_ENABLED === 'true',
+    maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
+    maxRequestsPerHour: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR, 1000, 1),
+    maxRequestsPerDay: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY, 10000, 1),
+    windowSizeMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60000, 1),
+    clientIdentification: process.env.RATE_LIMIT_CLIENT_ID || 'ip',
+    identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
+    whitelistedClients: process.env.RATE_LIMIT_WHITELIST
+      ? process.env.RATE_LIMIT_WHITELIST.split(',')
+          .map((c) => c.trim())
+          .filter((c) => c.length > 0)
+      : [],
+    penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
+    persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
+  },
+  gracefulShutdown: {
+    enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
+    timeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT, 30000, 1),
+    forceTimeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT, 5000, 1),
+    signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
+      ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
+      : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
+  },
+  httpTransport: {
+    port: parsePositiveInt(process.env.MCP_HTTP_PORT, 3002, 1024, 65535),
+    host: process.env.MCP_HTTP_HOST || '0.0.0.0',
+    enableJsonResponse: process.env.MCP_JSON_RESPONSE === 'true',
+    enableSessions: process.env.MCP_SESSIONS !== 'false',
+    enableResumability: process.env.MCP_RESUMABILITY === 'true',
+    enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
+    allowedOrigins: process.env.MCP_ALLOWED_ORIGINS
+      ? process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+      : undefined,
+    allowedHosts: process.env.MCP_ALLOWED_HOSTS
+      ? process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim())
+      : undefined,
+  },
+  oauth: {
+    enabled: process.env.OAUTH_ENABLED === 'true',
+    issuerUrl: process.env.OAUTH_ISSUER_URL,
+    clientId: process.env.OAUTH_CLIENT_ID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+  },
 };
 
 /**
  * Get the server configuration
- * 
+ *
  * Loads configuration from environment variables with defaults,
  * validates it, and returns a type-safe ServerConfig object.
- * 
+ *
  * **Validation**:
  * 1. Custom validation for business rules
  * 2. Zod schema validation for type safety
- * 
+ *
  * **Environment Variables**:
  * - `COURTLISTENER_BASE_URL` - API base URL
  * - `CACHE_ENABLED` - Enable/disable caching
  * - `LOG_LEVEL` - Logging level (debug, info, warn, error)
  * - And many more...
- * 
+ *
  * @returns Validated server configuration
  * @throws {Error} If configuration is invalid
- * 
+ *
  * @example
  * ```typescript
  * const config = getConfig();
  * console.log(config.courtListener.baseUrl);
  * console.log(config.cache.enabled);
  * ```
- * 
+ *
  * @see {@link ServerConfig} for complete configuration structure
  */
 export function getConfig(): ServerConfig {
   const config = validateConfig(defaultConfig);
-  
+
   // Additional Zod validation for type safety
   try {
     return validateConfigWithZod(config);

@@ -1,7 +1,7 @@
 import type { CallToolRequest, CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
-import './best-practice-server.js';
+import './mcp-server.js';
 
-declare module './best-practice-server.js' {
+declare module './mcp-server.js' {
   interface BestPracticeLegalMCPServer {
     run(): Promise<void>;
     listTools(): Promise<{

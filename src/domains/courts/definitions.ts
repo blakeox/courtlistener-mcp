@@ -35,5 +35,20 @@ export const courtToolDefinitions: EnhancedTool[] = [
       },
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            results: { type: 'array' },
+            count: { type: 'number' },
+          },
+        },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
 ];

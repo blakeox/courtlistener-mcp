@@ -4,6 +4,7 @@
  */
 
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
 
@@ -188,16 +189,15 @@ export class CompressionMiddleware {
 }
 
 /**
- * Create compression middleware from environment configuration
+ * Create compression middleware from centralized config
  */
 export function createCompressionMiddleware(logger: Logger): CompressionMiddleware {
+  const cfg = getConfig();
   const config: CompressionConfig = {
-    enabled: process.env.COMPRESSION_ENABLED === 'true',
-    threshold: parseInt(process.env.COMPRESSION_THRESHOLD || '1024'),
-    level: parseInt(process.env.COMPRESSION_LEVEL || '6'),
-    types: process.env.COMPRESSION_TYPES
-      ? process.env.COMPRESSION_TYPES.split(',').map((t) => t.trim())
-      : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
+    enabled: cfg.compression.enabled,
+    threshold: cfg.compression.threshold,
+    level: cfg.compression.level,
+    types: cfg.compression.types,
   };
 
   return new CompressionMiddleware(config, logger);

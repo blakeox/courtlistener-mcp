@@ -4,6 +4,7 @@
  */
 
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 
 export interface SanitizationConfig {
   enabled: boolean;
@@ -284,14 +285,15 @@ export class InputSanitizer {
 }
 
 /**
- * Create input sanitizer from environment configuration
+ * Create input sanitizer from centralized config
  */
 export function createInputSanitizer(logger: Logger): InputSanitizer {
+  const cfg = getConfig();
   const config: Partial<SanitizationConfig> = {
-    enabled: process.env.SANITIZATION_ENABLED !== 'false',
-    maxStringLength: parseInt(process.env.SANITIZATION_MAX_STRING_LENGTH || '10000'),
-    maxArrayLength: parseInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH || '1000'),
-    maxObjectDepth: parseInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH || '10'),
+    enabled: cfg.sanitization?.enabled ?? cfg.security.sanitizationEnabled,
+    maxStringLength: cfg.sanitization?.maxStringLength ?? 10000,
+    maxArrayLength: cfg.sanitization?.maxArrayLength ?? 1000,
+    maxObjectDepth: cfg.sanitization?.maxObjectDepth ?? 10,
   };
 
   return new InputSanitizer(logger, config);

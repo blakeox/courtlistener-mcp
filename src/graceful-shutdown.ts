@@ -4,6 +4,7 @@
  */
 
 import { Logger } from './infrastructure/logger.js';
+import { getConfig } from './infrastructure/config.js';
 
 export interface ShutdownConfig {
   enabled: boolean;
@@ -229,16 +230,16 @@ export class GracefulShutdown {
 }
 
 /**
- * Create graceful shutdown from environment configuration
+ * Create graceful shutdown from centralized config
  */
 export function createGracefulShutdown(logger: Logger): GracefulShutdown {
+  const cfg = getConfig();
+  const gs = cfg.gracefulShutdown;
   const config: ShutdownConfig = {
-    enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
-    timeout: parseInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT || '30000'),
-    forceTimeout: parseInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT || '5000'),
-    signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
-      ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
-      : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
+    enabled: gs?.enabled ?? true,
+    timeout: gs?.timeout ?? 30000,
+    forceTimeout: gs?.forceTimeout ?? 5000,
+    signals: gs?.signals ?? ['SIGTERM', 'SIGINT', 'SIGUSR2'],
   };
 
   return new GracefulShutdown(config, logger);

@@ -28,5 +28,14 @@ export const caseToolDefinitions: EnhancedTool[] = [
       required: ['cluster_id'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
 ];

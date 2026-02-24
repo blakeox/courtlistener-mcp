@@ -28,6 +28,15 @@ export const opinionToolDefinitions: EnhancedTool[] = [
       required: ['opinion_id'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
   {
     name: 'analyze_legal_argument',
@@ -87,6 +96,21 @@ export const opinionToolDefinitions: EnhancedTool[] = [
       required: ['argument', 'search_query'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            results: { type: 'array' },
+            count: { type: 'number' },
+          },
+        },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
+    },
   },
   {
     name: 'get_citation_network',
@@ -132,6 +156,15 @@ export const opinionToolDefinitions: EnhancedTool[] = [
       },
       required: ['opinion_id'],
       additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object' as const,
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        metadata: { type: 'object' },
+      },
+      required: ['success', 'data'],
     },
   },
 ];

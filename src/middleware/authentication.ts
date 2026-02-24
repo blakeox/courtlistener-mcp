@@ -11,6 +11,7 @@
  */
 
 import { Logger } from '../infrastructure/logger.js';
+import { getConfig } from '../infrastructure/config.js';
 
 export interface AuthConfig {
   enabled: boolean;
@@ -136,16 +137,15 @@ export class AuthenticationMiddleware {
 }
 
 /**
- * Create authentication middleware from environment
+ * Create authentication middleware from centralized config
  */
 export function createAuthMiddleware(logger: Logger): AuthenticationMiddleware {
+  const cfg = getConfig();
   const config: AuthConfig = {
-    enabled: process.env.AUTH_ENABLED === 'true',
-    apiKeys: process.env.AUTH_API_KEYS
-      ? process.env.AUTH_API_KEYS.split(',').map((key) => key.trim())
-      : [],
-    allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
-    headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
+    enabled: cfg.security.authEnabled,
+    apiKeys: cfg.security.apiKeys,
+    allowAnonymous: cfg.security.allowAnonymous,
+    headerName: cfg.security.headerName,
   };
 
   return new AuthenticationMiddleware(config, logger);
