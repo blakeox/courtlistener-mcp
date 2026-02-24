@@ -12,6 +12,7 @@ import { withDefaults } from '../../server/handler-decorators.js';
 import {
   createPaginationInfoCamelCase,
   PaginatedApiResponse,
+  resolveOffsetLimit,
 } from '../../common/pagination-utils.js';
 
 /**
@@ -32,6 +33,8 @@ const searchOpinionsSchema = z
     page: z.coerce.number().int().min(1).optional(),
     page_size: z.coerce.number().int().min(1).max(100).optional(),
     pageSize: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   })
   .transform((parsed) => ({
     query: parsed.query ?? parsed.q,
@@ -40,9 +43,26 @@ const searchOpinionsSchema = z
     date_filed_after: parsed.date_filed_after ?? parsed.dateAfter,
     date_filed_before: parsed.date_filed_before ?? parsed.dateBefore,
     order_by: parsed.order_by ?? parsed.orderBy ?? 'relevance',
+    ...resolvePageFromCursor(parsed),
+  }));
+
+/** Resolve page/page_size from cursor or fallback to explicit params */
+function resolvePageFromCursor(parsed: {
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  page_size?: number | undefined;
+  pageSize?: number | undefined;
+}): { page: number; page_size: number } {
+  if (parsed.cursor) {
+    const { offset, limit } = resolveOffsetLimit(parsed);
+    return { page: Math.floor(offset / limit) + 1, page_size: limit };
+  }
+  return {
     page: parsed.page ?? 1,
     page_size: parsed.page_size ?? parsed.pageSize ?? 20,
-  }));
+  };
+}
 
 const advancedSearchSchema = z
   .object({
@@ -63,6 +83,8 @@ const advancedSearchSchema = z
     order_by: z.string().optional(),
     page: z.number().int().min(1).optional(),
     page_size: z.number().int().min(1).max(100).optional().default(20),
+    cursor: z.string().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
   })
   .superRefine((value, ctx) => {
     const meaningfulKeys = [
@@ -108,6 +130,8 @@ const searchCasesSchema = z
     page: z.coerce.number().int().min(1).optional(),
     page_size: z.coerce.number().int().min(1).max(100).optional(),
     pageSize: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   })
   .transform((parsed) => ({
     query: parsed.query ?? parsed.q,
@@ -118,8 +142,7 @@ const searchCasesSchema = z
     date_filed_after: parsed.date_filed_after,
     date_filed_before: parsed.date_filed_before,
     precedential_status: parsed.precedential_status,
-    page: parsed.page ?? 1,
-    page_size: parsed.page_size ?? parsed.pageSize ?? 20,
+    ...resolvePageFromCursor(parsed),
   }));
 
 export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinionsSchema> {

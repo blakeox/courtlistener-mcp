@@ -5,6 +5,13 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "configs",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "legal-mcp": "dist/index.js"
   },

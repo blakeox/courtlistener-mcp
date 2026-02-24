@@ -87,6 +87,16 @@ export const searchToolDefinitions: EnhancedTool[] = [
           minimum: 1,
           maximum: 100,
         },
+        cursor: {
+          type: 'string',
+          description: 'Pagination cursor from previous response (alternative to page/page_size)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of results to return (used with cursor)',
+          minimum: 1,
+          maximum: 100,
+        },
       },
       additionalProperties: false,
     },

@@ -4,6 +4,43 @@
  */
 
 /**
+ * Encode an offset as an opaque cursor string (base64url)
+ */
+export function encodeCursor(offset: number): string {
+  return Buffer.from(`offset:${offset}`).toString('base64url');
+}
+
+/**
+ * Decode a cursor string back to an offset
+ */
+export function decodeCursor(cursor: string): number {
+  const decoded = Buffer.from(cursor, 'base64url').toString('utf8');
+  const match = decoded.match(/^offset:(\d+)$/);
+  if (!match || match[1] === undefined) {
+    throw new Error('Invalid cursor format');
+  }
+  return parseInt(match[1], 10);
+}
+
+/**
+ * Resolve cursor/limit or page/page_size to offset/limit.
+ * Cursor takes priority when provided.
+ */
+export function resolveOffsetLimit(params: {
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  page_size?: number | undefined;
+}): { offset: number; limit: number } {
+  if (params.cursor) {
+    return { offset: decodeCursor(params.cursor), limit: params.limit ?? 20 };
+  }
+  const page = params.page ?? 1;
+  const pageSize = params.page_size ?? 20;
+  return { offset: (page - 1) * pageSize, limit: pageSize };
+}
+
+/**
  * Standard pagination response structure
  */
 export interface PaginationInfo {
@@ -17,6 +54,7 @@ export interface PaginationInfo {
   totalCount?: number;
   has_next?: boolean;
   has_previous?: boolean;
+  nextCursor?: string;
 }
 
 /**
@@ -31,7 +69,7 @@ export interface PaginatedApiResponse<T = unknown> {
 
 /**
  * Create standardized pagination info from API response
- * 
+ *
  * @example
  * ```typescript
  * const pagination = createPaginationInfo(response, input.page, input.page_size);
@@ -41,18 +79,21 @@ export interface PaginatedApiResponse<T = unknown> {
 export function createPaginationInfo(
   response: PaginatedApiResponse,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): PaginationInfo {
   const count = response.count ?? 0;
   const totalPages = Math.ceil(count / pageSize);
+
+  const hasNext = page < totalPages;
 
   return {
     page,
     page_size: pageSize,
     count,
     total_pages: totalPages,
-    has_next: page < totalPages,
+    has_next: hasNext,
     has_previous: page > 1,
+    ...(hasNext ? { nextCursor: encodeCursor(page * pageSize) } : {}),
   };
 }
 
@@ -62,18 +103,21 @@ export function createPaginationInfo(
 export function createPaginationInfoCamelCase(
   response: PaginatedApiResponse,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): PaginationInfo {
   const count = response.count ?? 0;
   const totalPages = Math.ceil(count / pageSize);
+
+  const hasNext = page < totalPages;
 
   return {
     page,
     pageSize,
     totalCount: count,
     totalPages,
-    has_next: page < totalPages,
+    has_next: hasNext,
     has_previous: page > 1,
+    ...(hasNext ? { nextCursor: encodeCursor(page * pageSize) } : {}),
   };
 }
 
@@ -83,7 +127,7 @@ export function createPaginationInfoCamelCase(
 export function calculatePagination(
   totalCount: number,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): {
   totalPages: number;
   hasNext: boolean;
@@ -110,7 +154,7 @@ export function calculatePagination(
 export function validatePaginationParams(
   page: number,
   pageSize: number,
-  maxPageSize: number = 100
+  maxPageSize: number = 100,
 ): { valid: boolean; error?: string } {
   if (page < 1) {
     return { valid: false, error: 'Page must be >= 1' };
@@ -133,7 +177,7 @@ export function validatePaginationParams(
 export function paginateResults<T>(
   items: T[],
   page: number,
-  pageSize: number
+  pageSize: number,
 ): { results: T[]; pagination: PaginationInfo } {
   const startIndex = (page - 1) * pageSize;
   const endIndex = startIndex + pageSize;
@@ -151,4 +195,3 @@ export function paginateResults<T>(
     },
   };
 }
-

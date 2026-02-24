@@ -4,7 +4,7 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
   {
     name: 'get_comprehensive_judge_profile',
     description:
-      'Get complete judicial profile including positions, education, political affiliations, ABA ratings, and financial disclosures',
+      'Get complete judicial profile including positions, education, political affiliations, ABA ratings, and financial disclosures. ⚡ Moderate API cost.',
     category: 'analysis',
     complexity: 'advanced',
     rateLimitWeight: 4,
@@ -40,7 +40,7 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
   {
     name: 'get_comprehensive_case_analysis',
     description:
-      'Get complete case analysis including docket entries, parties, attorneys, and tags for full case intelligence',
+      'Get complete case analysis including docket entries, parties, attorneys, and tags for full case intelligence. ⚡ Moderate API cost.',
     category: 'analysis',
     complexity: 'advanced',
     rateLimitWeight: 4,

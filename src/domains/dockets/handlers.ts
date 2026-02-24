@@ -19,6 +19,8 @@ const getDocketsSchema = z.object({
   date_filed: z.string().optional(),
   page: z.number().min(1).optional().default(1),
   page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
 });
 
 const getDocketSchema = z.object({
@@ -45,6 +47,8 @@ const getDocketEntriesSchema = z.object({
   date_filed_before: z.string().optional(),
   page: z.number().min(1).optional().default(1),
   page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
 });
 
 /**
@@ -71,12 +75,16 @@ export class GetDocketsHandler extends TypedToolHandler<typeof getDocketsSchema>
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getDockets(input);
+    const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
+    const page = input.cursor ? Math.floor(offset / resolvedLimit) + 1 : input.page;
+    const pageSize = input.cursor ? resolvedLimit : input.page_size;
+
+    const response = await this.apiClient.getDockets({ ...input, page, page_size: pageSize });
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} dockets`,
       dockets: response.results,
-      pagination: createPaginationInfo(response, input.page, input.page_size),
+      pagination: createPaginationInfo(response, page, pageSize),
     });
   }
 }
@@ -201,13 +209,17 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
     input: z.infer<typeof getDocketEntriesSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
+    const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
+    const page = input.cursor ? Math.floor(offset / resolvedLimit) + 1 : input.page;
+    const pageSize = input.cursor ? resolvedLimit : input.page_size;
+
     const params = {
       docket: input.docket,
       entry_number: input.entry_number,
       date_filed_after: input.date_filed_after,
       date_filed_before: input.date_filed_before,
-      page: input.page,
-      page_size: input.page_size,
+      page,
+      page_size: pageSize,
     };
 
     context.logger.info('Fetching docket entries', {

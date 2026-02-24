@@ -41,7 +41,7 @@ export const opinionToolDefinitions: EnhancedTool[] = [
   {
     name: 'analyze_legal_argument',
     description:
-      'Analyze a legal argument by finding supporting and opposing cases, with AI-powered relevance assessment',
+      'Analyze a legal argument by finding supporting and opposing cases, with AI-powered relevance assessment. ⚡ Moderate API cost.',
     category: 'analysis',
     complexity: 'advanced',
     rateLimitWeight: 3,
