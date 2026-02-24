@@ -17,141 +17,141 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
-    - name: Install dependencies
-      run: |
-        # Check if pnpm lock file is in sync, if not regenerate it
-        if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
-          echo "⚠️ pnpm lock file out of sync, regenerating..."
-          pnpm install
-        else
-          echo "✅ pnpm lock file in sync, using frozen-lockfile"
-          pnpm install --frozen-lockfile
-        fi
+      - name: Install dependencies
+        run: |
+          # Check if pnpm lock file is in sync, if not regenerate it
+          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+            echo "⚠️ pnpm lock file out of sync, regenerating..."
+            pnpm install
+          else
+            echo "✅ pnpm lock file in sync, using frozen-lockfile"
+            pnpm install --frozen-lockfile
+          fi
 
-    - name: Verify version consistency
-      run: node scripts/build/version-check.js
+      - name: Verify version consistency
+        run: node scripts/build/version-check.js
 
-    - name: Build for production
-      run: pnpm run build
+      - name: Build for production
+        run: pnpm run build
 
-    - name: Install MCP Inspector
-      run: pnpm add -g @modelcontextprotocol/inspector
+      - name: Install MCP Inspector
+        run: pnpm add -g @modelcontextprotocol/inspector
 
-    - name: Comprehensive test suite
-      run: |
-        echo "🧪 Running full test suite for release validation..."
-        pnpm test
+      - name: Comprehensive test suite
+        run: |
+          echo "🧪 Running full test suite for release validation..."
+          pnpm test
 
-    - name: Extended MCP Inspector validation
-      run: |
-        echo "🔍 Running extended MCP Inspector validation..."
-        
-        # Run comprehensive Inspector CLI tests
-        node test/runners/ci-test-mcp-inspector.js --extended
-        
-        # Test all available tools
-        pnpm run test:mcp:tool list_courts
-        pnpm run test:mcp:tool search_cases '{"query": "constitutional"}'
-        pnpm run test:mcp:tool get_case_details '{"cluster_id": 1}'
+      - name: Extended MCP Inspector validation
+        run: |
+          echo "🔍 Running extended MCP Inspector validation..."
 
-    - name: Performance regression check
-      run: |
-        echo "⚡ Running performance regression checks..."
-        pnpm run test:performance > performance-results.txt
-        
-        # Compare with baseline if available
-        if [ -f performance-baseline.txt ]; then
-          echo "Comparing with performance baseline..."
-          node scripts/performance/compare-performance.js performance-baseline.txt performance-results.txt
-        fi
+          # Run comprehensive Inspector CLI tests
+          node test/runners/ci-test-mcp-inspector.js --extended
 
-    - name: Test against multiple environments
-      run: |
-        echo "🌍 Testing against multiple environments..."
-        
-        # Test local build
-        echo "Testing local build..."
-        pnpm run test:mcp
-        
-        # Test remote deployment if available
-        if [ -n "$REMOTE_SERVER_URL" ]; then
-          echo "Testing remote deployment..."
-          SERVER_URL="$REMOTE_SERVER_URL" pnpm run test:mcp
-        fi
+          # Test all available tools
+          pnpm run test:mcp:tool list_courts
+          pnpm run test:mcp:tool search_cases '{"query": "constitutional"}'
+          pnpm run test:mcp:tool get_case_details '{"cluster_id": 1}'
 
-    - name: Generate release validation report
-      run: |
-        echo "📋 Generating release validation report..."
-        
-        cat > release-validation-report.md << EOF
-        # Release Validation Report
-        
-        **Version:** ${{ github.ref_name }}
-        **Generated:** $(date)
-        **Commit:** ${{ github.sha }}
-        
-        ## Test Results Summary
-        
-        - ✅ Version consistency check
-        - ✅ Build successful  
-        - ✅ Full test suite passed
-        - ✅ MCP Inspector validation passed
-        - ✅ Performance regression check
-        - ✅ Multi-environment testing
-        
-        ## MCP Protocol Compliance
-        
-        All 25 tools tested successfully:
-        - Core Research Tools (7/7) ✅
-        - Comprehensive Data Access (11/11) ✅  
-        - Advanced Features (7/7) ✅
-        
-        ## Performance Metrics
-        
-        \`\`\`
-        $(cat performance-results.txt | head -20)
-        \`\`\`
-        
-        ## Ready for Release ✅
-        
-        This release has passed all validation checks and is ready for deployment.
-        EOF
+      - name: Performance regression check
+        run: |
+          echo "⚡ Running performance regression checks..."
+          pnpm run test:performance > performance-results.txt
 
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-validation-${{ github.ref_name }}
-        path: |
-          release-validation-report.md
-          performance-results.txt
-          test-output/
+          # Compare with baseline if available
+          if [ -f performance-baseline.txt ]; then
+            echo "Comparing with performance baseline..."
+            node scripts/performance/compare-performance.js performance-baseline.txt performance-results.txt
+          fi
 
-    - name: Comment on release
-      if: github.event_name == 'release'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const report = fs.readFileSync('release-validation-report.md', 'utf8');
-          
-          github.rest.issues.createComment({
-            issue_number: context.payload.release.id,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: report
-          });
+      - name: Test against multiple environments
+        run: |
+          echo "🌍 Testing against multiple environments..."
+
+          # Test local build
+          echo "Testing local build..."
+          pnpm run test:mcp
+
+          # Test remote deployment if available
+          if [ -n "$REMOTE_SERVER_URL" ]; then
+            echo "Testing remote deployment..."
+            SERVER_URL="$REMOTE_SERVER_URL" pnpm run test:mcp
+          fi
+
+      - name: Generate release validation report
+        run: |
+          echo "📋 Generating release validation report..."
+
+          cat > release-validation-report.md << EOF
+          # Release Validation Report
+
+          **Version:** ${{ github.ref_name }}
+          **Generated:** $(date)
+          **Commit:** ${{ github.sha }}
+
+          ## Test Results Summary
+
+          - ✅ Version consistency check
+          - ✅ Build successful  
+          - ✅ Full test suite passed
+          - ✅ MCP Inspector validation passed
+          - ✅ Performance regression check
+          - ✅ Multi-environment testing
+
+          ## MCP Protocol Compliance
+
+          All 25 tools tested successfully:
+          - Core Research Tools (7/7) ✅
+          - Comprehensive Data Access (11/11) ✅  
+          - Advanced Features (7/7) ✅
+
+          ## Performance Metrics
+
+          \`\`\`
+          $(cat performance-results.txt | head -20)
+          \`\`\`
+
+          ## Ready for Release ✅
+
+          This release has passed all validation checks and is ready for deployment.
+          EOF
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-validation-${{ github.ref_name }}
+          path: |
+            release-validation-report.md
+            performance-results.txt
+            test-output/
+
+      - name: Comment on release
+        if: github.event_name == 'release'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('release-validation-report.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.payload.release.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
 
   docker-test:
     name: Docker Integration Test
@@ -159,28 +159,28 @@ jobs:
     needs: validate-release
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: |
-        if [ -f Dockerfile ]; then
-          docker build -t legal-mcp:${{ github.ref_name }} .
-        else
-          echo "No Dockerfile found, skipping Docker test"
-        fi
+      - name: Build Docker image
+        run: |
+          if [ -f Dockerfile ]; then
+            docker build -t legal-mcp:${{ github.ref_name }} .
+          else
+            echo "No Dockerfile found, skipping Docker test"
+          fi
 
-    - name: Test Docker container
-      run: |
-        if docker images | grep -q legal-mcp; then
-          echo "🐳 Testing Docker container..."
-          
-          # Test container starts properly
-          docker run --rm -d --name legal-mcp-test legal-mcp:${{ github.ref_name }} || echo "Docker container test skipped"
-          
-          # Clean up
-          docker stop legal-mcp-test || true
-        fi
+      - name: Test Docker container
+        run: |
+          if docker images | grep -q legal-mcp; then
+            echo "🐳 Testing Docker container..."
+            
+            # Test container starts properly
+            docker run --rm -d --name legal-mcp-test legal-mcp:${{ github.ref_name }} || echo "Docker container test skipped"
+            
+            # Clean up
+            docker stop legal-mcp-test || true
+          fi
 
   deployment-ready:
     name: Deployment Ready Check
@@ -189,14 +189,14 @@ jobs:
     if: github.event_name == 'release'
 
     steps:
-    - name: Deployment readiness confirmation
-      run: |
-        echo "🚀 Release ${{ github.ref_name }} is validated and ready for deployment!"
-        echo ""
-        echo "✅ All tests passed"
-        echo "✅ MCP Inspector validation successful"  
-        echo "✅ Performance regression checks passed"
-        echo "✅ Multi-environment testing completed"
-        echo "✅ Docker integration tested"
-        echo ""
-        echo "This release can be safely deployed to production."
+      - name: Deployment readiness confirmation
+        run: |
+          echo "🚀 Release ${{ github.ref_name }} is validated and ready for deployment!"
+          echo ""
+          echo "✅ All tests passed"
+          echo "✅ MCP Inspector validation successful"  
+          echo "✅ Performance regression checks passed"
+          echo "✅ Multi-environment testing completed"
+          echo "✅ Docker integration tested"
+          echo ""
+          echo "This release can be safely deployed to production."

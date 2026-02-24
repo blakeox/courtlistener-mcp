@@ -2,9 +2,9 @@ name: Performance Monitoring
 
 on:
   push:
-    branches: [ '*' ]  # Run on all branches to catch performance regressions
+    branches: ['*'] # Run on all branches to catch performance regressions
   pull_request:
-    branches: [ '*' ]  # Run on PRs targeting any branch
+    branches: ['*'] # Run on PRs targeting any branch
   schedule:
     # Run every 6 hours
     - cron: '0 */6 * * *'
@@ -30,133 +30,133 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
-    - name: Install dependencies
-      run: |
-        # Check if pnpm lock file is in sync, if not regenerate it
-        if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
-          echo "⚠️ pnpm lock file out of sync, regenerating..."
-          pnpm install
-        else
-          echo "✅ pnpm lock file in sync, using frozen-lockfile"
-          pnpm install --frozen-lockfile
-        fi
-
-    - name: Build project
-      run: pnpm run build
-
-    - name: Run performance tests
-      env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
-        TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'remote' }}
-      run: |
-        echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
-        
-        mkdir -p performance-data
-        
-        case "$TEST_ENVIRONMENT" in
-          "local")
-            echo "Testing local server performance..."
-            pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
-            ;;
-          "remote")
-            echo "Testing remote server performance..."
-            # Use SSE endpoint for performance tests
-            MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-            SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
-            ;;
-          "both")
-            echo "Testing both local and remote server performance..."
-            pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
-            # Use SSE endpoint for performance tests
-            MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-            SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
-            ;;
-        esac
-
-    - name: Analyze performance trends
-      run: |
-        echo "📊 Analyzing performance trends..."
-        
-        # Create performance summary
-        cat > performance-summary.md << EOF
-        # Performance Monitoring Report
-        
-        **Date:** $(date)
-        **Environment:** ${{ github.event.inputs.environment || 'remote' }}
-        **Commit:** ${{ github.sha }}
-        
-        ## Latest Performance Results
-        
-        \`\`\`
-        $(find performance-data -name "*.txt" -exec tail -10 {} \; | head -50)
-        \`\`\`
-        
-        ## Performance Alerts
-        
-        $(node scripts/performance/analyze-performance.js performance-data/ || echo "No performance issues detected ✅")
-        
-        EOF
-
-    - name: Check for performance regressions
-      run: |
-        echo "🔍 Checking for performance regressions..."
-        
-        # Download previous performance data if available
-        if [ -n "${{ secrets.PERFORMANCE_BASELINE_URL }}" ]; then
-          curl -s "${{ secrets.PERFORMANCE_BASELINE_URL }}" > baseline.txt || echo "No baseline available"
-          
-          if [ -f baseline.txt ] && [ -f performance-data/*.txt ]; then
-            node scripts/performance/compare-performance.js baseline.txt performance-data/*.txt || echo "Performance comparison completed"
+      - name: Install dependencies
+        run: |
+          # Check if pnpm lock file is in sync, if not regenerate it
+          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+            echo "⚠️ pnpm lock file out of sync, regenerating..."
+            pnpm install
+          else
+            echo "✅ pnpm lock file in sync, using frozen-lockfile"
+            pnpm install --frozen-lockfile
           fi
-        fi
 
-    - name: Upload performance data
-      uses: actions/upload-artifact@v4
-      with:
-        name: performance-monitoring-${{ github.run_number }}
-        path: |
-          performance-data/
-          performance-summary.md
-        retention-days: 30
+      - name: Build project
+        run: pnpm run build
 
-    - name: Create issue for performance regression
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const title = `🚨 Performance Regression Detected - ${new Date().toISOString().split('T')[0]}`;
-          const body = `
-          A performance regression has been detected during automated monitoring.
-          
+      - name: Run performance tests
+        env:
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+          TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'remote' }}
+        run: |
+          echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
+
+          mkdir -p performance-data
+
+          case "$TEST_ENVIRONMENT" in
+            "local")
+              echo "Testing local server performance..."
+              pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
+              ;;
+            "remote")
+              echo "Testing remote server performance..."
+              # Use SSE endpoint for performance tests
+              MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
+              SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              ;;
+            "both")
+              echo "Testing both local and remote server performance..."
+              pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
+              # Use SSE endpoint for performance tests
+              MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
+              SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              ;;
+          esac
+
+      - name: Analyze performance trends
+        run: |
+          echo "📊 Analyzing performance trends..."
+
+          # Create performance summary
+          cat > performance-summary.md << EOF
+          # Performance Monitoring Report
+
+          **Date:** $(date)
           **Environment:** ${{ github.event.inputs.environment || 'remote' }}
           **Commit:** ${{ github.sha }}
-          **Workflow:** ${{ github.workflow }}
-          **Run:** ${{ github.run_number }}
-          
-          Please review the performance data and investigate potential causes.
-          
-          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          `;
-          
-          github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: title,
-            body: body,
-            labels: ['performance', 'regression', 'monitoring']
-          });
+
+          ## Latest Performance Results
+
+          \`\`\`
+          $(find performance-data -name "*.txt" -exec tail -10 {} \; | head -50)
+          \`\`\`
+
+          ## Performance Alerts
+
+          $(node scripts/performance/analyze-performance.js performance-data/ || echo "No performance issues detected ✅")
+
+          EOF
+
+      - name: Check for performance regressions
+        run: |
+          echo "🔍 Checking for performance regressions..."
+
+          # Download previous performance data if available
+          if [ -n "${{ secrets.PERFORMANCE_BASELINE_URL }}" ]; then
+            curl -s "${{ secrets.PERFORMANCE_BASELINE_URL }}" > baseline.txt || echo "No baseline available"
+            
+            if [ -f baseline.txt ] && [ -f performance-data/*.txt ]; then
+              node scripts/performance/compare-performance.js baseline.txt performance-data/*.txt || echo "Performance comparison completed"
+            fi
+          fi
+
+      - name: Upload performance data
+        uses: actions/upload-artifact@v6
+        with:
+          name: performance-monitoring-${{ github.run_number }}
+          path: |
+            performance-data/
+            performance-summary.md
+          retention-days: 30
+
+      - name: Create issue for performance regression
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = `🚨 Performance Regression Detected - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            A performance regression has been detected during automated monitoring.
+
+            **Environment:** ${{ github.event.inputs.environment || 'remote' }}
+            **Commit:** ${{ github.sha }}
+            **Workflow:** ${{ github.workflow }}
+            **Run:** ${{ github.run_number }}
+
+            Please review the performance data and investigate potential causes.
+
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['performance', 'regression', 'monitoring']
+            });
 
   health-check:
     name: Remote Server Health Check
@@ -164,58 +164,58 @@ jobs:
     if: github.event.schedule
 
     steps:
-    - name: Check remote server health
-      env:
-        REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
-      run: |
-        echo "🏥 Checking remote server health..."
-        
-        # Basic connectivity test
-        if curl -f -s --max-time 10 "$REMOTE_SERVER_URL" > /dev/null; then
-          echo "✅ Remote server is responding"
-        else
-          echo "❌ Remote server is not responding"
-          exit 1
-        fi
-        
-        # Test basic MCP protocol
-        echo "Testing basic MCP protocol compliance..."
-        
-        response=$(curl -s --max-time 30 -X POST \
-          -H "Content-Type: application/json" \
-          -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"clientInfo":{"name":"Health Check","version":"1.0.0"}}}' \
-          "$REMOTE_SERVER_URL")
-        
-        if echo "$response" | grep -q '"result"'; then
-          echo "✅ MCP protocol responding correctly"
-        else
-          echo "❌ MCP protocol not responding correctly"
-          echo "Response: $response"
-          exit 1
-        fi
+      - name: Check remote server health
+        env:
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
+        run: |
+          echo "🏥 Checking remote server health..."
 
-    - name: Create alert for server downtime
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const title = `🚨 Remote Server Health Check Failed - ${new Date().toISOString()}`;
-          const body = `
-          The remote Legal MCP server is not responding to health checks.
-          
-          **Server URL:** ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
-          **Check Time:** ${new Date().toISOString()}
-          **Workflow:** ${{ github.workflow }}
-          
-          Please investigate the server status and ensure it's functioning correctly.
-          
-          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          `;
-          
-          github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: title,
-            body: body,
-            labels: ['critical', 'server-health', 'monitoring']
-          });
+          # Basic connectivity test
+          if curl -f -s --max-time 10 "$REMOTE_SERVER_URL" > /dev/null; then
+            echo "✅ Remote server is responding"
+          else
+            echo "❌ Remote server is not responding"
+            exit 1
+          fi
+
+          # Test basic MCP protocol
+          echo "Testing basic MCP protocol compliance..."
+
+          response=$(curl -s --max-time 30 -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"clientInfo":{"name":"Health Check","version":"1.0.0"}}}' \
+            "$REMOTE_SERVER_URL")
+
+          if echo "$response" | grep -q '"result"'; then
+            echo "✅ MCP protocol responding correctly"
+          else
+            echo "❌ MCP protocol not responding correctly"
+            echo "Response: $response"
+            exit 1
+          fi
+
+      - name: Create alert for server downtime
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = `🚨 Remote Server Health Check Failed - ${new Date().toISOString()}`;
+            const body = `
+            The remote Legal MCP server is not responding to health checks.
+
+            **Server URL:** ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
+            **Check Time:** ${new Date().toISOString()}
+            **Workflow:** ${{ github.workflow }}
+
+            Please investigate the server status and ensure it's functioning correctly.
+
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['critical', 'server-health', 'monitoring']
+            });

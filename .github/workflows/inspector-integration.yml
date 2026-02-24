@@ -37,190 +37,190 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-    - name: Install dependencies
-      run: |
-        pnpm install --frozen-lockfile || pnpm install
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
 
-    - name: Build project
-      run: pnpm run build
+      - name: Build project
+        run: pnpm run build
 
-    - name: Install MCP Inspector ${{ matrix.inspector-version }}
-      run: |
-        if [ "${{ matrix.inspector-version }}" == "latest" ]; then
-          pnpm add -g @modelcontextprotocol/inspector@latest
-        else
-          pnpm add -g @modelcontextprotocol/inspector@${{ matrix.inspector-version }}
-        fi
+      - name: Install MCP Inspector ${{ matrix.inspector-version }}
+        run: |
+          if [ "${{ matrix.inspector-version }}" == "latest" ]; then
+            pnpm add -g @modelcontextprotocol/inspector@latest
+          else
+            pnpm add -g @modelcontextprotocol/inspector@${{ matrix.inspector-version }}
+          fi
 
-    - name: Test Inspector compatibility
-      run: |
-        echo "🧪 Testing Inspector ${{ matrix.inspector-version }} with Node ${{ matrix.node-version }}"
-        
-        # Run basic compatibility tests
-        node test/runners/ci-test-mcp-inspector.js
-        
-        # Test web interface compatibility
-        timeout 30s pnpm run inspect:local &
-        INSPECTOR_PID=$!
-        sleep 10
-        
-        # Check web interface responds correctly
-        curl -f http://localhost:6274/health || echo "Web interface compatibility issue"
-        
-        # Test CLI functionality
-        npx @modelcontextprotocol/inspector --version
-        
-        # Clean up
-        kill $INSPECTOR_PID || true
+      - name: Test Inspector compatibility
+        run: |
+          echo "🧪 Testing Inspector ${{ matrix.inspector-version }} with Node ${{ matrix.node-version }}"
 
-    - name: Generate compatibility report
-      run: |
-        echo "# Inspector Compatibility Report" > compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        echo "**Inspector Version:** ${{ matrix.inspector-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        echo "**Node Version:** ${{ matrix.node-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        echo "**Test Date:** $(date)" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        echo "" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        
-        if [ -f test-output/ci-mcp-inspector-report.json ]; then
-          echo "## Test Results" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "\`\`\`json" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          cat test-output/ci-mcp-inspector-report.json >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "\`\`\`" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-        fi
+          # Run basic compatibility tests
+          node test/runners/ci-test-mcp-inspector.js
 
-    - name: Upload compatibility artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: inspector-compatibility-${{ matrix.inspector-version }}-node${{ matrix.node-version }}
-        path: |
-          compatibility-report-*.md
-          test-output/
-        retention-days: 30
+          # Test web interface compatibility
+          timeout 30s pnpm run inspect:local &
+          INSPECTOR_PID=$!
+          sleep 10
+
+          # Check web interface responds correctly
+          curl -f http://localhost:6274/health || echo "Web interface compatibility issue"
+
+          # Test CLI functionality
+          npx @modelcontextprotocol/inspector --version
+
+          # Clean up
+          kill $INSPECTOR_PID || true
+
+      - name: Generate compatibility report
+        run: |
+          echo "# Inspector Compatibility Report" > compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+          echo "**Inspector Version:** ${{ matrix.inspector-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+          echo "**Node Version:** ${{ matrix.node-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+          echo "**Test Date:** $(date)" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+          echo "" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+
+          if [ -f test-output/ci-mcp-inspector-report.json ]; then
+            echo "## Test Results" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+            echo "\`\`\`json" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+            cat test-output/ci-mcp-inspector-report.json >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+            echo "\`\`\`" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
+          fi
+
+      - name: Upload compatibility artifacts
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: inspector-compatibility-${{ matrix.inspector-version }}-node${{ matrix.node-version }}
+          path: |
+            compatibility-report-*.md
+            test-output/
+          retention-days: 30
 
   visual-regression:
     name: Inspector Visual Regression Testing
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event.inputs.test_type == 'comprehensive'
     env:
-      VISUAL_BASELINE_URL: ""
+      VISUAL_BASELINE_URL: ''
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-    - name: Install dependencies
-      run: |
-        pnpm install --frozen-lockfile || pnpm install
-        pnpm add -g @modelcontextprotocol/inspector
-        # Install Playwright for visual testing
-        npx playwright install --with-deps chromium
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
+          pnpm add -g @modelcontextprotocol/inspector
+          # Install Playwright for visual testing
+          npx playwright install --with-deps chromium
 
-    - name: Build project
-      run: pnpm run build
+      - name: Build project
+        run: pnpm run build
 
-    - name: Setup Inspector visual testing
-      run: |
-        # Create visual test script
-        cat > scripts/visual-test-inspector.js << 'EOF'
-        import { chromium } from 'playwright';
-        import { spawn } from 'child_process';
-        import { join } from 'path';
+      - name: Setup Inspector visual testing
+        run: |
+          # Create visual test script
+          cat > scripts/visual-test-inspector.js << 'EOF'
+          import { chromium } from 'playwright';
+          import { spawn } from 'child_process';
+          import { join } from 'path';
 
-        async function runVisualTests() {
-          console.log('🎨 Starting MCP Inspector visual regression tests...');
-          
-          // Start Inspector
-          const inspector = spawn('pnpm', ['run', 'inspect:local'], {
-            stdio: ['pipe', 'pipe', 'pipe']
-          });
-          
-          // Wait for Inspector to start
-          await new Promise(resolve => setTimeout(resolve, 15000));
-          
-          const browser = await chromium.launch();
-          const page = await browser.newPage();
-          
-          try {
-            // Test Inspector homepage
-            await page.goto('http://localhost:6274');
-            await page.waitForLoadState('networkidle');
-            await page.screenshot({ path: 'visual-tests/inspector-home.png', fullPage: true });
+          async function runVisualTests() {
+            console.log('🎨 Starting MCP Inspector visual regression tests...');
             
-            // Test tools listing page
-            await page.click('text=Tools');
-            await page.waitForLoadState('networkidle');
-            await page.screenshot({ path: 'visual-tests/inspector-tools.png', fullPage: true });
+            // Start Inspector
+            const inspector = spawn('pnpm', ['run', 'inspect:local'], {
+              stdio: ['pipe', 'pipe', 'pipe']
+            });
             
-            // Test individual tool interface
-            await page.click('text=search_cases');
-            await page.waitForLoadState('networkidle');
-            await page.screenshot({ path: 'visual-tests/inspector-tool-detail.png', fullPage: true });
+            // Wait for Inspector to start
+            await new Promise(resolve => setTimeout(resolve, 15000));
             
-            console.log('✅ Visual tests completed successfully');
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
             
-          } catch (error) {
-            console.error('❌ Visual test failed:', error);
-            throw error;
-          } finally {
-            await browser.close();
-            inspector.kill();
+            try {
+              // Test Inspector homepage
+              await page.goto('http://localhost:6274');
+              await page.waitForLoadState('networkidle');
+              await page.screenshot({ path: 'visual-tests/inspector-home.png', fullPage: true });
+              
+              // Test tools listing page
+              await page.click('text=Tools');
+              await page.waitForLoadState('networkidle');
+              await page.screenshot({ path: 'visual-tests/inspector-tools.png', fullPage: true });
+              
+              // Test individual tool interface
+              await page.click('text=search_cases');
+              await page.waitForLoadState('networkidle');
+              await page.screenshot({ path: 'visual-tests/inspector-tool-detail.png', fullPage: true });
+              
+              console.log('✅ Visual tests completed successfully');
+              
+            } catch (error) {
+              console.error('❌ Visual test failed:', error);
+              throw error;
+            } finally {
+              await browser.close();
+              inspector.kill();
+            }
           }
-        }
 
-        runVisualTests().catch(console.error);
-        EOF
+          runVisualTests().catch(console.error);
+          EOF
 
-    - name: Run visual regression tests
-      run: |
-        mkdir -p visual-tests
-        node scripts/visual-test-inspector.js
+      - name: Run visual regression tests
+        run: |
+          mkdir -p visual-tests
+          node scripts/visual-test-inspector.js
 
-    - name: Compare with baseline visuals
-      run: |
-        echo "🔍 Comparing visual tests with baseline..."
-        
-        # Download baseline images if they exist
-        if [ -n "$VISUAL_BASELINE_URL" ]; then
-          curl -s "$VISUAL_BASELINE_URL/inspector-home.png" -o baseline-home.png || echo "No baseline home image"
-          curl -s "$VISUAL_BASELINE_URL/inspector-tools.png" -o baseline-tools.png || echo "No baseline tools image"
-          curl -s "$VISUAL_BASELINE_URL/inspector-tool-detail.png" -o baseline-detail.png || echo "No baseline detail image"
-          
-          # Simple visual comparison (in production, use more sophisticated tools)
-          if [ -f baseline-home.png ] && [ -f visual-tests/inspector-home.png ]; then
-            echo "📊 Visual comparison completed"
+      - name: Compare with baseline visuals
+        run: |
+          echo "🔍 Comparing visual tests with baseline..."
+
+          # Download baseline images if they exist
+          if [ -n "$VISUAL_BASELINE_URL" ]; then
+            curl -s "$VISUAL_BASELINE_URL/inspector-home.png" -o baseline-home.png || echo "No baseline home image"
+            curl -s "$VISUAL_BASELINE_URL/inspector-tools.png" -o baseline-tools.png || echo "No baseline tools image"
+            curl -s "$VISUAL_BASELINE_URL/inspector-tool-detail.png" -o baseline-detail.png || echo "No baseline detail image"
+            
+            # Simple visual comparison (in production, use more sophisticated tools)
+            if [ -f baseline-home.png ] && [ -f visual-tests/inspector-home.png ]; then
+              echo "📊 Visual comparison completed"
+            fi
           fi
-        fi
 
-    - name: Upload visual test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: visual-regression-tests
-        path: |
-          visual-tests/
-          baseline-*.png
-        retention-days: 30
+      - name: Upload visual test results
+        uses: actions/upload-artifact@v6
+        with:
+          name: visual-regression-tests
+          path: |
+            visual-tests/
+            baseline-*.png
+          retention-days: 30
 
   inspector-performance:
     name: Inspector Performance Benchmarking
@@ -228,93 +228,93 @@ jobs:
     if: github.event_name == 'schedule' || github.event.inputs.test_type == 'performance'
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-    - name: Install dependencies
-      run: |
-        pnpm install --frozen-lockfile || pnpm install
-        pnpm add -g @modelcontextprotocol/inspector
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
+          pnpm add -g @modelcontextprotocol/inspector
 
-    - name: Build project
-      run: pnpm run build
+      - name: Build project
+        run: pnpm run build
 
-    - name: Benchmark Inspector startup time
-      run: |
-        echo "⚡ Benchmarking Inspector startup performance..."
-        
-        for i in {1..5}; do
-          echo "Run $i of 5..."
-          start_time=$(date +%s%N)
-          
-          # Start Inspector and wait for it to be ready
-          timeout 60s pnpm run inspect:local &
-          INSPECTOR_PID=$!
-          
-          # Wait for Inspector to be ready
-          while ! curl -f -s http://localhost:6274/health > /dev/null; do
-            sleep 1
-            current_time=$(date +%s%N)
-            elapsed=$((($current_time - $start_time) / 1000000))
-            if [ $elapsed -gt 30000 ]; then
-              echo "Timeout waiting for Inspector"
-              break
-            fi
+      - name: Benchmark Inspector startup time
+        run: |
+          echo "⚡ Benchmarking Inspector startup performance..."
+
+          for i in {1..5}; do
+            echo "Run $i of 5..."
+            start_time=$(date +%s%N)
+            
+            # Start Inspector and wait for it to be ready
+            timeout 60s pnpm run inspect:local &
+            INSPECTOR_PID=$!
+            
+            # Wait for Inspector to be ready
+            while ! curl -f -s http://localhost:6274/health > /dev/null; do
+              sleep 1
+              current_time=$(date +%s%N)
+              elapsed=$((($current_time - $start_time) / 1000000))
+              if [ $elapsed -gt 30000 ]; then
+                echo "Timeout waiting for Inspector"
+                break
+              fi
+            done
+            
+            end_time=$(date +%s%N)
+            startup_time=$((($end_time - $start_time) / 1000000))
+            echo "Startup time: ${startup_time}ms"
+            echo "${startup_time}" >> inspector-startup-times.txt
+            
+            # Clean up
+            kill $INSPECTOR_PID || true
+            sleep 2
           done
-          
+
+      - name: Benchmark Inspector tool execution
+        run: |
+          echo "🧪 Benchmarking Inspector tool execution performance..."
+
+          # Start Inspector for testing
+          pnpm run inspect:local &
+          INSPECTOR_PID=$!
+          sleep 15
+
+          # Quick tool sample run timings
+          start_time=$(date +%s%N)
+          pnpm dlx @modelcontextprotocol/inspector --cli node dist/index.js --method tools/call --tool-name list_courts --tool-arg jurisdiction=F >/dev/null 2>&1 || true
           end_time=$(date +%s%N)
-          startup_time=$((($end_time - $start_time) / 1000000))
-          echo "Startup time: ${startup_time}ms"
-          echo "${startup_time}" >> inspector-startup-times.txt
-          
+          echo $((($end_time - $start_time) / 1000000)) > tool-sample-time.txt
+
           # Clean up
           kill $INSPECTOR_PID || true
-          sleep 2
-        done
 
-    - name: Benchmark Inspector tool execution
-      run: |
-        echo "🧪 Benchmarking Inspector tool execution performance..."
-        
-        # Start Inspector for testing
-        pnpm run inspect:local &
-        INSPECTOR_PID=$!
-        sleep 15
-        
-        # Quick tool sample run timings
-        start_time=$(date +%s%N)
-        pnpm dlx @modelcontextprotocol/inspector --cli node dist/index.js --method tools/call --tool-name list_courts --tool-arg jurisdiction=F >/dev/null 2>&1 || true
-        end_time=$(date +%s%N)
-        echo $((($end_time - $start_time) / 1000000)) > tool-sample-time.txt
-        
-        # Clean up
-        kill $INSPECTOR_PID || true
+      - name: Quick performance summary
+        run: |
+          AVG_STARTUP=$(awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print 0}' inspector-startup-times.txt)
+          TOOL_MS=$(cat tool-sample-time.txt)
+          echo "Startup avg (ms): $AVG_STARTUP" > inspector-performance-report.txt
+          echo "Sample tool exec (ms): $TOOL_MS" >> inspector-performance-report.txt
 
-    - name: Quick performance summary
-      run: |
-        AVG_STARTUP=$(awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print 0}' inspector-startup-times.txt)
-        TOOL_MS=$(cat tool-sample-time.txt)
-        echo "Startup avg (ms): $AVG_STARTUP" > inspector-performance-report.txt
-        echo "Sample tool exec (ms): $TOOL_MS" >> inspector-performance-report.txt
-
-    - name: Upload performance artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: inspector-performance-results
-        path: |
-          inspector-performance-report.txt
-          inspector-startup-times.txt
-          tool-sample-time.txt
-        retention-days: 30
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: inspector-performance-results
+          path: |
+            inspector-performance-report.txt
+            inspector-startup-times.txt
+            tool-sample-time.txt
+          retention-days: 30
 
   integration-summary:
     name: Inspector Integration Summary
@@ -323,75 +323,75 @@ jobs:
     if: always()
 
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
 
-    - name: Generate comprehensive report
-      run: |
-        echo "📋 Generating comprehensive MCP Inspector integration report..."
-        
-        cat > inspector-integration-summary.md << EOF
-        # MCP Inspector Integration Summary
-        
-        **Workflow Run:** ${{ github.run_number }}
-        **Date:** $(date)
-        **Trigger:** ${{ github.event_name }}
-        
-        ## Test Results Overview
-        
-        ### Compatibility Testing
-        $(find . -name "inspector-compatibility-*" -type d | wc -l) compatibility test combinations completed
-        
-        ### Visual Regression Testing
-        $(find . -name "visual-regression-tests" -type d | wc -l > 0 && echo "✅ Visual tests completed" || echo "⚠️ Visual tests skipped")
-        
-        ### Performance Benchmarking
-        $(find . -name "inspector-performance-results" -type d | wc -l > 0 && echo "✅ Performance tests completed" || echo "⚠️ Performance tests skipped")
-        
-        ## Quality Assessment
-        
-        - Inspector Compatibility: $(ls inspector-compatibility-*/compatibility-report-*.md 2>/dev/null | wc -l) reports generated
-        - Visual Regression: $(ls visual-regression-tests/*.png 2>/dev/null | wc -l) screenshots captured
-        - Performance Metrics: $(ls inspector-performance-results/*.csv 2>/dev/null | wc -l) performance datasets collected
-        
-        ## Recommendations
-        
-        1. Review compatibility reports for any version-specific issues
-        2. Investigate any visual regressions identified
-        3. Monitor performance trends over time
-        4. Update baseline images and performance thresholds as needed
-        
-        EOF
+      - name: Generate comprehensive report
+        run: |
+          echo "📋 Generating comprehensive MCP Inspector integration report..."
 
-    - name: Upload summary report
-      uses: actions/upload-artifact@v4
-      with:
-        name: inspector-integration-summary
-        path: inspector-integration-summary.md
-        retention-days: 90
+          cat > inspector-integration-summary.md << EOF
+          # MCP Inspector Integration Summary
 
-    - name: Create issue for regressions
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const title = `🚨 MCP Inspector Integration Issue Detected - ${new Date().toISOString().split('T')[0]}`;
-          const body = `
-          Issues detected during MCP Inspector integration testing.
-          
-          **Workflow:** ${{ github.workflow }}
-          **Run:** ${{ github.run_number }}
-          **Date:** ${new Date().toISOString()}
-          
-          Please review the test artifacts and address any compatibility, visual, or performance issues.
-          
-          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          `;
-          
-          github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: title,
-            body: body,
-            labels: ['inspector', 'integration', 'testing', 'ci-cd']
-          });
+          **Workflow Run:** ${{ github.run_number }}
+          **Date:** $(date)
+          **Trigger:** ${{ github.event_name }}
+
+          ## Test Results Overview
+
+          ### Compatibility Testing
+          $(find . -name "inspector-compatibility-*" -type d | wc -l) compatibility test combinations completed
+
+          ### Visual Regression Testing
+          $(find . -name "visual-regression-tests" -type d | wc -l > 0 && echo "✅ Visual tests completed" || echo "⚠️ Visual tests skipped")
+
+          ### Performance Benchmarking
+          $(find . -name "inspector-performance-results" -type d | wc -l > 0 && echo "✅ Performance tests completed" || echo "⚠️ Performance tests skipped")
+
+          ## Quality Assessment
+
+          - Inspector Compatibility: $(ls inspector-compatibility-*/compatibility-report-*.md 2>/dev/null | wc -l) reports generated
+          - Visual Regression: $(ls visual-regression-tests/*.png 2>/dev/null | wc -l) screenshots captured
+          - Performance Metrics: $(ls inspector-performance-results/*.csv 2>/dev/null | wc -l) performance datasets collected
+
+          ## Recommendations
+
+          1. Review compatibility reports for any version-specific issues
+          2. Investigate any visual regressions identified
+          3. Monitor performance trends over time
+          4. Update baseline images and performance thresholds as needed
+
+          EOF
+
+      - name: Upload summary report
+        uses: actions/upload-artifact@v6
+        with:
+          name: inspector-integration-summary
+          path: inspector-integration-summary.md
+          retention-days: 90
+
+      - name: Create issue for regressions
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = `🚨 MCP Inspector Integration Issue Detected - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            Issues detected during MCP Inspector integration testing.
+
+            **Workflow:** ${{ github.workflow }}
+            **Run:** ${{ github.run_number }}
+            **Date:** ${new Date().toISOString()}
+
+            Please review the test artifacts and address any compatibility, visual, or performance issues.
+
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['inspector', 'integration', 'testing', 'ci-cd']
+            });

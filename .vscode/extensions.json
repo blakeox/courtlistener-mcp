@@ -4,65 +4,62 @@
     "ms-vscode.vscode-typescript-next",
     "esbenp.prettier-vscode",
     "dbaeumer.vscode-eslint",
-    
+
     // MCP & Node.js Development
     "ms-vscode.node-debug2",
     "christian-kohler.npm-intellisense",
     "ms-vscode.vscode-json",
-    
+
     // Testing & Quality
     "hbenl.vscode-test-explorer",
     "hbenl.vscode-mocha-test-adapter",
     "orta.vscode-jest",
     "ryanluker.vscode-coverage-gutters",
-    
+
     // Git & Collaboration
     "eamodio.gitlens",
     "github.vscode-pull-request-github",
     "ms-vscode.vscode-github-issue-notebooks",
     "github.copilot",
     "github.copilot-chat",
-    
+
     // Docker & Deployment
     "ms-azuretools.vscode-docker",
     "ms-vscode-remote.remote-containers",
-    
+
     // API Development & Testing
     "humao.rest-client",
     "rangav.vscode-thunder-client",
     "postman.postman-for-vscode",
-    
+
     // Documentation
     "yzhang.markdown-all-in-one",
     "davidanson.vscode-markdownlint",
     "shd101wyy.markdown-preview-enhanced",
     "bierner.jsdoc-markdown-highlighting",
-    
+
     // Code Quality & Analysis
     "streetsidesoftware.code-spell-checker",
     "formulahendry.auto-rename-tag",
     "gruntfuggly.todo-tree",
     "usernamehw.errorlens",
     "ms-vscode.vscode-typescript-next",
-    
+
     // Environment & Configuration
     "ms-vscode.dotenv",
     "redhat.vscode-yaml",
     "tamasfe.even-better-toml",
-    
+
     // Performance & Monitoring
     "ms-vscode.vscode-node-azure-pack",
-    "pflannery.vscode-versionlens",
-    
+    "legalfina.npm-version-lens",
+
     // Productivity & Navigation
     "formulahendry.code-runner",
     "alefragnani.bookmarks",
     "ms-vscode.hexeditor",
     "ms-vscode.remote-explorer"
   ],
-  
-  "unwantedRecommendations": [
-    "ms-vscode.vscode-typescript",
-    "hookyqr.beautify"
-  ]
+
+  "unwantedRecommendations": ["ms-vscode.vscode-typescript", "hookyqr.beautify"]
 }
