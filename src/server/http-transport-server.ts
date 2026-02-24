@@ -64,6 +64,20 @@ export async function startHttpTransport(
   // Parse JSON bodies for POST requests
   app.use(express.json());
 
+  // CORS headers for browser-based MCP clients
+  app.use((_req, res, next) => {
+    const allowedOrigin = process.env.CORS_ALLOWED_ORIGINS || '*';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, Authorization');
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+    if (_req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   // Health endpoint
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', transport: 'streamable-http' });
@@ -115,10 +129,19 @@ export async function startHttpTransport(
           transports.set(id, transport);
           logger.info('MCP HTTP session initialized', { sessionId: id });
         },
+        onsessionclosed: (id) => {
+          transports.delete(id);
+          logger.info('MCP HTTP session closed', { sessionId: id });
+        },
       });
 
       // Connect the MCP server to this transport
       await mcpServer.connect(transport);
+
+      transport.onclose = () => {
+        const sid = transport.sessionId;
+        if (sid) transports.delete(sid);
+      };
 
       // Handle the request
       await transport.handleRequest(req, res, req.body);

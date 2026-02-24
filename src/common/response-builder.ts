@@ -1,25 +1,25 @@
 /**
  * Response Builder
- * 
+ *
  * Utility for creating consistent CallToolResult responses across all handlers.
- * 
+ *
  * **Benefits**:
  * - Consistent response formatting
  * - Easier to modify response structure globally
  * - Type-safe response creation
  * - Centralized response logic
- * 
+ *
  * @example
  * ```typescript
  * // Success response
  * return ResponseBuilder.success({ caseId: '123', name: 'Case Name' });
- * 
+ *
  * // Success with metadata
  * return ResponseBuilder.success(data, { cached: true, duration: 150 });
- * 
+ *
  * // Error response
  * return ResponseBuilder.error('Case not found', { caseId: '123' });
- * 
+ *
  * // Paginated response
  * return ResponseBuilder.paginated(cases, {
  *   page: 1,
@@ -67,17 +67,17 @@ export interface ResponseMetadata {
 
 /**
  * ResponseBuilder
- * 
+ *
  * Factory for creating standardized MCP CallToolResult responses.
  */
 export class ResponseBuilder {
   /**
    * Create a successful response
-   * 
+   *
    * @param data - Response data
    * @param metadata - Optional metadata (cached, duration, etc.)
    * @returns CallToolResult with success format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.success({ id: '123', name: 'Case' });
@@ -85,10 +85,10 @@ export class ResponseBuilder {
    * ```
    */
   static success(data: unknown, metadata?: ResponseMetadata): CallToolResult {
-    const response = metadata 
+    const response = metadata
       ? { success: true as const, data, metadata }
       : { success: true as const, data };
-      
+
     return {
       content: [
         {
@@ -96,16 +96,17 @@ export class ResponseBuilder {
           text: JSON.stringify(response, null, 2),
         } as TextContent,
       ],
+      structuredContent: response as Record<string, unknown>,
     };
   }
-  
+
   /**
    * Create an error response
-   * 
+   *
    * @param message - Error message
    * @param details - Optional error details
    * @returns CallToolResult with error format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.error('Case not found', { caseId: '123' });
@@ -115,7 +116,7 @@ export class ResponseBuilder {
     const response = details
       ? { success: false as const, error: message, details }
       : { success: false as const, error: message };
-      
+
     return {
       content: [
         {
@@ -126,15 +127,15 @@ export class ResponseBuilder {
       isError: true,
     };
   }
-  
+
   /**
    * Create a paginated list response
-   * 
+   *
    * @param items - Array of items for current page
    * @param pagination - Pagination metadata
    * @param metadata - Optional response metadata
    * @returns CallToolResult with paginated format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.paginated(cases, {
@@ -150,7 +151,7 @@ export class ResponseBuilder {
   static paginated<T>(
     items: T[],
     pagination: PaginationMetadata,
-    metadata?: ResponseMetadata
+    metadata?: ResponseMetadata,
   ): CallToolResult {
     const response = {
       success: true as const,
@@ -158,7 +159,7 @@ export class ResponseBuilder {
       pagination,
       ...(metadata && { metadata }),
     };
-    
+
     return {
       content: [
         {
@@ -166,15 +167,16 @@ export class ResponseBuilder {
           text: JSON.stringify(response, null, 2),
         } as TextContent,
       ],
+      structuredContent: response as Record<string, unknown>,
     };
   }
-  
+
   /**
    * Create a response with custom content
-   * 
+   *
    * @param content - Custom MCP content array
    * @returns CallToolResult with custom content
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.custom([
@@ -186,14 +188,14 @@ export class ResponseBuilder {
   static custom(content: TextContent[]): CallToolResult {
     return { content };
   }
-  
+
   /**
    * Create a streaming response indicator
-   * 
+   *
    * @param message - Message indicating streaming
    * @param metadata - Optional metadata about the stream
    * @returns CallToolResult indicating streaming
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.streaming('Fetching large dataset...', {
@@ -204,38 +206,34 @@ export class ResponseBuilder {
   static streaming(message: string, metadata?: Record<string, unknown>): CallToolResult {
     return this.success({ streaming: true, message }, metadata);
   }
-  
+
   /**
    * Create a validation error response
-   * 
+   *
    * @param field - Field that failed validation
    * @param message - Validation error message
    * @param value - Invalid value (optional)
    * @returns CallToolResult with validation error format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.validationError('query', 'Query cannot be empty', '');
    * ```
    */
-  static validationError(
-    field: string,
-    message: string,
-    value?: unknown
-  ): CallToolResult {
+  static validationError(field: string, message: string, value?: unknown): CallToolResult {
     return this.error(`Validation failed for '${field}': ${message}`, {
       field,
       ...(value !== undefined && { value }),
     });
   }
-  
+
   /**
    * Create a not found response
-   * 
+   *
    * @param resource - Resource type that wasn't found
    * @param identifier - Identifier that wasn't found
    * @returns CallToolResult with not found format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.notFound('case', '12345');
@@ -248,23 +246,20 @@ export class ResponseBuilder {
       statusCode: 404,
     });
   }
-  
+
   /**
    * Create a rate limit exceeded response
-   * 
+   *
    * @param retryAfter - Seconds until retry is allowed
    * @param details - Optional details
    * @returns CallToolResult with rate limit format
-   * 
+   *
    * @example
    * ```typescript
    * return ResponseBuilder.rateLimitExceeded(60, { limit: 100 });
    * ```
    */
-  static rateLimitExceeded(
-    retryAfter: number,
-    details?: Record<string, unknown>
-  ): CallToolResult {
+  static rateLimitExceeded(retryAfter: number, details?: Record<string, unknown>): CallToolResult {
     return this.error('Rate limit exceeded', {
       retryAfter,
       statusCode: 429,
@@ -272,4 +267,3 @@ export class ResponseBuilder {
     });
   }
 }
-
