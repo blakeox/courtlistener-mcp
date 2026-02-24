@@ -65,7 +65,7 @@ export class LegalOAuthProvider implements OAuthServerProvider {
       codeChallenge: params.codeChallenge,
       redirectUri: params.redirectUri,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
-      resource: params.resource,
+      ...(params.resource !== undefined && { resource: params.resource }),
     });
 
     const redirectUrl = new URL(params.redirectUri);
@@ -155,7 +155,7 @@ export class LegalOAuthProvider implements OAuthServerProvider {
       clientId: stored.clientId,
       scopes: stored.scopes,
       expiresAt: stored.expiresAt,
-      resource: stored.resource,
+      ...(stored.resource !== undefined && { resource: stored.resource }),
     };
   }
 
@@ -194,14 +194,14 @@ export class LegalOAuthProvider implements OAuthServerProvider {
       clientId,
       scopes,
       expiresAt: now + ACCESS_TOKEN_TTL_SECONDS,
-      resource,
+      ...(resource !== undefined && { resource }),
     });
 
     this.refreshTokens.set(refreshToken, {
       clientId,
       scopes,
       expiresAt: now + REFRESH_TOKEN_TTL_SECONDS,
-      resource,
+      ...(resource !== undefined && { resource }),
     });
 
     return {

@@ -242,7 +242,7 @@ export type ValidatedServerConfig = z.infer<typeof ServerConfigSchema>;
  * ```
  */
 export function validateConfigWithZod(config: unknown): ServerConfig {
-  return ServerConfigSchema.parse(config);
+  return ServerConfigSchema.parse(config) as ServerConfig;
 }
 
 /**
@@ -267,7 +267,7 @@ export function validateConfigSafe(
   const result = ServerConfigSchema.safeParse(config);
 
   if (result.success) {
-    return { success: true, data: result.data };
+    return { success: true, data: result.data as ServerConfig };
   }
 
   return { success: false, error: result.error };

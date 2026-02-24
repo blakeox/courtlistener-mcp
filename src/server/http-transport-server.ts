@@ -8,8 +8,10 @@
 
 import { randomUUID } from 'node:crypto';
 import express from 'express';
+import helmet from 'helmet';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import { InMemoryEventStore } from '../infrastructure/event-store.js';
@@ -45,8 +47,8 @@ function getDefaultConfig(): HttpTransportConfig {
     enableSessions: ht?.enableSessions ?? true,
     enableResumability: ht?.enableResumability ?? false,
     enableDnsRebindingProtection: ht?.enableDnsRebindingProtection ?? false,
-    allowedOrigins: ht?.allowedOrigins,
-    allowedHosts: ht?.allowedHosts,
+    ...(ht?.allowedOrigins !== undefined && { allowedOrigins: ht.allowedOrigins }),
+    ...(ht?.allowedHosts !== undefined && { allowedHosts: ht.allowedHosts }),
   };
 }
 
@@ -65,6 +67,9 @@ export async function startHttpTransport(
 ): Promise<{ app: express.Application; close: () => Promise<void> }> {
   const cfg = { ...getDefaultConfig(), ...config };
   const app = express();
+
+  // Security headers
+  app.use(helmet());
 
   // Parse JSON bodies for POST requests
   app.use(express.json());
@@ -126,12 +131,14 @@ export async function startHttpTransport(
     // For initialization requests (no session ID), create a new transport
     if (!sessionId && req.method === 'POST') {
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: cfg.enableSessions ? () => randomUUID() : undefined,
-        enableJsonResponse: cfg.enableJsonResponse,
-        eventStore,
-        enableDnsRebindingProtection: cfg.enableDnsRebindingProtection,
-        allowedOrigins: cfg.allowedOrigins,
-        allowedHosts: cfg.allowedHosts,
+        ...(cfg.enableSessions && { sessionIdGenerator: () => randomUUID() }),
+        ...(cfg.enableJsonResponse !== undefined && { enableJsonResponse: cfg.enableJsonResponse }),
+        ...(eventStore !== undefined && { eventStore }),
+        ...(cfg.enableDnsRebindingProtection !== undefined && {
+          enableDnsRebindingProtection: cfg.enableDnsRebindingProtection,
+        }),
+        ...(cfg.allowedOrigins !== undefined && { allowedOrigins: cfg.allowedOrigins }),
+        ...(cfg.allowedHosts !== undefined && { allowedHosts: cfg.allowedHosts }),
         onsessioninitialized: (id) => {
           transports.set(id, transport);
           logger.info('MCP HTTP session initialized', { sessionId: id });
@@ -143,7 +150,7 @@ export async function startHttpTransport(
       });
 
       // Connect the MCP server to this transport
-      await mcpServer.connect(transport);
+      await mcpServer.connect(transport as Transport);
 
       transport.onclose = () => {
         const sid = transport.sessionId;

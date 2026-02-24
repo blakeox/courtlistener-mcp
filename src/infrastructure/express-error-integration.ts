@@ -44,8 +44,8 @@ export interface ErrorHandlingConfig {
 export class ExpressErrorHandler {
   private app: Application;
   private logger: Logger;
-  private metrics?: MetricsCollector;
-  private circuitBreaker?: CircuitBreaker;
+  private metrics: MetricsCollector | undefined;
+  private circuitBreaker: CircuitBreaker | undefined;
   private boundary: ErrorBoundaryMiddleware;
   private recovery: ErrorRecoveryService;
   private reporting: ErrorReportingService;
@@ -272,8 +272,12 @@ export class ExpressErrorHandler {
       '/admin/errors',
       this.boundary.wrapAsync(async (req: Request, res: Response) => {
         const filters = {
-          severity: req.query.severity as ErrorSeverity | undefined,
-          category: req.query.category as ErrorCategory | undefined,
+          ...(req.query.severity !== undefined && {
+            severity: req.query.severity as ErrorSeverity,
+          }),
+          ...(req.query.category !== undefined && {
+            category: req.query.category as ErrorCategory,
+          }),
           status: req.query.status as string,
           limit: parseInt(req.query.limit as string) || 50,
           offset: parseInt(req.query.offset as string) || 0,
@@ -334,6 +338,10 @@ export class ExpressErrorHandler {
       '/admin/errors/:errorKey/resolution',
       this.boundary.wrapAsync(async (req: Request, res: Response) => {
         const { errorKey } = req.params;
+        if (!errorKey) {
+          res.status(400).json({ error: 'Missing errorKey parameter' });
+          return;
+        }
         const { status, assignee, notes } = req.body;
 
         const updated = this.reporting.updateErrorResolution(errorKey, status, assignee, notes);

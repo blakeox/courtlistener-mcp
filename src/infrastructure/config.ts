@@ -27,9 +27,9 @@ const defaultConfig: ServerConfig = {
   },
   metrics: {
     enabled: process.env.METRICS_ENABLED === 'true',
-    port: process.env.METRICS_PORT
-      ? parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535)
-      : undefined,
+    ...(process.env.METRICS_PORT !== undefined && {
+      port: parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535),
+    }),
   },
   // Enhanced security and middleware configuration
   security: {
@@ -83,7 +83,9 @@ const defaultConfig: ServerConfig = {
   sampling: {
     enabled: process.env.SAMPLING_ENABLED === 'true',
     maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
-    defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
+    ...(process.env.SAMPLING_DEFAULT_MODEL !== undefined && {
+      defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
+    }),
   },
   correlation: {
     enabled: process.env.CORRELATION_ENABLED !== 'false',
@@ -127,18 +129,20 @@ const defaultConfig: ServerConfig = {
     enableSessions: process.env.MCP_SESSIONS !== 'false',
     enableResumability: process.env.MCP_RESUMABILITY === 'true',
     enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
-    allowedOrigins: process.env.MCP_ALLOWED_ORIGINS
-      ? process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-      : undefined,
-    allowedHosts: process.env.MCP_ALLOWED_HOSTS
-      ? process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim())
-      : undefined,
+    ...(process.env.MCP_ALLOWED_ORIGINS !== undefined && {
+      allowedOrigins: process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
+    }),
+    ...(process.env.MCP_ALLOWED_HOSTS !== undefined && {
+      allowedHosts: process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim()),
+    }),
   },
   oauth: {
     enabled: process.env.OAUTH_ENABLED === 'true',
-    issuerUrl: process.env.OAUTH_ISSUER_URL,
-    clientId: process.env.OAUTH_CLIENT_ID,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+    ...(process.env.OAUTH_ISSUER_URL !== undefined && { issuerUrl: process.env.OAUTH_ISSUER_URL }),
+    ...(process.env.OAUTH_CLIENT_ID !== undefined && { clientId: process.env.OAUTH_CLIENT_ID }),
+    ...(process.env.OAUTH_CLIENT_SECRET !== undefined && {
+      clientSecret: process.env.OAUTH_CLIENT_SECRET,
+    }),
   },
 };
 

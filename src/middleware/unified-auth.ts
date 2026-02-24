@@ -19,7 +19,7 @@ export interface AuthResult {
 export class UnifiedAuthMiddleware {
   constructor(
     private config: UnifiedAuthConfig,
-    private logger?: Logger
+    private logger?: Logger,
   ) {}
 
   async authenticate(request: Request): Promise<AuthResult> {
@@ -30,7 +30,7 @@ export class UnifiedAuthMiddleware {
     // const oidcCfg = g().__OIDC;
     // const expectedToken = g().__SSE_AUTH_TOKEN__;
     // if (oidcCfg?.issuer) { ... } else if (expectedToken) { ... }
-    
+
     // If neither is configured, we assume it's open or handled elsewhere?
     // In worker.ts, if neither is set, it falls through (implicitly allowed).
     if (!oidc?.issuer && !staticToken) {
@@ -40,7 +40,8 @@ export class UnifiedAuthMiddleware {
     const url = new URL(request.url);
     const authHeader = request.headers.get('authorization');
     const lowerAuth = authHeader?.toLowerCase() ?? '';
-    const headerToken = (authHeader && lowerAuth.startsWith('bearer ')) ? authHeader.slice(7).trim() : undefined;
+    const headerToken =
+      authHeader && lowerAuth.startsWith('bearer ') ? authHeader.slice(7).trim() : undefined;
     const queryToken = url.searchParams.get('access_token') ?? undefined;
     const presentedToken = headerToken || queryToken;
 
@@ -48,7 +49,8 @@ export class UnifiedAuthMiddleware {
     if (oidc?.issuer) {
       if (!presentedToken) {
         return this.createError(401, 'Unauthorized', {
-          'WWW-Authenticate': 'Bearer realm="mcp", error="invalid_request", error_description="missing_token"'
+          'WWW-Authenticate':
+            'Bearer realm="mcp", error="invalid_request", error_description="missing_token"',
         });
       }
 
@@ -56,10 +58,13 @@ export class UnifiedAuthMiddleware {
         const result = await verifyAccessToken(presentedToken, oidc);
         return { isAuthenticated: true, payload: result.payload };
       } catch (err: unknown) {
-        this.logger?.error('OIDC verification failed', err instanceof Error ? err : new Error(String(err)));
+        this.logger?.error(
+          'OIDC verification failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
         const errorMessage = err instanceof Error ? err.message : String(err);
         return this.createError(403, 'Forbidden', {
-          'WWW-Authenticate': `Bearer realm="mcp", error="insufficient_scope", error_description="${errorMessage}"`
+          'WWW-Authenticate': `Bearer realm="mcp", error="insufficient_scope", error_description="${errorMessage}"`,
         });
       }
     }
@@ -68,7 +73,7 @@ export class UnifiedAuthMiddleware {
     if (staticToken) {
       if (!presentedToken) {
         return this.createError(401, 'Unauthorized', {
-          'WWW-Authenticate': 'Bearer realm="mcp"'
+          'WWW-Authenticate': 'Bearer realm="mcp"',
         });
       }
 
@@ -83,14 +88,18 @@ export class UnifiedAuthMiddleware {
     return { isAuthenticated: true };
   }
 
-  private createError(status: number, message: string, headers?: Record<string, string>): AuthResult {
+  private createError(
+    status: number,
+    message: string,
+    headers?: Record<string, string>,
+  ): AuthResult {
     return {
       isAuthenticated: false,
       error: {
         status,
         message,
-        headers
-      }
+        ...(headers !== undefined && { headers }),
+      },
     };
   }
 }

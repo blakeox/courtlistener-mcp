@@ -334,7 +334,7 @@ export abstract class TypedToolHandler<
    * Validate input using the defined Zod schema
    * This is automatically implemented - no need to override
    */
-  validate(input: unknown): Result<TInput, Error> {
+  override validate(input: unknown): Result<TInput, Error> {
     try {
       const validated = this.schema.parse(input) as TInput;
       return success(validated);
@@ -353,7 +353,7 @@ export abstract class TypedToolHandler<
    * Get JSON Schema from Zod schema
    * This is automatically implemented - no need to override
    */
-  getSchema(): Record<string, unknown> {
+  override getSchema(): Record<string, unknown> {
     // Use explicit unknown to avoid deep type instantiation issues with zod-to-json-schema
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return zodToJsonSchema(this.schema as any) as Record<string, unknown>;
@@ -384,5 +384,5 @@ export abstract class TypedToolHandler<
    * Execute the tool
    * Override this in your subclass with your business logic
    */
-  abstract execute(input: TInput, context: ToolContext): Promise<CallToolResult>;
+  abstract override execute(input: TInput, context: ToolContext): Promise<CallToolResult>;
 }

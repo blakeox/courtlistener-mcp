@@ -12,7 +12,7 @@ import { CircuitBreakerManager } from './infrastructure/circuit-breaker.js';
 
 export class HealthServer {
   private server: http.Server;
-  private circuitBreakerManager?: CircuitBreakerManager;
+  private circuitBreakerManager: CircuitBreakerManager | undefined;
 
   constructor(
     private port: number,

@@ -67,7 +67,7 @@ export class Logger {
       ? {
           name: error.name,
           message: error.message,
-          stack: error.stack,
+          ...(error.stack !== undefined && { stack: error.stack }),
         }
       : undefined;
 

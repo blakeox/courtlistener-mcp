@@ -6,6 +6,7 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
+import { AdvancedSearchParams } from '../../types.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 import {
@@ -196,7 +197,7 @@ export class AdvancedSearchHandler extends TypedToolHandler<typeof advancedSearc
     const results = await this.apiClient.advancedSearch({
       ...input,
       page_size: input.page_size,
-    });
+    } as AdvancedSearchParams);
 
     const searchTypeLabels: Record<string, string> = {
       o: 'Opinions',

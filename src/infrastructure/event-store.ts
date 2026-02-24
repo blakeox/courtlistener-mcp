@@ -57,7 +57,11 @@ export class InMemoryEventStore implements EventStore {
       throw new Error(`Event ID ${lastEventId} not found in store`);
     }
 
-    const streamId = this.events[idx].streamId;
+    const event = this.events[idx];
+    if (!event) {
+      throw new Error(`Event at index ${idx} not found`);
+    }
+    const streamId = event.streamId;
     const eventsToReplay = this.events.slice(idx + 1).filter((e) => e.streamId === streamId);
 
     for (const event of eventsToReplay) {

@@ -35,8 +35,8 @@ export class CircuitBreaker {
   private state: CircuitState = CircuitState.CLOSED;
   private failureCount = 0;
   private successCount = 0;
-  private lastFailureTime?: number;
-  private nextAttemptTime?: number;
+  private lastFailureTime: number | undefined;
+  private nextAttemptTime: number | undefined;
   private totalRequests = 0;
   private totalFailures = 0;
   private startTime = Date.now();
@@ -188,8 +188,8 @@ export class CircuitBreaker {
       state: this.state,
       failureCount: this.failureCount,
       successCount: this.successCount,
-      lastFailureTime: this.lastFailureTime,
-      nextAttemptTime: this.nextAttemptTime,
+      ...(this.lastFailureTime !== undefined && { lastFailureTime: this.lastFailureTime }),
+      ...(this.nextAttemptTime !== undefined && { nextAttemptTime: this.nextAttemptTime }),
       totalRequests: this.totalRequests,
       totalFailures: this.totalFailures,
       uptime: Date.now() - this.startTime,

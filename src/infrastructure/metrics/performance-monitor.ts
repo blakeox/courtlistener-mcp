@@ -25,7 +25,7 @@ export class PerformanceMonitor {
   private healthChecks: HealthCheckManager;
   private resourceMonitor: ResourceMonitor;
   private traceCollector: TraceCollector;
-  private intervalId?: NodeJS.Timeout;
+  private intervalId: NodeJS.Timeout | undefined;
 
   constructor(logger: Logger, metrics: MetricsCollector, options: PerformanceMonitorOptions = {}) {
     this.logger = logger.child('PerformanceMonitor');
@@ -110,11 +110,13 @@ export class PerformanceMonitor {
    * Get comprehensive monitoring report
    */
   getMonitoringReport(): MonitoringReport {
+    const healthResult = this.healthChecks.getLastResult();
+    const resourcesResult = this.resourceMonitor.getLastUsage();
     return {
       timestamp: new Date().toISOString(),
       metrics: this.metrics.getMetrics(),
-      health: this.healthChecks.getLastResult(),
-      resources: this.resourceMonitor.getLastUsage(),
+      ...(healthResult !== undefined && { health: healthResult }),
+      ...(resourcesResult !== undefined && { resources: resourcesResult }),
       traces: this.traceCollector.getAnalysis(),
       alerts: this.alerts.getActiveAlerts(),
       performance: this.metrics.getPerformanceSummary(),
@@ -137,12 +139,13 @@ export class PerformanceMonitor {
    * Get monitoring statistics
    */
   getStats(): PerformanceMonitorStats {
+    const lastUsage = this.resourceMonitor.getLastUsage();
     return {
       uptime: Math.floor((Date.now() - this.resourceMonitor.getStartTime()) / 1000),
       checksPerformed: this.healthChecks.getChecksPerformed(),
       alertsTriggered: this.alerts.getAlertsTriggered(),
       tracesCollected: this.traceCollector.getTracesCollected(),
-      resourceUsage: this.resourceMonitor.getLastUsage(),
+      ...(lastUsage !== undefined && { resourceUsage: lastUsage }),
     };
   }
 }

@@ -85,7 +85,7 @@ export class BestPracticeLegalMCPServer {
   private transport?: Transport;
   private isShuttingDown = false;
   private readonly activeRequests = new Set<string>();
-  private heartbeatInterval?: NodeJS.Timeout;
+  private heartbeatInterval: NodeJS.Timeout | undefined;
   private sessionProperties: Map<string, unknown> = new Map();
   private readonly enhancedToolMetadata: Map<string, ToolMetadata> = buildEnhancedMetadata();
 
@@ -490,7 +490,12 @@ export class BestPracticeLegalMCPServer {
             errorResult.content.length > 0
           ) {
             const firstContent = errorResult.content[0];
-            if (firstContent.type === 'text' && typeof firstContent.text === 'string') {
+            if (
+              firstContent &&
+              firstContent.type === 'text' &&
+              'text' in firstContent &&
+              typeof firstContent.text === 'string'
+            ) {
               try {
                 const parsed = JSON.parse(firstContent.text);
                 if (parsed && typeof parsed === 'object' && 'error' in parsed) {

@@ -43,8 +43,8 @@ export class ApplicationError extends Error {
     super(message);
     this.name = this.constructor.name;
     this.code = code;
-    this.statusCode = statusCode;
-    this.details = details;
+    if (statusCode !== undefined) this.statusCode = statusCode;
+    if (details !== undefined) this.details = details;
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -67,8 +67,8 @@ export class ApiError extends ApplicationError {
     details?: Record<string, unknown>,
   ) {
     super(message, 'API_ERROR', apiStatus || 500, details);
-    this.endpoint = endpoint;
-    this.apiStatus = apiStatus;
+    if (endpoint !== undefined) this.endpoint = endpoint;
+    if (apiStatus !== undefined) this.apiStatus = apiStatus;
   }
 }
 
@@ -180,7 +180,7 @@ export abstract class BaseError extends ApplicationError {
 
     this.context = {
       timestamp: this.timestamp,
-      stackTrace: this.stack,
+      ...(this.stack !== undefined && { stackTrace: this.stack }),
       ...context,
     };
 
@@ -247,7 +247,7 @@ export class ValidationError extends BaseError {
     this.validationErrors = validationErrors;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       validationErrors: this.validationErrors,
@@ -276,10 +276,10 @@ export class AuthorizationError extends BaseError {
     context: Partial<ErrorContext> = {},
   ) {
     super(message, ErrorCategory.AUTHORIZATION, ErrorSeverity.MEDIUM, 403, context, true, false);
-    this.requiredPermissions = requiredPermissions;
+    if (requiredPermissions !== undefined) this.requiredPermissions = requiredPermissions;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       requiredPermissions: this.requiredPermissions,
@@ -301,11 +301,11 @@ export class NotFoundError extends BaseError {
     context: Partial<ErrorContext> = {},
   ) {
     super(message, ErrorCategory.NOT_FOUND, ErrorSeverity.LOW, 404, context, true, false);
-    this.resourceType = resourceType;
-    this.resourceId = resourceId;
+    if (resourceType !== undefined) this.resourceType = resourceType;
+    if (resourceId !== undefined) this.resourceId = resourceId;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       resourceType: this.resourceType,
@@ -342,7 +342,7 @@ export class RateLimitError extends BaseError {
     this.retryAfter = retryAfter;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       limit: this.limit,
@@ -381,11 +381,11 @@ export class ExternalAPIError extends BaseError {
       isRetryable,
     );
     this.apiName = apiName;
-    this.apiStatusCode = apiStatusCode;
+    if (apiStatusCode !== undefined) this.apiStatusCode = apiStatusCode;
     this.apiResponse = apiResponse;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       apiName: this.apiName,
@@ -403,10 +403,10 @@ export class BusinessLogicError extends BaseError {
 
   constructor(message: string, businessCode?: string, context: Partial<ErrorContext> = {}) {
     super(message, ErrorCategory.BUSINESS_LOGIC, ErrorSeverity.MEDIUM, 422, context, true, false);
-    this.businessCode = businessCode;
+    if (businessCode !== undefined) this.businessCode = businessCode;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       businessCode: this.businessCode,
@@ -443,10 +443,10 @@ export class ConfigurationError extends BaseError {
 
   constructor(message: string, configKey?: string, context: Partial<ErrorContext> = {}) {
     super(message, ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL, 500, context, false, false);
-    this.configKey = configKey;
+    if (configKey !== undefined) this.configKey = configKey;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       configKey: this.configKey,
@@ -480,7 +480,7 @@ export class DependencyError extends BaseError {
     this.dependencyType = dependencyType;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       dependencyName: this.dependencyName,
@@ -726,16 +726,16 @@ export class ErrorFactory {
       return {
         message: error.message,
         code: error.code,
-        statusCode: error.statusCode,
-        details: error.details,
-        stack: error.stack,
+        ...(error.statusCode !== undefined && { statusCode: error.statusCode }),
+        ...(error.details !== undefined && { details: error.details }),
+        ...(error.stack !== undefined && { stack: error.stack }),
       };
     }
 
     if (error instanceof Error) {
       return {
         message: error.message,
-        stack: error.stack,
+        ...(error.stack !== undefined && { stack: error.stack }),
       };
     }
 

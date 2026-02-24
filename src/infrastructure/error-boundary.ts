@@ -42,7 +42,7 @@ export interface ErrorMetrics {
  */
 export class ErrorBoundaryMiddleware {
   private logger: Logger;
-  private metrics?: MetricsCollector;
+  private metrics: MetricsCollector | undefined;
   private config: ErrorBoundaryConfig;
   private errorMetrics: ErrorMetrics;
   private recentErrors: Array<{ timestamp: number; severity: ErrorSeverity }> = [];

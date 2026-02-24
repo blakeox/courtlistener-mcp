@@ -186,7 +186,8 @@ export class EnvironmentConfigValidator {
 
     // Check Node.js version
     const nodeVersion = process.version;
-    const majorVersion = parseInt(nodeVersion.split('.')[0].substring(1));
+    const versionPart = nodeVersion.split('.')[0];
+    const majorVersion = versionPart ? parseInt(versionPart.substring(1)) : 0;
 
     if (majorVersion < 18) {
       errors.push(`Node.js version ${nodeVersion} is not supported. Minimum version is 18.0.0`);

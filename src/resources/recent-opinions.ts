@@ -22,7 +22,7 @@ export class RecentOpinionsResourceHandler implements ResourceHandler {
 
       const results = await this.api.searchOpinions({
         order_by: 'dateFiled desc',
-        date_filed_after: filed_after,
+        ...(filed_after !== undefined && { date_filed_after: filed_after }),
       });
 
       return {

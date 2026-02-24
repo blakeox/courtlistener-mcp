@@ -118,6 +118,9 @@ export class MiddlewareFactory {
       }
 
       const middleware = middlewares[index++];
+      if (!middleware) {
+        return finalHandler();
+      }
       return middleware.process(context, next);
     };
 

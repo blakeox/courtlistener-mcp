@@ -50,7 +50,7 @@ export class CacheManager {
   private accessOrder = new Map<string, number>();
   private accessCounter = 0;
   private logger: Logger;
-  private cleanupInterval?: NodeJS.Timeout;
+  private cleanupInterval: NodeJS.Timeout | undefined;
 
   constructor(
     private config: CacheConfig,

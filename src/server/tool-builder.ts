@@ -33,8 +33,8 @@ export function buildEnhancedMetadata(): Map<string, ToolMetadata> {
       complexity: tool.complexity,
       rateLimitWeight: tool.rateLimitWeight,
       description: tool.description,
-      examples: tool.examples,
-      outputSchema: tool.outputSchema,
+      ...(tool.examples !== undefined && { examples: tool.examples }),
+      ...(tool.outputSchema !== undefined && { outputSchema: tool.outputSchema }),
     });
   }
 

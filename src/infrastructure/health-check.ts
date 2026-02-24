@@ -206,7 +206,7 @@ export class HealthCheckManager {
         return result.value;
       } else {
         return {
-          name: dependencies[index],
+          name: dependencies[index] ?? 'unknown',
           status: 'unhealthy' as const,
           error: result.reason?.message || 'Unknown error',
           lastChecked: new Date().toISOString(),

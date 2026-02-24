@@ -63,6 +63,7 @@ export class TraceCollector {
         operationBreakdown[trace.operation] = { count: 0, avgDuration: 0 };
       }
       const op = operationBreakdown[trace.operation];
+      if (!op) return;
       op.count++;
       op.avgDuration = (op.avgDuration * (op.count - 1) + trace.duration) / op.count;
     });

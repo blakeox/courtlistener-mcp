@@ -152,20 +152,20 @@ export class AuditLogger {
       timestamp: new Date().toISOString(),
       method: 'tools/call',
       toolName,
-      clientId: authContext.clientId,
+      ...(authContext.clientId !== undefined && { clientId: authContext.clientId }),
       authContext: {
         isAuthenticated: authContext.isAuthenticated,
         permissions: authContext.permissions,
       },
-      requestArgs: this.auditConfig.includeRequestBody
-        ? (this.truncateData(requestArgs) as Record<string, unknown>)
-        : undefined,
-      responseData: this.auditConfig.includeResponseBody
-        ? this.truncateData(responseData)
-        : undefined,
+      ...(this.auditConfig.includeRequestBody && {
+        requestArgs: this.truncateData(requestArgs) as Record<string, unknown>,
+      }),
+      ...(this.auditConfig.includeResponseBody && {
+        responseData: this.truncateData(responseData),
+      }),
       duration,
       success,
-      error,
+      ...(error !== undefined && { error }),
       ...metadata,
     };
   }
@@ -184,14 +184,14 @@ export class AuditLogger {
       correlationId,
       timestamp: new Date().toISOString(),
       method: 'authenticate',
-      clientId: authContext.clientId,
+      ...(authContext.clientId !== undefined && { clientId: authContext.clientId }),
       authContext: {
         isAuthenticated: authContext.isAuthenticated,
         permissions: authContext.permissions,
       },
       duration: 0,
       success,
-      error,
+      ...(error !== undefined && { error }),
       ...metadata,
     };
   }

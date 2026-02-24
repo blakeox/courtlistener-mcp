@@ -50,10 +50,12 @@ export function getToolsByCategory(): Record<string, EnhancedTool[]> {
   const categories: Record<string, EnhancedTool[]> = {};
 
   for (const tool of tools) {
-    if (!categories[tool.category]) {
-      categories[tool.category] = [];
+    const cat = categories[tool.category];
+    if (!cat) {
+      categories[tool.category] = [tool];
+    } else {
+      cat.push(tool);
     }
-    categories[tool.category].push(tool);
   }
 
   return categories;

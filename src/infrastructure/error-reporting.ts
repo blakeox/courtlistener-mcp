@@ -59,7 +59,7 @@ export interface ErrorReportingConfig {
  */
 export class ErrorReportingService {
   private logger: Logger;
-  private metrics?: MetricsCollector;
+  private metrics: MetricsCollector | undefined;
   private config: ErrorReportingConfig;
   private errorReports: Map<string, ErrorReport> = new Map();
   private errorTrends: Map<string, ErrorTrend> = new Map();
@@ -231,8 +231,8 @@ export class ErrorReportingService {
     }
 
     report.resolution.status = status;
-    report.resolution.assignee = assignee;
-    report.resolution.notes = notes;
+    if (assignee !== undefined) report.resolution.assignee = assignee;
+    if (notes !== undefined) report.resolution.notes = notes;
 
     if (status === 'resolved') {
       report.resolution.resolvedAt = new Date().toISOString();

@@ -39,7 +39,7 @@ export interface ClientStats {
 export class PerClientRateLimiter {
   private clients = new Map<string, ClientStats>();
   private logger: Logger;
-  private cleanupInterval?: NodeJS.Timeout;
+  private cleanupInterval: NodeJS.Timeout | undefined;
 
   constructor(
     private config: RateLimitConfig,

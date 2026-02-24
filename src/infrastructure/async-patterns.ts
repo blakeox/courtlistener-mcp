@@ -326,7 +326,7 @@ export class RequestQueue {
         id: cryptoId('req'),
         operation,
         priority,
-        metadata,
+        ...(metadata !== undefined && { metadata }),
         resolve,
         reject,
         attempts: 0,

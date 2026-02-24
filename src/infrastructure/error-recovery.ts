@@ -44,7 +44,7 @@ export interface RecoveryOptions {
  */
 export class ErrorRecoveryService {
   private logger: Logger;
-  private circuitBreaker?: CircuitBreaker;
+  private circuitBreaker: CircuitBreaker | undefined;
   private retryConfig: RetryConfig;
   private fallbackConfig: FallbackConfig;
 

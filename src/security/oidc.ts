@@ -63,7 +63,7 @@ export async function verifyAccessToken(
 
   const { payload } = await _jwtVerify(token, JWKS, {
     issuer: cfg.issuer,
-    audience: cfg.audience,
+    ...(cfg.audience !== undefined && { audience: cfg.audience }),
   });
 
   // Optional scope check

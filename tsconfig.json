@@ -16,7 +16,10 @@
     "downlevelIteration": true,
     "types": ["node"],
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "test", "src/legacy"]
