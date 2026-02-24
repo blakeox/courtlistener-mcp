@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "courtlistener": {
-      "url": "https://courtlistener-mcp.<your-subdomain>.workers.dev/sse"
+      "url": "https://courtlistener-mcp.blakeoxford.workers.dev/sse"
     }
   }
 }
