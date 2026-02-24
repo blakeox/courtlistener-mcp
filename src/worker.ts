@@ -40,7 +40,7 @@ interface Env {
   /** Optional bearer token to gate access — set via `wrangler secret put MCP_AUTH_TOKEN` */
   MCP_AUTH_TOKEN?: string;
   /** Durable Object binding (auto-wired by wrangler.jsonc) */
-  CourtListenerMCP: DurableObjectNamespace;
+  MCP_OBJECT: DurableObjectNamespace;
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "CourtListenerMCP",
+        "name": "MCP_OBJECT",
         "class_name": "CourtListenerMCP"
       }
     ]
@@ -14,7 +14,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["CourtListenerMCP"]
+      "new_sqlite_classes": ["CourtListenerMCP"]
     }
   ]
 }
