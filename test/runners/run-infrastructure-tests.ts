@@ -6,7 +6,13 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { performance } from 'perf_hooks';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.join(__dirname, '../..');
 
 interface TestDefinition {
   name: string;
@@ -50,9 +56,15 @@ function runTest(test: TestDefinition): Promise<TestResult> {
     console.log(`${test.emoji} Running ${test.name} tests...`);
     const startTime = performance.now();
 
-    const child = spawn('npx', ['tsx', '--test', test.file], {
-      stdio: ['inherit', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      path.join(projectRoot, 'node_modules', '.bin', 'tsx'),
+      ['--test', test.file],
+      {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        cwd: projectRoot,
+        detached: true,
+      },
+    );
 
     let stdout = '';
     let stderr = '';
@@ -224,4 +236,3 @@ runAllTests().catch((error) => {
   console.error('Error running infrastructure tests:', error);
   process.exit(1);
 });
-

@@ -84,19 +84,25 @@ class UnitTestRunner {
     const testPath = path.join(projectRoot, 'test', 'unit', testFile);
 
     return new Promise((resolve) => {
-      // All tests are now TypeScript, use tsx with node --test
-      const command = 'npx';
-      const args = ['tsx', '--test', testPath];
+      // Use tsx directly to avoid npx wrapper issues with process cleanup
+      const command = path.join(projectRoot, 'node_modules', '.bin', 'tsx');
+      const args = ['--test', testPath];
 
       const child = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: projectRoot,
+        detached: true,
       });
 
       // Add a timeout to prevent hanging tests
+      // Kill entire process group to avoid orphaned child processes
       const timeout = setTimeout(() => {
         console.log(`   ⏰ ${testFile} - TIMEOUT (killing process)`);
-        child.kill('SIGKILL');
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch {
+          /* already exited */
+        }
       }, 30000); // 30 second timeout
 
       let output = '';
@@ -146,9 +152,7 @@ class UnitTestRunner {
     console.log('='.repeat(50));
 
     const successRate =
-      this.totalTests > 0
-        ? ((this.passedTests / this.totalTests) * 100).toFixed(1)
-        : '0';
+      this.totalTests > 0 ? ((this.passedTests / this.totalTests) * 100).toFixed(1) : '0';
 
     console.log(`Total Tests: ${this.totalTests}`);
     console.log(`✅ Passed: ${this.passedTests}`);
@@ -187,4 +191,3 @@ runner.runAllTests().catch((error) => {
   console.error('Error running unit tests:', error);
   process.exit(1);
 });
-
