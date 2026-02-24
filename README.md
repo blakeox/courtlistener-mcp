@@ -315,6 +315,78 @@ Add this server to your MCP client configuration:
 }
 ```
 
+## Multi-LLM Client Support
+
+### Supported Clients
+
+This MCP server works with any MCP-compatible client over **stdio** or **HTTP**
+transports:
+
+| Client                        | Transport    | Notes                            |
+| ----------------------------- | ------------ | -------------------------------- |
+| **Claude Desktop** (local)    | stdio        | Local connection, no auth needed |
+| **Claude Desktop** (remote)   | HTTP         | StreamableHTTP transport         |
+| **OpenAI ChatGPT**            | HTTP         | OAuth 2.1 authentication         |
+| **Cursor**                    | stdio        | Local connection                 |
+| **Continue.dev**              | stdio        | Local connection                 |
+| **Zed**                       | stdio        | Local connection                 |
+| **VS Code GitHub Copilot**    | stdio        | Local connection                 |
+| **Any MCP-compatible client** | stdio / HTTP | Both transports supported        |
+
+### Transport Modes
+
+**Stdio (default)** — For local MCP clients:
+
+```bash
+node dist/index.js
+```
+
+**HTTP (remote)** — For remote/web-based MCP clients:
+
+```bash
+node dist/index.js --http
+# or
+TRANSPORT=http node dist/index.js
+```
+
+### Client Configuration
+
+Pre-built configuration files for each supported client are available in the
+[`configs/`](./configs/) directory:
+
+- [`claude-desktop.json`](./configs/claude-desktop.json) — Claude Desktop
+  (stdio)
+- [`claude-desktop-remote.json`](./configs/claude-desktop-remote.json) — Claude
+  Desktop (remote)
+- [`openai-chatgpt.json`](./configs/openai-chatgpt.json) — OpenAI ChatGPT
+- [`cursor.json`](./configs/cursor.json) — Cursor
+- [`continue-dev.json`](./configs/continue-dev.json) — Continue.dev
+- [`vscode-copilot.json`](./configs/vscode-copilot.json) — VS Code GitHub
+  Copilot
+- [`zed.json`](./configs/zed.json) — Zed
+
+### OAuth Setup (Remote Deployments)
+
+For HTTP transport with OAuth-enabled clients (e.g., ChatGPT), set the following
+environment variables:
+
+```bash
+OAUTH_ENABLED=true
+OAUTH_ISSUER_URL=https://your-deployment.example.com
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+```
+
+### Docker
+
+```bash
+# Stdio mode (default)
+docker compose up
+
+# HTTP mode
+docker compose --profile http up
+```
+
 ## Available Tools
 
 This Legal MCP Server provides **25 comprehensive tools** for legal research

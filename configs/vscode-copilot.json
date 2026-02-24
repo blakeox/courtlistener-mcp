@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "servers": {
+      "courtlistener": {
+        "type": "stdio",
+        "command": "node",
+        "args": ["dist/index.js"],
+        "cwd": "/path/to/courtlistener-mcp",
+        "env": {
+          "COURTLISTENER_API_KEY": "your-api-key"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "context_servers": {
+    "courtlistener": {
+      "command": {
+        "path": "node",
+        "args": ["dist/index.js"],
+        "env": {
+          "COURTLISTENER_API_KEY": "your-api-key"
+        }
+      },
+      "settings": {}
+    }
+  }
+}

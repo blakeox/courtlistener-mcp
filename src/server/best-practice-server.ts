@@ -150,6 +150,13 @@ export class BestPracticeLegalMCPServer {
   }
 
   /**
+   * Access the underlying MCP Server instance for custom transport wiring.
+   */
+  getServer(): Server {
+    return this.server;
+  }
+
+  /**
    * Backwards-compatible alias for start()
    *
    * @deprecated Use `start()` instead
@@ -700,6 +707,7 @@ export class BestPracticeLegalMCPServer {
 
     return baseDefinitions.map((tool) => {
       const metadata = this.enhancedToolMetadata.get(tool.name);
+      const handler = this.toolRegistry.get(tool.name);
       // Ensure inputSchema has the required 'type' field for MCP Tool format
       const inputSchema =
         tool.inputSchema && typeof tool.inputSchema === 'object' && 'type' in tool.inputSchema
@@ -710,7 +718,8 @@ export class BestPracticeLegalMCPServer {
         name: tool.name,
         description: metadata?.description ?? tool.description,
         inputSchema: inputSchema as Tool['inputSchema'],
-        // Extra metadata is provided separately so MCP clients remain spec-compliant
+        ...(handler?.annotations && { annotations: handler.annotations }),
+        ...(handler?.title && { title: handler.title }),
       } satisfies Tool;
     });
   }

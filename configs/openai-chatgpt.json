@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "courtlistener": {
+      "url": "https://your-deployment.example.com/mcp",
+      "transport": "streamable-http",
+      "auth": {
+        "type": "oauth2",
+        "authorizationUrl": "https://your-deployment.example.com/authorize",
+        "tokenUrl": "https://your-deployment.example.com/token",
+        "scopes": ["legal:read", "legal:search", "legal:analyze"]
+      }
+    }
+  }
+}

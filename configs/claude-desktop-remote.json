@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "courtlistener": {
+      "url": "http://localhost:3002/mcp",
+      "transport": "streamable-http",
+      "env": {
+        "COURTLISTENER_API_KEY": "your-api-key"
+      }
+    }
+  }
+}

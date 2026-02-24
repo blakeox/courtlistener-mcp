@@ -3,7 +3,11 @@
  * Modular tool handlers that can be dynamically registered and executed
  */
 
-import { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequest,
+  CallToolResult,
+  ToolAnnotations,
+} from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { Result, success, failure } from '../common/types.js';
@@ -16,6 +20,8 @@ export interface ToolHandler<TInput = unknown> {
   readonly name: string;
   readonly description: string;
   readonly category: string;
+  readonly title?: string;
+  readonly annotations?: ToolAnnotations;
 
   /**
    * Validate tool input parameters
@@ -267,6 +273,12 @@ export abstract class TypedToolHandler<
    * Define this in your subclass for automatic validation and type inference
    */
   protected abstract readonly schema: TSchema;
+
+  /** MCP ToolAnnotations — defaults mark all tools as read-only, open-world */
+  readonly annotations: ToolAnnotations = {
+    readOnlyHint: true,
+    openWorldHint: true,
+  };
 
   /**
    * Optional: Tool metadata for enriched definitions

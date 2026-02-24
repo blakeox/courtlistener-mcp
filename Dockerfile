@@ -33,8 +33,8 @@ RUN npm prune --production
 RUN chown -R mcp:mcp /app
 USER mcp
 
-# Expose health check port
-EXPOSE 3001
+# Expose health check port and HTTP transport port
+EXPOSE 3001 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
@@ -46,7 +46,11 @@ ENV NODE_ENV=production \
     LOG_LEVEL=info \
     LOG_FORMAT=json \
     METRICS_ENABLED=true \
-    METRICS_PORT=3001
+    METRICS_PORT=3001 \
+    TRANSPORT=stdio \
+    MCP_HTTP_PORT=3002 \
+    MCP_HTTP_HOST=0.0.0.0
 
-# Start the server
+# Start the server (default: stdio mode)
+# For HTTP transport mode, set TRANSPORT=http or use: CMD ["node", "dist/index.js", "--http"]
 CMD ["node", "dist/index.js"]
