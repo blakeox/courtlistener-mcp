@@ -12,6 +12,7 @@ import {
 import { Logger } from './logger.js';
 import { CacheManager } from './cache.js';
 import { MetricsCollector } from './metrics.js';
+import { cryptoId } from '../common/utils.js';
 
 export interface EnhancedAPIOptions {
   baseUrl: string;
@@ -109,7 +110,7 @@ export class EnhancedCourtListenerAPIClient {
     options: RequestOptions = {},
     priority: number = 0,
   ): Promise<T> {
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = cryptoId('req');
     const startTime = Date.now();
 
     this.logger.debug('API request started', {

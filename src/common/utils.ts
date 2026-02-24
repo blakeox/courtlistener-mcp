@@ -2,6 +2,7 @@
  * Common utilities and helper functions
  */
 
+import { randomUUID } from 'node:crypto';
 import { Result, success, failure } from './types.js';
 
 /**
@@ -73,6 +74,9 @@ export function deepMerge<T extends Record<string, unknown>>(
 
   for (const key in source) {
     if (Object.prototype.hasOwnProperty.call(source, key)) {
+      // Guard against prototype pollution
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+
       const sourceValue = source[key];
       const targetValue = target[key];
 
@@ -98,11 +102,15 @@ export function deepMerge<T extends Record<string, unknown>>(
  * Generate a UUID v4
  */
 export function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return randomUUID();
+}
+
+/**
+ * Generate a short random ID for non-security purposes (request IDs, correlation IDs)
+ */
+export function cryptoId(prefix = ''): string {
+  const id = randomUUID().replace(/-/g, '').substring(0, 12);
+  return prefix ? `${prefix}_${Date.now()}_${id}` : id;
 }
 
 /**
@@ -200,9 +208,16 @@ export function isValidEmail(email: string): boolean {
  * Sanitize string for safe usage
  */
 export function sanitize(input: string): string {
-  return input
-    .replace(/[<>]/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+=/gi, '')
-    .trim();
+  let result = input;
+  const dangerousSchemes = /javascript:|data:|vbscript:/gi;
+  const eventHandlers = /on\w+=/gi;
+
+  // Loop until stable to prevent bypass via nested dangerous strings
+  let prev: string;
+  do {
+    prev = result;
+    result = result.replace(/[<>]/g, '').replace(dangerousSchemes, '').replace(eventHandlers, '');
+  } while (result !== prev);
+
+  return result.trim();
 }

@@ -25,7 +25,7 @@ class FullArchitectureLegalMCPServer {
 
   constructor() {
     this.logger = createLogger(getConfig().logging, 'FullArchitectureLegalMCP');
-    
+
     // Bootstrap all services
     this.logger.info('Bootstrapping services...');
     bootstrapServices();
@@ -45,7 +45,7 @@ class FullArchitectureLegalMCPServer {
         capabilities: {
           tools: {},
         },
-      }
+      },
     );
 
     this.setupServer();
@@ -61,8 +61,8 @@ class FullArchitectureLegalMCPServer {
         'configuration-validation',
         'async-optimizations',
         'comprehensive-logging',
-        'modular-architecture'
-      ]
+        'modular-architecture',
+      ],
     });
   }
 
@@ -70,17 +70,17 @@ class FullArchitectureLegalMCPServer {
     // List tools handler using new architecture
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const timer = this.logger.startTimer('list_tools');
-      
+
       try {
         const tools = this.toolRegistry.getToolDefinitions();
-        
+
         const duration = timer.end();
         this.logger.info('Listed tools', {
           toolCount: tools.length,
           duration,
-          categories: this.toolRegistry.getCategories()
+          categories: this.toolRegistry.getCategories(),
         });
-        
+
         return { tools };
       } catch (error) {
         timer.endWithError(error as Error);
@@ -93,20 +93,20 @@ class FullArchitectureLegalMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const timer = this.logger.startTimer(`tool_${name}`);
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+      const requestId = `req_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
+
       try {
         this.logger.info('Tool execution started', {
           toolName: name,
           arguments: args,
-          requestId
+          requestId,
         });
 
         // Use the tool registry for execution
         const result = await this.toolRegistry.execute(request, {
           logger: this.logger.child(`Tool:${name}`),
           requestId,
-          userId: 'system' // Could be extracted from headers in real implementation
+          userId: 'system', // Could be extracted from headers in real implementation
         });
 
         const duration = timer.end();
@@ -114,7 +114,7 @@ class FullArchitectureLegalMCPServer {
           toolName: name,
           duration,
           requestId,
-          success: !result.isError
+          success: !result.isError,
         });
 
         return result;
@@ -123,22 +123,26 @@ class FullArchitectureLegalMCPServer {
         this.logger.error('Tool execution failed', error as Error, {
           toolName: name,
           requestId,
-          arguments: args
+          arguments: args,
         });
-        
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                error: 'Tool execution failed',
-                message: (error as Error).message,
-                toolName: name,
-                requestId
-              }, null, 2)
-            }
+              text: JSON.stringify(
+                {
+                  error: 'Tool execution failed',
+                  message: (error as Error).message,
+                  toolName: name,
+                  requestId,
+                },
+                null,
+                2,
+              ),
+            },
           ],
-          isError: true
+          isError: true,
         };
       }
     });
@@ -149,16 +153,16 @@ class FullArchitectureLegalMCPServer {
    */
   async start() {
     this.logger.info('🎯 Starting Full Architecture Legal MCP Server...');
-    
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
     this.logger.info('🌟 Full Architecture Legal MCP Server running!', {
       serverName: 'full-architecture-legal-mcp',
       version: '2.0.0',
       availableTools: this.toolRegistry.getToolNames(),
       totalTools: this.toolRegistry.getToolNames().length,
-      architecture: 'modular-domain-driven'
+      architecture: 'modular-domain-driven',
     });
   }
 
@@ -175,8 +179,8 @@ class FullArchitectureLegalMCPServer {
       architecture: {
         patterns: ['dependency-injection', 'factory', 'strategy', 'observer'],
         principles: ['single-responsibility', 'open-closed', 'dependency-inversion'],
-        structure: 'domain-driven-design'
-      }
+        structure: 'domain-driven-design',
+      },
     };
   }
 }
@@ -184,7 +188,7 @@ class FullArchitectureLegalMCPServer {
 // Start the server if this file is run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = new FullArchitectureLegalMCPServer();
-  
+
   // Graceful shutdown handling
   process.on('SIGINT', () => {
     console.log('\\n🛑 Received SIGINT, shutting down gracefully...');

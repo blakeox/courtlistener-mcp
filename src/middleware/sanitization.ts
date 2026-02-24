@@ -53,7 +53,7 @@ export class InputSanitizer {
 
   // Common injection patterns to detect and block
   private static readonly INJECTION_PATTERNS = [
-    /(<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>)/gi, // Script tags
+    /<script[\s>\/]/gi, // Script tags (opening)
     /(javascript:|data:|vbscript:)/gi, // Protocol handlers
     /(on\w+\s*=)/gi, // Event handlers
     /(<iframe|<object|<embed|<link|<meta)/gi, // Dangerous HTML tags
@@ -130,7 +130,7 @@ export class InputSanitizer {
     value: unknown,
     path: string,
     depth: number,
-    result: SanitizationResult
+    result: SanitizationResult,
   ): SanitizableValue {
     // Check depth limit
     if (depth > this.config.maxObjectDepth) {

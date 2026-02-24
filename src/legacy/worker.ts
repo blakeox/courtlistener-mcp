@@ -20,12 +20,12 @@ type OidcCfg = {
   jwksUrl?: string;
   requiredScope?: string;
 };
-type LimitsCfg = { maxTotal?: number; maxPerIp?: number }
-type Counters = { total: number; perIp: Map<string, number> }
+type LimitsCfg = { maxTotal?: number; maxPerIp?: number };
+type Counters = { total: number; perIp: Map<string, number> };
 type McpSession = {
   transport: CloudflareSseTransport;
   server: LegalMCPServer;
-}
+};
 
 function g() {
   return globalThis as unknown as {
@@ -61,15 +61,17 @@ async function handleMCPRequest(request: Request): Promise<Response> {
   // Unified Authentication
   const oidcConfig = g().__OIDC;
   const authMiddleware = new UnifiedAuthMiddleware({
-    oidc: (oidcConfig?.issuer) ? {
-      issuer: oidcConfig.issuer,
-      audience: oidcConfig.audience,
-      jwksUrl: oidcConfig.jwksUrl,
-      requiredScope: oidcConfig.requiredScope
-    } : undefined,
-    staticToken: g().__SSE_AUTH_TOKEN__
+    oidc: oidcConfig?.issuer
+      ? {
+          issuer: oidcConfig.issuer,
+          audience: oidcConfig.audience,
+          jwksUrl: oidcConfig.jwksUrl,
+          requiredScope: oidcConfig.requiredScope,
+        }
+      : undefined,
+    staticToken: g().__SSE_AUTH_TOKEN__,
   });
-  
+
   const authResult = await authMiddleware.authenticate(request);
   if (!authResult.isAuthenticated && authResult.error) {
     return new Response(authResult.error.message, {
@@ -77,8 +79,8 @@ async function handleMCPRequest(request: Request): Promise<Response> {
       headers: {
         'Content-Type': 'text/plain',
         'Access-Control-Allow-Origin': '*',
-        ...authResult.error.headers
-      }
+        ...authResult.error.headers,
+      },
     });
   }
 
@@ -91,8 +93,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
     const maxTotal = Number.isFinite(limits.maxTotal) ? Number(limits.maxTotal) : 100; // default
     const maxPerIp = Number.isFinite(limits.maxPerIp) ? Number(limits.maxPerIp) : 5; // default
 
-    const sessionId =
-      request.headers.get('mcp-session-id') || Math.random().toString(36).substring(7);
+    const sessionId = request.headers.get('mcp-session-id') || crypto.randomUUID();
 
     // Simple in-memory connection counters (per-worker instance)
     const counters = (g().__SSE_COUNTERS__ ||= { total: 0, perIp: new Map<string, number>() });
@@ -116,11 +117,11 @@ async function handleMCPRequest(request: Request): Promise<Response> {
     // Create Transport and Server
     const transport = new CloudflareSseTransport(sessionId);
     const server = new LegalMCPServer();
-    
+
     // Store session
     const sessions = (g().__MCP_SESSIONS__ ||= new Map());
     sessions.set(sessionId, { transport, server });
-    
+
     // Start server (connects to transport)
     await server.start(transport);
 
@@ -146,7 +147,7 @@ async function handleMCPRequest(request: Request): Promise<Response> {
           const nowPerIp = (counters.perIp.get(clientIp) || 1) - 1;
           if (nowPerIp > 0) counters.perIp.set(clientIp, nowPerIp);
           else counters.perIp.delete(clientIp);
-          
+
           // Remove session
           sessions.delete(sessionId);
         };
@@ -206,14 +207,14 @@ async function handleMCPRequest(request: Request): Promise<Response> {
 
   // Handle POST requests with MCP messages (via SSE transport)
   if (request.method === 'POST' && url.pathname === '/message') {
-      const sessionId = url.searchParams.get('sessionId');
-      if (!sessionId) return new Response('Missing sessionId', { status: 400 });
-      
-      const session = g().__MCP_SESSIONS__?.get(sessionId);
-      if (!session) return new Response('Session not found', { status: 404 });
-      
-      await session.transport.handlePostMessage(request);
-      return new Response('Accepted', { status: 202 });
+    const sessionId = url.searchParams.get('sessionId');
+    if (!sessionId) return new Response('Missing sessionId', { status: 400 });
+
+    const session = g().__MCP_SESSIONS__?.get(sessionId);
+    if (!session) return new Response('Session not found', { status: 404 });
+
+    await session.transport.handlePostMessage(request);
+    return new Response('Accepted', { status: 202 });
   }
 
   // Handle POST requests (JSON-RPC) - Legacy/Direct
@@ -305,9 +306,9 @@ async function handleMCPRequest(request: Request): Promise<Response> {
         case 'resources/read': {
           const params = (message.params ?? {}) as Record<string, unknown>;
           const uri = params.uri;
-          
+
           if (typeof uri !== 'string') {
-             response = {
+            response = {
               jsonrpc: '2.0',
               id: message.id,
               error: {
@@ -474,7 +475,8 @@ export default {
             version: serverInfo.version,
             protocolVersion: serverInfo.protocolVersion,
             capabilities: Object.keys(serverInfo.capabilities).filter(
-              k => serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined
+              (k) =>
+                serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined,
             ),
             timestamp: new Date().toISOString(),
           }),
@@ -498,7 +500,8 @@ export default {
             description: 'Model Context Protocol server for CourtListener legal database',
             protocolVersion: serverInfo.protocolVersion,
             capabilities: Object.keys(serverInfo.capabilities).filter(
-              k => serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined
+              (k) =>
+                serverInfo.capabilities[k as keyof typeof serverInfo.capabilities] !== undefined,
             ),
             endpoints: {
               '/health': 'Health check',
@@ -624,25 +627,26 @@ export default {
         const tools = await server.listTools();
         const resources = await server.listResources();
         const prompts = await server.listPrompts();
-        
+
         const manifest = {
           server: {
-            name: "courtlistener-mcp",
-            version: "0.1.0",
-            description: "Legal research MCP server providing comprehensive access to CourtListener legal database"
+            name: 'courtlistener-mcp',
+            version: '0.1.0',
+            description:
+              'Legal research MCP server providing comprehensive access to CourtListener legal database',
           },
           capabilities: {
             tools,
             resources,
-            prompts
-          }
+            prompts,
+          },
         };
-        
+
         return new Response(JSON.stringify(manifest, null, 2), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
       }
 

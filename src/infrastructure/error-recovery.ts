@@ -3,6 +3,7 @@
  * Implements retry logic, fallback strategies, and circuit breaker integration
  */
 
+import { randomUUID } from 'node:crypto';
 import { Logger } from './logger.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import {
@@ -354,7 +355,7 @@ export class ErrorRecoveryService {
       .setRequestId(`recovery_${Date.now()}`)
       .setEndpoint(endpoint)
       .setMethod(method)
-      .setCorrelationId(`recovery_${Math.random().toString(36).substr(2, 9)}`)
+      .setCorrelationId(`recovery_${randomUUID().replace(/-/g, '').substring(0, 12)}`)
       .addData('recovery', true)
       .addData('timestamp', new Date().toISOString());
 

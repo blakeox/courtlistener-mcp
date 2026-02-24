@@ -3,6 +3,8 @@
  * Provides comprehensive error types, context tracking, and structured responses
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { Logger as _Logger } from './logger.js';
 
 // Base error context interface
@@ -87,7 +89,7 @@ export abstract class BaseError extends Error {
   }
 
   private generateErrorId(): string {
-    return `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `err_${Date.now()}_${randomUUID().replace(/-/g, '').substring(0, 12)}`;
   }
 
   public toJSON() {

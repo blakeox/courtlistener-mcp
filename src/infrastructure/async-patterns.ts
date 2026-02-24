@@ -7,8 +7,7 @@
 // Note: any types required for generic Promise/Queue patterns that can't be typed more strictly
 
 import { Logger } from './logger.js';
-
-/**
+import { cryptoId } from '../common/utils.js'; /**
  * Connection Pool Manager
  * Manages HTTP connection reuse for improved performance
  */
@@ -135,7 +134,7 @@ export class ConnectionPool {
   }
 
   private async createConnection(): Promise<PooledConnection> {
-    const connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const connectionId = cryptoId('conn');
 
     this.logger.debug('Creating new connection', {
       connectionId,
@@ -324,7 +323,7 @@ export class RequestQueue {
 
     return new Promise((resolve, reject) => {
       const request: QueuedRequest = {
-        id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: cryptoId('req'),
         operation,
         priority,
         metadata,

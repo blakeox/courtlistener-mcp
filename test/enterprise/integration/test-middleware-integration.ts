@@ -34,13 +34,9 @@ class MockAuthenticationMiddleware {
   }
 
   async authenticate(headers: Record<string, string>): Promise<MockAuthResult> {
-    if (!this.config.enabled)
-      return { authenticated: true, clientId: 'anonymous' };
+    if (!this.config.enabled) return { authenticated: true, clientId: 'anonymous' };
 
-    const apiKey =
-      headers['x-api-key'] ||
-      headers['authorization']?.replace('Bearer ', '') ||
-      '';
+    const apiKey = headers['x-api-key'] || headers['authorization']?.replace('Bearer ', '') || '';
     if (this.validApiKeys.has(apiKey)) {
       return { authenticated: true, clientId: `client-${apiKey}` };
     }
@@ -73,9 +69,9 @@ class MockInputSanitizer {
     let sanitized = input;
 
     if (typeof input === 'string') {
-      if (input.includes('<script>')) {
+      if (/<script[\s>\/]/i.test(input)) {
         violations.push({ type: 'XSS', severity: 'high' });
-        sanitized = input.replace(/<script>.*?<\/script>/g, '[SCRIPT_REMOVED]');
+        sanitized = input.replace(/<script[\s>\/][^]*?<\/script>/gi, '[SCRIPT_REMOVED]');
       }
       if (input.includes('DROP TABLE')) {
         violations.push({ type: 'SQL_INJECTION', severity: 'high' });
@@ -112,8 +108,7 @@ class MockRateLimiter {
     if (!this.config.enabled) return { allowed: true };
 
     const now = Date.now();
-    const client =
-      this.clients.get(clientId) || { requests: [], penalties: 0 };
+    const client = this.clients.get(clientId) || { requests: [], penalties: 0 };
 
     client.requests = client.requests.filter((req) => now - req < 60000);
 
@@ -167,7 +162,7 @@ class MockAuditLogger {
       clientId?: string;
       [key: string]: unknown;
     },
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): Promise<string | null> {
     if (!this.config.enabled) return null;
 
@@ -189,7 +184,7 @@ class MockAuditLogger {
   async logResponse(
     auditId: string,
     res: { statusCode?: number },
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): Promise<void> {
     if (!this.config.enabled) return;
 
@@ -206,10 +201,7 @@ class MockAuditLogger {
     this.auditEntries.push(entry);
   }
 
-  async logSecurityEvent(
-    eventType: string,
-    details: Record<string, unknown>
-  ): Promise<void> {
+  async logSecurityEvent(eventType: string, details: Record<string, unknown>): Promise<void> {
     if (!this.config.enabled) return;
 
     const entry: AuditEntry = {
@@ -249,12 +241,9 @@ class MockCompressionMiddleware {
 
   async compressResponse(
     data: string,
-    acceptedEncodings: string[] = []
+    acceptedEncodings: string[] = [],
   ): Promise<CompressionResult> {
-    if (
-      !this.config.enabled ||
-      Buffer.byteLength(data, 'utf8') < this.config.threshold
-    ) {
+    if (!this.config.enabled || Buffer.byteLength(data, 'utf8') < this.config.threshold) {
       return {
         data,
         compressed: false,
@@ -310,8 +299,7 @@ class MockCircuitBreaker {
     }
 
     if (this.state === 'OPEN') {
-      const timeSinceFailure =
-        this.lastFailureTime && Date.now() - this.lastFailureTime;
+      const timeSinceFailure = this.lastFailureTime && Date.now() - this.lastFailureTime;
       if (timeSinceFailure && timeSinceFailure < 60000) {
         // 1 minute recovery time
         throw new Error('Circuit breaker is OPEN');
@@ -388,19 +376,10 @@ class EnterpriseMiddlewareStack {
     // Initialize all middleware components
     this.auth = new MockAuthenticationMiddleware(config.auth || {}, this.logger);
     this.sanitizer = new MockInputSanitizer(config.sanitizer || {}, this.logger);
-    this.rateLimiter = new MockRateLimiter(
-      config.rateLimiter || {},
-      this.logger
-    );
+    this.rateLimiter = new MockRateLimiter(config.rateLimiter || {}, this.logger);
     this.auditor = new MockAuditLogger(config.auditor || {}, this.logger);
-    this.compressor = new MockCompressionMiddleware(
-      config.compressor || {},
-      this.logger
-    );
-    this.circuitBreaker = new MockCircuitBreaker(
-      config.circuitBreaker || {},
-      this.logger
-    );
+    this.compressor = new MockCompressionMiddleware(config.compressor || {}, this.logger);
+    this.circuitBreaker = new MockCircuitBreaker(config.circuitBreaker || {}, this.logger);
 
     this.config = {
       enableAuth: true,
@@ -427,7 +406,7 @@ class EnterpriseMiddlewareStack {
       url?: string;
       clientId?: string;
     },
-    handler: RequestHandler
+    handler: RequestHandler,
   ): Promise<MiddlewareResponse> {
     const startTime = Date.now();
     let auditId: string | null = null;
@@ -438,9 +417,7 @@ class EnterpriseMiddlewareStack {
     try {
       // Step 1: Authentication
       if (this.config.enableAuth) {
-        authResult = await this.auth.authenticate(
-          (req.headers as Record<string, string>) || {}
-        );
+        authResult = await this.auth.authenticate((req.headers as Record<string, string>) || {});
         if (!authResult.authenticated) {
           await this.auditor.logSecurityEvent('AUTH_FAILURE', {
             reason: authResult.reason,
@@ -463,7 +440,7 @@ class EnterpriseMiddlewareStack {
         sanitizationResult = await this.sanitizer.sanitize(req.body);
         if (sanitizationResult.violations.length > 0) {
           const highSeverityViolations = sanitizationResult.violations.filter(
-            (v) => v.severity === 'high'
+            (v) => v.severity === 'high',
           );
           if (highSeverityViolations.length > 0) {
             await this.auditor.logSecurityEvent('MALICIOUS_INPUT', {
@@ -487,7 +464,7 @@ class EnterpriseMiddlewareStack {
       // Step 3: Rate Limiting
       if (this.config.enableRateLimit) {
         rateLimitResult = await this.rateLimiter.checkLimit(
-          (req.clientId as string) || 'anonymous'
+          (req.clientId as string) || 'anonymous',
         );
         if (!rateLimitResult.allowed) {
           await this.auditor.logSecurityEvent('RATE_LIMIT_EXCEEDED', {
@@ -513,8 +490,7 @@ class EnterpriseMiddlewareStack {
         auditId = (await this.auditor.logRequest(req, {
           clientId: req.clientId,
           authenticated: authResult?.authenticated,
-          sanitizationViolations:
-            sanitizationResult?.violations?.length || 0,
+          sanitizationViolations: sanitizationResult?.violations?.length || 0,
         })) as string;
       }
 
@@ -531,14 +507,11 @@ class EnterpriseMiddlewareStack {
       // Step 6: Response Compression
       if (this.config.enableCompression && response.body) {
         const acceptedEncodings =
-          ((req.headers?.['accept-encoding'] as string) || '')
-            .split(',')
-            .map((e) => e.trim()) || [];
+          ((req.headers?.['accept-encoding'] as string) || '').split(',').map((e) => e.trim()) ||
+          [];
         const compressionResult = await this.compressor.compressResponse(
-          typeof response.body === 'string'
-            ? response.body
-            : JSON.stringify(response.body),
-          acceptedEncodings
+          typeof response.body === 'string' ? response.body : JSON.stringify(response.body),
+          acceptedEncodings,
         );
 
         if (compressionResult.compressed) {
@@ -562,8 +535,7 @@ class EnterpriseMiddlewareStack {
       return response;
     } catch (error) {
       // Error handling with audit logging
-      const errorMessage =
-        error instanceof Error ? error.message : 'Internal server error';
+      const errorMessage = error instanceof Error ? error.message : 'Internal server error';
       const errorResponse: MiddlewareResponse = {
         statusCode: (error as { statusCode?: number })?.statusCode || 500,
         body: { error: errorMessage },
@@ -638,13 +610,10 @@ async function testFullPipeline(): Promise<void> {
     const response = await middlewareStack.processRequest(req, mockHandler);
 
     console.assert(response.statusCode === 200, 'Should return 200 status');
-    console.assert(
-      req.clientId === 'client-valid-key-1',
-      'Should set client ID'
-    );
+    console.assert(req.clientId === 'client-valid-key-1', 'Should set client ID');
     console.assert(
       response.headers?.['Content-Encoding'] !== undefined,
-      'Should compress response'
+      'Should compress response',
     );
     console.log('    ✅ should process valid authenticated request successfully');
   }
@@ -664,27 +633,18 @@ async function testFullPipeline(): Promise<void> {
 
     const response = await middlewareStack.processRequest(req, mockHandler);
 
-    console.assert(
-      response.statusCode === 401,
-      'Should return 401 for unauthenticated request'
-    );
+    console.assert(response.statusCode === 401, 'Should return 401 for unauthenticated request');
     console.assert(
       (response.body as { error?: string })?.error === 'Authentication failed',
-      'Should include auth error'
+      'Should include auth error',
     );
 
     // Check security event was logged
     const securityEvents = middlewareStack.auditor.auditEntries.filter(
-      (e) => e.type === 'security_event'
+      (e) => e.type === 'security_event',
     );
-    console.assert(
-      securityEvents.length > 0,
-      'Should log security event'
-    );
-    console.assert(
-      securityEvents[0]?.eventType === 'AUTH_FAILURE',
-      'Should log auth failure'
-    );
+    console.assert(securityEvents.length > 0, 'Should log security event');
+    console.assert(securityEvents[0]?.eventType === 'AUTH_FAILURE', 'Should log auth failure');
     console.log('    ✅ should reject unauthenticated requests');
   }
 
@@ -703,32 +663,23 @@ async function testFullPipeline(): Promise<void> {
 
     const response = await middlewareStack.processRequest(req, mockHandler);
 
+    console.assert(response.statusCode === 400, 'Should return 400 for malicious input');
     console.assert(
-      response.statusCode === 400,
-      'Should return 400 for malicious input'
-    );
-    console.assert(
-      (response.body as { error?: string })?.error ===
-        'Malicious input detected',
-      'Should detect malicious input'
+      (response.body as { error?: string })?.error === 'Malicious input detected',
+      'Should detect malicious input',
     );
     console.assert(
       Array.isArray((response.body as { violations?: unknown[] })?.violations) &&
         (response.body as { violations: unknown[] }).violations.length > 0,
-      'Should include violation details'
+      'Should include violation details',
     );
 
     // Check security event was logged
     const securityEvents = middlewareStack.auditor.auditEntries.filter(
-      (e) => e.type === 'security_event'
+      (e) => e.type === 'security_event',
     );
-    const maliciousInputEvent = securityEvents.find(
-      (e) => e.eventType === 'MALICIOUS_INPUT'
-    );
-    console.assert(
-      maliciousInputEvent !== undefined,
-      'Should log malicious input event'
-    );
+    const maliciousInputEvent = securityEvents.find((e) => e.eventType === 'MALICIOUS_INPUT');
+    console.assert(maliciousInputEvent !== undefined, 'Should log malicious input event');
     console.log('    ✅ should block malicious input');
   }
 
@@ -748,10 +699,7 @@ async function testFullPipeline(): Promise<void> {
     const rateLimitConfig: MiddlewareStackConfig = {
       rateLimiter: { requestsPerMinute: 2 },
     };
-    const limitedStack = new EnterpriseMiddlewareStack(
-      rateLimitConfig,
-      mockLogger
-    );
+    const limitedStack = new EnterpriseMiddlewareStack(rateLimitConfig, mockLogger);
 
     // Make requests up to limit
     await limitedStack.processRequest(req, mockHandler);
@@ -760,17 +708,14 @@ async function testFullPipeline(): Promise<void> {
     // This should be rate limited
     const response = await limitedStack.processRequest(req, mockHandler);
 
-    console.assert(
-      response.statusCode === 429,
-      'Should return 429 for rate limited request'
-    );
+    console.assert(response.statusCode === 429, 'Should return 429 for rate limited request');
     console.assert(
       (response.body as { error?: string })?.error === 'Rate limit exceeded',
-      'Should include rate limit error'
+      'Should include rate limit error',
     );
     console.assert(
       response.headers?.['Retry-After'] !== undefined,
-      'Should include retry after header'
+      'Should include retry after header',
     );
     console.log('    ✅ should enforce rate limits');
   }
@@ -788,4 +733,3 @@ async function runAllTests(): Promise<void> {
 }
 
 runAllTests();
-

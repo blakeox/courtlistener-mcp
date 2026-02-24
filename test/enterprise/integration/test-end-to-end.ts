@@ -416,7 +416,7 @@ class EnhancedEndToEndTests {
 
           async validate(credentials: string) {
             if (this.validCredentials.has(credentials)) {
-              const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+              const sessionId = `session_${Date.now()}_${crypto.randomUUID().substring(0, 8)}`;
               this.sessions.set(sessionId, {
                 credentials,
                 created: Date.now(),
@@ -525,7 +525,7 @@ class EnhancedEndToEndTests {
         return {
           type: 'sanitization',
           patterns: {
-            xss: /<script[^>]*>.*?<\/script>/gi,
+            xss: /<script[\s>\/]/gi,
             sqlInjection: /(union|select|insert|update|delete|drop|create|alter)\s+/gi,
             commandInjection: /[;&|`$(){}[\]]/g,
           },

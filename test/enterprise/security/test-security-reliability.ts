@@ -96,30 +96,28 @@ class SecurityReliabilityTests {
   private async startTestServer(): Promise<void> {
     console.log('🚀 Starting test server...');
 
-    this.server = createServer(
-      (req: IncomingMessage, res: ServerResponse) => {
-        // Mock MCP server responses
-        res.setHeader('Content-Type', 'application/json');
+    this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      // Mock MCP server responses
+      res.setHeader('Content-Type', 'application/json');
 
-        if (req.url === '/health') {
-          res.writeHead(200);
-          res.end(JSON.stringify({ status: 'healthy', timestamp: Date.now() }));
-        } else if (req.url === '/tools/list') {
-          res.writeHead(200);
-          res.end(
-            JSON.stringify({
-              tools: [
-                { name: 'search_cases', description: 'Search legal cases' },
-                { name: 'get_case_details', description: 'Get case details' },
-              ],
-            })
-          );
-        } else {
-          res.writeHead(404);
-          res.end(JSON.stringify({ error: 'Not found' }));
-        }
+      if (req.url === '/health') {
+        res.writeHead(200);
+        res.end(JSON.stringify({ status: 'healthy', timestamp: Date.now() }));
+      } else if (req.url === '/tools/list') {
+        res.writeHead(200);
+        res.end(
+          JSON.stringify({
+            tools: [
+              { name: 'search_cases', description: 'Search legal cases' },
+              { name: 'get_case_details', description: 'Get case details' },
+            ],
+          }),
+        );
+      } else {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Not found' }));
       }
-    );
+    });
 
     return new Promise<void>((resolve) => {
       if (!this.server) return;
@@ -178,8 +176,7 @@ class SecurityReliabilityTests {
         });
         console.log(`  ✅ ${test.name}`);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.testResults.push({
           category: 'Security',
           name: test.name,
@@ -213,7 +210,7 @@ class SecurityReliabilityTests {
 
       // Verify dangerous patterns are removed/escaped
       const hasDangerousPatterns = /(['";]|DROP|INSERT|DELETE|UPDATE|UNION|SELECT)/i.test(
-        sanitized
+        sanitized,
       );
 
       results.push({
@@ -251,9 +248,7 @@ class SecurityReliabilityTests {
       const sanitized = this.sanitizeInput(payload);
 
       // Verify XSS patterns are neutralized
-      const hasXSSPatterns = /<script|javascript:|onerror|onload/i.test(
-        sanitized
-      );
+      const hasXSSPatterns = /<script|javascript:|onerror|onload/i.test(sanitized);
 
       results.push({
         payload: payload.substring(0, 20) + '...',
@@ -278,8 +273,7 @@ class SecurityReliabilityTests {
       { headers: { Authorization: 'Bearer invalid_token' } },
       {
         headers: {
-          Authorization:
-            'Basic ' + Buffer.from('admin:').toString('base64'),
+          Authorization: 'Basic ' + Buffer.from('admin:').toString('base64'),
         },
       },
       { headers: { 'X-Forwarded-For': '127.0.0.1' } },
@@ -401,8 +395,7 @@ class SecurityReliabilityTests {
         });
         console.log(`  ✅ ${test.name}`);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.testResults.push({
           category: 'Error Handling',
           name: test.name,
@@ -455,9 +448,7 @@ class SecurityReliabilityTests {
       const sanitizedError = this.sanitizeErrorMessage(error.message);
 
       // Check for sensitive information leakage
-      const hasSensitiveInfo = /password|key|\.ssh|etc\/passwd|mysql:\/\//i.test(
-        sanitizedError
-      );
+      const hasSensitiveInfo = /password|key|\.ssh|etc\/passwd|mysql:\/\//i.test(sanitizedError);
 
       if (!hasSensitiveInfo) {
         leakagesPrevented++;
@@ -548,8 +539,7 @@ class SecurityReliabilityTests {
         });
         console.log(`  ✅ ${test.name}`);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.testResults.push({
           category: 'Reliability',
           name: test.name,
@@ -581,13 +571,12 @@ class SecurityReliabilityTests {
 
     const finalMemory = process.memoryUsage();
     const memoryIncrease = finalMemory.heapUsed - initialMemory.heapUsed;
-    const memoryIncreasePercent =
-      (memoryIncrease / initialMemory.heapUsed) * 100;
+    const memoryIncreasePercent = (memoryIncrease / initialMemory.heapUsed) * 100;
 
     // Acceptable memory increase threshold (10%)
     if (memoryIncreasePercent > 10) {
       throw new Error(
-        `Potential memory leak detected: ${memoryIncreasePercent.toFixed(2)}% increase`
+        `Potential memory leak detected: ${memoryIncreasePercent.toFixed(2)}% increase`,
       );
     }
 
@@ -628,8 +617,7 @@ class SecurityReliabilityTests {
     successRate: string;
   }> {
     const concurrentRequests = 50;
-    const promises: Promise<{ id: number; success: boolean; delay: number }>[] =
-      [];
+    const promises: Promise<{ id: number; success: boolean; delay: number }>[] = [];
 
     const startTime = Date.now();
 
@@ -648,7 +636,7 @@ class SecurityReliabilityTests {
     const successRate = (successful / concurrentRequests) * 100;
     if (successRate < 90) {
       throw new Error(
-        `Concurrent request handling failed: ${successRate.toFixed(1)}% success rate`
+        `Concurrent request handling failed: ${successRate.toFixed(1)}% success rate`,
       );
     }
 
@@ -682,12 +670,8 @@ class SecurityReliabilityTests {
     const violations = checks.filter((check) => check.value > check.threshold);
 
     if (violations.length > 0) {
-      const violationDetails = violations
-        .map((v) => `${v.metric}: ${v.value}${v.unit}`)
-        .join(', ');
-      throw new Error(
-        `System resource thresholds exceeded: ${violationDetails}`
-      );
+      const violationDetails = violations.map((v) => `${v.metric}: ${v.value}${v.unit}`).join(', ');
+      throw new Error(`System resource thresholds exceeded: ${violationDetails}`);
     }
 
     return { metrics, violations: violations.length };
@@ -718,8 +702,7 @@ class SecurityReliabilityTests {
         });
         console.log(`  ✅ ${test.name}`);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.testResults.push({
           category: 'Data Integrity',
           name: test.name,
@@ -750,10 +733,7 @@ class SecurityReliabilityTests {
     for (const test of validationTests) {
       const result = this.validateCaseData(test.data);
 
-      if (
-        (test.shouldPass && result.valid) ||
-        (!test.shouldPass && !result.valid)
-      ) {
+      if ((test.shouldPass && result.valid) || (!test.shouldPass && !result.valid)) {
         correctValidations++;
       }
     }
@@ -818,8 +798,7 @@ class SecurityReliabilityTests {
         });
         console.log(`  ✅ ${test.name}`);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.testResults.push({
           category: 'Compliance',
           name: test.name,
@@ -902,12 +881,17 @@ class SecurityReliabilityTests {
   // Helper methods for simulating various test scenarios
   private sanitizeInput(input: unknown): string {
     if (typeof input !== 'string') return '';
-    return input
-      .replace(/['";]/g, '') // Remove dangerous quotes
-      .replace(/DROP|INSERT|DELETE|UPDATE|UNION|SELECT/gi, '') // Remove SQL keywords
-      .replace(/<script|javascript:|onerror|onload/gi, '') // Remove XSS patterns
-      .trim()
-      .substring(0, 500); // Limit length
+    let result = input;
+    // Loop until stable to prevent bypass via nested patterns
+    let prev: string;
+    do {
+      prev = result;
+      result = result
+        .replace(/['";]/g, '')
+        .replace(/\b(?:DROP|INSERT|DELETE|UPDATE|UNION|SELECT)\b/gi, '')
+        .replace(/<script[\s>\/]|javascript:|data:|vbscript:|onerror|onload/gi, '');
+    } while (result !== prev);
+    return result.trim().substring(0, 500);
   }
 
   private validateAuthentication(headers: Record<string, string>): ValidationResult {
@@ -957,10 +941,7 @@ class SecurityReliabilityTests {
     return { valid: true };
   }
 
-  private handleServiceFailure(
-    serviceName: string,
-    isAvailable: boolean
-  ): ServiceFailureResult {
+  private handleServiceFailure(serviceName: string, isAvailable: boolean): ServiceFailureResult {
     // Simulate graceful degradation
     if (!isAvailable) {
       return {
@@ -1001,10 +982,7 @@ class SecurityReliabilityTests {
     };
   }
 
-  private simulateTimeoutScenario(
-    operationTime: number,
-    timeout: number
-  ): TimeoutScenario {
+  private simulateTimeoutScenario(operationTime: number, timeout: number): TimeoutScenario {
     const timedOut = operationTime > timeout;
     return {
       operationTime,
@@ -1041,7 +1019,7 @@ class SecurityReliabilityTests {
   }
 
   private async simulateConcurrentRequest(
-    id: number
+    id: number,
   ): Promise<{ id: number; success: boolean; delay: number }> {
     // Simulate varying response times
     const delay = Math.random() * 100 + 50;
@@ -1067,10 +1045,7 @@ class SecurityReliabilityTests {
     };
   }
 
-  private validateCaseData(data: {
-    case_id?: string;
-    title?: string;
-  }): ValidationResult {
+  private validateCaseData(data: { case_id?: string; title?: string }): ValidationResult {
     if (!data.case_id || data.case_id.length === 0) {
       return { valid: false, reason: 'Missing case_id' };
     }
@@ -1116,49 +1091,38 @@ class SecurityReliabilityTests {
     console.log('🔒 SECURITY & RELIABILITY TEST SUMMARY');
     console.log('='.repeat(60));
 
-    const categories = [
-      ...new Set(this.testResults.map((r) => r.category)),
-    ];
+    const categories = [...new Set(this.testResults.map((r) => r.category))];
 
     let totalTests = 0;
     let totalPassed = 0;
 
     categories.forEach((category) => {
-      const categoryTests = this.testResults.filter(
-        (r) => r.category === category
-      );
+      const categoryTests = this.testResults.filter((r) => r.category === category);
       const passed = categoryTests.filter((r) => r.status === 'PASSED').length;
 
       console.log(`\n📊 ${category}:`);
       console.log(`   Tests: ${categoryTests.length}`);
       console.log(`   Passed: ${passed} ✅`);
       console.log(
-        `   Failed: ${categoryTests.length - passed} ${categoryTests.length - passed > 0 ? '❌' : '✅'}`
+        `   Failed: ${categoryTests.length - passed} ${categoryTests.length - passed > 0 ? '❌' : '✅'}`,
       );
 
       totalTests += categoryTests.length;
       totalPassed += passed;
     });
 
-    const successRate =
-      totalTests > 0
-        ? ((totalPassed / totalTests) * 100).toFixed(1)
-        : '0';
+    const successRate = totalTests > 0 ? ((totalPassed / totalTests) * 100).toFixed(1) : '0';
 
     console.log('\n🎯 Overall Results:');
     console.log(`   Total Tests: ${totalTests}`);
     console.log(`   Success Rate: ${successRate}%`);
 
     if (Number(successRate) >= 95) {
-      console.log(
-        '   🏆 EXCELLENT - Enterprise-grade security & reliability!'
-      );
+      console.log('   🏆 EXCELLENT - Enterprise-grade security & reliability!');
     } else if (Number(successRate) >= 85) {
       console.log('   ✅ GOOD - Security & reliability standards met');
     } else {
-      console.log(
-        '   ⚠️ NEEDS IMPROVEMENT - Some security/reliability issues detected'
-      );
+      console.log('   ⚠️ NEEDS IMPROVEMENT - Some security/reliability issues detected');
     }
 
     console.log('\n✅ Security & Reliability Testing Complete!');
@@ -1171,4 +1135,3 @@ securityReliabilityTests.runAllTests().catch((error) => {
   console.error('Error in security/reliability tests:', error);
   process.exit(1);
 });
-

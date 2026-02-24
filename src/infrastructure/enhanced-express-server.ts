@@ -94,7 +94,9 @@ export class EnhancedExpressServer {
     this.app.use(
       cors(
         this.config.corsOptions || {
-          origin: process.env.NODE_ENV === 'development' ? '*' : false,
+          origin: process.env.CORS_ALLOWED_ORIGINS
+            ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+            : false,
           methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
           allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'x-correlation-id'],
         },

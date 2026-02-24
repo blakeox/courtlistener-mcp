@@ -3,6 +3,7 @@
  * Integrates error boundaries, recovery, and reporting with Express HTTP server
  */
 
+import { randomUUID } from 'node:crypto';
 import _express, { Request, Response, NextFunction, Application } from 'express';
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
@@ -117,7 +118,7 @@ export class ExpressErrorHandler {
     const requestId =
       (req.headers[this.config.requestId.header] as string) ||
       (this.config.requestId.generate
-        ? `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        ? `req_${Date.now()}_${randomUUID().replace(/-/g, '').substring(0, 12)}`
         : undefined);
 
     if (requestId) {

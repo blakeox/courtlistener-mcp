@@ -5,6 +5,7 @@
 
 import { Logger } from '../infrastructure/logger.js';
 import { AuthContext } from './authentication.js';
+import { cryptoId } from '../common/utils.js';
 
 export interface CorrelationConfig {
   enabled: boolean;
@@ -45,7 +46,7 @@ export class RequestCorrelation {
    */
   static generateId(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2);
+    const random = cryptoId();
     return `${timestamp}-${random}`;
   }
 
@@ -155,7 +156,9 @@ export class AuditLogger {
         isAuthenticated: authContext.isAuthenticated,
         permissions: authContext.permissions,
       },
-      requestArgs: this.auditConfig.includeRequestBody ? this.truncateData(requestArgs) as Record<string, unknown> : undefined,
+      requestArgs: this.auditConfig.includeRequestBody
+        ? (this.truncateData(requestArgs) as Record<string, unknown>)
+        : undefined,
       responseData: this.auditConfig.includeResponseBody
         ? this.truncateData(responseData)
         : undefined,
@@ -200,7 +203,10 @@ export class AuditLogger {
 
     // Remove sensitive fields from request args
     if (sanitized.requestArgs) {
-      sanitized.requestArgs = this.removeSensitiveFields(sanitized.requestArgs) as Record<string, unknown>;
+      sanitized.requestArgs = this.removeSensitiveFields(sanitized.requestArgs) as Record<
+        string,
+        unknown
+      >;
     }
 
     // Remove sensitive fields from response data
@@ -227,7 +233,7 @@ export class AuditLogger {
       return data;
     }
 
-    const cleaned: Record<string, unknown> = Array.isArray(data) 
+    const cleaned: Record<string, unknown> = Array.isArray(data)
       ? ([...data] as unknown as Record<string, unknown>)
       : { ...(data as Record<string, unknown>) };
 

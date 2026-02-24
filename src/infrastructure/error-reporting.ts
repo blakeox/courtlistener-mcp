@@ -3,6 +3,7 @@
  * Provides error aggregation, analysis, and external reporting capabilities
  */
 
+import { randomUUID } from 'node:crypto';
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
 import {
@@ -326,7 +327,7 @@ export class ErrorReportingService {
    * Generate unique report ID
    */
   private generateReportId(): string {
-    return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `error_${Date.now()}_${randomUUID().replace(/-/g, '').substring(0, 12)}`;
   }
 
   /**
