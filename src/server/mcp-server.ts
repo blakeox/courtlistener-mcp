@@ -311,7 +311,7 @@ export class BestPracticeLegalMCPServer {
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
     const handler = this.promptRegistry.findHandler(name);
     if (!handler) {
-      throw new McpError(ErrorCode.InvalidRequest, `Prompt not found: ${name}`);
+      throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
     }
     return handler.getMessages(args || {});
   }

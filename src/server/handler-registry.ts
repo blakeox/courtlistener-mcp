@@ -154,7 +154,7 @@ export function setupHandlers(deps: HandlerDependencies): void {
     try {
       const handler = promptRegistry.findHandler(name);
       if (!handler) {
-        throw new McpError(ErrorCode.InvalidRequest, `Prompt not found: ${name}`);
+        throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
       }
 
       // Convert arguments to Record<string, string> as expected by PromptHandler
