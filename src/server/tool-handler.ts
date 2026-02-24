@@ -6,7 +6,10 @@
 import {
   CallToolRequest,
   CallToolResult,
+  ErrorCode,
+  McpError,
   ToolAnnotations,
+  EmbeddedResource,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -157,13 +160,16 @@ export class ToolHandlerRegistry {
     const handler = this.handlers.get(request.params.name);
 
     if (!handler) {
-      throw new Error(`Unknown tool: ${request.params.name}`);
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
     }
 
     // Validate input
     const validationResult = handler.validate(request.params.arguments);
     if (!validationResult.success) {
-      throw validationResult.error;
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        validationResult.error?.message ?? 'Invalid parameters',
+      );
     }
 
     // Execute tool
@@ -201,6 +207,33 @@ export abstract class BaseToolHandler<TInput = unknown, _TOutput = unknown>
           type: 'text',
           text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
         },
+      ],
+    };
+  }
+
+  /**
+   * Helper to create a success result with an embedded resource reference
+   */
+  protected successWithResource(
+    content: string | Record<string, unknown> | Array<unknown>,
+    resourceUri: string,
+    resourceData: unknown,
+  ): CallToolResult {
+    const resource: EmbeddedResource = {
+      type: 'resource' as const,
+      resource: {
+        uri: resourceUri,
+        mimeType: 'application/json',
+        text: JSON.stringify(resourceData),
+      },
+    };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+        },
+        resource,
       ],
     };
   }

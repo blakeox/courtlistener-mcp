@@ -31,7 +31,11 @@
  * ```
  */
 
-import type { CallToolResult, TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CallToolResult,
+  TextContent,
+  EmbeddedResource,
+} from '@modelcontextprotocol/sdk/types.js';
 import { PaginatedApiResponse, PaginationInfo, createPaginationInfo } from './pagination-utils.js';
 
 /**
@@ -50,6 +54,8 @@ export interface PaginationMetadata {
   hasPrevious: boolean;
   /** Number of items per page */
   pageSize?: number;
+  /** Opaque cursor for fetching the next page */
+  nextCursor?: string;
 }
 
 /**
@@ -72,6 +78,24 @@ export interface ResponseMetadata {
  * Factory for creating standardized MCP CallToolResult responses.
  */
 export class ResponseBuilder {
+  /**
+   * Create an embedded resource content item for tool responses
+   *
+   * @param uri - Resource URI (e.g. courtlistener://opinion/123)
+   * @param data - Resource data to serialize as JSON
+   * @returns EmbeddedResource content item
+   */
+  static withResource(uri: string, data: unknown): EmbeddedResource {
+    return {
+      type: 'resource' as const,
+      resource: {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify(data),
+      },
+    };
+  }
+
   /**
    * Create a successful response
    *

@@ -3,7 +3,11 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
+import {
+  createPaginationInfo,
+  PaginatedApiResponse,
+  resolveOffsetLimit,
+} from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for courts handlers
@@ -13,6 +17,16 @@ const listCourtsSchema = z.object({
   court_type: z.enum(['federal', 'state', 'appellate', 'district', 'supreme']).optional(),
   page: z.number().min(1).optional().default(1),
   page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z
+    .string()
+    .optional()
+    .describe('Pagination cursor from previous response (alternative to page/page_size)'),
+  limit: z
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Number of results to return (used with cursor)'),
 });
 
 const getJudgesSchema = z.object({
@@ -21,6 +35,16 @@ const getJudgesSchema = z.object({
   active: z.boolean().optional(),
   page: z.number().min(1).optional().default(1),
   page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z
+    .string()
+    .optional()
+    .describe('Pagination cursor from previous response (alternative to page/page_size)'),
+  limit: z
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Number of results to return (used with cursor)'),
 });
 
 const getJudgeSchema = z.object({
@@ -85,12 +109,16 @@ export class GetJudgesHandler extends TypedToolHandler<typeof getJudgesSchema> {
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.getJudges(input);
+    const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
+    const page = input.cursor ? Math.floor(offset / resolvedLimit) + 1 : input.page;
+    const pageSize = input.cursor ? resolvedLimit : input.page_size;
+
+    const response = await this.apiClient.getJudges({ ...input, page, page_size: pageSize });
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} judges`,
       judges: response.results,
-      pagination: createPaginationInfo(response, input.page, input.page_size),
+      pagination: createPaginationInfo(response, page, pageSize),
     });
   }
 }
@@ -120,9 +148,13 @@ export class GetJudgeHandler extends TypedToolHandler<typeof getJudgeSchema> {
 
     const response = await this.apiClient.getJudge(parseInt(input.judge_id));
 
-    return this.success({
-      summary: `Retrieved details for judge ${input.judge_id}`,
-      judge: response,
-    });
+    return this.successWithResource(
+      {
+        summary: `Retrieved details for judge ${input.judge_id}`,
+        judge: response,
+      },
+      `courtlistener://judge/${input.judge_id}`,
+      response,
+    );
   }
 }

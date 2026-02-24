@@ -74,10 +74,14 @@ export class GetCaseDetailsHandler extends TypedToolHandler<typeof getCaseDetail
       clusterId: Number(input.cluster_id),
     });
 
-    return this.success({
-      summary: `Retrieved details for case ${input.cluster_id}`,
-      case: response,
-    });
+    return this.successWithResource(
+      {
+        summary: `Retrieved details for case ${input.cluster_id}`,
+        case: response,
+      },
+      `courtlistener://case/${input.cluster_id}`,
+      response,
+    );
   }
 }
 

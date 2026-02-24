@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
+import {
+  createPaginationInfo,
+  PaginatedApiResponse,
+  resolveOffsetLimit,
+} from '../../common/pagination-utils.js';
 
 /**
  * Zod schemas for dockets handlers
@@ -102,10 +106,14 @@ export class GetDocketHandler extends TypedToolHandler<typeof getDocketSchema> {
 
     const response = await this.apiClient.getDocket(parseInt(input.docket_id));
 
-    return this.success({
-      summary: `Retrieved details for docket ${input.docket_id}`,
-      docket: response,
-    });
+    return this.successWithResource(
+      {
+        summary: `Retrieved details for docket ${input.docket_id}`,
+        docket: response,
+      },
+      `courtlistener://docket/${input.docket_id}`,
+      response,
+    );
   }
 }
 

@@ -41,10 +41,14 @@ export class GetOpinionTextHandler extends TypedToolHandler<typeof getOpinionTex
       format: input.format,
     });
 
-    return this.success({
-      summary: `Retrieved ${input.format} text for opinion ${input.opinion_id}`,
-      opinion: response,
-    });
+    return this.successWithResource(
+      {
+        summary: `Retrieved ${input.format} text for opinion ${input.opinion_id}`,
+        opinion: response,
+      },
+      `courtlistener://opinion/${input.opinion_id}`,
+      response,
+    );
   }
 }
 
