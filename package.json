@@ -2,7 +2,7 @@
   "name": "courtlistener-mcp",
   "version": "0.1.0",
   "description": "Legal research MCP server providing comprehensive access to CourtListener legal database",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
     "LICENSE"
   ],
   "bin": {
-    "legal-mcp": "dist/index.js"
+    "courtlistener-mcp": "dist/index.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -21,6 +21,8 @@
     "generate:manifest": "npx tsx scripts/generate-manifest.ts",
     "deploy": "wrangler deploy",
     "start": "node dist/index.js",
+    "doctor": "node dist/index.js --doctor",
+    "setup": "node dist/index.js --setup",
     "mcp": "node dist/index.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:all": "npm run test:unit && npm run test:integration",
@@ -82,6 +84,7 @@
     "coverage:unit": "c8 --config .c8rc.json npm run test:unit",
     "coverage:check": "c8 --config .c8rc.json --check-coverage --branches=50 --functions=50 --lines=50 --statements=50 npm run test:unit",
     "test:analysis": "npx tsx test/analysis/analyze-untested-code.ts",
+    "prepublishOnly": "npm run build && npm run typecheck",
     "prepare": "husky"
   },
   "keywords": [
@@ -95,6 +98,7 @@
   ],
   "author": "Legal MCP Contributors",
   "license": "MIT",
+  "homepage": "https://github.com/blakeox/courtlistener-mcp#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/blakeox/courtlistener-mcp.git"

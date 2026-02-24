@@ -1,0 +1,41 @@
+services:
+  courtlistener-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: courtlistener-mcp:latest
+    container_name: courtlistener-mcp
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '3001:3001'
+      - '3002:3002'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/health']
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    volumes:
+      - mcp-tmp:/app/tmp
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  mcp-tmp:
+    driver: local

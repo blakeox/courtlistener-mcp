@@ -58,6 +58,89 @@ This server strictly follows the
   handling
 - ✅ **Comprehensive API Coverage** - Complete CourtListener API v4 integration
 
+## Quick Start
+
+### Option 1: npx (Recommended — Zero Install)
+
+```bash
+npx courtlistener-mcp --setup
+```
+
+This runs an interactive wizard that detects your MCP client and configures
+everything automatically. Alternatively, run directly:
+
+```bash
+npx courtlistener-mcp
+```
+
+### Option 2: Docker
+
+```bash
+# Copy the environment template
+cp .env.production .env
+
+# Edit .env with your settings
+# Then start the server
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The Docker setup exposes:
+
+- **Port 3001**: Health check endpoint
+- **Port 3002**: HTTP/SSE transport for remote MCP clients
+
+### Option 3: From Source
+
+```bash
+git clone https://github.com/blakeox/courtlistener-mcp.git
+cd courtlistener-mcp
+pnpm install
+pnpm build
+node dist/index.js
+```
+
+## Configuration
+
+### Getting a CourtListener API Key
+
+1. Create an account at [courtlistener.com](https://www.courtlistener.com/)
+2. Go to Profile → API Keys
+3. Generate a new token
+4. Set it as `COURTLISTENER_API_KEY` in your environment
+
+The server works without an API key for public endpoints, but authenticated
+access provides higher rate limits.
+
+### Client Configuration
+
+Pre-built configuration files for popular MCP clients are available in the
+[`configs/`](./configs/) directory:
+
+- `claude-desktop.json` — Claude Desktop (local stdio)
+- `claude-desktop-remote.json` — Claude Desktop (remote SSE via Cloudflare)
+- `cursor.json` — Cursor
+- `continue-dev.json` — Continue
+- `vscode-copilot.json` — VS Code GitHub Copilot
+- `zed.json` — Zed
+- `openai-chatgpt.json` — OpenAI ChatGPT
+
+Run `npx courtlistener-mcp --setup` to automatically configure your client, or
+copy the appropriate config manually.
+
+### Diagnostics
+
+```bash
+npx courtlistener-mcp --doctor
+```
+
+Checks Node.js version, API key, API connectivity, and dependencies.
+
+For all available options, run:
+
+```bash
+npx courtlistener-mcp --help
+```
+
 ## Features
 
 ### 📚 Core Legal Research Tools
@@ -206,30 +289,6 @@ Each workflow includes:
 - Performance regression detection
 - Comprehensive reporting and artifact collection
 
-### Environment Setup
-
-1. **Clone and install**:
-
-```bash
- git clone https://github.com/blakeox/legal-mcp.git
- cd legal-mcp
- npm install
-```
-
-1. **Configure (optional)**:
-
-```bash
- cp .env.example .env
- # Edit .env with your preferences
-```
-
-1. **Build and run**:
-
-```bash
- npm run build
- npm start
-```
-
 ### Enhanced Configuration
 
 The server supports extensive configuration via environment variables:
@@ -245,8 +304,12 @@ METRICS_PORT=3001
 NODE_ENV=production
 
 # Remote SSE gateway (Cloudflare Worker)
+# Keep upstream key only on Cloudflare (never in client configs)
+COURTLISTENER_API_KEY=your_courtlistener_api_key
 # Static token (fallback when OIDC is not configured)
 SSE_AUTH_TOKEN=your_shared_secret
+# (optional alias in some deployments)
+MCP_SSE_AUTH_TOKEN=your_shared_secret
 
 # OAuth/OIDC (preferred)
 OIDC_ISSUER=https://your-issuer.example.com
@@ -493,25 +556,37 @@ The Cloudflare Worker exposes an SSE endpoint at `/sse` for remote MCP clients.
 - Health: `GET https://<your-worker-subdomain>/health`
 - SSE: `GET https://<your-worker-subdomain>/sse`
 
-Optional auth can be enabled by setting a Worker secret `SSE_AUTH_TOKEN`. When
-set, clients must provide a token via either:
+Optional auth can be enabled by setting a Worker secret `SSE_AUTH_TOKEN` (or
+`MCP_SSE_AUTH_TOKEN` alias). When set, clients must provide a token via either:
 
 - HTTP header: `Authorization: Bearer <token>`
 - Query string: `?access_token=<token>`
 
-Configure the secret:
+### Cloudflare deployment (secure secrets)
+
+Configure Worker secrets:
 
 ```bash
-# Set locally for preview or globally for the deployed environment
+# Upstream CourtListener key: server-side only
+wrangler secret put COURTLISTENER_API_KEY
+# Client auth token for /sse (choose one name)
 wrangler secret put SSE_AUTH_TOKEN
 # or
+wrangler secret put MCP_SSE_AUTH_TOKEN
+# Production environment examples
+wrangler secret put COURTLISTENER_API_KEY --env production
 wrangler secret put SSE_AUTH_TOKEN --env production
 ```
+
+Never ship `COURTLISTENER_API_KEY` to ChatGPT/Claude/Desktop/any browser client.
+Clients should only use `MCP_SSE_TOKEN` (the value of `SSE_AUTH_TOKEN` or
+`MCP_SSE_AUTH_TOKEN`) when connecting to your `/sse` endpoint.
 
 Local wrapper for tools that need a "file to run":
 
 ```bash
 # Uses scripts/dev/mcp-remote.js to proxy the remote SSE into a local stdio process
+# MCP_SSE_TOKEN should match your SSE_AUTH_TOKEN (not COURTLISTENER_API_KEY)
 MCP_REMOTE_URL="https://courtlistener-mcp.<your-subdomain>.workers.dev/sse" \
 MCP_SSE_TOKEN="your-token" \
 pnpm run mcp:remote
@@ -519,9 +594,10 @@ pnpm run mcp:remote
 
 ChatGPT or Claude Desktop connection:
 
-- Use the SSE URL directly. If auth is enabled, append
-  `?access_token=your-token` to the URL or configure a Bearer header if the
-  client supports custom headers. or see [EXAMPLES.md](./EXAMPLES.md).
+- Use the SSE URL directly. If auth is enabled, send only the SSE token
+  (`SSE_AUTH_TOKEN`/`MCP_SSE_AUTH_TOKEN`) as `?access_token=your-token` or in a
+  Bearer header if supported; never send `COURTLISTENER_API_KEY`. See
+  [EXAMPLES.md](./EXAMPLES.md).
 
 ## MCP Integration
 

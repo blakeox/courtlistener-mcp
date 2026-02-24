@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "courtlistener": {
-      "url": "http://localhost:3002/mcp",
-      "transport": "streamable-http",
+      "url": "https://courtlistener-mcp.<your-subdomain>.workers.dev/sse",
+      "transport": "sse",
       "env": {
-        "COURTLISTENER_API_KEY": "your-api-key"
+        "MCP_SSE_TOKEN": "your-sse-token"
       }
     }
   }
