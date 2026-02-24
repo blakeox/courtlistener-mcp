@@ -6,12 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { Logger } from './logger.js';
 import { MetricsCollector } from './metrics.js';
-import {
-  BaseError,
-  ErrorSeverity,
-  ErrorCategory,
-  ErrorContext as _ErrorContext,
-} from '../common/errors.js';
+import { BaseError, ErrorSeverity, ErrorCategory } from '../common/errors.js';
 
 export interface ErrorReport {
   id: string;
@@ -55,7 +50,6 @@ export interface ErrorReportingConfig {
   externalEndpoints: {
     webhook?: string;
     slack?: string;
-    email?: string;
   };
   retentionDays: number;
 }
@@ -362,7 +356,7 @@ export class ErrorReportingService {
   /**
    * Send alert for error report
    */
-  private async sendAlert(report: ErrorReport): Promise<void> {
+  private sendAlert(report: ErrorReport): void {
     if (!this.config.enableExternalReporting) {
       return;
     }
@@ -379,11 +373,17 @@ export class ErrorReportingService {
     try {
       // Send to configured endpoints
       if (this.config.externalEndpoints.webhook) {
-        await this.sendWebhookAlert(this.config.externalEndpoints.webhook, alertData);
+        this.logger.debug('Webhook alert would be sent', {
+          webhook: this.config.externalEndpoints.webhook,
+          alertData,
+        });
       }
 
       if (this.config.externalEndpoints.slack) {
-        await this.sendSlackAlert(this.config.externalEndpoints.slack, alertData);
+        this.logger.debug('Slack alert would be sent', {
+          slackWebhook: this.config.externalEndpoints.slack,
+          alertData,
+        });
       }
 
       this.logger.info(`Alert sent for error report`, {
@@ -397,28 +397,6 @@ export class ErrorReportingService {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-  }
-
-  /**
-   * Send webhook alert
-   */
-  private async sendWebhookAlert(
-    webhook: string,
-    alertData: Record<string, unknown>,
-  ): Promise<void> {
-    // Implementation would use fetch or http client
-    this.logger.debug('Webhook alert would be sent', { webhook, alertData });
-  }
-
-  /**
-   * Send Slack alert
-   */
-  private async sendSlackAlert(
-    slackWebhook: string,
-    alertData: Record<string, unknown>,
-  ): Promise<void> {
-    // Implementation would format for Slack and send
-    this.logger.debug('Slack alert would be sent', { slackWebhook, alertData });
   }
 
   /**
