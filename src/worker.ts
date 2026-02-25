@@ -155,6 +155,22 @@ export default {
       }
     }
 
+    // Friendly guidance when /sse is called without MCP-required Accept header
+    if (url.pathname === '/sse') {
+      const accept = request.headers.get('Accept') ?? '';
+      if (!accept.includes('text/event-stream')) {
+        return Response.json(
+          {
+            error: 'Not Acceptable',
+            message: 'Client must include Accept: application/json, text/event-stream',
+            example:
+              'curl -i https://mcp.blakeoxford.com/sse -H \'Accept: application/json, text/event-stream\' -H \'Content-Type: application/json\' -d \'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}\'',
+          },
+          { status: 406 },
+        );
+      }
+    }
+
     // Route everything else to the MCP Durable Object
     return mcpHandler.fetch(request, env, ctx);
   },
