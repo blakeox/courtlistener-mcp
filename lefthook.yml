@@ -2,3 +2,12 @@ pre-commit:
   commands:
     lint-staged:
       run: pnpm lint-staged
+
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm run typecheck
+    build:
+      run: pnpm run build
+    unit-tests:
+      run: pnpm run test:unit
