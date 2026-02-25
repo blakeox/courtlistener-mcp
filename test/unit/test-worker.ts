@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/// <reference types="node" />
 
 /**
  * ✅ COMPREHENSIVE Unit Tests for Cloudflare Worker (TypeScript)
@@ -13,12 +14,15 @@ let worker: {
 } | null = null;
 try {
   // Import the worker module (compiled JS) to access default export
-  worker = await import('../../dist/worker.js');
+  worker = (await import('../../dist/worker.js')) as unknown as {
+    default: { fetch: (request: Request, env: WorkerEnv, ctx: unknown) => Promise<Response> };
+  };
 } catch {
   worker = null;
 }
 
 interface WorkerEnv {
+  MCP_OBJECT: unknown;
   MAX_SSE_CONNECTIONS?: string;
   MAX_SSE_CONNECTIONS_PER_IP?: string;
   SSE_AUTH_TOKEN?: string;
@@ -49,11 +53,9 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
 
   it('should enforce per-IP and total limits with 429 Too Many Connections', async () => {
     const env: WorkerEnv = {
+      MCP_OBJECT: {},
       MAX_SSE_CONNECTIONS: '1',
       MAX_SSE_CONNECTIONS_PER_IP: '1',
-      // disable auth for test simplicity
-      SSE_AUTH_TOKEN: undefined,
-      OIDC_ISSUER: undefined,
     };
 
     // First connection should succeed (SSE stream)
@@ -96,8 +98,8 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
 
   it('should require static token when configured and reject missing/invalid tokens', async () => {
     const env: WorkerEnv = {
+      MCP_OBJECT: {},
       SSE_AUTH_TOKEN: 'secret',
-      OIDC_ISSUER: undefined,
     };
 
     // Missing token -> 401
