@@ -133,6 +133,19 @@ export default {
       });
     }
 
+    // Helpful root response for browser/manual checks
+    if (url.pathname === '/') {
+      return Response.json({
+        service: 'courtlistener-mcp',
+        status: 'ok',
+        message: 'MCP endpoint is available at /sse',
+        endpoints: {
+          health: '/health',
+          mcp: '/sse',
+        },
+      });
+    }
+
     // Optional bearer-token gate
     if (env.MCP_AUTH_TOKEN) {
       const auth = request.headers.get('Authorization');
