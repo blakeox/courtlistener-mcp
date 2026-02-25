@@ -2,6 +2,7 @@
   "name": "courtlistener-mcp",
   "compatibility_date": "2025-07-25",
   "main": "src/worker.ts",
+  "workers_dev": true,
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
     "bindings": [
@@ -15,6 +16,12 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CourtListenerMCP"]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "mcp.blakeoxford.com",
+      "custom_domain": true
     }
   ]
 }
