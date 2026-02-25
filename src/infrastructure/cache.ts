@@ -162,6 +162,21 @@ export class CacheManager {
   }
 
   /**
+   * Invalidate cache entries matching a key pattern.
+   */
+  invalidatePattern(pattern: RegExp): number {
+    let removedCount = 0;
+    for (const key of this.cache.keys()) {
+      if (pattern.test(key)) {
+        this.cache.delete(key);
+        this.accessOrder.delete(key);
+        removedCount++;
+      }
+    }
+    return removedCount;
+  }
+
+  /**
    * Remove expired entries
    */
   private cleanup(): void {

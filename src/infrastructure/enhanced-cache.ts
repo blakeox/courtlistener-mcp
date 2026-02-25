@@ -3,7 +3,6 @@
  * Phase 5: Performance Optimizations
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // Note: any types used intentionally for internal cache access that lacks proper typing
 
 import { CacheManager } from './cache.js';
@@ -137,16 +136,9 @@ export class EnhancedCache {
    * Invalidate all entries matching a pattern
    */
   invalidatePattern(pattern: RegExp): number {
-    let count = 0;
+    const count = this.cache.invalidatePattern(pattern);
 
-    for (const [key] of (this as any).cache.entries()) {
-      if (pattern.test(key)) {
-        (this as any).cache.delete(key);
-        count++;
-      }
-    }
-
-    (this as any).logger.info('Invalidated cache entries by pattern', {
+    this.logger.info('Invalidated cache entries by pattern', {
       pattern: pattern.source,
       count,
     });
@@ -169,6 +161,14 @@ export class EnhancedCache {
       warmupInProgress: this.warmupKeys.size,
     };
   }
+
+  set<T>(key: string, params: Record<string, unknown>, value: T, ttl: number): void {
+    this.cache.set(key, params, value, ttl);
+  }
+
+  get<T>(key: string, params: Record<string, unknown>): T | null {
+    return this.cache.get<T>(key, params);
+  }
 }
 
 /**
@@ -190,7 +190,7 @@ export class PaginationCache {
   ): void {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
 
-    (this.baseCache as any).set(
+    this.baseCache.set(
       pageKey,
       {},
       {
@@ -213,7 +213,7 @@ export class PaginationCache {
     pageSize: number,
   ): { data: T[]; page: number; pageSize: number; totalCount: number; totalPages: number } | null {
     const pageKey = `${baseKey}:page:${page}:size:${pageSize}`;
-    return (this.baseCache as any).get(pageKey, {});
+    return this.baseCache.get(pageKey, {});
   }
 
   /**

@@ -18,6 +18,7 @@ interface TestResult {
 
 async function runIntegrationTests(): Promise<void> {
   console.log('🧪 Starting Legal MCP Integration Tests...\n');
+  const hasApiKey = Boolean(process.env.COURTLISTENER_API_KEY);
 
   const passedTests: TestResult[] = [];
   const failedTests: TestResult[] = [];
@@ -109,6 +110,13 @@ async function runIntegrationTests(): Promise<void> {
 
   // Details and text retrieval tests
   await test('Get case details with valid ID', async () => {
+    if (!hasApiKey) {
+      console.log(
+        '   ⚠️  Skipping: COURTLISTENER_API_KEY is not set for authenticated endpoint test',
+      );
+      return;
+    }
+
     // First search for a case to get a valid cluster_id
     const searchRequest: CallToolRequest = {
       method: 'tools/call',
@@ -230,4 +238,3 @@ runIntegrationTests().catch((error) => {
   console.error('Fatal error running integration tests:', error);
   process.exit(1);
 });
-

@@ -8,8 +8,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-// Import the worker module (compiled JS) to access default export
-const worker = await import('../../dist/worker.js');
+let worker: {
+  default: { fetch: (request: Request, env: WorkerEnv, ctx: unknown) => Promise<Response> };
+} | null = null;
+try {
+  // Import the worker module (compiled JS) to access default export
+  worker = await import('../../dist/worker.js');
+} catch {
+  worker = null;
+}
 
 interface WorkerEnv {
   MAX_SSE_CONNECTIONS?: string;
@@ -35,6 +42,11 @@ function delay(ms: number): Promise<void> {
 }
 
 describe('Worker SSE rate limiting (TypeScript)', () => {
+  if (!worker) {
+    it('skips in Node runtime without cloudflare:* loader support', { skip: true }, () => {});
+    return;
+  }
+
   it('should enforce per-IP and total limits with 429 Too Many Connections', async () => {
     const env: WorkerEnv = {
       MAX_SSE_CONNECTIONS: '1',
@@ -72,7 +84,7 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
     const res3 = await worker.default.fetch(
       mockRequest('/sse', { headers: { 'cf-connecting-ip': '1.2.3.4' } }),
       env,
-      {}
+      {},
     );
     assert.equal(res3.status, 200, 'SSE should be accepted after prior stream closed');
 
@@ -92,7 +104,7 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
     const resMissing = await worker.default.fetch(
       mockRequest('/sse', { headers: { 'cf-connecting-ip': '5.6.7.8' } }),
       env,
-      {}
+      {},
     );
     assert.equal(resMissing.status, 401);
 
@@ -102,7 +114,7 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
         headers: { 'cf-connecting-ip': '5.6.7.8' },
       }),
       env,
-      {}
+      {},
     );
     assert.equal(resWrong.status, 401);
 
@@ -115,7 +127,7 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
         },
       }),
       env,
-      {}
+      {},
     );
     assert.equal(resOk.status, 200);
     if (resOk.body) {
@@ -123,4 +135,3 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
     }
   });
 });
-

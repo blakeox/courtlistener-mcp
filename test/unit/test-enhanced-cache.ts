@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import { CacheManager } from '../../src/infrastructure/cache.js';
 import { EnhancedCache, PaginationCache } from '../../src/infrastructure/enhanced-cache.js';
@@ -31,6 +31,10 @@ describe('EnhancedCache', () => {
     logger = new SilentLogger();
     baseCache = new CacheManager({ enabled: true, ttl: 3600, maxSize: 100 }, logger);
     enhancedCache = new EnhancedCache(baseCache, logger);
+  });
+
+  afterEach(() => {
+    baseCache.destroy();
   });
 
   describe('getStaleWhileRevalidate', () => {
@@ -219,6 +223,10 @@ describe('PaginationCache', () => {
     baseCache = new CacheManager({ enabled: true, ttl: 3600, maxSize: 100 }, logger);
     enhancedCache = new EnhancedCache(baseCache, logger);
     paginationCache = new PaginationCache(enhancedCache);
+  });
+
+  afterEach(() => {
+    baseCache.destroy();
   });
 
   describe('setPaginatedResult', () => {
@@ -423,5 +431,7 @@ describe('Cache Integration', () => {
 
     const afterInvalidate = paginationCache.getPaginatedResult('opinions:search:privacy', 1, 20);
     assert.strictEqual(afterInvalidate, null);
+
+    baseCache.destroy();
   });
 });

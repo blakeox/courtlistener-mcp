@@ -45,7 +45,11 @@ class StubMiddlewareFactory {
   createMiddlewareStack(): unknown[] {
     return [];
   }
-  async executeMiddlewareStack(_mws: unknown, _ctx: unknown, next: () => unknown): Promise<unknown> {
+  async executeMiddlewareStack(
+    _mws: unknown,
+    _ctx: unknown,
+    next: () => unknown,
+  ): Promise<unknown> {
     return next();
   }
 }
@@ -98,19 +102,31 @@ class StubRegistry {
     return this.defs;
   }
 
+  get(name: string): StubToolDefinition | undefined {
+    return this.defs.find((def) => def.name === name);
+  }
+
   async execute(name: string, args: unknown): Promise<CallToolResult> {
     return { content: [{ type: 'text', text: 'success' }] };
   }
 }
 
 class StubResourceRegistry {
-  getAllResources() { return []; }
-  findHandler() { return undefined; }
+  getAllResources() {
+    return [];
+  }
+  findHandler() {
+    return undefined;
+  }
 }
 
 class StubPromptRegistry {
-  getAllPrompts() { return []; }
-  findHandler() { return undefined; }
+  getAllPrompts() {
+    return [];
+  }
+  findHandler() {
+    return undefined;
+  }
 }
 
 function installTestDI(): void {
@@ -124,8 +140,12 @@ function installTestDI(): void {
   }
 
   // Use registerOrReplace if available, otherwise use register after unregistering
-  const registerOrReplace = (container as { registerOrReplace?: (name: string, def: Parameters<typeof container.register>[1]) => void }).registerOrReplace;
-  
+  const registerOrReplace = (
+    container as {
+      registerOrReplace?: (name: string, def: Parameters<typeof container.register>[1]) => void;
+    }
+  ).registerOrReplace;
+
   if (registerOrReplace) {
     // Bind to container to preserve 'this' context
     registerOrReplace.call(container, 'logger', {
@@ -150,17 +170,45 @@ function installTestDI(): void {
       factory: () => new StubMiddlewareFactory(),
     });
     registerOrReplace.call(container, 'config', {
-    factory: () => ({
-      logging: { enabled: false, level: 'silent', format: 'json' },
-      metrics: { enabled: false, port: 0 },
-      security: { rateLimitEnabled: false, authEnabled: false, apiKeys: [], allowAnonymous: true, corsEnabled: false, corsOrigins: [], maxRequestsPerMinute: 100, sanitizationEnabled: false },
-      cache: { enabled: false, ttl: 300, maxSize: 1000 },
-      circuitBreaker: { enabled: false, failureThreshold: 5, successThreshold: 3, timeout: 10000, resetTimeout: 60000 },
-      audit: { enabled: false, logLevel: 'info', includeRequestBody: false, includeResponseBody: false, maxBodyLength: 2000, sensitiveFields: [] },
-      compression: { enabled: false, threshold: 1024, level: 6 },
-      courtListener: { baseUrl: 'https://api.example.com', version: 'v4', timeout: 30000, retryAttempts: 3, rateLimitPerMinute: 100 },
-    }),
-  });
+      factory: () => ({
+        logging: { enabled: false, level: 'silent', format: 'json' },
+        metrics: { enabled: false, port: 0 },
+        security: {
+          rateLimitEnabled: false,
+          authEnabled: false,
+          apiKeys: [],
+          allowAnonymous: true,
+          corsEnabled: false,
+          corsOrigins: [],
+          maxRequestsPerMinute: 100,
+          sanitizationEnabled: false,
+        },
+        cache: { enabled: false, ttl: 300, maxSize: 1000 },
+        circuitBreaker: {
+          enabled: false,
+          failureThreshold: 5,
+          successThreshold: 3,
+          timeout: 10000,
+          resetTimeout: 60000,
+        },
+        audit: {
+          enabled: false,
+          logLevel: 'info',
+          includeRequestBody: false,
+          includeResponseBody: false,
+          maxBodyLength: 2000,
+          sensitiveFields: [],
+        },
+        compression: { enabled: false, threshold: 1024, level: 6 },
+        courtListener: {
+          baseUrl: 'https://api.example.com',
+          version: 'v4',
+          timeout: 30000,
+          retryAttempts: 3,
+          rateLimitPerMinute: 100,
+        },
+      }),
+    });
     registerOrReplace.call(container, 'circuitBreakerManager', {
       factory: () => new StubCircuitBreakers(),
     });
@@ -168,13 +216,16 @@ function installTestDI(): void {
       factory: () => new StubCache() as CacheManager,
     });
     registerOrReplace.call(container, 'serverFactory', {
-      factory: () => new StubServerFactory(new LoggerClass({ level: 'silent', format: 'json', enabled: false }, 'Test')),
+      factory: () =>
+        new StubServerFactory(
+          new LoggerClass({ level: 'silent', format: 'json', enabled: false }, 'Test'),
+        ),
     });
   } else {
     // Fallback: manually unregister then register
     const unregister = (container as { unregister?: (name: string) => void }).unregister;
     const register = container.register.bind(container);
-    
+
     const registerService = (name: string, def: Parameters<typeof container.register>[1]) => {
       if (unregister) {
         try {
@@ -199,7 +250,7 @@ function installTestDI(): void {
         }
       }
     };
-    
+
     registerService('logger', {
       factory: () => new LoggerClass({ level: 'silent', format: 'json', enabled: false }, 'Test'),
     });
@@ -225,12 +276,40 @@ function installTestDI(): void {
       factory: () => ({
         logging: { enabled: false, level: 'silent', format: 'json' },
         metrics: { enabled: false, port: 0 },
-        security: { rateLimitEnabled: false, authEnabled: false, apiKeys: [], allowAnonymous: true, corsEnabled: false, corsOrigins: [], maxRequestsPerMinute: 100, sanitizationEnabled: false },
+        security: {
+          rateLimitEnabled: false,
+          authEnabled: false,
+          apiKeys: [],
+          allowAnonymous: true,
+          corsEnabled: false,
+          corsOrigins: [],
+          maxRequestsPerMinute: 100,
+          sanitizationEnabled: false,
+        },
         cache: { enabled: false, ttl: 300, maxSize: 1000 },
-        circuitBreaker: { enabled: false, failureThreshold: 5, successThreshold: 3, timeout: 10000, resetTimeout: 60000 },
-        audit: { enabled: false, logLevel: 'info', includeRequestBody: false, includeResponseBody: false, maxBodyLength: 2000, sensitiveFields: [] },
+        circuitBreaker: {
+          enabled: false,
+          failureThreshold: 5,
+          successThreshold: 3,
+          timeout: 10000,
+          resetTimeout: 60000,
+        },
+        audit: {
+          enabled: false,
+          logLevel: 'info',
+          includeRequestBody: false,
+          includeResponseBody: false,
+          maxBodyLength: 2000,
+          sensitiveFields: [],
+        },
         compression: { enabled: false, threshold: 1024, level: 6 },
-        courtListener: { baseUrl: 'https://api.example.com', version: 'v4', timeout: 30000, retryAttempts: 3, rateLimitPerMinute: 100 },
+        courtListener: {
+          baseUrl: 'https://api.example.com',
+          version: 'v4',
+          timeout: 30000,
+          retryAttempts: 3,
+          rateLimitPerMinute: 100,
+        },
       }),
     });
     registerService('circuitBreakerManager', {
@@ -240,7 +319,10 @@ function installTestDI(): void {
       factory: () => new StubCache() as CacheManager,
     });
     registerService('serverFactory', {
-      factory: () => new StubServerFactory(new LoggerClass({ level: 'silent', format: 'json', enabled: false }, 'Test')),
+      factory: () =>
+        new StubServerFactory(
+          new LoggerClass({ level: 'silent', format: 'json', enabled: false }, 'Test'),
+        ),
     });
   }
 }
@@ -268,13 +350,13 @@ describe('BestPracticeLegalMCPServer', () => {
     process.removeAllListeners('SIGQUIT');
     process.removeAllListeners('uncaughtException');
     process.removeAllListeners('unhandledRejection');
-    
+
     // Restore original listeners
-    originalSigIntListeners.forEach(l => process.on('SIGINT', l));
-    originalSigTermListeners.forEach(l => process.on('SIGTERM', l));
-    originalSigQuitListeners.forEach(l => process.on('SIGQUIT', l));
-    originalUncaughtExceptionListeners.forEach(l => process.on('uncaughtException', l));
-    originalUnhandledRejectionListeners.forEach(l => process.on('unhandledRejection', l));
+    originalSigIntListeners.forEach((l) => process.on('SIGINT', l));
+    originalSigTermListeners.forEach((l) => process.on('SIGTERM', l));
+    originalSigQuitListeners.forEach((l) => process.on('SIGQUIT', l));
+    originalUncaughtExceptionListeners.forEach((l) => process.on('uncaughtException', l));
+    originalUnhandledRejectionListeners.forEach((l) => process.on('unhandledRejection', l));
 
     if (typeof (container as { clearAll?: () => void }).clearAll === 'function') {
       (container as { clearAll: () => void }).clearAll();
@@ -330,4 +412,3 @@ describe('BestPracticeLegalMCPServer', () => {
     await server.stop();
   });
 });
-
