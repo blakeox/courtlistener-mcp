@@ -21,6 +21,9 @@ cd courtlistener-mcp
 # Install dependencies
 npm install
 
+# Install git hooks (Lefthook)
+pnpm run hooks:install
+
 # Build the project
 npm run build
 

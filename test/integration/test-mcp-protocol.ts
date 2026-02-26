@@ -11,7 +11,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SERVER_URL = 'https://courtlistener-mcp.blakeoxford.workers.dev/sse';
+const SERVER_URL = process.env.SERVER_URL || 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp';
 
 interface TestCase {
   name: string;
@@ -192,6 +192,8 @@ async function testMCPServer(): Promise<boolean> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2024-11-05',
         },
         body: JSON.stringify(test.payload),
       });
@@ -263,6 +265,8 @@ async function testSpecificFunction(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'MCP-Protocol-Version': '2024-11-05',
       },
       body: JSON.stringify(payload),
     });

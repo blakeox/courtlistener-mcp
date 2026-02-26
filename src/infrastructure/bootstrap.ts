@@ -95,6 +95,12 @@ import {
 } from '../domains/search/handlers.js';
 
 export function bootstrapServices(): void {
+  // Worker and test runtimes may invoke bootstrap multiple times in the same
+  // process. Keep initialization idempotent to avoid duplicate registrations.
+  if (container.has('config')) {
+    return;
+  }
+
   // Register configuration with validation
   container.register('config', {
     factory: () => {

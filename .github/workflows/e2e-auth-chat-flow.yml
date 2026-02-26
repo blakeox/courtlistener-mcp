@@ -1,0 +1,67 @@
+name: E2E Auth + Chat Flow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-auth-chat-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-auth-chat-flow:
+    name: End-to-End Auth and MCP Chat
+    runs-on: ubuntu-latest
+
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
+      E2E_TURNSTILE_TOKEN: ${{ secrets.E2E_TURNSTILE_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+            pnpm install
+          else
+            pnpm install --frozen-lockfile
+          fi
+
+      - name: Verify required E2E secrets
+        run: |
+          missing=0
+          if [ -z "${E2E_BASE_URL}" ]; then
+            echo "Missing secret: E2E_BASE_URL"
+            missing=1
+          fi
+          if [ -z "${SUPABASE_URL}" ]; then
+            echo "Missing secret: E2E_SUPABASE_URL"
+            missing=1
+          fi
+          if [ -z "${SUPABASE_SECRET_KEY}" ]; then
+            echo "Missing secret: E2E_SUPABASE_SECRET_KEY"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Run end-to-end auth/chat flow
+        run: pnpm run test:e2e:auth-chat-flow

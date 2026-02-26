@@ -10,7 +10,7 @@
 import { spawn } from 'child_process';
 import { platform } from 'os';
 
-const REMOTE_SERVER_URL = 'https://courtlistener-mcp.blakeopowell.workers.dev/sse';
+const REMOTE_SERVER_URL = process.env.MCP_REMOTE_URL || 'https://courtlistenermcp.blakeoxford.com/mcp';
 
 function openBrowser(url) {
   const command = platform() === 'darwin' ? 'open' : 
@@ -28,7 +28,7 @@ async function launchInspector(mode = 'remote') {
     console.log(`🌐 Testing remote server: ${REMOTE_SERVER_URL}`);
     
     // Open inspector with remote server pre-configured
-    const inspectorUrl = `http://localhost:6274/?transport=sse&serverUrl=${encodeURIComponent(REMOTE_SERVER_URL)}`;
+    const inspectorUrl = `http://localhost:6274/?transport=streamable-http&serverUrl=${encodeURIComponent(REMOTE_SERVER_URL)}`;
     
     console.log('🚀 Starting inspector server...');
     
@@ -55,7 +55,7 @@ async function launchInspector(mode = 'remote') {
     
     // Start inspector with local server
     command = 'npx';
-    args = ['@modelcontextprotocol/inspector', 'node', 'dist/worker.js'];
+    args = ['@modelcontextprotocol/inspector', 'node', 'dist/index.js'];
     
     const inspectorProcess = spawn(command, args, {
       stdio: 'inherit'

@@ -39,8 +39,8 @@ const CONFIG: Config = {
   remoteServer: {
     url:
       process.env.REMOTE_SERVER_URL ||
-      'https://courtlistener-mcp.blakeopowell.workers.dev/sse',
-    transport: 'sse',
+      'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+    transport: 'streamable-http',
   },
   timeout: 30000, // 30 seconds
   outputDir: join(projectRoot, 'test-output'),
@@ -538,4 +538,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { runTest, testRemoteServer, CONFIG };
-

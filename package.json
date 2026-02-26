@@ -16,10 +16,15 @@
     "courtlistener-mcp": "dist/index.js"
   },
   "scripts": {
+    "hooks:install": "lefthook install --force",
     "typecheck": "tsc --noEmit",
-    "build": "tsc && npm run generate:manifest",
+    "build": "npm run clean && npm run generate:web:styles && tsc && npm run generate:manifest",
+    "generate:web:styles": "node scripts/web/generate-tailwind-web-styles.mjs",
     "generate:manifest": "npx tsx scripts/generate-manifest.ts",
     "deploy": "wrangler deploy",
+    "cloudflare:check": "node scripts/cloudflare/check-setup.js",
+    "cloudflare:deploy": "pnpm run cloudflare:check && wrangler deploy",
+    "cloudflare:tail": "wrangler tail",
     "start": "node dist/index.js",
     "doctor": "node dist/index.js --doctor",
     "setup": "node dist/index.js --setup",
@@ -57,6 +62,11 @@
     "inspect:local": "node scripts/dev/inspect.js local",
     "inspect:remote": "node scripts/dev/inspect.js remote",
     "mcp:remote": "node scripts/dev/mcp-remote.js",
+    "mcp:test:remote": "node scripts/dev/test-remote-mcp.js",
+    "test:e2e:auth-chat-flow": "node scripts/testing/e2e-auth-chat-flow.mjs",
+    "mcp:key:create": "node scripts/supabase/mcp-key-manager.js create",
+    "mcp:key:revoke": "node scripts/supabase/mcp-key-manager.js revoke",
+    "mcp:key:list": "node scripts/supabase/mcp-key-manager.js list",
     "dev": "tsc --watch --preserveWatchOutput",
     "lint": "eslint . --ext .ts",
     "lint:src": "eslint src --ext .ts",
@@ -85,7 +95,7 @@
     "coverage:check": "c8 --config .c8rc.json --check-coverage --branches=50 --functions=50 --lines=50 --statements=50 npm run test:unit",
     "test:analysis": "npx tsx test/analysis/analyze-untested-code.ts",
     "prepublishOnly": "npm run build && npm run typecheck",
-    "prepare": "husky && lefthook install"
+    "prepare": "lefthook install --force"
   },
   "keywords": [
     "mcp",
@@ -115,6 +125,7 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
+    "jose": "^6.1.3",
     "node-fetch": "^3.3.2",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
@@ -122,6 +133,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260303.0",
     "@modelcontextprotocol/inspector": "^0.19.0",
+    "@tailwindcss/cli": "^4.2.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
@@ -132,12 +144,11 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
-    "husky": "^9.1.7",
-    "jose": "^6.1.3",
     "lefthook": "^1.13.6",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "sinon": "^21.0.1",
+    "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "wrangler": "^4.63.0"

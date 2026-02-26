@@ -4,11 +4,11 @@ echo "Testing URL manipulation logic..."
 
 # Test cases
 test_urls=(
-    "https://courtlistener-mcp.blakeopowell.workers.dev/health"
-    "https://courtlistener-mcp.blakeopowell.workers.dev/sse"
-    "https://courtlistener-mcp.blakeopowell.workers.dev"
+    "https://courtlistenermcp.blakeoxford.com/health"
+    "https://courtlistenermcp.blakeoxford.com/mcp"
+    "https://courtlistenermcp.blakeoxford.com"
     "https://example.com/health"
-    "https://example.com/sse"
+    "https://example.com/mcp"
 )
 
 for url in "${test_urls[@]}"; do
@@ -16,16 +16,16 @@ for url in "${test_urls[@]}"; do
     
     # This simulates our workflow logic for MCP endpoint
     if [[ "$url" == *"/health" ]]; then
-        mcp_endpoint="${url%/health}/sse"
-    elif [[ "$url" == *"/sse" ]]; then
+        mcp_endpoint="${url%/health}/mcp"
+    elif [[ "$url" == *"/mcp" ]]; then
         mcp_endpoint="$url"
     else
-        mcp_endpoint="$url/sse"
+        mcp_endpoint="$url/mcp"
     fi
     
     # This simulates our workflow logic for health endpoint
-    if [[ "$url" == *"/sse" ]]; then
-        health_endpoint="${url%/sse}/health"
+    if [[ "$url" == *"/mcp" ]]; then
+        health_endpoint="${url%/mcp}/health"
     elif [[ "$url" == *"/health" ]]; then
         health_endpoint="$url"
     else

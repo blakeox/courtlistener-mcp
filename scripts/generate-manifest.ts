@@ -35,7 +35,7 @@ async function generate() {
       }
     };
     
-    const outputPath = path.resolve(__dirname, '../../manifest.json');
+    const outputPath = path.resolve(__dirname, '../manifest.json');
     await fs.writeFile(outputPath, JSON.stringify(manifest, null, 2));
     
     console.log(`Manifest generated successfully at ${outputPath}`);

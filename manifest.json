@@ -13,52 +13,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "query": {
-                "type": "string"
-              },
-              "q": {
-                "type": "string"
-              },
-              "court": {
-                "type": "string"
-              },
-              "judge": {
-                "type": "string"
-              },
-              "dateAfter": {
-                "type": "string"
-              },
-              "dateBefore": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "orderBy": {
-                "type": "string"
-              },
-              "order_by": {
-                "type": "string"
-              },
-              "page": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "pageSize": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -67,49 +27,58 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "query": {
-                "type": "string"
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "q": {
-                "type": "string"
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
+                  },
+                  "count": {
+                    "type": "number"
+                  }
+                }
               },
-              "court": {
-                "type": "string"
+              "metadata": {
+                "type": "object"
               },
-              "judge": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "citation": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "precedential_status": {
-                "type": "string"
-              },
-              "page": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "pageSize": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "current_page": {
+                    "type": "number"
+                  },
+                  "total_pages": {
+                    "type": "number"
+                  },
+                  "total_results": {
+                    "type": "number"
+                  },
+                  "has_next": {
+                    "type": "boolean"
+                  },
+                  "has_previous": {
+                    "type": "boolean"
+                  }
+                }
               }
             },
-            "additionalProperties": false
+            "required": [
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -118,71 +87,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "o",
-                  "r",
-                  "p",
-                  "oa"
-                ],
-                "default": "o"
-              },
-              "query": {
-                "type": "string",
-                "minLength": 1
-              },
-              "court": {
-                "type": "string"
-              },
-              "judge": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "citation": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "precedential_status": {
-                "type": "string"
-              },
-              "cited_lt": {
-                "type": "number"
-              },
-              "cited_gt": {
-                "type": "number"
-              },
-              "status": {
-                "type": "string"
-              },
-              "nature_of_suit": {
-                "type": "string"
-              },
-              "order_by": {
-                "type": "string"
-              },
-              "page": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -191,28 +101,30 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "cluster_id": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "id": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
+              "data": {
+                "type": "object"
+              },
+              "metadata": {
+                "type": "object"
               }
             },
-            "additionalProperties": false
+            "required": [
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -221,44 +133,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "cluster_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "case_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 10
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -267,31 +147,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "case_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "include_citations": {
-                "type": "boolean",
-                "default": true
-              },
-              "depth": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 3,
-                "default": 1
-              }
-            },
-            "required": [
-              "case_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -300,63 +161,70 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "minimum": 0
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "format": {
-                "type": "string",
-                "enum": [
-                  "text",
-                  "html",
-                  "pdf"
-                ],
-                "default": "text"
+              "data": {
+                "type": "object"
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "opinion_id"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
           "name": "analyze_legal_argument",
-          "description": "Analyze a legal argument by finding supporting and opposing cases, with AI-powered relevance assessment",
+          "description": "Analyze a legal argument by finding supporting and opposing cases, with AI-powered relevance assessment. ⚡ Moderate API cost.",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "argument": {
-                "type": "string",
-                "minLength": 1
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "search_query": {
-                "type": "string",
-                "minLength": 1
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
+                  },
+                  "count": {
+                    "type": "number"
+                  }
+                }
               },
-              "jurisdiction": {
-                "type": "string"
-              },
-              "date_range_start": {
-                "type": "string"
-              },
-              "date_range_end": {
-                "type": "string"
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "argument",
-              "search_query"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -365,42 +233,30 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "depth": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 3,
-                "default": 2
+              "data": {
+                "type": "object"
               },
-              "direction": {
-                "type": "string",
-                "enum": [
-                  "cited_by",
-                  "cites",
-                  "both"
-                ],
-                "default": "both"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 50
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "opinion_id"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -409,23 +265,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "citation": {
-                "type": "string",
-                "minLength": 1
-              },
-              "normalize": {
-                "type": "boolean",
-                "default": true
-              },
-              "include_alternatives": {
-                "type": "boolean",
-                "default": false
-              }
-            },
-            "required": [
-              "citation"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -434,32 +279,38 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "jurisdiction": {
-                "type": "string"
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "court_type": {
-                "type": "string",
-                "enum": [
-                  "federal",
-                  "state",
-                  "appellate",
-                  "district",
-                  "supreme"
-                ]
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
+                  },
+                  "count": {
+                    "type": "number"
+                  }
+                }
               },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
+              "metadata": {
+                "type": "object"
               }
             },
-            "additionalProperties": false
+            "required": [
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -468,28 +319,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "active": {
-                "type": "boolean"
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -498,21 +333,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              }
-            },
-            "required": [
-              "judge_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -521,31 +347,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed": {
-                "type": "string"
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -554,25 +361,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "include_entries": {
-                "type": "boolean",
-                "default": true
-              }
-            },
-            "required": [
-              "docket_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -581,48 +375,58 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "docket": {
-                "anyOf": [
-                  {
-                    "type": "string"
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
                   },
-                  {
+                  "count": {
                     "type": "number"
                   }
-                ]
+                }
               },
-              "entry_number": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
+              "metadata": {
+                "type": "object"
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "current_page": {
                     "type": "number"
+                  },
+                  "total_pages": {
+                    "type": "number"
+                  },
+                  "total_results": {
+                    "type": "number"
+                  },
+                  "has_next": {
+                    "type": "boolean"
+                  },
+                  "has_previous": {
+                    "type": "boolean"
                   }
-                ]
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
+                }
               }
             },
             "required": [
-              "docket"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -631,35 +435,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "document_type": {
-                "type": "string"
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "required": [
-              "docket_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -668,25 +449,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "document_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "include_content": {
-                "type": "boolean",
-                "default": false
-              }
-            },
-            "required": [
-              "document_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -695,34 +463,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "year": {
-                "type": "number",
-                "minimum": 1990,
-                "maximum": 2025
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -731,21 +477,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "disclosure_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              }
-            },
-            "required": [
-              "disclosure_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -754,29 +491,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "include_attorneys": {
-                "type": "boolean",
-                "default": true
-              },
-              "include_parties": {
-                "type": "boolean",
-                "default": true
-              }
-            },
-            "required": [
-              "docket_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -785,49 +505,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "action": {
-                "type": "string",
-                "enum": [
-                  "create",
-                  "list",
-                  "update",
-                  "delete"
-                ]
-              },
-              "alert_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "query": {
-                "type": "string"
-              },
-              "frequency": {
-                "type": "string",
-                "enum": [
-                  "daily",
-                  "weekly",
-                  "monthly"
-                ]
-              },
-              "alert_type": {
-                "type": "string",
-                "enum": [
-                  "case",
-                  "opinion",
-                  "docket"
-                ]
-              }
-            },
-            "required": [
-              "action"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -836,38 +519,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "date_argued": {
-                "type": "string"
-              },
-              "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "page": {
-                "type": "number",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -876,29 +533,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "oral_argument_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "include_transcript": {
-                "type": "boolean",
-                "default": false
-              },
-              "include_audio_url": {
-                "type": "boolean",
-                "default": true
-              }
-            },
-            "required": [
-              "oral_argument_id"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -907,49 +547,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "data_type": {
-                "type": "string",
-                "enum": [
-                  "court_distribution",
-                  "case_timeline",
-                  "citation_network",
-                  "judge_statistics"
-                ]
-              },
-              "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
-              },
-              "depth": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 5
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 200
-              },
-              "start_date": {
-                "type": "string"
-              },
-              "end_date": {
-                "type": "string"
-              },
-              "court_id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "data_type"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -958,20 +561,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "data_type": {
-                "type": "string",
-                "minLength": 1
-              },
-              "sample_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 50
-              }
-            },
-            "required": [
-              "data_type"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -980,80 +575,76 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "page": {
-                "type": "integer",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
-              }
-            },
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
           "name": "get_comprehensive_judge_profile",
-          "description": "Get complete judicial profile including positions, education, political affiliations, ABA ratings, and financial disclosures",
+          "description": "Get complete judicial profile including positions, education, political affiliations, ABA ratings, and financial disclosures. ⚡ Moderate API cost.",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
+              },
+              "data": {
+                "type": "object"
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "judge_id"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
           "name": "get_comprehensive_case_analysis",
-          "description": "Get complete case analysis including docket entries, parties, attorneys, and tags for full case intelligence",
+          "description": "Get complete case analysis including docket entries, parties, attorneys, and tags for full case intelligence. ⚡ Moderate API cost.",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "cluster_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
+              },
+              "data": {
+                "type": "object"
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "cluster_id"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -1062,50 +653,38 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "disclosure_type": {
-                "type": "string",
-                "enum": [
-                  "investments",
-                  "debts",
-                  "gifts",
-                  "agreements",
-                  "positions",
-                  "reimbursements",
-                  "spouse_incomes",
-                  "non_investment_incomes"
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
               },
-              "judge": {
-                "anyOf": [
-                  {
-                    "type": "string"
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
                   },
-                  {
+                  "count": {
                     "type": "number"
                   }
-                ]
+                }
               },
-              "year": {
-                "type": "integer",
-                "minimum": 1900,
-                "maximum": 2025
-              },
-              "page": {
-                "type": "integer",
-                "minimum": 1,
-                "default": 1
-              },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100,
-                "default": 20
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "disclosure_type"
-            ],
-            "additionalProperties": true
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -1114,15 +693,38 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "text": {
-                "type": "string",
-                "minLength": 1
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "array"
+                  },
+                  "count": {
+                    "type": "number"
+                  }
+                }
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "text"
-            ],
-            "additionalProperties": false
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -1131,19 +733,30 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "action": {
-                "type": "string",
-                "enum": [
-                  "fetch",
-                  "query",
-                  "email"
-                ]
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean"
+              },
+              "data": {
+                "type": "object"
+              },
+              "metadata": {
+                "type": "object"
               }
             },
             "required": [
-              "action"
-            ],
-            "additionalProperties": true
+              "success",
+              "data"
+            ]
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         },
         {
@@ -1152,22 +765,12 @@
           "inputSchema": {
             "type": "object",
             "properties": {
-              "query": {
-                "type": "string",
-                "description": "Natural language query describing what you are looking for"
-              },
-              "max_results": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 20,
-                "default": 5,
-                "description": "Maximum number of results to return"
-              }
-            },
-            "required": [
-              "query"
-            ],
-            "additionalProperties": false
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "openWorldHint": true
           }
         }
       ],
@@ -1224,6 +827,42 @@
           "uri": "courtlistener://schema/search-params",
           "name": "Search-params Schema",
           "description": "Schema for search-params data structure",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://case/123456",
+          "name": "Example Case 123456",
+          "description": "Example of a case/opinion cluster resource",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://docket/123456",
+          "name": "Example Docket 123456",
+          "description": "Example of a docket resource",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://court/scotus",
+          "name": "Example Court (SCOTUS)",
+          "description": "Example of a court resource",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://judge/123456",
+          "name": "Example Judge 123456",
+          "description": "Example of a judge resource",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://search/recent",
+          "name": "Recent Opinions",
+          "description": "Dynamic listing of opinions filed in the last 7 days",
+          "mimeType": "application/json"
+        },
+        {
+          "uri": "courtlistener://api/status",
+          "name": "API Status",
+          "description": "Check API connectivity, cache stats, and rate limit status",
           "mimeType": "application/json"
         }
       ]
@@ -1328,6 +967,87 @@
               "name": "jurisdiction",
               "description": "Applicable jurisdiction",
               "required": false
+            }
+          ]
+        },
+        {
+          "name": "legal_research_workflow",
+          "description": "Step-by-step case research workflow guiding through searching, analyzing, and synthesizing findings",
+          "arguments": [
+            {
+              "name": "topic",
+              "description": "The legal topic or question to research",
+              "required": true
+            },
+            {
+              "name": "jurisdiction",
+              "description": "The jurisdiction to focus on (e.g., \"federal\", \"California\")",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "citation_analysis",
+          "description": "Analyze the citation network for a case, including cited cases and citation patterns",
+          "arguments": [
+            {
+              "name": "case_citation",
+              "description": "The citation of the case to analyze (e.g., \"410 U.S. 113\")",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "jurisdiction_comparison",
+          "description": "Compare how different jurisdictions approach a legal issue",
+          "arguments": [
+            {
+              "name": "legal_issue",
+              "description": "The legal issue to compare across jurisdictions",
+              "required": true
+            },
+            {
+              "name": "jurisdictions",
+              "description": "Comma-separated list of jurisdictions to compare (e.g., \"California, New York, Texas\")",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "case_brief",
+          "description": "Generate a structured case brief from a court opinion",
+          "arguments": [
+            {
+              "name": "opinion_id",
+              "description": "The opinion ID to brief (CourtListener opinion ID)",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "motion_drafting",
+          "description": "Draft a motion outline supported by case law research",
+          "arguments": [
+            {
+              "name": "motion_type",
+              "description": "Type of motion (e.g., \"Motion to Dismiss\", \"Summary Judgment\", \"Motion to Compel\")",
+              "required": true
+            },
+            {
+              "name": "supporting_cases",
+              "description": "Optional comma-separated case citations to use as supporting authority",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "judicial_due_diligence",
+          "description": "Review a judge's financial disclosures, background, and ruling patterns",
+          "arguments": [
+            {
+              "name": "judge_name",
+              "description": "The name of the judge to research",
+              "required": true
             }
           ]
         }

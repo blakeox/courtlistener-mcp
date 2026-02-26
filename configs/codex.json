@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "courtlistener": {
+      "url": "https://courtlistenermcp.blakeoxford.com/mcp",
+      "transport": "streamable-http"
+    },
+    "courtlistener-local": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "/path/to/courtlistener-mcp",
+      "env": {
+        "COURTLISTENER_API_KEY": "your-api-key"
+      }
+    }
+  }
+}

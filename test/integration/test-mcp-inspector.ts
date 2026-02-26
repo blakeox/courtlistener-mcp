@@ -57,8 +57,8 @@ const CONFIG: Config = {
     env: { NODE_ENV: 'test' },
   },
   remoteServer: {
-    url: 'https://courtlistener-mcp.blakeopowell.workers.dev/sse',
-    transport: 'sse',
+    url: 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+    transport: 'streamable-http',
   },
   tests: [
     {
@@ -503,4 +503,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { runTest, testRemoteServerHTTP, CONFIG };
-

@@ -54,8 +54,8 @@ const CONFIG: Config = {
   remoteServer: {
     url:
       process.env.REMOTE_SERVER_URL ||
-      'https://courtlistener-mcp.blakeopowell.workers.dev/sse',
-    transport: 'sse',
+      'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+    transport: 'streamable-http',
   },
   inspector: {
     timeout: 45000, // 45 seconds for CI
@@ -788,4 +788,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { runEnhancedTest, CONFIG };
-

@@ -143,13 +143,8 @@ jobs:
           echo "Running comprehensive MCP protocol validation..."
           pnpm run test:mcp
           if [ -n "$REMOTE_SERVER_URL" ]; then
-            REMOTE_SSE_URL="$REMOTE_SERVER_URL"
-            if [[ "$REMOTE_SSE_URL" == "/health" || "$REMOTE_SSE_URL" == *"/health" ]]; then
-              REMOTE_SSE_URL="${REMOTE_SSE_URL%/health}/sse"
-            elif [[ "$REMOTE_SSE_URL" != *"/sse" ]]; then
-              REMOTE_SSE_URL="${REMOTE_SSE_URL}/sse"
-            fi
-            SERVER_URL="$REMOTE_SSE_URL" pnpm run test:mcp
+            eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+            SERVER_URL="$REMOTE_MCP_URL" pnpm run test:mcp
           fi
 
       - name: Generate MCP compliance report
@@ -202,23 +197,17 @@ jobs:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "Testing remote server deployment..."
-          if [ -z "$REMOTE_SERVER_URL" ]; then
-            REMOTE_SERVER_URL='https://courtlistener-mcp.blakeopowell.workers.dev/health'
-          fi
-          curl -f "$REMOTE_SERVER_URL" || echo "Remote server not accessible"
-          MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-          SERVER_URL="$MCP_ENDPOINT" pnpm run test:mcp
+          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+          curl -f "$REMOTE_HEALTH_URL" || echo "Remote server not accessible"
+          SERVER_URL="$REMOTE_MCP_URL" pnpm run test:mcp
 
       - name: Performance benchmark against remote
         env:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "Running performance benchmarks..."
-          if [ -z "$REMOTE_SERVER_URL" ]; then
-            REMOTE_SERVER_URL='https://courtlistener-mcp.blakeopowell.workers.dev/health'
-          fi
-          MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-          SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance
+          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+          SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance
 
   security-check:
     name: Security & Code Quality

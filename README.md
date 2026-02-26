@@ -69,7 +69,7 @@ single URL to your MCP client config — **no install, no API key, nothing**:
 {
   "mcpServers": {
     "courtlistener": {
-      "url": "https://courtlistener-mcp.<subdomain>.workers.dev/sse"
+      "url": "https://courtlistener-mcp.<subdomain>.workers.dev/mcp"
     }
   }
 }
@@ -129,12 +129,15 @@ wrangler secret put COURTLISTENER_API_KEY
 # Optional: restrict access with a bearer token
 wrangler secret put MCP_AUTH_TOKEN
 
-# Deploy
-wrangler deploy
+# Run readiness checks (auth, secrets, endpoint handshake)
+pnpm run cloudflare:check
+
+# Deploy (runs checks first)
+pnpm run cloudflare:deploy
 ```
 
 Your server is now live at
-`https://courtlistener-mcp.<subdomain>.workers.dev/sse`. Share this URL with
+`https://courtlistener-mcp.<subdomain>.workers.dev/mcp`. Share this URL with
 users — they add it to their MCP client and start querying legal data
 immediately.
 
@@ -156,15 +159,25 @@ Pre-built configuration files for popular MCP clients are available in the
 [`configs/`](./configs/) directory:
 
 - `claude-desktop.json` — Claude Desktop (local stdio)
-- `claude-desktop-remote.json` — Claude Desktop (remote SSE via Cloudflare)
+- `claude-desktop-remote.json` — Claude Desktop (remote streamable HTTP via Cloudflare)
 - `cursor.json` — Cursor
 - `continue-dev.json` — Continue
 - `vscode-copilot.json` — VS Code GitHub Copilot
 - `zed.json` — Zed
 - `openai-chatgpt.json` — OpenAI ChatGPT
+- `codex.json` — Codex desktop/app
 
 Run `npx courtlistener-mcp --setup` to automatically configure your client, or
 copy the appropriate config manually.
+
+### Codex Integration
+
+To connect this server in Codex, use either:
+
+- [`configs/codex.json`](./configs/codex.json) for a direct streamable HTTP
+  connection, or
+- [`mcp-config.json`](./mcp-config.json) for local/bridge variants used during
+  development.
 
 ### Diagnostics
 
@@ -345,20 +358,8 @@ NODE_ENV=production
 # Remote SSE gateway (Cloudflare Worker)
 # Keep upstream key only on Cloudflare (never in client configs)
 COURTLISTENER_API_KEY=your_courtlistener_api_key
-# Static token (fallback when OIDC is not configured)
-SSE_AUTH_TOKEN=your_shared_secret
-# (optional alias in some deployments)
-MCP_SSE_AUTH_TOKEN=your_shared_secret
-
-# OAuth/OIDC (preferred)
-OIDC_ISSUER=https://your-issuer.example.com
-OIDC_AUDIENCE=api://legal-mcp
-OIDC_JWKS_URL=https://your-issuer.example.com/.well-known/jwks.json # optional override
-OIDC_REQUIRED_SCOPE=mcp:connect
-
-# Connection limiting (protect remote SSE endpoint)
-MAX_SSE_CONNECTIONS=100             # global concurrent SSE connections (default 100)
-MAX_SSE_CONNECTIONS_PER_IP=5        # per-client IP concurrent connections (default 5)
+# Optional bearer token required by clients
+MCP_AUTH_TOKEN=your_shared_secret
 ```
 
 ### Health Monitoring
@@ -461,6 +462,7 @@ Pre-built configuration files for each supported client are available in the
 - [`claude-desktop-remote.json`](./configs/claude-desktop-remote.json) — Claude
   Desktop (remote)
 - [`openai-chatgpt.json`](./configs/openai-chatgpt.json) — OpenAI ChatGPT
+- [`codex.json`](./configs/codex.json) — Codex desktop/app
 - [`cursor.json`](./configs/cursor.json) — Cursor
 - [`continue-dev.json`](./configs/continue-dev.json) — Continue.dev
 - [`vscode-copilot.json`](./configs/vscode-copilot.json) — VS Code GitHub
@@ -491,7 +493,7 @@ docker compose --profile http up
 
 ## Available Tools
 
-This Legal MCP Server provides **25 comprehensive tools** for legal research
+This Legal MCP Server provides **33 comprehensive tools** for legal research
 through the CourtListener API:
 
 ### Core Research Tools (7)
@@ -595,7 +597,8 @@ state management. Once deployed, users connect with a single URL — no local
 install required.
 
 - **Health**: `GET https://<subdomain>.workers.dev/health`
-- **MCP endpoint**: `https://<subdomain>.workers.dev/sse`
+- **MCP endpoint (primary)**: `https://<subdomain>.workers.dev/mcp`
+- **SSE compatibility endpoint**: `https://<subdomain>.workers.dev/sse`
 
 ### Authentication
 
@@ -607,6 +610,196 @@ wrangler secret put MCP_AUTH_TOKEN
 
 When set, all MCP requests must include `Authorization: Bearer <token>`. When
 not set, the endpoint is open.
+
+Supabase-backed API-key auth is also supported for user management without
+storing query payloads:
+
+```bash
+wrangler secret put SUPABASE_URL
+wrangler secret put SUPABASE_PUBLISHABLE_KEY
+wrangler secret put SUPABASE_SECRET_KEY
+wrangler secret put SUPABASE_API_KEYS_TABLE  # optional, defaults to mcp_api_keys
+wrangler secret put MCP_UI_PUBLIC_ORIGIN     # optional, e.g. https://courtlistenermcp.blakeoxford.com
+wrangler secret put MCP_UI_INSECURE_COOKIES  # optional; set true only for local http dev
+```
+
+`SUPABASE_PUBLISHABLE_KEY` is used by `POST /api/signup` to trigger Supabase's standard
+email-confirmation flow. `SUPABASE_SECRET_KEY` is used for login validation,
+API key lifecycle operations, and audit logging.
+`MCP_UI_PUBLIC_ORIGIN` forces email confirmation links to resolve to your hosted UI
+instead of localhost defaults.
+`MCP_UI_INSECURE_COOKIES=true` disables `Secure` cookie attributes for localhost HTTP
+testing only; do not use it in production.
+
+Backward compatibility: `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are still accepted as legacy aliases.
+
+When Supabase auth is configured, users authenticate with:
+- `Authorization: Bearer <user_api_key>`
+
+The Worker hashes the bearer token and validates key status in Supabase
+(`active`, `not revoked`, `not expired`). It does not write request prompts,
+tool inputs, or usage payloads to Supabase.
+
+Built-in web UI routes (same Worker):
+- `GET /` (overview, browser only)
+- `GET /signup` (create account)
+- `GET /login` (authenticate account after email verification)
+- `GET /keys` (list/create/revoke keys)
+- `GET /chat` (sample MCP chat bound to `/mcp`)
+- `GET /api/session`
+- `POST /api/login`
+- `POST /api/login/token` (automatic session exchange for Supabase email-confirm hash tokens)
+- `POST /api/logout`
+- `POST /api/signup`
+- `GET /api/keys`
+- `POST /api/keys`
+- `POST /api/keys/revoke`
+
+Legacy endpoint (disabled by default):
+- `POST /api/signup/issue-key` (enable only with `MCP_ENABLE_SIGNUP_ISSUE_KEY=true`)
+
+Web UI styling is compiled with Tailwind CSS v4 during builds via:
+- `npm run generate:web:styles`
+
+Optional signup bot-protection (Turnstile):
+
+```bash
+wrangler secret put TURNSTILE_SITE_KEY
+wrangler secret put TURNSTILE_SECRET_KEY
+```
+
+When `TURNSTILE_SECRET_KEY` is set, `/api/signup` requires a valid Turnstile token.
+
+Schema reference: [`docs/supabase/mcp-auth-schema.sql`](docs/supabase/mcp-auth-schema.sql)
+Audit schema reference: [`docs/supabase/mcp-audit-logs.sql`](docs/supabase/mcp-audit-logs.sql)
+
+Recommended setup flow:
+
+1. Run `docs/supabase/mcp-auth-schema.sql` in Supabase SQL editor.
+2. Create account at `/signup`, verify email, then login via `/api/login` (or UI on `/login`).
+3. Create your first key from `/keys` (or via `/api/keys` while logged in).
+4. Sign in with your first user account and run:
+   - `select public.bootstrap_first_admin();`
+5. Generate additional user API keys with:
+   - `select * from public.create_mcp_api_key('primary', now() + interval '90 days');`
+6. Revoke compromised keys with:
+   - `select public.revoke_mcp_api_key('<key-id-uuid>');`
+
+CLI alternative (service-role admin flow, no manual SQL):
+
+```bash
+# Create a key for a specific user id
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:create -- --user-id <auth_user_uuid> --label "prod-key" --expires-days 90
+
+# Revoke by key id
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:revoke -- --key-id <mcp_key_uuid>
+
+# Revoke by raw token
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:revoke -- --token <raw_token>
+
+# List keys (redacted hash preview)
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:list -- --active-only true --limit 100
+
+# List keys for one label only
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:list -- --label "prod-key" --limit 100
+
+# List keys by partial label match
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:list -- --label-contains "prod" --limit 100
+
+# List keys by expiration window
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+pnpm run mcp:key:list -- --expires-before "2026-12-31T00:00:00Z" --expires-after "2026-01-01T00:00:00Z" --limit 100
+```
+
+OIDC JWT validation is also supported for remote deployments:
+
+```bash
+wrangler secret put OIDC_ISSUER
+wrangler secret put OIDC_AUDIENCE        # optional
+wrangler secret put OIDC_JWKS_URL        # optional
+wrangler secret put OIDC_REQUIRED_SCOPE  # optional
+```
+
+When OIDC is configured, the Worker accepts tokens from either:
+- `Authorization: Bearer <jwt>`
+- `CF-Access-Jwt-Assertion: <jwt>` (Cloudflare Access)
+
+If OIDC, Supabase, and static token auth are all configured, runtime selection
+is controlled by:
+`MCP_AUTH_PRIMARY` (default: `supabase` when configured) with optional static
+fallback only when explicitly enabled.
+
+Auth policy controls:
+
+```bash
+# Optional explicit primary auth backend (supabase | oidc | static)
+wrangler secret put MCP_AUTH_PRIMARY
+
+# Optional migration-only fallback. Default is disabled.
+wrangler secret put MCP_ALLOW_STATIC_FALLBACK
+```
+
+Recommended production posture:
+- Set `MCP_AUTH_PRIMARY=supabase`
+- Remove `MCP_AUTH_TOKEN` after migration
+- Leave `MCP_ALLOW_STATIC_FALLBACK` unset (or set to `false`)
+- In Supabase Auth settings, enable leaked-password protection and email confirmation
+
+### CORS and Protocol Guards
+
+For browser-based MCP clients, you can restrict cross-origin access:
+
+```bash
+# Comma-separated allow-list; when omitted, any origin is accepted
+wrangler secret put MCP_ALLOWED_ORIGINS
+```
+
+You can also require the protocol header on MCP POST requests:
+
+```bash
+wrangler secret put MCP_REQUIRE_PROTOCOL_VERSION
+```
+
+Set it to `true` to enforce `MCP-Protocol-Version`.
+
+### Auth Failure Rate Limiting
+
+The Worker applies edge-side rate limiting for repeated failed authentication
+attempts on `/mcp` and `/sse` to reduce brute-force attacks.
+
+```bash
+# Optional controls (defaults shown)
+wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED         # default true
+wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_MAX             # default 20
+wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS  # default 300
+wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_BLOCK_SECONDS   # default 600
+```
+
+### UI API Rate Limiting
+
+Signup and key-management APIs are also edge-rate-limited:
+
+```bash
+wrangler secret put MCP_UI_RATE_LIMIT_ENABLED                   # default true
+wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_MAX                # default 8
+wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_WINDOW_SECONDS     # default 300
+wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_BLOCK_SECONDS      # default 900
+wrangler secret put MCP_UI_KEYS_RATE_LIMIT_MAX                  # default 120
+wrangler secret put MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS       # default 300
+wrangler secret put MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS        # default 300
+```
+
+Optional key TTL hard cap (applies to `/api/keys`, and legacy `/api/signup/issue-key` if enabled):
+
+```bash
+wrangler secret put MCP_API_KEY_MAX_TTL_DAYS                    # default 90
+```
 
 ### Deployment
 
@@ -620,6 +813,17 @@ wrangler deploy
 
 The `COURTLISTENER_API_KEY` stays on the server — clients never see it.
 
+### Cloudflare Readiness Check
+
+Use the built-in diagnostic before deploys and when troubleshooting:
+
+```bash
+pnpm run cloudflare:check
+```
+
+It verifies Wrangler auth, required Worker config, required secrets, and live
+MCP initialize handshake against your configured route.
+
 ## MCP Integration
 
 This server implements the
@@ -632,7 +836,7 @@ enabling seamless integration with AI chat applications that support MCP.
 
 1. **MCP Client Configuration**: Add this server to your MCP-compatible chat
    application
-2. **Tool Discovery**: The app automatically discovers all 15 legal research
+2. **Tool Discovery**: The app automatically discovers all 33 legal research
    tools
 3. **Natural Language**: Ask legal questions naturally - the AI will use
    appropriate tools
@@ -731,6 +935,14 @@ Run the comprehensive MCP validation test suite:
 
 ```bash
 npm run test:mcp
+```
+
+Quick remote handshake test (useful for Codex/client onboarding):
+
+```bash
+pnpm run mcp:test:remote
+# Optional for authenticated deployments:
+# MCP_REMOTE_BEARER_TOKEN=your-token pnpm run mcp:test:remote
 ```
 
 #### Visual Testing with MCP Inspector

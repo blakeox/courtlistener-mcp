@@ -58,12 +58,13 @@ jobs:
 
       - name: Run performance tests
         env:
-          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/sse' }}
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
           TEST_ENVIRONMENT: ${{ github.event.inputs.environment || 'remote' }}
         run: |
           echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
 
           mkdir -p performance-data
+          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
 
           case "$TEST_ENVIRONMENT" in
             "local")
@@ -72,16 +73,12 @@ jobs:
               ;;
             "remote")
               echo "Testing remote server performance..."
-              # Use SSE endpoint for performance tests
-              MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-              SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
               ;;
             "both")
               echo "Testing both local and remote server performance..."
               pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
-              # Use SSE endpoint for performance tests
-              MCP_ENDPOINT="${REMOTE_SERVER_URL%/health}/sse"
-              SERVER_URL="$MCP_ENDPOINT" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
               ;;
           esac
 
@@ -166,12 +163,13 @@ jobs:
     steps:
       - name: Check remote server health
         env:
-          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "🏥 Checking remote server health..."
+          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
 
           # Basic connectivity test
-          if curl -f -s --max-time 10 "$REMOTE_SERVER_URL" > /dev/null; then
+          if curl -f -s --max-time 10 "$REMOTE_HEALTH_URL" > /dev/null; then
             echo "✅ Remote server is responding"
           else
             echo "❌ Remote server is not responding"
@@ -183,8 +181,9 @@ jobs:
 
           response=$(curl -s --max-time 30 -X POST \
             -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
             -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"clientInfo":{"name":"Health Check","version":"1.0.0"}}}' \
-            "$REMOTE_SERVER_URL")
+            "$REMOTE_MCP_URL")
 
           if echo "$response" | grep -q '"result"'; then
             echo "✅ MCP protocol responding correctly"
@@ -203,7 +202,7 @@ jobs:
             const body = `
             The remote Legal MCP server is not responding to health checks.
 
-            **Server URL:** ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeopowell.workers.dev/health' }}
+            **Server URL:** ${{ secrets.REMOTE_SERVER_URL || 'https://courtlistener-mcp.blakeoxford.workers.dev' }}
             **Check Time:** ${new Date().toISOString()}
             **Workflow:** ${{ github.workflow }}
 
