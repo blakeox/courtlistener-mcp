@@ -63,5 +63,8 @@ jobs:
             exit 1
           fi
 
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run end-to-end auth/chat flow
         run: pnpm run test:e2e:auth-chat-flow

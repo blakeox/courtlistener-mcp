@@ -11,7 +11,21 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SERVER_URL = process.env.SERVER_URL || 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp';
+const SERVER_URL =
+  process.env.SERVER_URL || 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp';
+const MCP_REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
+
+function buildMcpRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+    'MCP-Protocol-Version': '2024-11-05',
+  };
+  if (MCP_REMOTE_BEARER_TOKEN) {
+    headers.Authorization = `Bearer ${MCP_REMOTE_BEARER_TOKEN}`;
+  }
+  return headers;
+}
 
 interface TestCase {
   name: string;
@@ -190,11 +204,7 @@ async function testMCPServer(): Promise<boolean> {
     try {
       const response = await fetch(SERVER_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, text/event-stream',
-          'MCP-Protocol-Version': '2024-11-05',
-        },
+        headers: buildMcpRequestHeaders(),
         body: JSON.stringify(test.payload),
       });
 
@@ -263,11 +273,7 @@ async function testSpecificFunction(
   try {
     const response = await fetch(SERVER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'MCP-Protocol-Version': '2024-11-05',
-      },
+      headers: buildMcpRequestHeaders(),
       body: JSON.stringify(payload),
     });
 

@@ -159,7 +159,8 @@ Pre-built configuration files for popular MCP clients are available in the
 [`configs/`](./configs/) directory:
 
 - `claude-desktop.json` — Claude Desktop (local stdio)
-- `claude-desktop-remote.json` — Claude Desktop (remote streamable HTTP via Cloudflare)
+- `claude-desktop-remote.json` — Claude Desktop (remote streamable HTTP via
+  Cloudflare)
 - `cursor.json` — Cursor
 - `continue-dev.json` — Continue
 - `vscode-copilot.json` — VS Code GitHub Copilot
@@ -623,17 +624,19 @@ wrangler secret put MCP_UI_PUBLIC_ORIGIN     # optional, e.g. https://courtliste
 wrangler secret put MCP_UI_INSECURE_COOKIES  # optional; set true only for local http dev
 ```
 
-`SUPABASE_PUBLISHABLE_KEY` is used by `POST /api/signup` to trigger Supabase's standard
-email-confirmation flow. `SUPABASE_SECRET_KEY` is used for login validation,
-API key lifecycle operations, and audit logging.
-`MCP_UI_PUBLIC_ORIGIN` forces email confirmation links to resolve to your hosted UI
-instead of localhost defaults.
-`MCP_UI_INSECURE_COOKIES=true` disables `Secure` cookie attributes for localhost HTTP
-testing only; do not use it in production.
+`SUPABASE_PUBLISHABLE_KEY` is used by `POST /api/signup` to trigger Supabase's
+standard email-confirmation flow. `SUPABASE_SECRET_KEY` is used for login
+validation, API key lifecycle operations, and audit logging.
+`MCP_UI_PUBLIC_ORIGIN` forces email confirmation links to resolve to your hosted
+UI instead of localhost defaults. `MCP_UI_INSECURE_COOKIES=true` disables
+`Secure` cookie attributes for localhost HTTP testing only; do not use it in
+production.
 
-Backward compatibility: `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are still accepted as legacy aliases.
+Backward compatibility: `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
+still accepted as legacy aliases.
 
 When Supabase auth is configured, users authenticate with:
+
 - `Authorization: Bearer <user_api_key>`
 
 The Worker hashes the bearer token and validates key status in Supabase
@@ -641,6 +644,7 @@ The Worker hashes the bearer token and validates key status in Supabase
 tool inputs, or usage payloads to Supabase.
 
 Built-in web UI routes (same Worker):
+
 - `GET /` (overview, browser only)
 - `GET /signup` (create account)
 - `GET /login` (authenticate account after email verification)
@@ -648,7 +652,8 @@ Built-in web UI routes (same Worker):
 - `GET /chat` (sample MCP chat bound to `/mcp`)
 - `GET /api/session`
 - `POST /api/login`
-- `POST /api/login/token` (automatic session exchange for Supabase email-confirm hash tokens)
+- `POST /api/login/token` (automatic session exchange for Supabase email-confirm
+  hash tokens)
 - `POST /api/logout`
 - `POST /api/signup`
 - `GET /api/keys`
@@ -656,9 +661,12 @@ Built-in web UI routes (same Worker):
 - `POST /api/keys/revoke`
 
 Legacy endpoint (disabled by default):
-- `POST /api/signup/issue-key` (enable only with `MCP_ENABLE_SIGNUP_ISSUE_KEY=true`)
+
+- `POST /api/signup/issue-key` (enable only with
+  `MCP_ENABLE_SIGNUP_ISSUE_KEY=true`)
 
 Web UI styling is compiled with Tailwind CSS v4 during builds via:
+
 - `npm run generate:web:styles`
 
 Optional signup bot-protection (Turnstile):
@@ -668,15 +676,19 @@ wrangler secret put TURNSTILE_SITE_KEY
 wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-When `TURNSTILE_SECRET_KEY` is set, `/api/signup` requires a valid Turnstile token.
+When `TURNSTILE_SECRET_KEY` is set, `/api/signup` requires a valid Turnstile
+token.
 
-Schema reference: [`docs/supabase/mcp-auth-schema.sql`](docs/supabase/mcp-auth-schema.sql)
-Audit schema reference: [`docs/supabase/mcp-audit-logs.sql`](docs/supabase/mcp-audit-logs.sql)
+Schema reference:
+[`docs/supabase/mcp-auth-schema.sql`](docs/supabase/mcp-auth-schema.sql) Audit
+schema reference:
+[`docs/supabase/mcp-audit-logs.sql`](docs/supabase/mcp-audit-logs.sql)
 
 Recommended setup flow:
 
 1. Run `docs/supabase/mcp-auth-schema.sql` in Supabase SQL editor.
-2. Create account at `/signup`, verify email, then login via `/api/login` (or UI on `/login`).
+2. Create account at `/signup`, verify email, then login via `/api/login` (or UI
+   on `/login`).
 3. Create your first key from `/keys` (or via `/api/keys` while logged in).
 4. Sign in with your first user account and run:
    - `select public.bootstrap_first_admin();`
@@ -727,13 +739,13 @@ wrangler secret put OIDC_REQUIRED_SCOPE  # optional
 ```
 
 When OIDC is configured, the Worker accepts tokens from either:
+
 - `Authorization: Bearer <jwt>`
 - `CF-Access-Jwt-Assertion: <jwt>` (Cloudflare Access)
 
 If OIDC, Supabase, and static token auth are all configured, runtime selection
-is controlled by:
-`MCP_AUTH_PRIMARY` (default: `supabase` when configured) with optional static
-fallback only when explicitly enabled.
+is controlled by: `MCP_AUTH_PRIMARY` (default: `supabase` when configured) with
+optional static fallback only when explicitly enabled.
 
 Auth policy controls:
 
@@ -746,10 +758,12 @@ wrangler secret put MCP_ALLOW_STATIC_FALLBACK
 ```
 
 Recommended production posture:
+
 - Set `MCP_AUTH_PRIMARY=supabase`
 - Remove `MCP_AUTH_TOKEN` after migration
 - Leave `MCP_ALLOW_STATIC_FALLBACK` unset (or set to `false`)
-- In Supabase Auth settings, enable leaked-password protection and email confirmation
+- In Supabase Auth settings, enable leaked-password protection and email
+  confirmation
 
 ### CORS and Protocol Guards
 
@@ -795,7 +809,8 @@ wrangler secret put MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS       # default 300
 wrangler secret put MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS        # default 300
 ```
 
-Optional key TTL hard cap (applies to `/api/keys`, and legacy `/api/signup/issue-key` if enabled):
+Optional key TTL hard cap (applies to `/api/keys`, and legacy
+`/api/signup/issue-key` if enabled):
 
 ```bash
 wrangler secret put MCP_API_KEY_MAX_TTL_DAYS                    # default 90
@@ -935,6 +950,8 @@ Run the comprehensive MCP validation test suite:
 
 ```bash
 npm run test:mcp
+# Optional for authenticated deployments:
+# MCP_REMOTE_BEARER_TOKEN=your-token npm run test:mcp
 ```
 
 Quick remote handshake test (useful for Codex/client onboarding):
@@ -975,6 +992,8 @@ Test individual functions:
 ```bash
 npm run test:mcp:tool search_cases '{"query":"privacy rights","court":"scotus","page_size":3}'
 npm run test:mcp:tool list_courts '{"jurisdiction":"F"}'
+# Optional for authenticated deployments:
+# MCP_REMOTE_BEARER_TOKEN=your-token npm run test:mcp:tool search_cases '{"query":"privacy rights"}'
 ```
 
 #### Complete Test Suite

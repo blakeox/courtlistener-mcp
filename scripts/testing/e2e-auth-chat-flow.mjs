@@ -6,11 +6,11 @@
  * Flow:
  * 1) Create account via /api/signup (with CSRF + cookie jar)
  * 2) Confirm created user via Supabase Admin API (email_confirm=true)
- * 3) Login via /api/login and assert /api/session authenticated=true
- * 4) Logout and assert /api/session authenticated=false
- * 5) Login again
- * 6) Create API key via /api/keys
- * 7) Call MCP initialize + tools/call using created key
+ * 3) Browser login via /login
+ * 4) Browser logout
+ * 5) Browser login again
+ * 6) Browser create API key via /keys UI and read token from page
+ * 7) Call MCP initialize + tools/call using the UI-created key
  *
  * Required env:
  *   E2E_BASE_URL
@@ -24,6 +24,7 @@
  *   E2E_TURNSTILE_TOKEN
  *   E2E_MCP_TOOL              (default: search_cases)
  *   E2E_MCP_PROMPT            (default: Roe v Wade abortion rights)
+ *   E2E_BROWSER_HEADLESS      (default: true)
  */
 
 const cfg = {
@@ -39,6 +40,7 @@ const cfg = {
   turnstileToken: process.env.E2E_TURNSTILE_TOKEN?.trim() || '',
   mcpTool: process.env.E2E_MCP_TOOL?.trim() || 'search_cases',
   mcpPrompt: process.env.E2E_MCP_PROMPT?.trim() || 'Roe v Wade abortion rights',
+  browserHeadless: process.env.E2E_BROWSER_HEADLESS?.trim().toLowerCase() !== 'false',
 };
 
 class CookieJar {
@@ -134,100 +136,11 @@ async function main() {
     return user.id;
   });
 
-  await step('Load /login for CSRF cookie', async () => {
-    const response = await fetch(`${cfg.baseUrl}/login`, {
-      method: 'GET',
-      headers: {
-        accept: 'text/html',
-        cookie: jar.header(),
-      },
+  const apiToken = await step('Browser flow: login, logout/login, create key from /keys', async () => {
+    const token = await getApiKeyFromBrowserUI(cfg.baseUrl, cfg.email, cfg.password, {
+      headless: cfg.browserHeadless,
     });
-    assert(response.ok, `GET /login failed (${response.status})`);
-    jar.setFromResponse(response);
-    assert(jar.get('clmcp_csrf'), 'Missing clmcp_csrf cookie after GET /login');
-  });
-
-  await step('Login with email/password', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/login`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': jar.get('clmcp_csrf'),
-        cookie: jar.header(),
-      },
-      body: JSON.stringify({ email: cfg.email, password: cfg.password }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    jar.setFromResponse(response);
-    assert(response.ok, `POST /api/login failed (${response.status}): ${JSON.stringify(payload)}`);
-    assert(jar.get('clmcp_ui'), 'Missing clmcp_ui session cookie after login');
-  });
-
-  await step('Validate /api/session authenticated=true', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/session`, {
-      method: 'GET',
-      headers: { cookie: jar.header() },
-    });
-    const payload = await response.json().catch(() => ({}));
-    jar.setFromResponse(response);
-    assert(response.ok, `GET /api/session failed (${response.status})`);
-    assert(payload?.authenticated === true, `Expected authenticated=true, got: ${JSON.stringify(payload)}`);
-    assert(payload?.user?.id === userId, `Expected user id ${userId}, got: ${JSON.stringify(payload?.user)}`);
-  });
-
-  await step('Logout', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/logout`, {
-      method: 'POST',
-      headers: {
-        'x-csrf-token': jar.get('clmcp_csrf'),
-        cookie: jar.header(),
-      },
-    });
-    const payload = await response.json().catch(() => ({}));
-    jar.setFromResponse(response);
-    assert(response.ok, `POST /api/logout failed (${response.status}): ${JSON.stringify(payload)}`);
-  });
-
-  await step('Validate /api/session authenticated=false', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/session`, {
-      method: 'GET',
-      headers: { cookie: jar.header() },
-    });
-    const payload = await response.json().catch(() => ({}));
-    assert(response.ok, `GET /api/session failed (${response.status})`);
-    assert(payload?.authenticated === false, `Expected authenticated=false, got: ${JSON.stringify(payload)}`);
-  });
-
-  await step('Login again', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/login`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': jar.get('clmcp_csrf'),
-        cookie: jar.header(),
-      },
-      body: JSON.stringify({ email: cfg.email, password: cfg.password }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    jar.setFromResponse(response);
-    assert(response.ok, `POST /api/login (second) failed (${response.status}): ${JSON.stringify(payload)}`);
-    assert(jar.get('clmcp_ui'), 'Missing clmcp_ui session cookie after second login');
-  });
-
-  const apiToken = await step('Create API key via /api/keys', async () => {
-    const response = await fetch(`${cfg.baseUrl}/api/keys`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': jar.get('clmcp_csrf'),
-        cookie: jar.header(),
-      },
-      body: JSON.stringify({ label: 'e2e-flow', expiresDays: 30 }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    assert(response.status === 201, `POST /api/keys failed (${response.status}): ${JSON.stringify(payload)}`);
-    const token = payload?.api_key?.token || '';
-    assert(token, 'No api_key.token returned from /api/keys');
+    assert(token, 'Browser flow did not return an API token');
     return token;
   });
 
@@ -294,6 +207,75 @@ async function main() {
 function buildToolArguments(toolName, prompt) {
   if (toolName === 'lookup_citation') return { citation: prompt };
   return { query: prompt, page_size: 5, order_by: 'score desc' };
+}
+
+async function getApiKeyFromBrowserUI(baseUrl, email, password, options = { headless: true }) {
+  let playwrightModule;
+  try {
+    playwrightModule = await import('playwright');
+  } catch {
+    throw new Error(
+      'Playwright is required for browser key retrieval. Install with `pnpm add -D playwright` and run `pnpm exec playwright install --with-deps chromium`.',
+    );
+  }
+
+  const browser = await playwrightModule.chromium.launch({
+    headless: options.headless !== false,
+  });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+    await page.fill('#email', email);
+    await page.fill('#password', password);
+    await Promise.all([
+      page.waitForURL(/\/keys(?:\?|$)/, { timeout: 20_000 }),
+      page.click('#loginBtn'),
+    ]);
+
+    await page.waitForSelector('#loadKeysBtn', { timeout: 20_000 });
+    const firstLoginSession = await page.evaluate(async () => {
+      const response = await fetch('/api/session', { credentials: 'same-origin' });
+      return response.json();
+    });
+    assert(
+      firstLoginSession?.authenticated === true,
+      `Expected authenticated session after first browser login, got ${JSON.stringify(firstLoginSession)}`,
+    );
+
+    await Promise.all([
+      page.waitForURL(/\/login(?:\?|$)/, { timeout: 20_000 }),
+      page.click('#logoutBtn'),
+    ]);
+
+    await page.fill('#email', email);
+    await page.fill('#password', password);
+    await Promise.all([
+      page.waitForURL(/\/keys(?:\?|$)/, { timeout: 20_000 }),
+      page.click('#loginBtn'),
+    ]);
+    await page.waitForSelector('#createKeyBtn', { timeout: 20_000 });
+
+    await page.fill('#newLabel', 'e2e-flow');
+    await page.fill('#newExpiresDays', '30');
+    await page.click('#createKeyBtn');
+
+    await page.waitForFunction(() => {
+      const el = document.getElementById('newKeyToken');
+      const text = el?.textContent || '';
+      return /[a-f0-9]{64}/i.test(text);
+    }, undefined, { timeout: 30_000 });
+
+    const tokenText = (await page.locator('#newKeyToken').textContent()) || '';
+    const match = tokenText.match(/[a-f0-9]{64}/i);
+    const token = match?.[0] || '';
+    assert(token, `No API token found in #newKeyToken text: ${tokenText.slice(0, 120)}`);
+    return token;
+  } finally {
+    await context.close();
+    await browser.close();
+  }
 }
 
 async function readMcpJson(response) {
