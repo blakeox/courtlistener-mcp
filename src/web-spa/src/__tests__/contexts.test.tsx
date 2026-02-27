@@ -81,6 +81,74 @@ describe('PlaygroundProvider', () => {
     expect(result.current.lastRawMcp).toBe('{"test": true}');
   });
 
+  it('addProtocolEntry adds to protocol log', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    act(() => result.current.addProtocolEntry('request', { method: 'initialize' }));
+    expect(result.current.protocolLog).toHaveLength(1);
+    expect(result.current.protocolLog[0].direction).toBe('request');
+    expect(result.current.protocolLog[0].payload).toEqual({ method: 'initialize' });
+    expect(result.current.protocolLog[0].at).toBeTruthy();
+  });
+
+  it('addProtocolEntry accumulates multiple entries', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    act(() => result.current.addProtocolEntry('request', { method: 'tools/call' }));
+    act(() => result.current.addProtocolEntry('response', { result: {} }));
+    expect(result.current.protocolLog).toHaveLength(2);
+    expect(result.current.protocolLog[0].direction).toBe('request');
+    expect(result.current.protocolLog[1].direction).toBe('response');
+  });
+
+  it('clearProtocol empties protocol log', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    act(() => result.current.addProtocolEntry('request', { method: 'init' }));
+    act(() => result.current.addProtocolEntry('response', { result: {} }));
+    act(() => result.current.clearProtocol());
+    expect(result.current.protocolLog).toEqual([]);
+  });
+
+  it('protocolLog starts empty', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    expect(result.current.protocolLog).toEqual([]);
+  });
+
+  it('append supports optional meta parameter', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    act(() => result.current.append('system', 'Tool info', { tool: 'search_cases', latency: 120 }));
+    expect(result.current.transcript).toHaveLength(1);
+    expect(result.current.transcript[0].meta).toEqual({ tool: 'search_cases', latency: 120 });
+  });
+
+  it('append without meta leaves meta undefined', async () => {
+    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
+    );
+    const { result } = renderHook(() => usePlayground(), { wrapper });
+    act(() => result.current.append('user', 'Hello'));
+    expect(result.current.transcript[0].meta).toBeUndefined();
+  });
+
   it('throws when used outside provider', async () => {
     const { usePlayground } = await import('../lib/playground-context');
     expect(() => {

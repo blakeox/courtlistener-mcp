@@ -70,6 +70,45 @@ describe('api-mock', () => {
     expect(result.session_id).toBeTruthy();
   });
 
+  it('aiChat includes tool_reason in response', async () => {
+    const mock = await import('../lib/api-mock');
+    const result = await mock.aiChat({ message: 'test query', mcpToken: 'tok' });
+    expect(result.tool_reason).toBeTruthy();
+    expect(typeof result.tool_reason).toBe('string');
+  });
+
+  it('aiChat accepts history parameter', async () => {
+    const mock = await import('../lib/api-mock');
+    const result = await mock.aiChat({
+      message: 'follow up',
+      mcpToken: 'tok',
+      history: [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'response' }],
+    });
+    expect(result.ai_response).toBeTruthy();
+  });
+
+  it('aiPlain returns structured mock response', async () => {
+    const mock = await import('../lib/api-mock');
+    const result = await mock.aiPlain({ message: 'test legal question' });
+    expect(result.ai_response).toBeTruthy();
+    expect(result.mode).toBe('cheap');
+  });
+
+  it('aiPlain respects mode parameter', async () => {
+    const mock = await import('../lib/api-mock');
+    const result = await mock.aiPlain({ message: 'test', mode: 'balanced' });
+    expect(result.mode).toBe('balanced');
+  });
+
+  it('aiPlain accepts history parameter', async () => {
+    const mock = await import('../lib/api-mock');
+    const result = await mock.aiPlain({
+      message: 'follow up',
+      history: [{ role: 'user', content: 'prior' }, { role: 'assistant', content: 'prior resp' }],
+    });
+    expect(result.ai_response).toBeTruthy();
+  });
+
   it('toErrorMessage handles various error types', async () => {
     const mock = await import('../lib/api-mock');
     expect(mock.toErrorMessage(null)).toBe('Unknown error');

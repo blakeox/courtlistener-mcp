@@ -152,14 +152,16 @@ export async function aiChat(_args: {
   message: string;
   mcpToken: string;
   mcpSessionId?: string;
-  toolName?: 'auto' | 'search_cases' | 'search_opinions' | 'lookup_citation';
+  toolName?: string;
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;
+  history?: Array<{ role: string; content: string }>;
 }): Promise<{
   test_mode: boolean;
   fallback_used: boolean;
   mode: 'cheap' | 'balanced';
   tool: string;
+  tool_reason?: string;
   session_id: string;
   ai_response: string;
   mcp_result: unknown;
@@ -170,10 +172,27 @@ export async function aiChat(_args: {
     fallback_used: false,
     mode: 'cheap',
     tool: 'search_cases',
+    tool_reason: 'Default: general case search for broad legal queries.',
     session_id: `mock-session-${Date.now()}`,
     ai_response:
       'Mock AI response: This is a simulated AI chat result for UI development. The search found several relevant cases discussing the topic.',
     mcp_result: { content: [{ type: 'text', text: 'Mock MCP result data' }] },
+  };
+}
+
+export async function aiPlain(_args: {
+  message: string;
+  mode?: 'cheap' | 'balanced';
+  history?: Array<{ role: string; content: string }>;
+}): Promise<{
+  ai_response: string;
+  mode: 'cheap' | 'balanced';
+}> {
+  await delay(600);
+  return {
+    ai_response:
+      'Mock plain AI response: This is a simulated response without MCP tools. I can only answer from my training data.',
+    mode: _args.mode ?? 'cheap',
   };
 }
 

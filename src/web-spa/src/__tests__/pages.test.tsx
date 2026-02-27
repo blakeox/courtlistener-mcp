@@ -19,7 +19,8 @@ vi.mock('../lib/api', () => ({
   createKey: vi.fn().mockResolvedValue({ message: 'ok', api_key: { id: 'k1', label: 'test', created_at: '2024-01-01', expires_at: null, token: 'tok' } }),
   revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
-  aiChat: vi.fn().mockResolvedValue({ test_mode: true, fallback_used: false, mode: 'cheap', tool: 'search_cases', session_id: 'sid', ai_response: 'resp', mcp_result: {} }),
+  aiChat: vi.fn().mockResolvedValue({ test_mode: true, fallback_used: false, mode: 'cheap', tool: 'search_cases', tool_reason: 'Default search', session_id: 'sid', ai_response: 'resp', mcp_result: {} }),
+  aiPlain: vi.fn().mockResolvedValue({ ai_response: 'plain resp', mode: 'cheap' }),
   toErrorMessage: vi.fn().mockReturnValue('Error'),
 }));
 
@@ -241,10 +242,73 @@ describe('PlaygroundPage', () => {
     expect(screen.getByRole('tablist', { name: /playground mode/i })).toBeInTheDocument();
   });
 
-  it('shows Raw MCP and AI Chat tab buttons', async () => {
+  it('shows all three tab buttons', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('tab', { name: /raw mcp console/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /ai chat/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /compare/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /raw mcp console/i })).toBeInTheDocument();
+  });
+
+  it('AI Chat tab is selected by default', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    const aiTab = screen.getByRole('tab', { name: /ai chat/i });
+    expect(aiTab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('shows AI Chat panel content by default', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    // AI Chat panel should show empty state message
+    expect(screen.getByText(/start a conversation/i)).toBeInTheDocument();
+  });
+
+  it('shows preset buttons in AI Chat tab', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    // Should show AI preset buttons (from AI_PRESETS)
+    expect(screen.getByText(/case search/i)).toBeInTheDocument();
+    expect(screen.getByText(/citation lookup/i)).toBeInTheDocument();
+  });
+
+  it('shows tool catalog toggle button', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    expect(screen.getByText(/show tool catalog/i)).toBeInTheDocument();
+  });
+
+  it('shows session badge', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    // SessionBadge shows session status
+    expect(screen.getByText(/session/i)).toBeInTheDocument();
+  });
+
+  it('shows token missing warning when no token set', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    expect(screen.getByText(/no bearer token set/i)).toBeInTheDocument();
+  });
+
+  it('renders AI Chat input area with textarea and send button', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    expect(screen.getByPlaceholderText(/ask a legal research question/i)).toBeInTheDocument();
+    expect(screen.getByText('Send')).toBeInTheDocument();
+  });
+
+  it('Compare tab panel is hidden when not active', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    const comparePanel = document.getElementById('panel-compare');
+    expect(comparePanel?.hidden).toBe(true);
+  });
+
+  it('Raw MCP Console tab panel is hidden when not active', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    const rawPanel = document.getElementById('panel-raw');
+    expect(rawPanel?.hidden).toBe(true);
   });
 });
