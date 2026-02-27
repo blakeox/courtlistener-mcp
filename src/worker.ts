@@ -294,8 +294,8 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
-const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.2-3b-instruct';
-const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct';
+const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.2-1b-instruct';
+const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct-fast';
 const CHEAP_MODE_MAX_TOKENS = 350;
 const BALANCED_MODE_MAX_TOKENS = 800;
 
@@ -2161,19 +2161,24 @@ export default {
           }
           messages.push({ role: 'user', content: mcpContext });
 
-          const completion = await env.AI.run(model, {
-            messages,
-            max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
-          });
+          try {
+            const completion = await env.AI.run(model, {
+              messages,
+              max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
+              temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
+            });
 
-          const aiText =
-            (completion as { response?: string }).response ||
-            (completion as { result?: { response?: string } }).result?.response ||
-            '';
-          if (aiText.trim()) {
-            completionText = aiText.trim();
-            fallbackUsed = false;
+            const aiText =
+              (completion as { response?: string }).response ||
+              (completion as { result?: { response?: string } }).result?.response ||
+              '';
+            if (aiText.trim()) {
+              completionText = aiText.trim();
+              fallbackUsed = false;
+            }
+          } catch (aiError) {
+            console.error('[ui-api] AI.run failed, using fallback summary', { model, error: aiError });
+            // fallbackUsed stays true, completionText stays as buildLowCostSummary
           }
         }
         if (!completionText.trim()) {
