@@ -294,9 +294,10 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
-const DEFAULT_CF_AI_MODEL = '@cf/meta/llama-3.2-1b-instruct';
-const CHEAP_MODE_MAX_TOKENS = 180;
-const BALANCED_MODE_MAX_TOKENS = 420;
+const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.2-3b-instruct';
+const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct';
+const CHEAP_MODE_MAX_TOKENS = 350;
+const BALANCED_MODE_MAX_TOKENS = 800;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -419,6 +420,34 @@ function buildLowCostSummary(
     compact,
     'Next follow-up query: Ask for a narrower court, date range, or citation for more precise results.',
   ].join('\n\n');
+}
+
+/** Extract key structured fields from MCP response to give the LLM cleaner context. */
+function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number): string {
+  try {
+    const payload = mcpPayload as Record<string, unknown>;
+    const result = payload?.result as Record<string, unknown> | undefined;
+    const content = result?.content as Array<{ type?: string; text?: string }> | undefined;
+
+    // Most MCP tools return result.content[].text with the actual data
+    if (Array.isArray(content) && content.length > 0) {
+      const texts = content
+        .filter((c) => c.type === 'text' && c.text)
+        .map((c) => c.text!)
+        .join('\n\n');
+      if (texts.length > 0) {
+        const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
+        return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
+      }
+    }
+
+    // Fallback: stringify the payload
+    const raw = JSON.stringify(mcpPayload);
+    return `Tool: ${toolName}\n\nRaw response:\n${raw.length > maxLen ? `${raw.slice(0, maxLen)}... [truncated]` : raw}`;
+  } catch {
+    const raw = JSON.stringify(mcpPayload);
+    return `Tool: ${toolName}\n\nRaw response:\n${raw.slice(0, maxLen)}`;
+  }
 }
 
 async function callMcpJsonRpc(
@@ -2102,11 +2131,25 @@ export default {
         let completionText = buildLowCostSummary(message, toolName, toolResult.payload);
         let fallbackUsed = true;
         if (env.AI && typeof env.AI.run === 'function') {
-          const model = env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CF_AI_MODEL;
+          const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
           const systemPrompt = testMode
             ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
-            : 'You are a legal research assistant having a multi-turn conversation. Keep response under 140 words. Use sections: Summary, What MCP Returned, Next Follow-up Query. Reference prior conversation context when relevant.';
-          const mcpContext = `User question: ${message}\n\nMCP tool used: ${toolName}\n\nMCP raw response JSON:\n${JSON.stringify(toolResult.payload).slice(0, mode === 'cheap' ? 3500 : 10000)}`;
+            : [
+                'You are a legal research assistant with access to CourtListener via MCP tools.',
+                'CRITICAL RULES:',
+                '- ONLY cite case names, dates, courts, and holdings that appear in the data below.',
+                '- If the data does not contain specific case names or holdings, say "The search returned N results" and describe what categories of data were found.',
+                '- NEVER invent or hallucinate case names, citations, dates, or holdings.',
+                '- If you are unsure about a detail, say so explicitly.',
+                '- Quote directly from the returned data when possible.',
+                'Format your response with these sections:',
+                '**Summary**: A 1-2 sentence overview answering the user question based on the data.',
+                '**What MCP Returned**: Specific findings from the data — case names, citations, holdings, or counts. Only include what is actually in the data.',
+                '**Suggested Follow-up**: One specific follow-up query the user could try.',
+                conversationHistory.length > 0 ? 'Reference prior conversation context when relevant.' : '',
+              ].filter(Boolean).join('\n');
+          const dataMaxLen = mode === 'cheap' ? 4000 : 12000;
+          const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, toolResult.payload, dataMaxLen)}`;
 
           // Build messages array with conversation history
           const messages: Array<{ role: string; content: string }> = [
@@ -2121,7 +2164,7 @@ export default {
           const completion = await env.AI.run(model, {
             messages,
             max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.2,
+            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
           });
 
           const aiText =
@@ -2203,11 +2246,19 @@ export default {
         return jsonError('AI service unavailable.', 502, 'ai_unavailable');
       }
       try {
-        const model = env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CF_AI_MODEL;
+        const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
         const messages: Array<{ role: string; content: string }> = [
           {
             role: 'system',
-            content: 'You are a legal research assistant. Answer legal questions using ONLY your training data — you have NO access to any external databases, APIs, or tools. Keep response under 140 words. Be honest about the limitations of answering without real-time legal data.',
+            content: [
+              'You are a legal research assistant answering ONLY from your training data.',
+              'You have NO access to any external databases, APIs, or live legal data.',
+              'RULES:',
+              '- Be honest when you are uncertain about specific case names, dates, or holdings.',
+              '- Clearly state when information may be outdated or approximate.',
+              '- Do not fabricate specific case citations or holdings you are not confident about.',
+              '- Suggest the user verify any specific citations with an authoritative source.',
+            ].join('\n'),
           },
         ];
         for (const turn of conversationHistory) {
@@ -2218,7 +2269,7 @@ export default {
         const completion = await env.AI.run(model, {
           messages,
           max_tokens: mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-          temperature: mode === 'cheap' ? 0 : 0.2,
+          temperature: mode === 'cheap' ? 0 : 0.1,
         });
         const aiText =
           (completion as { response?: string }).response ||
