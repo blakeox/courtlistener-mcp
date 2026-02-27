@@ -20,6 +20,7 @@ node_modules/
 *.pid
 *.seed
 *.pid.lock
+src/web/spa-assets.ts
 
 # Environment
 .env
