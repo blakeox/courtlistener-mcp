@@ -50,6 +50,7 @@ import {
 } from './server/worker-security.js';
 import {
   authenticateUserWithPassword,
+  confirmUserEmail,
   createApiKeyForUser,
   getSupabaseManagementConfig,
   getSupabaseSignupConfig,
@@ -1593,7 +1594,38 @@ export default {
       }
 
       try {
-        await resetPasswordWithAccessToken(signupConfig, accessToken, password);
+        const user = await resetPasswordWithAccessToken(signupConfig, accessToken, password);
+
+        // Recovery link proves email ownership — confirm email if not yet confirmed
+        const managementConfig = getSupabaseManagementConfig(env);
+        if (managementConfig && user?.id && !user.email_confirmed_at) {
+          try {
+            await confirmUserEmail(managementConfig, user.id);
+          } catch (confirmErr) {
+            console.warn('email_confirm_after_reset_failed', confirmErr);
+          }
+        }
+
+        // Auto-login: create session so user doesn't have to re-enter credentials
+        const userId = user?.id;
+        const sessionSecret = getUiSessionSecret(env);
+        if (userId && sessionSecret) {
+          const sessionToken = await createUiSessionToken(userId, sessionSecret, 12 * 60 * 60);
+          const secureCookies = isSecureCookieRequest(request, env);
+          const responseHeaders = new Headers();
+          responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
+          responseHeaders.append('Set-Cookie', buildUiSessionIndicatorCookie(secureCookies));
+          applySecurityHeaders(responseHeaders);
+          return Response.json(
+            {
+              message: 'Password has been reset. You are now logged in.',
+              autoLogin: true,
+              user: { id: userId, email: user.email ?? null },
+            },
+            { status: 200, headers: responseHeaders },
+          );
+        }
+
         return jsonResponse({ message: 'Password has been reset. You can now log in.' }, 200);
       } catch {
         return jsonError('Invalid or expired recovery token.', 401, 'invalid_recovery_token');

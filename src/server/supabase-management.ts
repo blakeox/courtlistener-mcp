@@ -240,7 +240,7 @@ export async function resetPasswordWithAccessToken(
   config: SupabaseSignupConfig,
   accessToken: string,
   newPassword: string,
-): Promise<void> {
+): Promise<SupabaseUser> {
   const token = accessToken.trim();
   if (!token) {
     throw new Error('access_token_required');
@@ -260,6 +260,27 @@ export async function resetPasswordWithAccessToken(
   if (!response.ok) {
     const message = await readSupabaseError(response);
     throw new Error(`password_reset_failed:${message}`);
+  }
+
+  const user = (await response.json()) as SupabaseUser;
+  return user;
+}
+
+/** Confirm a user's email via the Supabase Admin API (requires service role key). */
+export async function confirmUserEmail(
+  config: SupabaseAuthConfig,
+  userId: string,
+): Promise<void> {
+  const url = `${cleanUrl(config.url)}/auth/v1/admin/users/${encodeURIComponent(userId)}`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: toJsonHeaders(config.serviceRoleKey),
+    body: JSON.stringify({ email_confirm: true }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`email_confirm_failed:${message}`);
   }
 }
 

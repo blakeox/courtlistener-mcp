@@ -24,6 +24,8 @@ export interface PasswordResetResponse {
   message?: string;
   error?: string;
   error_code?: string;
+  autoLogin?: boolean;
+  user?: { id: string; email: string | null };
 }
 
 export interface ApiKeyRecord {

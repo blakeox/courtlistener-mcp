@@ -6,11 +6,13 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
 import { getRecoveryToken } from '../lib/hash-utils';
 import { validatePassword } from '../lib/validation';
+import { useAuth } from '../lib/auth';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
 
 export function ResetPasswordPage(): React.JSX.Element {
   useDocumentTitle('Reset Password');
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -48,9 +50,17 @@ export function ResetPasswordPage(): React.JSX.Element {
         password,
       });
       window.history.replaceState({}, document.title, '/app/reset-password');
-      setOk(result.message ?? 'Password updated successfully. Redirecting to login...');
-      trackEvent('password_reset_succeeded');
-      setTimeout(() => navigate('/app/login', { replace: true }), 400);
+
+      if (result.autoLogin) {
+        await refresh();
+        setOk('Password updated. Redirecting...');
+        trackEvent('password_reset_succeeded', { autoLogin: true });
+        setTimeout(() => navigate('/app/keys', { replace: true }), 400);
+      } else {
+        setOk(result.message ?? 'Password updated successfully. Redirecting to login...');
+        trackEvent('password_reset_succeeded');
+        setTimeout(() => navigate('/app/login', { replace: true }), 400);
+      }
     } catch (error) {
       setError(toErrorMessage(error));
       trackEvent('password_reset_failed', { category: 'auth' });

@@ -72,7 +72,14 @@ export function LoginPage(): React.JSX.Element {
       trackEvent('login_succeeded', { type: 'password' });
       setTimeout(() => navigate('/app/keys'), 200);
     } catch (error) {
-      setError('Login failed. Check your credentials and try again.');
+      const apiErr = error as { error_code?: string; message?: string; status?: number };
+      if (apiErr.error_code === 'email_not_verified') {
+        setError('Email verification is required. Check your inbox or request a password reset to verify.');
+      } else if (apiErr.message) {
+        setError(apiErr.message);
+      } else {
+        setError('Login failed. Check your credentials and try again.');
+      }
       backoff.trigger(error);
       trackEvent('login_failed', { category: 'auth' });
     } finally {
