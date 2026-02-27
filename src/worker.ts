@@ -732,6 +732,11 @@ function getUiSessionSecret(env: Env): string | null {
   }
 
   if (!parseBoolean(env.MCP_UI_ALLOW_SUPABASE_SECRET_FALLBACK)) {
+    // Auto-derive from Supabase publishable key (stored server-side only)
+    const anonKey = env.SUPABASE_PUBLISHABLE_KEY?.trim() || '';
+    if (anonKey) {
+      return `clmcp-session-v1:${anonKey}`;
+    }
     return null;
   }
 
