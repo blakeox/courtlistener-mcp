@@ -459,8 +459,13 @@ async function callMcpJsonRpc(
   id: number,
   sessionId?: string,
 ): Promise<{ payload: unknown; sessionId: string | null }> {
+  // Resolve the best available token for internal MCP calls:
+  // 1. MCP_AUTH_TOKEN (static secret) is the most reliable for internal use
+  // 2. Fall back to the user-provided token if no static token is configured
+  const effectiveToken = env.MCP_AUTH_TOKEN?.trim() || token;
+
   const headers = new Headers({
-    authorization: `Bearer ${token}`,
+    authorization: `Bearer ${effectiveToken}`,
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
     'MCP-Protocol-Version': '2025-06-18',
