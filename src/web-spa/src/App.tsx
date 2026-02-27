@@ -1,21 +1,33 @@
 import React from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Shell, AuthRequired } from './components/Shell';
-import { SignupPage } from './pages/SignupPage';
-import { LoginPage } from './pages/LoginPage';
-import { ResetPasswordPage } from './pages/ResetPasswordPage';
-import { OnboardingPage } from './pages/OnboardingPage';
-import { KeysPage } from './pages/KeysPage';
-import { ConsolePage } from './pages/ConsolePage';
-import { AccountPage } from './pages/AccountPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+const SignupPage = React.lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
+const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
+const KeysPage = React.lazy(() => import('./pages/KeysPage').then(m => ({ default: m.KeysPage })));
+const PlaygroundPage = React.lazy(() => import('./pages/PlaygroundPage').then(m => ({ default: m.PlaygroundPage })));
+const AccountPage = React.lazy(() => import('./pages/AccountPage').then(m => ({ default: m.AccountPage })));
 import { useAuth } from './lib/auth';
 import { listKeys } from './lib/api';
+import { TokenProvider } from './lib/token-context';
+import { ToastProvider } from './components/Toast';
+
+function PageLoader(): React.JSX.Element {
+  return (
+    <div className="loading" role="status" aria-busy="true" aria-label="Loading page">
+      <div className="skeleton skeleton-line"></div>
+      <div className="skeleton skeleton-line short"></div>
+    </div>
+  );
+}
 
 export function App(): React.JSX.Element {
   const { session } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const keysQuery = useQuery({
     queryKey: ['keys', 'progress'],
@@ -33,71 +45,67 @@ export function App(): React.JSX.Element {
   );
 
   const steps = [
-    { label: 'Create account', complete: hasAccount, active: location.pathname === '/app/signup' },
+    { label: 'Create account', complete: hasAccount, active: location.pathname === '/app/signup', to: '/app/signup' },
     {
-      label: 'Verify email',
+      label: 'Verify & Login',
       complete: hasVerifiedAndLoggedIn,
       active: location.pathname === '/app/login' || location.pathname === '/app/reset-password',
+      to: '/app/login',
     },
-    {
-      label: 'Login',
-      complete: hasVerifiedAndLoggedIn,
-      active: location.pathname === '/app/login' || location.pathname === '/app/reset-password',
-    },
-    { label: 'Create key', complete: hasKey, active: location.pathname === '/app/keys' },
-    { label: 'First MCP call', complete: hasMcpSuccess, active: location.pathname === '/app/console' },
+    { label: 'Create key', complete: hasKey, active: location.pathname === '/app/keys', to: '/app/keys', disabled: !hasVerifiedAndLoggedIn },
+    { label: 'First MCP call', complete: hasMcpSuccess, active: location.pathname === '/app/playground', to: '/app/playground', disabled: !hasKey },
   ];
 
-  React.useEffect(() => {
-    const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-    if (!raw) return;
-    const params = new URLSearchParams(raw);
-    const flowType = (params.get('type') || '').trim().toLowerCase();
-    const accessToken = (params.get('access_token') || '').trim();
-    if (flowType !== 'recovery' || !accessToken) return;
-    if (location.pathname === '/app/reset-password') return;
-    navigate(
-      {
-        pathname: '/app/reset-password',
-        hash: window.location.hash,
-      },
-      { replace: true },
-    );
-  }, [location.pathname, navigate]);
-
   return (
-    <Shell steps={steps}>
-      <Routes>
-        <Route path="/app/signup" element={<SignupPage />} />
-        <Route path="/app/login" element={<LoginPage />} />
-        <Route path="/app/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/app/onboarding" element={<OnboardingPage />} />
-        <Route
-          path="/app/keys"
-          element={
-            <AuthRequired>
-              <KeysPage />
-            </AuthRequired>
-          }
-        />
-        <Route
-          path="/app/console"
-          element={
-            <AuthRequired>
-              <ConsolePage />
-            </AuthRequired>
-          }
-        />
-        <Route
-          path="/app/account"
-          element={
-            <AuthRequired>
-              <AccountPage />
-            </AuthRequired>
-          }
-        />
-        <Route path="*" element={<Navigate to="/app/onboarding" replace />} />
-      </Routes>
-    </Shell>
+    <TokenProvider>
+      <ToastProvider>
+        <Shell steps={steps}>
+          <ErrorBoundary>
+          <React.Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/app/signup" element={<SignupPage />} />
+            <Route path="/app/login" element={<LoginPage />} />
+            <Route path="/app/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/app/onboarding" element={<OnboardingPage />} />
+            <Route
+              path="/app/keys"
+              element={
+                <AuthRequired>
+                  <KeysPage />
+                </AuthRequired>
+              }
+            />
+            <Route
+              path="/app/playground"
+              element={
+                <AuthRequired>
+                  <PlaygroundPage />
+                </AuthRequired>
+              }
+            />
+            <Route
+              path="/app/account"
+              element={
+                <AuthRequired>
+                  <AccountPage />
+                </AuthRequired>
+              }
+            />
+            <Route path="*" element={<SmartRedirect hasAccount={hasAccount} hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasKey={hasKey} hasMcpSuccess={hasMcpSuccess} />} />
+          </Routes>
+          </React.Suspense>
+          </ErrorBoundary>
+        </Shell>
+      </ToastProvider>
+    </TokenProvider>
   );
+}
+
+function SmartRedirect(props: { hasAccount: boolean; hasVerifiedAndLoggedIn: boolean; hasKey: boolean; hasMcpSuccess: boolean }): React.JSX.Element {
+  let target = '/app/signup';
+  if (props.hasMcpSuccess) target = '/app/onboarding';
+  else if (props.hasKey) target = '/app/playground';
+  else if (props.hasVerifiedAndLoggedIn) target = '/app/keys';
+  else if (props.hasAccount) target = '/app/login';
+  return <Navigate to={target} replace />;
 }

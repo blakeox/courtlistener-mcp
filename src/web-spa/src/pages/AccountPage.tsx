@@ -1,20 +1,15 @@
 import React from 'react';
 import { useAuth } from '../lib/auth';
+import { useToken } from '../lib/token-context';
+import { useToast } from '../components/Toast';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Button, Card } from '../components/ui';
-import { readToken, isPersistedToken, clearToken } from '../lib/storage';
 
 export function AccountPage(): React.JSX.Element {
+  useDocumentTitle('Account');
   const { session, logout } = useAuth();
-  const [tokenSummary, setTokenSummary] = React.useState('none');
-
-  React.useEffect(() => {
-    const token = readToken();
-    if (!token) {
-      setTokenSummary('none');
-      return;
-    }
-    setTokenSummary(isPersistedToken() ? 'localStorage' : 'sessionStorage');
-  }, []);
+  const { token, persisted, clear } = useToken();
+  const { toast } = useToast();
 
   return (
     <div className="stack">
@@ -25,14 +20,14 @@ export function AccountPage(): React.JSX.Element {
           <dt>User ID</dt>
           <dd className="mono">{session?.user?.id ?? 'n/a'}</dd>
           <dt>Token storage mode</dt>
-          <dd>{tokenSummary}</dd>
+          <dd>{token ? (persisted ? 'localStorage' : 'sessionStorage') : 'none'}</dd>
         </dl>
         <div className="row">
           <Button
             variant="secondary"
             onClick={() => {
-              clearToken();
-              setTokenSummary('none');
+              clear();
+              toast('Token cleared', 'info');
             }}
           >
             Clear stored token
@@ -40,7 +35,11 @@ export function AccountPage(): React.JSX.Element {
           <Button
             variant="danger"
             onClick={async () => {
-              await logout();
+              try {
+                await logout();
+              } catch {
+                toast('Logout failed — local state cleared.', 'error');
+              }
             }}
           >
             Logout

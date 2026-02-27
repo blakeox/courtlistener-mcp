@@ -4,26 +4,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { AuthProvider } from './lib/auth';
+import { redirectRecoveryHashToResetPage } from './lib/hash-utils';
 import './styles.css';
-
-function redirectRecoveryHashToResetPage(): void {
-  const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-  if (!rawHash) return;
-  const params = new URLSearchParams(rawHash);
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  const accessToken = (params.get('access_token') || '').trim();
-  if (flowType !== 'recovery' || !accessToken) return;
-  if (window.location.pathname === '/app/reset-password') return;
-  window.location.replace(`/app/reset-password#${rawHash}`);
-}
 
 redirectRecoveryHashToResetPage();
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      staleTime: 10_000,
+      staleTime: 30_000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        const status = (error as { status?: number })?.status;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
     },
   },
 });

@@ -9,8 +9,28 @@ export default defineConfig({
     outDir: path.resolve(__dirname, '../../.spa-dist'),
     emptyOutDir: true,
     manifest: true,
+    sourcemap: false,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+        },
+      },
+    },
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/mcp': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
 });

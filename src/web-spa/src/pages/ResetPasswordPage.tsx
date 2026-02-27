@@ -2,39 +2,23 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { resetPassword, requestPasswordReset, toErrorMessage } from '../lib/api';
 import { trackEvent } from '../lib/telemetry';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useStatus } from '../hooks/useStatus';
+import { getRecoveryToken } from '../lib/hash-utils';
+import { validatePassword } from '../lib/validation';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
 
-function getRecoveryAccessTokenFromHash(): string {
-  const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-  const params = new URLSearchParams(raw);
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  const tokenType = (params.get('token_type') || '').trim().toLowerCase();
-  const accessToken = (params.get('access_token') || '').trim();
-  if (flowType !== 'recovery') return '';
-  if (!accessToken) return '';
-  if (tokenType && tokenType !== 'bearer') return '';
-  return accessToken;
-}
-
-function validatePassword(password: string): string | null {
-  if (password.length < 8) return 'Password must be at least 8 characters.';
-  if (!/[A-Z]/.test(password)) return 'Password should include an uppercase letter.';
-  if (!/[a-z]/.test(password)) return 'Password should include a lowercase letter.';
-  if (!/[0-9]/.test(password)) return 'Password should include a number.';
-  return null;
-}
-
 export function ResetPasswordPage(): React.JSX.Element {
+  useDocumentTitle('Reset Password');
   const navigate = useNavigate();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [status, setStatus] = React.useState('');
-  const [statusType, setStatusType] = React.useState<'ok' | 'error' | 'info'>('info');
+  const { status, statusType, setOk, setError, setInfo } = useStatus();
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
-  const recoveryAccessToken = React.useMemo(() => getRecoveryAccessTokenFromHash(), []);
+  const recoveryAccessToken = getRecoveryToken();
   const canReset = Boolean(recoveryAccessToken);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -42,25 +26,21 @@ export function ResetPasswordPage(): React.JSX.Element {
     const pwdError = validatePassword(password);
     if (pwdError) {
       setPasswordError(pwdError);
-      setStatus('Please address password requirements.');
-      setStatusType('error');
+      setError('Please address password requirements.');
       return;
     }
     if (password !== confirmPassword) {
       setPasswordError('Passwords do not match.');
-      setStatus('Passwords do not match.');
-      setStatusType('error');
+      setError('Passwords do not match.');
       return;
     }
     if (!recoveryAccessToken) {
-      setStatus('Password reset link is missing or invalid. Request a new one.');
-      setStatusType('error');
+      setError('Password reset link is missing or invalid. Request a new one.');
       return;
     }
 
     setBusy(true);
-    setStatus('Resetting password...');
-    setStatusType('info');
+    setInfo('Resetting password...');
 
     try {
       const result = await resetPassword({
@@ -68,14 +48,31 @@ export function ResetPasswordPage(): React.JSX.Element {
         password,
       });
       window.history.replaceState({}, document.title, '/app/reset-password');
-      setStatus(result.message ?? 'Password updated successfully. Redirecting to login...');
-      setStatusType('ok');
+      setOk(result.message ?? 'Password updated successfully. Redirecting to login...');
       trackEvent('password_reset_succeeded');
       setTimeout(() => navigate('/app/login', { replace: true }), 400);
     } catch (error) {
-      setStatus(toErrorMessage(error));
-      setStatusType('error');
+      setError(toErrorMessage(error));
       trackEvent('password_reset_failed', { category: 'auth' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetRequest(): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setError('A valid email is required.');
+      return;
+    }
+    setBusy(true);
+    setInfo('Sending password reset email...');
+    try {
+      const result = await requestPasswordReset({ email: normalizedEmail });
+      setOk(result.message || 'If the request can be processed, check your email for reset instructions.');
+      trackEvent('password_reset_requested');
+    } catch (error) {
+      setError(toErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -91,6 +88,7 @@ export function ResetPasswordPage(): React.JSX.Element {
                 id="password"
                 type="password"
                 autoComplete="new-password"
+                autoFocus
                 required
                 value={password}
                 onChange={(event) => {
@@ -134,31 +132,7 @@ export function ResetPasswordPage(): React.JSX.Element {
             <div className="row">
               <Button
                 type="button"
-                onClick={async () => {
-                  const normalizedEmail = email.trim().toLowerCase();
-                  if (!normalizedEmail || !normalizedEmail.includes('@')) {
-                    setStatus('A valid email is required.');
-                    setStatusType('error');
-                    return;
-                  }
-                  setBusy(true);
-                  setStatus('Sending password reset email...');
-                  setStatusType('info');
-                  try {
-                    const result = await requestPasswordReset({ email: normalizedEmail });
-                    setStatus(
-                      result.message ||
-                        'If the request can be processed, check your email for reset instructions.',
-                    );
-                    setStatusType('ok');
-                    trackEvent('password_reset_requested');
-                  } catch (error) {
-                    setStatus(toErrorMessage(error));
-                    setStatusType('error');
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
+                onClick={handleResetRequest}
                 disabled={busy}
               >
                 Send reset email

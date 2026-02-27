@@ -3,29 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { login, loginByAccessToken, requestPasswordReset, toErrorMessage } from '../lib/api';
 import { trackEvent } from '../lib/telemetry';
 import { useAuth } from '../lib/auth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useStatus } from '../hooks/useStatus';
+import { isRecoveryHash, readLoginHashToken } from '../lib/hash-utils';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
-
-function readHashAccessToken(): string {
-  const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-  const params = new URLSearchParams(raw);
-  const accessToken = (params.get('access_token') || '').trim();
-  const tokenType = (params.get('token_type') || '').trim().toLowerCase();
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  if (flowType === 'recovery') return '';
-  if (!accessToken) return '';
-  if (tokenType && tokenType !== 'bearer') return '';
-  return accessToken;
-}
-
-function hasRecoveryHashToken(): boolean {
-  const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-  const params = new URLSearchParams(raw);
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  const accessToken = (params.get('access_token') || '').trim();
-  return flowType === 'recovery' && Boolean(accessToken);
-}
+import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 
 export function LoginPage(): React.JSX.Element {
+  useDocumentTitle('Login');
   const navigate = useNavigate();
   const { refresh } = useAuth();
   const [email, setEmail] = React.useState('');
@@ -33,11 +18,11 @@ export function LoginPage(): React.JSX.Element {
   const [showPassword, setShowPassword] = React.useState(false);
   const [capsLock, setCapsLock] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const [status, setStatus] = React.useState('');
-  const [statusType, setStatusType] = React.useState<'ok' | 'error' | 'info'>('info');
+  const { status, statusType, setOk, setError, setInfo } = useStatus();
+  const backoff = useRateLimitBackoff();
 
   React.useEffect(() => {
-    if (hasRecoveryHashToken()) {
+    if (isRecoveryHash()) {
       navigate({
         pathname: '/app/reset-password',
         hash: window.location.hash,
@@ -45,27 +30,26 @@ export function LoginPage(): React.JSX.Element {
       return;
     }
 
-    const token = readHashAccessToken();
+    const token = readLoginHashToken();
     if (!token) return;
+
+    // Clear hash immediately to prevent token leaking in browser history
+    window.history.replaceState({}, document.title, '/app/login');
 
     let cancelled = false;
     (async () => {
       setBusy(true);
-      setStatus('Finalizing email confirmation...');
-      setStatusType('info');
+      setInfo('Finalizing email confirmation...');
       try {
         await loginByAccessToken(token);
         if (cancelled) return;
-        window.history.replaceState({}, document.title, '/app/login');
         await refresh();
-        setStatus('Email confirmed. Redirecting to onboarding...');
-        setStatusType('ok');
+        setOk('Email confirmed. Redirecting...');
         trackEvent('login_succeeded', { type: 'hash_token' });
-        setTimeout(() => navigate('/app/onboarding'), 200);
+        setTimeout(() => navigate('/app/keys'), 200);
       } catch (error) {
         if (cancelled) return;
-        setStatus(toErrorMessage(error));
-        setStatusType('error');
+        setError(toErrorMessage(error));
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -79,25 +63,37 @@ export function LoginPage(): React.JSX.Element {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setBusy(true);
-    setStatus('Logging in...');
-    setStatusType('info');
+    setInfo('Logging in...');
 
     try {
       await login({ email: email.trim(), password });
       await refresh();
-      setStatus('Logged in. Redirecting to onboarding...');
-      setStatusType('ok');
+      setOk('Logged in. Redirecting...');
       trackEvent('login_succeeded', { type: 'password' });
-      setTimeout(() => navigate('/app/onboarding'), 200);
+      setTimeout(() => navigate('/app/keys'), 200);
     } catch (error) {
-      const message = toErrorMessage(error);
-      setStatus(
-        message.toLowerCase().includes('verification')
-          ? `${message} Verify your email and retry login.`
-          : message,
-      );
-      setStatusType('error');
+      setError('Login failed. Check your credentials and try again.');
+      backoff.trigger(error);
       trackEvent('login_failed', { category: 'auth' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetRequest(): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setError('Enter a valid email first, then request reset.');
+      return;
+    }
+    setBusy(true);
+    setInfo('Sending password reset email...');
+    try {
+      const result = await requestPasswordReset({ email: normalizedEmail });
+      setOk(result.message || 'If the request can be processed, check your email for reset instructions.');
+      trackEvent('password_reset_requested');
+    } catch (error) {
+      setError(toErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -107,11 +103,13 @@ export function LoginPage(): React.JSX.Element {
     <div className="two-col">
       <Card title="Login" subtitle="Authenticate your verified account and continue onboarding.">
         <form onSubmit={onSubmit} noValidate>
+          <fieldset disabled={busy || backoff.blocked} className="fieldset-plain">
           <FormField id="email" label="Email">
             <Input
               id="email"
               type="email"
               autoComplete="email"
+              autoFocus
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -139,10 +137,11 @@ export function LoginPage(): React.JSX.Element {
             </Link>
           </div>
 
-          <Button id="loginBtn" type="submit" disabled={busy}>
-            {busy ? 'Logging in...' : 'Login'}
+          <Button id="loginBtn" type="submit" disabled={busy || backoff.blocked}>
+            {backoff.blocked ? `Rate limited (${backoff.secondsLeft}s)` : busy ? 'Logging in...' : 'Login'}
           </Button>
           <StatusBanner id="loginStatus" message={status} type={statusType} />
+          </fieldset>
         </form>
       </Card>
 
@@ -155,28 +154,7 @@ export function LoginPage(): React.JSX.Element {
         <div className="stack">
           <Button
             variant="secondary"
-            onClick={async () => {
-              const normalizedEmail = email.trim().toLowerCase();
-              if (!normalizedEmail || !normalizedEmail.includes('@')) {
-                setStatus('Enter a valid email first, then request reset.');
-                setStatusType('error');
-                return;
-              }
-              setBusy(true);
-              setStatus('Sending password reset email...');
-              setStatusType('info');
-              try {
-                const result = await requestPasswordReset({ email: normalizedEmail });
-                setStatus(result.message || 'If the request can be processed, check your email for reset instructions.');
-                setStatusType('ok');
-                trackEvent('password_reset_requested');
-              } catch (error) {
-                setStatus(toErrorMessage(error));
-                setStatusType('error');
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={handleResetRequest}
             disabled={busy}
           >
             Send reset email

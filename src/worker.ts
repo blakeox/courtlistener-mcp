@@ -126,16 +126,28 @@ interface Env {
   MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS?: string;
   /** Key API block duration in seconds after threshold (default 300) */
   MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS?: string;
+  /** Hosted AI chat lifetime request cap per user (default 10) */
+  MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
   /** Maximum allowed API key TTL in days (default 90) */
   MCP_API_KEY_MAX_TTL_DAYS?: string;
-  /** Secret used to sign UI session cookies (falls back to SUPABASE_SECRET_KEY if unset) */
+  /** Secret used to sign UI session cookies */
   MCP_UI_SESSION_SECRET?: string;
+  /** Temporary migration flag to allow using SUPABASE_SECRET_KEY for UI sessions when MCP_UI_SESSION_SECRET is unset */
+  MCP_UI_ALLOW_SUPABASE_SECRET_FALLBACK?: string;
   /** Allow non-Secure UI cookies for local HTTP development (default false) */
   MCP_UI_INSECURE_COOKIES?: string;
+  /** Enable server-side UI session revocation checks via Durable Objects (default true) */
+  MCP_UI_SESSION_REVOCATION_ENABLED?: string;
   /** Durable Object binding (auto-wired by wrangler.jsonc) */
   MCP_OBJECT: DurableObjectNamespace;
   /** Durable Object binding for auth failure rate limiting */
   AUTH_FAILURE_LIMITER: DurableObjectNamespace;
+  /** Cloudflare Workers AI binding for chat summarization */
+  AI?: {
+    run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
+  };
+  /** Optional override for Cloudflare AI model */
+  CLOUDFLARE_AI_MODEL?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +232,7 @@ const DEFAULT_UI_SIGNUP_RATE_LIMIT_BLOCK_SECONDS = 900;
 const DEFAULT_UI_KEYS_RATE_LIMIT_MAX = 120;
 const DEFAULT_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS = 300;
 const DEFAULT_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS = 300;
+const DEFAULT_UI_AI_CHAT_RATE_LIMIT_MAX = 10;
 const DEFAULT_API_KEY_MAX_TTL_DAYS = 90;
 
 interface AuthFailureState {
@@ -236,10 +249,41 @@ interface AuthFailureLimiterRequestBody {
   blockMs: number;
 }
 
+interface SessionRevocationRequestBody {
+  action: 'session_check' | 'session_revoke';
+  nowMs: number;
+  revokeUntilMs?: number;
+}
+
 interface AuthFailureLimiterResponseBody {
   blocked: boolean;
   retryAfterSeconds: number;
   state: AuthFailureState;
+}
+
+interface SessionRevocationResponseBody {
+  revoked: boolean;
+}
+
+interface LifetimeQuotaRequestBody {
+  action: 'quota_increment_check';
+  maxAllowed: number;
+}
+
+interface LifetimeQuotaResponseBody {
+  blocked: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+interface McpJsonRpcResponse<T> {
+  result?: T;
+  error?: {
+    code: number;
+    message: string;
+    data?: unknown;
+  };
 }
 
 const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
@@ -247,6 +291,9 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
+const DEFAULT_CF_AI_MODEL = '@cf/meta/llama-3.2-1b-instruct';
+const CHEAP_MODE_MAX_TOKENS = 180;
+const BALANCED_MODE_MAX_TOKENS = 420;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -261,6 +308,134 @@ async function parseJsonBody<T>(request: Request): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+function extractMcpResponseBody(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  if (trimmed.startsWith('{')) {
+    return JSON.parse(trimmed);
+  }
+  const dataLines = trimmed
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .filter(Boolean);
+  if (dataLines.length === 0) return {};
+  return JSON.parse(dataLines[dataLines.length - 1] ?? '{}');
+}
+
+function aiToolFromPrompt(message: string): 'lookup_citation' | 'search_cases' | 'search_opinions' {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('citation') || normalized.includes('v.')) {
+    return 'lookup_citation';
+  }
+  if (normalized.includes('opinion') || normalized.includes('holding')) {
+    return 'search_opinions';
+  }
+  return 'search_cases';
+}
+
+function aiToolArguments(toolName: string, prompt: string): Record<string, unknown> {
+  if (toolName === 'lookup_citation') {
+    return { citation: prompt };
+  }
+  return {
+    query: prompt,
+    page_size: 5,
+    order_by: 'score desc',
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasValidMcpRpcShape(payload: unknown): boolean {
+  if (!isPlainObject(payload)) return false;
+  if ('error' in payload && isPlainObject(payload.error)) return true;
+  if ('result' in payload) return true;
+  return false;
+}
+
+function buildLowCostSummary(
+  message: string,
+  toolName: string,
+  mcpPayload: unknown,
+): string {
+  const payloadText = JSON.stringify(mcpPayload);
+  const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
+  return [
+    `Summary: Ran \`${toolName}\` for your request.`,
+    `User question: ${message}`,
+    'What MCP returned (truncated):',
+    compact,
+    'Next follow-up query: Ask for a narrower court, date range, or citation for more precise results.',
+  ].join('\n\n');
+}
+
+async function callMcpJsonRpc(
+  env: Env,
+  ctx: ExecutionContext,
+  token: string,
+  method: string,
+  params: Record<string, unknown>,
+  id: number,
+  sessionId?: string,
+): Promise<{ payload: unknown; sessionId: string | null }> {
+  const headers = new Headers({
+    authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    'MCP-Protocol-Version': '2025-06-18',
+  });
+  if (sessionId) {
+    headers.set('mcp-session-id', sessionId);
+  }
+
+  const mcpRequest = new Request('https://mcp.internal/mcp', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method,
+      params,
+    }),
+  });
+
+  const authError = await authorizeMcpRequest(mcpRequest, env);
+  if (authError) {
+    const text = await authError.text();
+    throw new Error(text || 'MCP auth failed');
+  }
+
+  const protocolError = validateProtocolVersionHeader(
+    headers.get('MCP-Protocol-Version'),
+    parseBoolean(env.MCP_REQUIRE_PROTOCOL_VERSION),
+    SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  );
+  if (protocolError) {
+    const text = await protocolError.text();
+    throw new Error(text || 'MCP protocol version check failed');
+  }
+
+  const response = await mcpStreamableHandler.fetch(mcpRequest, env, ctx);
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(raw.slice(0, 1000) || 'MCP request failed');
+  }
+
+  const payload = extractMcpResponseBody(raw);
+  const rpcBody = payload as McpJsonRpcResponse<unknown>;
+  if (rpcBody.error?.message) {
+    throw new Error(`MCP error ${rpcBody.error.code}: ${rpcBody.error.message}`);
+  }
+
+  return {
+    payload,
+    sessionId: response.headers.get('mcp-session-id'),
+  };
 }
 
 function jsonResponse(payload: unknown, status = 200, extraHeaders?: HeadersInit): Response {
@@ -483,14 +658,17 @@ async function authenticateUiApiRequest(
     return jsonError('Invalid or expired API token.', 401, 'invalid_api_token');
   }
 
-  const sessionSecret = (
-    env.MCP_UI_SESSION_SECRET ||
-    env.SUPABASE_SECRET_KEY ||
-    ''
-  ).trim();
+  const sessionSecret = getUiSessionSecret(env);
   if (!sessionSecret) {
-    return jsonError('Missing bearer token.', 401, 'missing_bearer_token');
+    return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
   }
+
+  const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
+  const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
+  if (parsedPayload && (await isUiSessionRevoked(env, parsedPayload.jti))) {
+    return jsonError('Session is invalid or expired.', 401, 'invalid_session');
+  }
+
   const sessionUserId = await getUiSessionUserId(request, sessionSecret);
   if (!sessionUserId) {
     return jsonError('Missing bearer token.', 401, 'missing_bearer_token');
@@ -523,6 +701,42 @@ function base64UrlDecode(value: string): string | null {
   }
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  const maxLength = Math.max(aBytes.length, bBytes.length);
+
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLength; i += 1) {
+    const aByte = i < aBytes.length ? (aBytes[i] ?? 0) : 0;
+    const bByte = i < bBytes.length ? (bBytes[i] ?? 0) : 0;
+    diff |= aByte ^ bByte;
+  }
+
+  return diff === 0;
+}
+
+interface UiSessionPayload {
+  sub: string;
+  exp: number;
+  jti: string;
+}
+
+function getUiSessionSecret(env: Env): string | null {
+  const explicitSecret = env.MCP_UI_SESSION_SECRET?.trim() || '';
+  if (explicitSecret) {
+    return explicitSecret;
+  }
+
+  if (!parseBoolean(env.MCP_UI_ALLOW_SUPABASE_SECRET_FALLBACK)) {
+    return null;
+  }
+
+  const fallbackSecret = env.SUPABASE_SECRET_KEY?.trim() || '';
+  return fallbackSecret || null;
+}
+
 async function signSessionPayload(payload: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -539,13 +753,78 @@ async function signSessionPayload(payload: string, secret: string): Promise<stri
 }
 
 async function createUiSessionToken(userId: string, secret: string, ttlSeconds: number): Promise<string> {
-  const payloadObj = {
+  const payloadObj: UiSessionPayload = {
     sub: userId,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+    jti: generateRandomToken(24),
   };
   const payload = base64UrlEncode(JSON.stringify(payloadObj));
   const signature = await signSessionPayload(payload, secret);
   return `${payload}.${signature}`;
+}
+
+function parseUiSessionToken(token: string): UiSessionPayload | null {
+  const [payloadPart] = token.split('.');
+  if (!payloadPart) return null;
+  const payloadRaw = base64UrlDecode(payloadPart);
+  if (!payloadRaw) return null;
+
+  try {
+    const payload = JSON.parse(payloadRaw) as Partial<UiSessionPayload>;
+    if (!payload.sub || !payload.exp || !payload.jti) return null;
+    if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    return payload as UiSessionPayload;
+  } catch {
+    return null;
+  }
+}
+
+function isUiSessionRevocationEnabled(env: Env): boolean {
+  return env.MCP_UI_SESSION_REVOCATION_ENABLED
+    ? parseBoolean(env.MCP_UI_SESSION_REVOCATION_ENABLED)
+    : true;
+}
+
+function getSessionRevocationStub(env: Env, sessionJti: string): DurableObjectStub {
+  const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`ui-session:${sessionJti}`);
+  return env.AUTH_FAILURE_LIMITER.get(objectId);
+}
+
+async function callSessionRevocation(
+  env: Env,
+  sessionJti: string,
+  body: SessionRevocationRequestBody,
+): Promise<SessionRevocationResponseBody | null> {
+  const stub = getSessionRevocationStub(env, sessionJti);
+  const response = await stub.fetch('https://auth-failure-limiter/internal', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return (await response.json()) as SessionRevocationResponseBody;
+}
+
+async function isUiSessionRevoked(env: Env, sessionJti: string): Promise<boolean> {
+  if (!isUiSessionRevocationEnabled(env)) return false;
+  const result = await callSessionRevocation(env, sessionJti, {
+    action: 'session_check',
+    nowMs: Date.now(),
+  });
+  return result?.revoked === true;
+}
+
+async function revokeUiSession(env: Env, sessionJti: string, expiresAtEpochSeconds: number): Promise<void> {
+  if (!isUiSessionRevocationEnabled(env)) return;
+  const nowMs = Date.now();
+  const revokeUntilMs = Math.max(nowMs, expiresAtEpochSeconds * 1000);
+  await callSessionRevocation(env, sessionJti, {
+    action: 'session_revoke',
+    nowMs,
+    revokeUntilMs,
+  });
 }
 
 async function getUiSessionUserId(request: Request, secret: string): Promise<string | null> {
@@ -556,17 +835,10 @@ async function getUiSessionUserId(request: Request, secret: string): Promise<str
   const [payloadPart, signaturePart] = token.split('.');
   if (!payloadPart || !signaturePart) return null;
   const expectedSignature = await signSessionPayload(payloadPart, secret);
-  if (expectedSignature !== signaturePart) return null;
-  const payloadRaw = base64UrlDecode(payloadPart);
-  if (!payloadRaw) return null;
-  try {
-    const payload = JSON.parse(payloadRaw) as { sub?: string; exp?: number };
-    if (!payload.sub || !payload.exp) return null;
-    if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
-    return payload.sub;
-  } catch {
-    return null;
-  }
+  if (!constantTimeEqual(expectedSignature, signaturePart)) return null;
+  const payload = parseUiSessionToken(token);
+  if (!payload) return null;
+  return payload.sub;
 }
 
 function isSecureCookieRequest(request: Request, env: Env): boolean {
@@ -620,7 +892,7 @@ function getOrCreateCsrfCookieHeader(request: Request, env: Env): string | null 
 function requireCsrfToken(request: Request): Response | null {
   const cookieToken = getCsrfTokenFromCookie(request);
   const headerToken = request.headers.get('x-csrf-token')?.trim() || '';
-  if (!cookieToken || !headerToken || headerToken !== cookieToken) {
+  if (!cookieToken || !headerToken || !constantTimeEqual(headerToken, cookieToken)) {
     return jsonError('CSRF token validation failed.', 403, 'csrf_validation_failed');
   }
   return null;
@@ -653,16 +925,68 @@ export class AuthFailureLimiterDO {
       return Response.json({ error: 'method_not_allowed' }, { status: 405 });
     }
 
-    const body = await parseJsonBody<AuthFailureLimiterRequestBody>(request);
+    const body = await parseJsonBody<
+      AuthFailureLimiterRequestBody | SessionRevocationRequestBody | LifetimeQuotaRequestBody
+    >(request);
     if (!body) {
       return Response.json({ error: 'invalid_request' }, { status: 400 });
     }
 
-    const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
-    const maxAttempts = Math.max(1, body.maxAttempts);
-    const windowMs = Math.max(1_000, body.windowMs);
-    const blockMs = Math.max(1_000, body.blockMs);
-    const action = body.action;
+    if (body.action === 'session_check' || body.action === 'session_revoke') {
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const key = 'ui_session_revoked_until_ms';
+      const revokedUntilMs = (await this.state.storage.get<number>(key)) ?? 0;
+
+      if (body.action === 'session_revoke') {
+        const requestedUntil =
+          typeof body.revokeUntilMs === 'number' && Number.isFinite(body.revokeUntilMs)
+            ? body.revokeUntilMs
+            : nowMs;
+        const nextUntil = Math.max(revokedUntilMs, requestedUntil, nowMs);
+        await this.state.storage.put(key, nextUntil);
+        return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
+      }
+
+      if (revokedUntilMs <= nowMs) {
+        if (revokedUntilMs > 0) {
+          await this.state.storage.delete(key);
+        }
+        return Response.json({ revoked: false } satisfies SessionRevocationResponseBody);
+      }
+
+      return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
+    }
+
+    if (body.action === 'quota_increment_check') {
+      const limit = Math.max(1, Math.floor(body.maxAllowed));
+      const key = 'lifetime_quota_count';
+      const existing = (await this.state.storage.get<number>(key)) ?? 0;
+
+      if (existing >= limit) {
+        return Response.json({
+          blocked: true,
+          used: existing,
+          limit,
+          remaining: 0,
+        } satisfies LifetimeQuotaResponseBody);
+      }
+
+      const next = existing + 1;
+      await this.state.storage.put(key, next);
+      return Response.json({
+        blocked: false,
+        used: next,
+        limit,
+        remaining: Math.max(0, limit - next),
+      } satisfies LifetimeQuotaResponseBody);
+    }
+
+    const authBody = body as AuthFailureLimiterRequestBody;
+    const nowMs = Number.isFinite(authBody.nowMs) ? authBody.nowMs : Date.now();
+    const maxAttempts = Math.max(1, authBody.maxAttempts);
+    const windowMs = Math.max(1_000, authBody.windowMs);
+    const blockMs = Math.max(1_000, authBody.blockMs);
+    const action = authBody.action;
 
     if (action === 'clear') {
       await this.clearState();
@@ -675,7 +999,7 @@ export class AuthFailureLimiterDO {
 
     let current = await this.loadState();
     let stateChanged = false;
-    if (nowMs - current.windowStartedAtMs > windowMs) {
+    if (nowMs - current.windowStartedAtMs >= windowMs) {
       current = {
         count: 0,
         windowStartedAtMs: nowMs,
@@ -891,6 +1215,41 @@ async function applyUiRateLimit(
   );
 }
 
+async function applyAiChatLifetimeQuota(env: Env, userId: string): Promise<Response | null> {
+  const enabled = env.MCP_UI_RATE_LIMIT_ENABLED
+    ? parseBoolean(env.MCP_UI_RATE_LIMIT_ENABLED)
+    : true;
+  if (!enabled) return null;
+
+  const maxAllowed = parsePositiveInt(
+    env.MCP_UI_AI_CHAT_RATE_LIMIT_MAX,
+    DEFAULT_UI_AI_CHAT_RATE_LIMIT_MAX,
+  );
+  const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`ui-ai-chat-quota:user:${userId}`);
+  const stub = env.AUTH_FAILURE_LIMITER.get(objectId);
+  const response = await stub.fetch('https://auth-failure-limiter/internal', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      action: 'quota_increment_check',
+      maxAllowed,
+    } satisfies LifetimeQuotaRequestBody),
+  });
+
+  if (!response.ok) {
+    return jsonError('Unable to validate hosted AI chat quota.', 503, 'ai_chat_quota_unavailable');
+  }
+
+  const quota = (await response.json()) as LifetimeQuotaResponseBody;
+  if (!quota.blocked) return null;
+
+  return jsonError(
+    `Hosted AI chat lifetime limit reached (${quota.limit} turns). Please connect your own local model directly to /mcp for continued chat.`,
+    429,
+    'ai_chat_limit_reached',
+  );
+}
+
 function isMcpPath(pathname: string): boolean {
   return pathname === '/mcp' || pathname === '/sse';
 }
@@ -907,9 +1266,9 @@ function buildCorsHeaders(origin: string | null, allowedOrigins: string[]): Head
     if (allowedOrigins.length === 0 || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
       headers.set('Access-Control-Allow-Origin', origin);
     }
-  } else if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) {
-    headers.set('Access-Control-Allow-Origin', '*');
   }
+  // When no Origin header is present, do not set CORS headers.
+  // Wildcard CORS is only allowed when an Origin header matches a configured '*'.
 
   return headers;
 }
@@ -1016,12 +1375,15 @@ export default {
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
-      const sessionSecret = (
-        env.MCP_UI_SESSION_SECRET ||
-        env.SUPABASE_SECRET_KEY ||
-        ''
-      ).trim();
-      const sessionUserId = sessionSecret ? await getUiSessionUserId(request, sessionSecret) : null;
+      const sessionSecret = getUiSessionSecret(env);
+      let sessionUserId: string | null = null;
+      if (sessionSecret) {
+        const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
+        const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
+        if (!parsedPayload || !(await isUiSessionRevoked(env, parsedPayload.jti))) {
+          sessionUserId = await getUiSessionUserId(request, sessionSecret);
+        }
+      }
       const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
       return jsonResponse(
         {
@@ -1055,11 +1417,11 @@ export default {
       const loginRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
       if (loginRateLimited) return loginRateLimited;
 
-      if (!email || !email.includes('@')) {
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return jsonError('A valid email is required.', 400, 'invalid_email');
       }
-      if (password.length < 8) {
-        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
+      if (password.length < 8 || password.length > 256) {
+        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
       }
 
       try {
@@ -1067,11 +1429,7 @@ export default {
         if (!authResult.user.email_confirmed_at) {
           return jsonError('Email verification is required before login.', 403, 'email_not_verified');
         }
-        const sessionSecret = (
-          env.MCP_UI_SESSION_SECRET ||
-          env.SUPABASE_SECRET_KEY ||
-          ''
-        ).trim();
+        const sessionSecret = getUiSessionSecret(env);
         if (!sessionSecret) {
           return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
@@ -1129,11 +1487,7 @@ export default {
           return jsonError('Email verification is required before login.', 403, 'email_not_verified');
         }
 
-        const sessionSecret = (
-          env.MCP_UI_SESSION_SECRET ||
-          env.SUPABASE_SECRET_KEY ||
-          ''
-        ).trim();
+        const sessionSecret = getUiSessionSecret(env);
         if (!sessionSecret) {
           return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
@@ -1234,8 +1588,8 @@ export default {
       if (!accessToken) {
         return jsonError('accessToken is required.', 400, 'missing_access_token');
       }
-      if (password.length < 8) {
-        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
+      if (password.length < 8 || password.length > 256) {
+        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
       }
 
       try {
@@ -1254,6 +1608,16 @@ export default {
       if (uiOriginRejection) return uiOriginRejection;
       const csrfError = requireCsrfToken(request);
       if (csrfError) return csrfError;
+
+      const sessionSecret = getUiSessionSecret(env);
+      if (sessionSecret) {
+        const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
+        const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
+        if (parsedPayload) {
+          await revokeUiSession(env, parsedPayload.jti, parsedPayload.exp);
+        }
+      }
+
       const secureCookies = isSecureCookieRequest(request, env);
       const responseHeaders = new Headers();
       responseHeaders.append('Set-Cookie', buildUiSessionCookieClear(secureCookies));
@@ -1296,7 +1660,7 @@ export default {
 
       const email = body?.email?.trim().toLowerCase() || '';
       const password = body?.password || '';
-      const fullName = body?.fullName?.trim() || '';
+      const fullName = (body?.fullName?.trim() || '').slice(0, 256);
       const turnstileToken = body?.turnstileToken?.trim() || '';
       const requestIp = getRequestIp(request);
       const turnstileSecret = env.TURNSTILE_SECRET_KEY?.trim();
@@ -1306,11 +1670,11 @@ export default {
         return signupRateLimited;
       }
 
-      if (!email || !email.includes('@')) {
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return jsonError('A valid email is required.', 400, 'invalid_email');
       }
-      if (password.length < 8) {
-        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
+      if (password.length < 8 || password.length > 256) {
+        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
       }
       if (turnstileSecret) {
         if (!turnstileToken) {
@@ -1422,7 +1786,7 @@ export default {
           if (csrfError) return csrfError;
         }
         const body = await parseJsonBody<{ label?: string; expiresDays?: number }>(request);
-        const label = body?.label?.trim() || 'rotation';
+        const label = (body?.label?.trim() || 'rotation').slice(0, 200);
         const maxTtlDays = getApiKeyMaxTtlDays(env);
         const expiresAt = getCappedExpiresAtFromDays(body?.expiresDays, 90, maxTtlDays);
 
@@ -1529,6 +1893,159 @@ export default {
         return jsonResponse({ message: 'Key revoked.' });
       } catch {
         return jsonError('Failed to revoke key.', 400, 'key_revoke_failed');
+      }
+    }
+
+    if (url.pathname === '/api/ai-chat') {
+      if (request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
+      }
+      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
+      if (uiOriginRejection) return uiOriginRejection;
+
+      const authResult = await authenticateUiApiRequest(request, env);
+      if (authResult instanceof Response) {
+        return authResult;
+      }
+      const aiChatQuota = await applyAiChatLifetimeQuota(env, authResult.userId);
+      if (aiChatQuota) return aiChatQuota;
+      if (authResult.authType === 'session') {
+        const csrfError = requireCsrfToken(request);
+        if (csrfError) return csrfError;
+      }
+
+      const body = await parseJsonBody<{
+        message?: string;
+        mcpToken?: string;
+        mcpSessionId?: string;
+        toolName?: 'auto' | 'search_cases' | 'search_opinions' | 'lookup_citation';
+        mode?: 'cheap' | 'balanced';
+        testMode?: boolean;
+      }>(request);
+      if (!body || !isPlainObject(body)) {
+        return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
+      }
+
+      if (typeof body.message !== 'string' || typeof body.mcpToken !== 'string') {
+        return jsonError('message and mcpToken must be strings.', 400, 'invalid_request_schema');
+      }
+      if (
+        typeof body.testMode !== 'undefined' &&
+        typeof body.testMode !== 'boolean'
+      ) {
+        return jsonError('testMode must be a boolean.', 400, 'invalid_request_schema');
+      }
+
+      const message = body.message.trim();
+      if (message.length > 10000) {
+        return jsonError('Message too long (max 10,000 characters).', 400, 'message_too_long');
+      }
+      const mcpToken = body.mcpToken.trim();
+      const requestedTool = body.toolName || 'auto';
+      const testMode = body.testMode === true;
+      const mode = testMode ? 'cheap' : body.mode === 'balanced' ? 'balanced' : 'cheap';
+      const toolName =
+        requestedTool === 'auto'
+          ? testMode
+            ? 'search_cases'
+            : aiToolFromPrompt(message)
+          : requestedTool;
+      const priorSessionId = body?.mcpSessionId?.trim() || '';
+
+      if (!message) {
+        return jsonError('message is required.', 400, 'missing_message');
+      }
+      if (!mcpToken) {
+        return jsonError('mcpToken is required.', 400, 'missing_mcp_token');
+      }
+      try {
+        const initializeResult = priorSessionId
+          ? null
+          : await callMcpJsonRpc(
+              env,
+              ctx,
+              mcpToken,
+              'initialize',
+              {
+                protocolVersion: '2025-06-18',
+                capabilities: {},
+                clientInfo: { name: 'courtlistener-ai-chat', version: '1.0.0' },
+              },
+              1,
+            );
+
+        const activeSessionId = priorSessionId || initializeResult?.sessionId || '';
+        if (!activeSessionId) {
+          return jsonError('Failed to create MCP session.', 502, 'mcp_session_failed');
+        }
+
+        const toolResult = await callMcpJsonRpc(
+          env,
+          ctx,
+          mcpToken,
+          'tools/call',
+          {
+            name: toolName,
+            arguments: aiToolArguments(toolName, message),
+          },
+          2,
+          activeSessionId,
+        );
+        if (!hasValidMcpRpcShape(toolResult.payload)) {
+          return jsonError('Invalid MCP response format.', 502, 'mcp_response_invalid');
+        }
+
+        let completionText = buildLowCostSummary(message, toolName, toolResult.payload);
+        let fallbackUsed = true;
+        if (env.AI && typeof env.AI.run === 'function') {
+          const model = env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CF_AI_MODEL;
+          const completion = await env.AI.run(model, {
+            messages: [
+              {
+                role: 'system',
+                content:
+                  testMode
+                    ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
+                    : 'You are a legal research assistant. Keep response under 140 words. Use sections: Summary, What MCP Returned, Next Follow-up Query.',
+              },
+              {
+                role: 'user',
+                content: `User question: ${message}\n\nMCP tool used: ${toolName}\n\nMCP raw response JSON:\n${JSON.stringify(toolResult.payload).slice(0, mode === 'cheap' ? 3500 : 10000)}`,
+              },
+            ],
+            max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
+            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.2,
+          });
+
+          const aiText =
+            (completion as { response?: string }).response ||
+            (completion as { result?: { response?: string } }).result?.response ||
+            '';
+          if (aiText.trim()) {
+            completionText = aiText.trim();
+            fallbackUsed = false;
+          }
+        }
+        if (!completionText.trim()) {
+          return jsonError('Invalid AI response format.', 502, 'ai_response_invalid');
+        }
+
+        return jsonResponse({
+          test_mode: testMode,
+          fallback_used: fallbackUsed,
+          mode,
+          tool: toolName,
+          session_id: toolResult.sessionId || activeSessionId,
+          ai_response: completionText,
+          mcp_result: toolResult.payload,
+        });
+      } catch (error) {
+        console.error('[ui-api] handler failed', { error });
+        return jsonError(
+          error instanceof Error ? error.message : 'Failed to generate AI response.',
+          502,
+          'ai_chat_failed',
+        );
       }
     }
 

@@ -46,6 +46,16 @@ const keyCreateSchema = z.object({
     .optional(),
 });
 
+const aiChatSchema = z.object({
+  test_mode: z.boolean(),
+  fallback_used: z.boolean(),
+  mode: z.enum(['cheap', 'balanced']),
+  tool: z.string(),
+  session_id: z.string(),
+  ai_response: z.string(),
+  mcp_result: z.unknown(),
+});
+
 function readCookie(name: string): string {
   const key = `${name}=`;
   const entry = document.cookie
@@ -63,7 +73,7 @@ async function parseBody<T>(response: Response): Promise<T | null> {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 30_000): Promise<T> {
   const headers = new Headers(init.headers ?? {});
   const csrf = readCookie('clmcp_csrf');
   const method = (init.method ?? 'GET').toUpperCase();
@@ -71,11 +81,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('x-csrf-token', csrf);
   }
 
-  const response = await fetch(path, {
-    ...init,
-    headers,
-    credentials: 'same-origin',
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers,
+      credentials: 'same-origin',
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw { status: 0, error: 'timeout', message: 'Request timed out' } satisfies ApiError;
+    }
+    throw err;
+  }
+  clearTimeout(timer);
 
   const body = await parseBody<Record<string, unknown>>(response);
   if (!response.ok) {
@@ -214,16 +238,30 @@ export async function mcpCall<T>(
     headers.set('mcp-session-id', args.sessionId);
   }
 
-  const response = await fetch('/mcp', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: args.id,
-      method: args.method,
-      params: args.params,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+
+  let response: Response;
+  try {
+    response = await fetch('/mcp', {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: args.id,
+        method: args.method,
+        params: args.params,
+      }),
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw { status: 0, error: 'timeout', message: 'Request timed out' } satisfies ApiError;
+    }
+    throw err;
+  }
+  clearTimeout(timer);
 
   const raw = await response.text();
   if (!response.ok) {
@@ -248,10 +286,35 @@ export async function mcpCall<T>(
     }
   }
 
+  if (body && typeof body === 'object' && 'error' in body) {
+    const errBody = body as { error?: { message?: string; code?: number } };
+    throw {
+      status: 0,
+      error: 'mcp_error',
+      message: typeof errBody.error?.message === 'string' ? errBody.error.message : 'MCP returned an error',
+    } satisfies ApiError;
+  }
+
   return {
     body: body as T,
     sessionId: response.headers.get('mcp-session-id'),
   };
+}
+
+export async function aiChat(args: {
+  message: string;
+  mcpToken: string;
+  mcpSessionId?: string;
+  toolName?: 'auto' | 'search_cases' | 'search_opinions' | 'lookup_citation';
+  mode?: 'cheap' | 'balanced';
+  testMode?: boolean;
+}): Promise<z.infer<typeof aiChatSchema>> {
+  const payload = await request<unknown>('/api/ai-chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  return aiChatSchema.parse(payload);
 }
 
 export function toErrorMessage(error: unknown): string {

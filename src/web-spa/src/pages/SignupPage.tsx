@@ -1,26 +1,23 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { signup, toErrorMessage } from '../lib/api';
+import { validatePassword } from '../lib/validation';
 import { markSignupStarted, trackEvent } from '../lib/telemetry';
 import { useAuth } from '../lib/auth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useStatus } from '../hooks/useStatus';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
-
-function validatePassword(password: string): string | null {
-  if (password.length < 8) return 'Password must be at least 8 characters.';
-  if (!/[A-Z]/.test(password)) return 'Password should include an uppercase letter.';
-  if (!/[a-z]/.test(password)) return 'Password should include a lowercase letter.';
-  if (!/[0-9]/.test(password)) return 'Password should include a number.';
-  return null;
-}
+import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 
 export function SignupPage(): React.JSX.Element {
+  useDocumentTitle('Create Account');
   const { session } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [fullName, setFullName] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [status, setStatus] = React.useState('');
-  const [statusType, setStatusType] = React.useState<'ok' | 'error' | 'info'>('info');
+  const { status, statusType, setOk, setError, setInfo } = useStatus();
+  const backoff = useRateLimitBackoff();
   const [submitted, setSubmitted] = React.useState(false);
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
@@ -43,14 +40,12 @@ export function SignupPage(): React.JSX.Element {
     const pwdError = validatePassword(password);
     setPasswordError(pwdError);
     if (pwdError) {
-      setStatus('Please address password requirements.');
-      setStatusType('error');
+      setError('Please address password requirements.');
       return;
     }
 
     setBusy(true);
-    setStatus('Creating account...');
-    setStatusType('info');
+    setInfo('Creating account...');
     markSignupStarted();
     trackEvent('signup_submitted');
 
@@ -60,13 +55,12 @@ export function SignupPage(): React.JSX.Element {
           ?.value?.trim() || '';
 
       const result = await signup({ email: email.trim(), password, fullName: fullName.trim(), turnstileToken });
-      setStatus(result.message ?? 'Check your email for verification and next steps.');
-      setStatusType('ok');
+      setOk(result.message ?? 'Check your email for verification and next steps.');
       setSubmitted(true);
       trackEvent('signup_succeeded');
     } catch (error) {
-      setStatus(toErrorMessage(error));
-      setStatusType('error');
+      setError(toErrorMessage(error));
+      backoff.trigger(error);
       trackEvent('signup_failed', { category: 'auth' });
     } finally {
       setBusy(false);
@@ -84,11 +78,13 @@ export function SignupPage(): React.JSX.Element {
     <div className="two-col">
       <Card title="Create account" subtitle="Register once, verify email, then login to create your first API key.">
         <form onSubmit={onSubmit} aria-describedby="signupStatus" noValidate>
+          <fieldset disabled={busy || backoff.blocked} className="fieldset-plain">
           <FormField id="email" label="Email">
             <Input
               id="email"
               type="email"
               autoComplete="email"
+              autoFocus
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -107,13 +103,18 @@ export function SignupPage(): React.JSX.Element {
               }}
             />
           </FormField>
-          <ul className="password-checks">
-            {checks.map((check) => (
-              <li key={check.label} className={check.pass ? 'ok' : ''}>
-                {check.pass ? '✓' : '○'} {check.label}
-              </li>
-            ))}
-          </ul>
+          <fieldset className="password-fieldset">
+            <legend>Password requirements</legend>
+            <ul className="password-checks" aria-live="polite">
+              {checks.map((check) => (
+                <li key={check.label} className={check.pass ? 'ok' : ''}>
+                  <span aria-hidden="true">{check.pass ? '✓' : '○'}</span>{' '}
+                  <span className="sr-only">{check.pass ? 'Met: ' : 'Not met: '}</span>
+                  {check.label}
+                </li>
+              ))}
+            </ul>
+          </fieldset>
           <FormField id="fullName" label="Display name (optional)">
             <Input
               id="fullName"
@@ -131,10 +132,11 @@ export function SignupPage(): React.JSX.Element {
             </div>
           ) : null}
 
-          <Button id="signupBtn" type="submit" disabled={busy}>
-            {busy ? 'Creating...' : 'Create account'}
+          <Button id="signupBtn" type="submit" disabled={busy || backoff.blocked}>
+            {backoff.blocked ? `Rate limited (${backoff.secondsLeft}s)` : busy ? 'Creating...' : 'Create account'}
           </Button>
           <StatusBanner id="signupStatus" message={status} type={statusType} />
+          </fieldset>
         </form>
       </Card>
 

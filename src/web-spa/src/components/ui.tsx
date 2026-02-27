@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export function Card(props: React.PropsWithChildren<{ title?: string; subtitle?: string; className?: string }>): React.JSX.Element {
   return (
@@ -15,7 +16,7 @@ export function Button(
 ): React.JSX.Element {
   const variant = props.variant ?? 'primary';
   return (
-    <button {...props} className={`btn ${variant} ${props.className ?? ''}`.trim()}>
+    <button type="button" {...props} className={`btn ${variant} ${props.className ?? ''}`.trim()}>
       {props.children}
     </button>
   );
@@ -50,16 +51,14 @@ export function FormField(props: {
 }): React.JSX.Element {
   const describedBy = [props.hint ? `${props.id}-hint` : '', props.error ? `${props.id}-error` : '']
     .filter(Boolean)
-    .join(' ');
+    .join(' ') || undefined;
 
   return (
     <div className="field">
       <label htmlFor={props.id}>{props.label}</label>
-      {React.cloneElement(props.children as React.ReactElement, {
-        id: props.id,
-        'aria-describedby': describedBy || undefined,
-        'aria-invalid': props.error ? true : undefined,
-      })}
+      <div aria-describedby={describedBy} aria-invalid={props.error ? true : undefined}>
+        {props.children}
+      </div>
       {props.hint ? (
         <div id={`${props.id}-hint`} className="hint">
           {props.hint}
@@ -74,14 +73,30 @@ export function FormField(props: {
   );
 }
 
-export function Stepper(props: { steps: Array<{ label: string; complete: boolean; active?: boolean }> }): React.JSX.Element {
+export function Stepper(props: {
+  steps: Array<{ label: string; complete: boolean; active?: boolean; to?: string; disabled?: boolean }>;
+}): React.JSX.Element {
   return (
     <ol className="stepper" aria-label="Setup progress">
-      {props.steps.map((step) => (
-        <li key={step.label} className={step.active ? 'active' : step.complete ? 'done' : ''}>
-          <span>{step.label}</span>
-        </li>
-      ))}
+      {props.steps.map((step, index) => {
+        const cls = step.active ? 'active' : step.complete ? 'done' : step.disabled ? 'disabled' : '';
+        const icon = step.complete ? '✓' : `${index + 1}`;
+        const content = (
+          <>
+            <span className="stepper-icon" aria-label={step.complete ? 'Completed' : `Step ${index + 1}`}>{icon}</span>
+            <span>{step.label}</span>
+          </>
+        );
+        return (
+          <li key={step.label} className={cls}>
+            {step.to && !step.disabled ? (
+              <Link to={step.to}>{content}</Link>
+            ) : (
+              content
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -96,38 +111,77 @@ export function Modal(props: {
   children: React.ReactNode;
   onClose: () => void;
 }): React.JSX.Element | null {
-  const dialogRef = React.useRef<HTMLDivElement | null>(null);
+  const dialogRef = React.useRef<HTMLDialogElement | null>(null);
 
   React.useEffect(() => {
-    if (!props.open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') props.onClose();
-    };
-    window.addEventListener('keydown', handler);
-    dialogRef.current?.focus();
-    return () => window.removeEventListener('keydown', handler);
-  }, [props.open, props.onClose]);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (props.open && !dialog.open) {
+      dialog.showModal();
+    } else if (!props.open && dialog.open) {
+      dialog.close();
+    }
+  }, [props.open]);
 
-  if (!props.open) return null;
+  React.useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const handler = () => props.onClose();
+    dialog.addEventListener('close', handler);
+    return () => dialog.removeEventListener('close', handler);
+  }, [props.onClose]);
+
+  React.useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog?.open) return;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length) focusable[0].focus();
+
+    function trapFocus(e: KeyboardEvent): void {
+      if (e.key !== 'Tab' || !focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    dialog.addEventListener('keydown', trapFocus);
+    return () => dialog.removeEventListener('keydown', trapFocus);
+  });
+
   return (
-    <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
-      <div
-        ref={dialogRef}
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.title}
-        tabIndex={-1}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="row between">
-          <h3>{props.title}</h3>
-          <button type="button" className="icon-btn" aria-label="Close dialog" onClick={props.onClose}>
-            x
-          </button>
-        </div>
-        {props.children}
+    <dialog
+      ref={dialogRef}
+      className="modal"
+      aria-label={props.title}
+    >
+      <div className="row between">
+        <h3>{props.title}</h3>
+        <button type="button" className="icon-btn" aria-label="Close dialog" onClick={props.onClose}>
+          ✕
+        </button>
       </div>
-    </div>
+      {props.children}
+    </dialog>
   );
+}
+
+export function formatDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }

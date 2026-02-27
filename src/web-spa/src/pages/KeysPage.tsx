@@ -1,9 +1,12 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createKey, listKeys, revokeKey, toErrorMessage } from '../lib/api';
-import { readToken, saveToken, isPersistedToken } from '../lib/storage';
 import { trackEvent } from '../lib/telemetry';
-import { Button, Card, FormField, Input, Modal, StatusBanner } from '../components/ui';
+import { useToken } from '../lib/token-context';
+import { useToast } from '../components/Toast';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useStatus } from '../hooks/useStatus';
+import { Button, Card, FormField, Input, Modal, StatusBanner, formatDate } from '../components/ui';
 import type { ApiKeyRecord } from '../lib/types';
 
 function statusForKey(key: ApiKeyRecord): 'active' | 'revoked' | 'expired' {
@@ -13,25 +16,26 @@ function statusForKey(key: ApiKeyRecord): 'active' | 'revoked' | 'expired' {
 }
 
 export function KeysPage(): React.JSX.Element {
+  useDocumentTitle('API Keys');
   const queryClient = useQueryClient();
-  const [token, setToken] = React.useState('');
-  const [persistToken, setPersistToken] = React.useState(false);
+  const { token, persisted: persistToken, setToken: setGlobalToken, clear: clearGlobalToken } = useToken();
+  const { toast } = useToast();
   const [label, setLabel] = React.useState('rotation');
   const [expiryPreset, setExpiryPreset] = React.useState('30');
   const [customDays, setCustomDays] = React.useState('30');
-  const [status, setStatus] = React.useState('');
-  const [statusType, setStatusType] = React.useState<'ok' | 'error' | 'info'>('info');
+  const { status, statusType, setOk, setError, setInfo } = useStatus();
   const [newToken, setNewToken] = React.useState('');
+  const newTokenRef = React.useRef<HTMLDivElement>(null);
   const [revokeId, setRevokeId] = React.useState('');
 
   React.useEffect(() => {
-    const saved = readToken();
-    setToken(saved);
-    setPersistToken(isPersistedToken());
-  }, []);
+    if (newToken && newTokenRef.current) {
+      newTokenRef.current.focus();
+    }
+  }, [newToken]);
 
   const keysQuery = useQuery({
-    queryKey: ['keys', token],
+    queryKey: ['keys'],
     queryFn: () => listKeys(token || undefined),
   });
 
@@ -50,28 +54,59 @@ export function KeysPage(): React.JSX.Element {
     onSuccess: async (data) => {
       const created = data.api_key?.token ?? '';
       setNewToken(created);
-      setStatus(created ? 'New key created. Save it now.' : 'Key created, but token missing in response.');
-      setStatusType(created ? 'ok' : 'error');
+      if (created) {
+        setGlobalToken(created, true);
+        toast('New key created and set as active token', 'ok');
+        // One-time warning about localStorage persistence
+        const warned = sessionStorage.getItem('clmcp_storage_warned');
+        if (!warned) {
+          sessionStorage.setItem('clmcp_storage_warned', '1');
+          toast('Token saved to localStorage — any script on this page can read it. Use Account page to clear.', 'info');
+        }
+      }
+      if (created) {
+        setOk('New key created. Save it now.');
+      } else {
+        setError('Key created, but token missing in response.');
+      }
       trackEvent('key_created');
       await queryClient.invalidateQueries({ queryKey: ['keys'] });
     },
     onError: (error) => {
-      setStatus(toErrorMessage(error));
-      setStatusType('error');
+      setError(toErrorMessage(error));
       trackEvent('key_create_failed', { category: 'auth' });
     },
   });
 
   const revokeMutation = useMutation({
     mutationFn: async (keyId: string) => revokeKey(keyId, token || undefined),
-    onSuccess: async () => {
-      setStatus('Key revoked.');
-      setStatusType('ok');
-      await queryClient.invalidateQueries({ queryKey: ['keys'] });
+    onMutate: async (keyId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['keys'] });
+      const previous = queryClient.getQueryData<{ keys: ApiKeyRecord[] }>(['keys']);
+      queryClient.setQueryData<{ keys: ApiKeyRecord[] } | undefined>(['keys'], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          keys: old.keys.map((k) =>
+            k.id === keyId ? { ...k, is_active: false, revoked_at: new Date().toISOString() } : k,
+          ),
+        };
+      });
+      return { previous };
     },
-    onError: (error) => {
-      setStatus(toErrorMessage(error));
-      setStatusType('error');
+    onSuccess: () => {
+      setOk('Key revoked.');
+      toast('Key revoked successfully', 'ok');
+    },
+    onError: (error, _keyId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['keys'], context.previous);
+      }
+      setError(toErrorMessage(error));
+      toast('Failed to revoke key — reverted', 'error');
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['keys'] });
     },
   });
 
@@ -80,47 +115,16 @@ export function KeysPage(): React.JSX.Element {
   return (
     <div className="stack">
       <div className="two-col">
-        <Card title="Session and bearer token" subtitle="Optional: use token mode. Session cookie mode is also supported.">
-          <FormField id="apiToken" label="API token">
-            <Input
-              id="apiToken"
-              type="password"
-              placeholder="Paste MCP bearer token"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </FormField>
-          <label className="inline-check">
-            <input
-              id="persistToken"
-              type="checkbox"
-              checked={persistToken}
-              onChange={(event) => setPersistToken(event.target.checked)}
-            />
-            Remember token on this device
-          </label>
-          <div className="row">
-            <Button
-              id="saveTokenBtn"
-              variant="secondary"
-              onClick={() => {
-                if (!token.trim()) {
-                  setStatus('Token is empty.');
-                  setStatusType('error');
-                  return;
-                }
-                saveToken(token, persistToken);
-                setStatus(persistToken ? 'Token saved to localStorage.' : 'Token saved to sessionStorage.');
-                setStatusType('ok');
-              }}
-            >
-              Save token
+        <Card title="Bearer token" subtitle="Your token is managed globally. Create a key below and it will auto-set.">
+          <dl className="dl-grid">
+            <dt>Token status</dt>
+            <dd>{token ? '✓ Set' : '✗ Not set'}</dd>
+          </dl>
+          {token && (
+            <Button variant="secondary" onClick={() => { clearGlobalToken(); toast('Token cleared', 'info'); }}>
+              Clear token
             </Button>
-            <Button id="loadKeysBtn" onClick={() => keysQuery.refetch()}>
-              Load keys
-            </Button>
-          </div>
-          <StatusBanner id="keysStatus" message={status} type={statusType} />
+          )}
         </Card>
 
         <Card title="Create rotation key" subtitle="One-time token reveal. Store it immediately.">
@@ -151,7 +155,7 @@ export function KeysPage(): React.JSX.Element {
             {createMutation.isPending ? 'Creating...' : 'Create key'}
           </Button>
           <StatusBanner id="newKeyStatus" message={status} type={statusType} />
-          <div id="newKeyToken" className="token-box" aria-label="Newly created API token">
+          <div id="newKeyToken" className="token-box" ref={newTokenRef} tabIndex={-1} aria-label="Newly created API token">
             {newToken || 'No key created yet.'}
           </div>
           <div className="row">
@@ -160,13 +164,15 @@ export function KeysPage(): React.JSX.Element {
               variant="secondary"
               onClick={async () => {
                 if (!newToken) {
-                  setStatus('Create a key first to copy it.');
-                  setStatusType('error');
+                  toast('Create a key first to copy it.', 'error');
                   return;
                 }
-                await navigator.clipboard.writeText(newToken);
-                setStatus('New key copied.');
-                setStatusType('ok');
+                try {
+                  await navigator.clipboard.writeText(newToken);
+                  toast('New key copied to clipboard', 'ok');
+                } catch {
+                  toast('Clipboard not available — copy manually', 'error');
+                }
               }}
             >
               Copy new key
@@ -177,18 +183,36 @@ export function KeysPage(): React.JSX.Element {
       </div>
 
       <Card title="Existing keys" subtitle="Statuses update immediately after creation or revocation.">
-        {keysQuery.isLoading ? <p>Loading keys...</p> : null}
-        {keysQuery.isError ? <StatusBanner role="alert" message={toErrorMessage(keysQuery.error)} type="error" /> : null}
-        {!keysQuery.isLoading && !rows.length ? <p>No keys found for this user.</p> : null}
+        {keysQuery.isLoading ? (
+          <div className="loading" role="status" aria-busy="true" aria-label="Loading keys">
+            <div className="skeleton skeleton-line"></div>
+            <div className="skeleton skeleton-line short"></div>
+            <div className="skeleton skeleton-line"></div>
+          </div>
+        ) : null}
+        {keysQuery.isError ? (
+          <div>
+            <StatusBanner role="alert" message={toErrorMessage(keysQuery.error)} type="error" />
+            <Button variant="secondary" onClick={() => keysQuery.refetch()} disabled={keysQuery.isFetching}>
+              {keysQuery.isFetching ? 'Retrying...' : 'Retry'}
+            </Button>
+          </div>
+        ) : null}
+        {!keysQuery.isLoading && !rows.length ? (
+          <div className="empty-state">
+            <div className="empty-icon">🔑</div>
+            <p>No keys found for this user.</p>
+          </div>
+        ) : null}
         {!!rows.length ? (
-          <table className="table">
+          <table className="table" aria-label="API keys">
             <thead>
               <tr>
-                <th>Label</th>
-                <th>Status</th>
-                <th>Expires</th>
-                <th>Created</th>
-                <th></th>
+                <th scope="col">Label</th>
+                <th scope="col">Status</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Created</th>
+                <th scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -203,8 +227,8 @@ export function KeysPage(): React.JSX.Element {
                     <td>
                       <span className={`chip ${statusValue}`}>{statusValue}</span>
                     </td>
-                    <td>{key.expires_at ? new Date(key.expires_at).toISOString() : 'none'}</td>
-                    <td>{new Date(key.created_at).toISOString()}</td>
+                    <td>{key.expires_at ? formatDate(key.expires_at) : 'none'}</td>
+                    <td>{formatDate(key.created_at)}</td>
                     <td>
                       <Button
                         variant="secondary"

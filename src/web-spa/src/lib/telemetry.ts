@@ -23,7 +23,7 @@ export function trackEvent(name: string, meta?: Record<string, string | number |
   const events = loadEvents();
   events.push(event);
   saveEvents(events);
-  console.info('[ui-telemetry]', event);
+  if (import.meta.env.DEV) console.info('[ui-telemetry]', event);
 }
 
 export function markSignupStarted(): void {
