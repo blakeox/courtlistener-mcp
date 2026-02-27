@@ -510,13 +510,29 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
   const results = data.data as Record<string, unknown> | unknown[] | undefined;
   const pagination = data.pagination as Record<string, unknown> | undefined;
 
-  // Search results with nested data.results pattern
+  // Search results with nested data.results or data.analysis pattern
   if (results && typeof results === 'object' && !Array.isArray(results)) {
     const nested = results as Record<string, unknown>;
     const summary = nested.summary as string | undefined;
     const items = nested.results as unknown[] | undefined;
     const searchParams = nested.search_parameters as Record<string, unknown> | undefined;
     const innerPagination = nested.pagination as Record<string, unknown> | undefined;
+
+    // Handle analysis results nested under data.analysis (e.g., analyze_legal_argument)
+    const nestedAnalysis = nested.analysis as Record<string, unknown> | undefined;
+    if (nestedAnalysis && typeof nestedAnalysis === 'object') {
+      if (nestedAnalysis.summary) lines.push(`Analysis: ${nestedAnalysis.summary}`);
+      if (nestedAnalysis.query_used) lines.push(`Query: ${nestedAnalysis.query_used}`);
+      if (typeof nestedAnalysis.total_found === 'number') lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
+
+      const topCases = nestedAnalysis.top_cases as unknown[] | undefined;
+      if (Array.isArray(topCases) && topCases.length > 0) {
+        lines.push(`\nTop ${topCases.length} relevant cases:`);
+        for (let i = 0; i < topCases.length; i++) {
+          lines.push(formatSearchResult(i + 1, topCases[i] as Record<string, unknown>));
+        }
+      }
+    }
 
     if (summary) lines.push(`Summary: ${summary}`);
     if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
@@ -547,10 +563,23 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
     }
   }
 
-  // Analysis results
+  // Analysis results (e.g., analyze_legal_argument)
   if (data.analysis && typeof data.analysis === 'object') {
-    lines.push('Analysis:');
-    lines.push(JSON.stringify(data.analysis, null, 2));
+    const analysis = data.analysis as Record<string, unknown>;
+    if (analysis.summary) lines.push(`Analysis: ${analysis.summary}`);
+    if (analysis.query_used) lines.push(`Query: ${analysis.query_used}`);
+    if (typeof analysis.total_found === 'number') lines.push(`Total opinions found: ${analysis.total_found}`);
+
+    const topCases = analysis.top_cases as unknown[] | undefined;
+    if (Array.isArray(topCases) && topCases.length > 0) {
+      lines.push(`\nTop ${topCases.length} relevant cases:`);
+      for (let i = 0; i < topCases.length; i++) {
+        const item = topCases[i] as Record<string, unknown>;
+        lines.push(formatSearchResult(i + 1, item));
+      }
+    } else if (!lines.some(l => l.startsWith('Top '))) {
+      lines.push(JSON.stringify(analysis, null, 2));
+    }
   }
 
   // If we couldn't extract structured data, return null to fall back

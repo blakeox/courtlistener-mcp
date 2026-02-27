@@ -408,10 +408,49 @@ export class CourtListenerAPI {
 
   // Analyze legal argument - placeholder method
   async analyzeLegalArgument(args: Record<string, unknown>): Promise<unknown> {
-    // This would require custom implementation or external service
+    const searchQuery = typeof args.search_query === 'string' ? args.search_query : '';
+    const argument = typeof args.argument === 'string' ? args.argument : '';
+    const query = searchQuery || argument;
+    if (!query) {
+      return { analysis: { top_cases: [], summary: 'No search query provided.' } };
+    }
+
+    const searchParams: Record<string, unknown> = {
+      q: query,
+      page_size: 10,
+      order_by: 'score desc',
+    };
+    if (typeof args.jurisdiction === 'string' && args.jurisdiction) {
+      searchParams.court = args.jurisdiction;
+    }
+    if (typeof args.date_range_start === 'string' && args.date_range_start) {
+      searchParams.date_filed_after = args.date_range_start;
+    }
+    if (typeof args.date_range_end === 'string' && args.date_range_end) {
+      searchParams.date_filed_before = args.date_range_end;
+    }
+
+    const response = await this.searchOpinions(searchParams);
+    const results = response?.results || [];
+
+    const topCases = results.slice(0, 10).map((r: Record<string, unknown>) => ({
+      case_name: r.case_name || r.caseName || 'Unknown',
+      court: r.court || r.court_id || '',
+      date_filed: r.date_filed || r.dateFiled || '',
+      citation: r.federal_cite_one || r.state_cite_one || r.neutral_cite || '',
+      citation_count: r.citation_count ?? 0,
+      precedential_status: r.precedential_status || '',
+      absolute_url: r.absolute_url || '',
+      snippet: r.snippet || r.summary || '',
+    }));
+
     return {
-      analysis: 'Legal argument analysis not yet implemented',
-      arguments: args,
+      analysis: {
+        top_cases: topCases,
+        total_found: response?.count ?? 0,
+        query_used: query,
+        summary: `Found ${response?.count ?? 0} relevant opinions for: "${query}"`,
+      },
     };
   }
 

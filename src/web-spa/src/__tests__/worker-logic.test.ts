@@ -169,6 +169,22 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
     const searchParams = nested.search_parameters as Record<string, unknown> | undefined;
     const innerPagination = nested.pagination as Record<string, unknown> | undefined;
 
+    // Handle analysis results nested under data.analysis (e.g., analyze_legal_argument)
+    const nestedAnalysis = nested.analysis as Record<string, unknown> | undefined;
+    if (nestedAnalysis && typeof nestedAnalysis === 'object') {
+      if (nestedAnalysis.summary) lines.push(`Analysis: ${nestedAnalysis.summary}`);
+      if (nestedAnalysis.query_used) lines.push(`Query: ${nestedAnalysis.query_used}`);
+      if (typeof nestedAnalysis.total_found === 'number') lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
+
+      const topCases = nestedAnalysis.top_cases as unknown[] | undefined;
+      if (Array.isArray(topCases) && topCases.length > 0) {
+        lines.push(`\nTop ${topCases.length} relevant cases:`);
+        for (let i = 0; i < topCases.length; i++) {
+          lines.push(formatSearchResult(i + 1, topCases[i] as Record<string, unknown>));
+        }
+      }
+    }
+
     if (summary) lines.push(`Summary: ${summary}`);
     if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
 
@@ -197,9 +213,23 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
     }
   }
 
+  // Analysis results (e.g., analyze_legal_argument)
   if (data.analysis && typeof data.analysis === 'object') {
-    lines.push('Analysis:');
-    lines.push(JSON.stringify(data.analysis, null, 2));
+    const analysis = data.analysis as Record<string, unknown>;
+    if (analysis.summary) lines.push(`Analysis: ${analysis.summary}`);
+    if (analysis.query_used) lines.push(`Query: ${analysis.query_used}`);
+    if (typeof analysis.total_found === 'number') lines.push(`Total opinions found: ${analysis.total_found}`);
+
+    const topCases = analysis.top_cases as unknown[] | undefined;
+    if (Array.isArray(topCases) && topCases.length > 0) {
+      lines.push(`\nTop ${topCases.length} relevant cases:`);
+      for (let i = 0; i < topCases.length; i++) {
+        const item = topCases[i] as Record<string, unknown>;
+        lines.push(formatSearchResult(i + 1, item));
+      }
+    } else if (!lines.some(l => l.startsWith('Top '))) {
+      lines.push(JSON.stringify(analysis, null, 2));
+    }
   }
 
   if (lines.length === 0) return null;
@@ -625,6 +655,29 @@ describe('formatMcpDataForLlm', () => {
     const result = formatMcpDataForLlm('search_cases', data);
     expect(result).toContain('highlighted text bold');
     expect(result).not.toContain('<em>');
+  });
+
+  it('formats nested analysis results (analyze_legal_argument)', () => {
+    const data = {
+      success: true,
+      data: {
+        analysis: {
+          top_cases: [
+            { case_name: 'Tinker v. Des Moines', court: 'scotus', date_filed: '1969-02-24', citation: '393 U.S. 503', citation_count: 500 },
+          ],
+          total_found: 150,
+          query_used: 'student free speech',
+          summary: 'Found 150 relevant opinions for: "student free speech"',
+        },
+      },
+    };
+    const result = formatMcpDataForLlm('analyze_legal_argument', data);
+    expect(result).toContain('Found 150 relevant opinions');
+    expect(result).toContain('Query: student free speech');
+    expect(result).toContain('Total opinions found: 150');
+    expect(result).toContain('Tinker v. Des Moines');
+    expect(result).toContain('393 U.S. 503');
+    expect(result).toContain('Cited 500 times');
   });
 });
 
