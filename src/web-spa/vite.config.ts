@@ -12,12 +12,6 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-query': ['@tanstack/react-query'],
-        },
-      },
     },
   },
   server: {
