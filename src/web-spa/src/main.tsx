@@ -6,6 +6,19 @@ import { App } from './App';
 import { AuthProvider } from './lib/auth';
 import './styles.css';
 
+function redirectRecoveryHashToResetPage(): void {
+  const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+  if (!rawHash) return;
+  const params = new URLSearchParams(rawHash);
+  const flowType = (params.get('type') || '').trim().toLowerCase();
+  const accessToken = (params.get('access_token') || '').trim();
+  if (flowType !== 'recovery' || !accessToken) return;
+  if (window.location.pathname === '/app/reset-password') return;
+  window.location.replace(`/app/reset-password#${rawHash}`);
+}
+
+redirectRecoveryHashToResetPage();
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
