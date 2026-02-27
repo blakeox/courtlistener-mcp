@@ -49,6 +49,7 @@ import {
   validateProtocolVersionHeader,
 } from './server/worker-security.js';
 import {
+  authenticateUserWithAnonKey,
   authenticateUserWithPassword,
   confirmUserEmail,
   createApiKeyForUser,
@@ -1406,8 +1407,9 @@ export default {
       const csrfError = requireCsrfToken(request);
       if (csrfError) return csrfError;
 
-      const config = getSupabaseManagementConfig(env);
-      if (!config) {
+      const managementConfig = getSupabaseManagementConfig(env);
+      const signupConfig = getSupabaseSignupConfig(env);
+      if (!managementConfig && !signupConfig) {
         return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
       }
 
@@ -1426,7 +1428,9 @@ export default {
       }
 
       try {
-        const authResult = await authenticateUserWithPassword(config, email, password);
+        const authResult = managementConfig
+          ? await authenticateUserWithPassword(managementConfig, email, password)
+          : await authenticateUserWithAnonKey(signupConfig!, email, password);
         if (!authResult.user.email_confirmed_at) {
           return jsonError('Email verification is required before login.', 403, 'email_not_verified');
         }

@@ -316,6 +316,39 @@ export async function authenticateUserWithPassword(
   };
 }
 
+/** Authenticate with email/password using the public anon key (no service role key required). */
+export async function authenticateUserWithAnonKey(
+  config: SupabaseSignupConfig,
+  email: string,
+  password: string,
+): Promise<PasswordAuthResult> {
+  const tokenUrl = `${cleanUrl(config.url)}/auth/v1/token?grant_type=password`;
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: toPublicJsonHeaders(config.anonKey),
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`password_auth_failed:${message}`);
+  }
+
+  const payload = (await response.json()) as {
+    access_token?: string;
+    user?: SupabaseUser;
+  };
+
+  if (!payload.user?.id || !payload.access_token) {
+    throw new Error('password_auth_failed:Supabase returned an invalid auth payload');
+  }
+
+  return {
+    user: payload.user,
+    accessToken: payload.access_token,
+  };
+}
+
 export async function createApiKeyForUser(
   config: SupabaseAuthConfig,
   input: CreateKeyInput,
