@@ -28,6 +28,11 @@ export interface PasswordAuthResult {
   accessToken: string;
 }
 
+export interface RecoveryExchangeResult {
+  user: SupabaseUser;
+  accessToken: string;
+}
+
 export interface SupabaseApiKey {
   id: string;
   user_id: string;
@@ -264,6 +269,44 @@ export async function resetPasswordWithAccessToken(
 
   const user = (await response.json()) as SupabaseUser;
   return user;
+}
+
+export async function exchangeRecoveryTokenHash(
+  config: SupabaseSignupConfig,
+  tokenHash: string,
+): Promise<RecoveryExchangeResult> {
+  const normalizedTokenHash = tokenHash.trim();
+  if (!normalizedTokenHash) {
+    throw new Error('token_hash_required');
+  }
+
+  const url = `${cleanUrl(config.url)}/auth/v1/verify`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: toPublicJsonHeaders(config.anonKey),
+    body: JSON.stringify({
+      type: 'recovery',
+      token_hash: normalizedTokenHash,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`recovery_exchange_failed:${message}`);
+  }
+
+  const payload = (await response.json()) as {
+    access_token?: string;
+    user?: SupabaseUser;
+  };
+  if (!payload.user?.id || !payload.access_token) {
+    throw new Error('recovery_exchange_failed:Supabase returned an invalid recovery payload');
+  }
+
+  return {
+    user: payload.user,
+    accessToken: payload.access_token,
+  };
 }
 
 /** Confirm a user's email via the Supabase Admin API (requires service role key). */

@@ -187,6 +187,15 @@ describe('ResetPasswordPage', () => {
     window.location.hash = '';
   });
 
+  it('shows password fields when recovery token_hash exists', async () => {
+    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=test-hash');
+    const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');
+    render(<ResetPasswordPage />, { wrapper: Wrapper });
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirm password')).toBeInTheDocument();
+    window.history.replaceState({}, document.title, '/');
+  });
+
   it('shows warning when no recovery token', async () => {
     window.location.hash = '';
     const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');

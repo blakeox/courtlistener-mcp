@@ -53,6 +53,7 @@ import {
   authenticateUserWithPassword,
   confirmUserEmail,
   createApiKeyForUser,
+  exchangeRecoveryTokenHash,
   getSupabaseManagementConfig,
   getSupabaseSignupConfig,
   getSupabaseUserFromAccessToken,
@@ -234,7 +235,7 @@ const DEFAULT_UI_SIGNUP_RATE_LIMIT_BLOCK_SECONDS = 900;
 const DEFAULT_UI_KEYS_RATE_LIMIT_MAX = 120;
 const DEFAULT_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS = 300;
 const DEFAULT_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS = 300;
-const DEFAULT_UI_AI_CHAT_RATE_LIMIT_MAX = 10;
+const DEFAULT_UI_AI_CHAT_RATE_LIMIT_MAX = 50;
 const DEFAULT_API_KEY_MAX_TTL_DAYS = 90;
 
 interface AuthFailureState {
@@ -327,20 +328,64 @@ function extractMcpResponseBody(raw: string): unknown {
   return JSON.parse(dataLines[dataLines.length - 1] ?? '{}');
 }
 
-function aiToolFromPrompt(message: string): 'lookup_citation' | 'search_cases' | 'search_opinions' {
+function aiToolFromPrompt(message: string): { tool: string; reason: string } {
   const normalized = message.toLowerCase();
-  if (normalized.includes('citation') || normalized.includes('v.')) {
-    return 'lookup_citation';
+  if (/\d+\s+(u\.?s\.?|s\.?\s*ct\.?|f\.\s*\d|f\.?\s*supp)/i.test(message) || normalized.includes('v.')) {
+    return { tool: 'lookup_citation', reason: 'Query contains a legal citation pattern (e.g., "v." or reporter reference).' };
   }
-  if (normalized.includes('opinion') || normalized.includes('holding')) {
-    return 'search_opinions';
+  if (normalized.includes('opinion') || normalized.includes('holding') || normalized.includes('ruling')) {
+    return { tool: 'search_opinions', reason: 'Query mentions opinions, holdings, or rulings.' };
   }
-  return 'search_cases';
+  if (normalized.includes('judge') && (normalized.includes('profile') || normalized.includes('background') || normalized.includes('record'))) {
+    return { tool: 'get_comprehensive_judge_profile', reason: 'Query asks for a judge profile or background.' };
+  }
+  if (normalized.includes('court') && (normalized.includes('list') || normalized.includes('which') || normalized.includes('all'))) {
+    return { tool: 'list_courts', reason: 'Query asks to list or identify courts.' };
+  }
+  if (normalized.includes('docket') || normalized.includes('filing')) {
+    return { tool: 'get_docket_entries', reason: 'Query mentions dockets or filings.' };
+  }
+  if (normalized.includes('citation') && (normalized.includes('valid') || normalized.includes('check') || normalized.includes('verify'))) {
+    return { tool: 'validate_citations', reason: 'Query asks to validate or check citations.' };
+  }
+  if (normalized.includes('argument') || normalized.includes('precedent') || normalized.includes('legal analysis')) {
+    return { tool: 'analyze_legal_argument', reason: 'Query involves legal argument analysis or precedent research.' };
+  }
+  return { tool: 'search_cases', reason: 'Default: general case search for broad legal queries.' };
 }
 
 function aiToolArguments(toolName: string, prompt: string): Record<string, unknown> {
   if (toolName === 'lookup_citation') {
     return { citation: prompt };
+  }
+  if (toolName === 'validate_citations') {
+    return { text: prompt };
+  }
+  if (toolName === 'analyze_legal_argument') {
+    return { argument: prompt, keywords: prompt.split(/\s+/).slice(0, 5) };
+  }
+  if (toolName === 'list_courts') {
+    return {};
+  }
+  if (toolName === 'get_comprehensive_judge_profile' || toolName === 'get_judge') {
+    const idMatch = prompt.match(/\b(\d+)\b/);
+    return idMatch ? { judge_id: idMatch[1] } : { query: prompt };
+  }
+  if (toolName === 'get_docket_entries') {
+    const idMatch = prompt.match(/\b(\d+)\b/);
+    return idMatch ? { docket_id: idMatch[1] } : { query: prompt };
+  }
+  if (toolName === 'get_case_details' || toolName === 'get_comprehensive_case_analysis') {
+    const idMatch = prompt.match(/\b(\d+)\b/);
+    return idMatch ? { cluster_id: idMatch[1] } : { query: prompt };
+  }
+  if (toolName === 'get_opinion_text') {
+    const idMatch = prompt.match(/\b(\d+)\b/);
+    return idMatch ? { opinion_id: idMatch[1] } : { query: prompt };
+  }
+  if (toolName === 'get_citation_network') {
+    const idMatch = prompt.match(/\b(\d+)\b/);
+    return idMatch ? { opinion_id: idMatch[1], depth: 2 } : { query: prompt };
   }
   return {
     query: prompt,
@@ -1588,22 +1633,29 @@ export default {
         );
       }
 
-      const body = await parseJsonBody<{ accessToken?: string; password?: string }>(request);
+      const body = await parseJsonBody<{ accessToken?: string; tokenHash?: string; password?: string }>(request);
       const accessToken = body?.accessToken?.trim() || '';
+      const tokenHash = body?.tokenHash?.trim() || '';
       const password = body?.password || '';
 
       const resetRateLimited = await applyUiRateLimit(request, env, 'signup');
       if (resetRateLimited) return resetRateLimited;
 
-      if (!accessToken) {
-        return jsonError('accessToken is required.', 400, 'missing_access_token');
+      if (!accessToken && !tokenHash) {
+        return jsonError('Recovery credential is required.', 400, 'missing_recovery_credential');
       }
       if (password.length < 8 || password.length > 256) {
         return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
       }
 
       try {
-        const user = await resetPasswordWithAccessToken(signupConfig, accessToken, password);
+        let recoveryAccessToken = accessToken;
+        if (!recoveryAccessToken && tokenHash) {
+          const exchanged = await exchangeRecoveryTokenHash(signupConfig, tokenHash);
+          recoveryAccessToken = exchanged.accessToken;
+        }
+
+        const user = await resetPasswordWithAccessToken(signupConfig, recoveryAccessToken, password);
 
         // Recovery link proves email ownership — confirm email if not yet confirmed
         const managementConfig = getSupabaseManagementConfig(env);
@@ -1959,7 +2011,7 @@ export default {
         message?: string;
         mcpToken?: string;
         mcpSessionId?: string;
-        toolName?: 'auto' | 'search_cases' | 'search_opinions' | 'lookup_citation';
+        toolName?: string;
         mode?: 'cheap' | 'balanced';
         testMode?: boolean;
       }>(request);
@@ -1985,12 +2037,13 @@ export default {
       const requestedTool = body.toolName || 'auto';
       const testMode = body.testMode === true;
       const mode = testMode ? 'cheap' : body.mode === 'balanced' ? 'balanced' : 'cheap';
-      const toolName =
-        requestedTool === 'auto'
-          ? testMode
-            ? 'search_cases'
-            : aiToolFromPrompt(message)
-          : requestedTool;
+      const autoResult = requestedTool === 'auto'
+        ? testMode
+          ? { tool: 'search_cases', reason: 'Test mode defaults to search_cases.' }
+          : aiToolFromPrompt(message)
+        : { tool: requestedTool, reason: `User selected ${requestedTool}.` };
+      const toolName = autoResult.tool;
+      const toolReason = autoResult.reason;
       const priorSessionId = body?.mcpSessionId?.trim() || '';
 
       if (!message) {
@@ -2076,6 +2129,7 @@ export default {
           fallback_used: fallbackUsed,
           mode,
           tool: toolName,
+          tool_reason: toolReason,
           session_id: toolResult.sessionId || activeSessionId,
           ai_response: completionText,
           mcp_result: toolResult.payload,

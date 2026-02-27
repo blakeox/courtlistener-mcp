@@ -156,4 +156,59 @@ describe('worker password reset API', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('accepts reset-password request with tokenHash and exchanges before update', async () => {
+    const originalFetch = globalThis.fetch;
+    let sawVerifyCall = false;
+    let sawResetCall = false;
+    let observedVerifyBody = '';
+    let observedResetAuth = '';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/auth/v1/verify')) {
+        sawVerifyCall = true;
+        observedVerifyBody = String(init?.body || '');
+        return new Response(
+          JSON.stringify({
+            access_token: 'access-token-from-hash',
+            user: { id: 'u1' },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith('/auth/v1/user')) {
+        sawResetCall = true;
+        observedResetAuth = new Headers(init?.headers).get('Authorization') || '';
+        return new Response(JSON.stringify({ id: 'u1' }), { status: 200 });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const response = await worker.default.fetch(
+        buildApiRequest('/api/password/reset', {
+          tokenHash: 'recovery-token-hash',
+          password: 'NewPassword123',
+        }),
+        {
+          MCP_OBJECT: {},
+          MCP_UI_RATE_LIMIT_ENABLED: 'false',
+          SUPABASE_URL: 'https://project.supabase.co',
+          SUPABASE_PUBLISHABLE_KEY: 'anon-key',
+        },
+        {},
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(sawVerifyCall, true);
+      assert.equal(sawResetCall, true);
+      assert.equal(observedResetAuth, 'Bearer access-token-from-hash');
+      const verifyPayload = JSON.parse(observedVerifyBody) as { type?: string; token_hash?: string };
+      assert.equal(verifyPayload.type, 'recovery');
+      assert.equal(verifyPayload.token_hash, 'recovery-token-hash');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

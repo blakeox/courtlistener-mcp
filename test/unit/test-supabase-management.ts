@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  exchangeRecoveryTokenHash,
   getSupabaseSignupConfig,
   resetPasswordWithAccessToken,
   sendPasswordResetEmail,
@@ -141,5 +142,42 @@ describe('supabase-management password reset helpers', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('exchangeRecoveryTokenHash exchanges token hash for access token', async () => {
+    let observedUrl = '';
+    let observedMethod = '';
+    let observedBody = '';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      observedUrl = String(input);
+      observedMethod = init?.method || '';
+      observedBody = String(init?.body || '');
+      return new Response(
+        JSON.stringify({
+          access_token: 'access-token-from-hash',
+          user: { id: 'user-1', email: 'user@example.com' },
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    try {
+      const result = await exchangeRecoveryTokenHash(
+        { url: 'https://x.supabase.co', anonKey: 'anon' },
+        'hash-token',
+      );
+      assert.equal(result.accessToken, 'access-token-from-hash');
+      assert.equal(result.user.id, 'user-1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(observedUrl, 'https://x.supabase.co/auth/v1/verify');
+    assert.equal(observedMethod, 'POST');
+    const payload = JSON.parse(observedBody) as { type?: string; token_hash?: string };
+    assert.equal(payload.type, 'recovery');
+    assert.equal(payload.token_hash, 'hash-token');
   });
 });

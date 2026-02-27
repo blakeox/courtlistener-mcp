@@ -51,6 +51,7 @@ const aiChatSchema = z.object({
   fallback_used: z.boolean(),
   mode: z.enum(['cheap', 'balanced']),
   tool: z.string(),
+  tool_reason: z.string().optional(),
   session_id: z.string(),
   ai_response: z.string(),
   mcp_result: z.unknown(),
@@ -174,7 +175,8 @@ export async function requestPasswordReset(payload: { email: string }): Promise<
 }
 
 export async function resetPassword(payload: {
-  accessToken: string;
+  accessToken?: string;
+  tokenHash?: string;
   password: string;
 }): Promise<PasswordResetResponse> {
   return request<PasswordResetResponse>('/api/password/reset', {
@@ -305,7 +307,7 @@ export async function aiChat(args: {
   message: string;
   mcpToken: string;
   mcpSessionId?: string;
-  toolName?: 'auto' | 'search_cases' | 'search_opinions' | 'lookup_citation';
+  toolName?: string;
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;
 }): Promise<z.infer<typeof aiChatSchema>> {

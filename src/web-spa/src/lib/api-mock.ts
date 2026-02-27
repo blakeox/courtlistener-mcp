@@ -66,7 +66,8 @@ export async function requestPasswordReset(
 }
 
 export async function resetPassword(_payload: {
-  accessToken: string;
+  accessToken?: string;
+  tokenHash?: string;
   password: string;
 }): Promise<PasswordResetResponse> {
   await delay();

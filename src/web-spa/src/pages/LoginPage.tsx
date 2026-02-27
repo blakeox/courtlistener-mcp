@@ -25,6 +25,7 @@ export function LoginPage(): React.JSX.Element {
     if (isRecoveryHash()) {
       navigate({
         pathname: '/app/reset-password',
+        search: window.location.search,
         hash: window.location.hash,
       }, { replace: true });
       return;

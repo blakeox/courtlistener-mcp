@@ -95,4 +95,33 @@ describe('web-spa api password reset', () => {
     assert.equal(parsed.password, 'NewPassword123');
     assert.match(String(result.message), /password has been reset/i);
   });
+
+  it('resetPassword posts tokenHash payload when provided', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      captured = {
+        url: String(input),
+        method: init?.method || 'GET',
+        body: String(init?.body || ''),
+        csrfHeader: headers.get('x-csrf-token'),
+        credentials: init?.credentials,
+      };
+      return new Response(
+        JSON.stringify({
+          message: 'Password has been reset. You can now log in.',
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    await resetPassword({
+      tokenHash: 'recovery-token-hash',
+      password: 'NewPassword123',
+    });
+
+    assert.ok(captured);
+    const parsed = JSON.parse(captured.body) as { tokenHash?: string; password?: string };
+    assert.equal(parsed.tokenHash, 'recovery-token-hash');
+    assert.equal(parsed.password, 'NewPassword123');
+  });
 });

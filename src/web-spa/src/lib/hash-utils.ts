@@ -3,22 +3,43 @@ function parseHashParams(): URLSearchParams {
   return new URLSearchParams(raw);
 }
 
+function parseSearchParams(): URLSearchParams {
+  return new URLSearchParams(window.location.search);
+}
+
+function readRecoveryType(): string {
+  const hashType = (parseHashParams().get('type') || '').trim().toLowerCase();
+  if (hashType) return hashType;
+  return (parseSearchParams().get('type') || '').trim().toLowerCase();
+}
+
 export function isRecoveryHash(): boolean {
-  const params = parseHashParams();
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  const accessToken = (params.get('access_token') || '').trim();
-  return flowType === 'recovery' && Boolean(accessToken);
+  if (readRecoveryType() !== 'recovery') return false;
+  const hashParams = parseHashParams();
+  const searchParams = parseSearchParams();
+  const accessToken = (hashParams.get('access_token') || searchParams.get('access_token') || '').trim();
+  const tokenHash = (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
+  return Boolean(accessToken || tokenHash);
 }
 
 export function getRecoveryToken(): string {
   const params = parseHashParams();
-  const flowType = (params.get('type') || '').trim().toLowerCase();
+  const flowType = readRecoveryType();
   const tokenType = (params.get('token_type') || '').trim().toLowerCase();
-  const accessToken = (params.get('access_token') || '').trim();
+  const searchAccessToken = (parseSearchParams().get('access_token') || '').trim();
+  const accessToken = (params.get('access_token') || searchAccessToken).trim();
   if (flowType !== 'recovery') return '';
   if (!accessToken) return '';
   if (tokenType && tokenType !== 'bearer') return '';
   return accessToken;
+}
+
+export function getRecoveryTokenHash(): string {
+  const flowType = readRecoveryType();
+  if (flowType !== 'recovery') return '';
+  const searchParams = parseSearchParams();
+  const hashParams = parseHashParams();
+  return (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
 }
 
 export function readLoginHashToken(): string {
@@ -36,12 +57,24 @@ export function readLoginHashToken(): string {
 export function redirectRecoveryHashToResetPage(): void {
   if (!isRecoveryHash()) return;
   if (window.location.pathname === '/app/reset-password') return;
-  const params = parseHashParams();
-  const safeParams = new URLSearchParams();
-  const accessToken = params.get('access_token');
-  const tokenType = params.get('token_type');
-  if (accessToken) safeParams.set('access_token', accessToken);
-  if (tokenType) safeParams.set('token_type', tokenType);
-  safeParams.set('type', 'recovery');
-  window.location.replace(`/app/reset-password#${safeParams.toString()}`);
+  const hashParams = parseHashParams();
+  const searchParams = parseSearchParams();
+  const recoverySearch = new URLSearchParams();
+  const recoveryHash = new URLSearchParams();
+
+  const tokenHash = (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
+  const accessToken = (hashParams.get('access_token') || searchParams.get('access_token') || '').trim();
+  const tokenType = (hashParams.get('token_type') || '').trim();
+
+  if (tokenHash) recoverySearch.set('token_hash', tokenHash);
+  if (tokenHash) recoverySearch.set('type', 'recovery');
+
+  if (accessToken) recoveryHash.set('access_token', accessToken);
+  if (tokenType) recoveryHash.set('token_type', tokenType);
+  if (accessToken) recoveryHash.set('type', 'recovery');
+
+  const search = recoverySearch.toString();
+  const hash = recoveryHash.toString();
+  const target = `/app/reset-password${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
+  window.location.replace(target);
 }

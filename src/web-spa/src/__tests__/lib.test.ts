@@ -3,6 +3,7 @@ import { validatePassword } from '../lib/validation';
 import {
   isRecoveryHash,
   getRecoveryToken,
+  getRecoveryTokenHash,
   readLoginHashToken,
 } from '../lib/hash-utils';
 
@@ -132,10 +133,12 @@ describe('storage', () => {
 });
 
 describe('hash-utils', () => {
+  const originalPathname = window.location.pathname;
+  const originalSearch = window.location.search;
   const originalHash = window.location.hash;
 
   afterEach(() => {
-    window.location.hash = originalHash;
+    window.history.replaceState({}, document.title, `${originalPathname}${originalSearch}${originalHash}`);
   });
 
   it('isRecoveryHash returns false with empty hash', () => {
@@ -166,5 +169,15 @@ describe('hash-utils', () => {
   it('readLoginHashToken ignores recovery hashes', () => {
     window.location.hash = '#type=recovery&access_token=tok';
     expect(readLoginHashToken()).toBe('');
+  });
+
+  it('isRecoveryHash returns true with recovery token_hash query', () => {
+    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=abc');
+    expect(isRecoveryHash()).toBe(true);
+  });
+
+  it('getRecoveryTokenHash extracts token_hash from query', () => {
+    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=myhash');
+    expect(getRecoveryTokenHash()).toBe('myhash');
   });
 });

@@ -4,7 +4,7 @@ import { resetPassword, requestPasswordReset, toErrorMessage } from '../lib/api'
 import { trackEvent } from '../lib/telemetry';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
-import { getRecoveryToken } from '../lib/hash-utils';
+import { getRecoveryToken, getRecoveryTokenHash } from '../lib/hash-utils';
 import { validatePassword } from '../lib/validation';
 import { useAuth } from '../lib/auth';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
@@ -21,7 +21,8 @@ export function ResetPasswordPage(): React.JSX.Element {
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
   const recoveryAccessToken = getRecoveryToken();
-  const canReset = Boolean(recoveryAccessToken);
+  const recoveryTokenHash = getRecoveryTokenHash();
+  const canReset = Boolean(recoveryAccessToken || recoveryTokenHash);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -36,7 +37,7 @@ export function ResetPasswordPage(): React.JSX.Element {
       setError('Passwords do not match.');
       return;
     }
-    if (!recoveryAccessToken) {
+    if (!recoveryAccessToken && !recoveryTokenHash) {
       setError('Password reset link is missing or invalid. Request a new one.');
       return;
     }
@@ -46,7 +47,8 @@ export function ResetPasswordPage(): React.JSX.Element {
 
     try {
       const result = await resetPassword({
-        accessToken: recoveryAccessToken,
+        accessToken: recoveryAccessToken || undefined,
+        tokenHash: recoveryTokenHash || undefined,
         password,
       });
       window.history.replaceState({}, document.title, '/app/reset-password');
