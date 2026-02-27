@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Shell, AuthRequired } from './components/Shell';
 import { SignupPage } from './pages/SignupPage';
@@ -15,6 +15,7 @@ import { listKeys } from './lib/api';
 export function App(): React.JSX.Element {
   const { session } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const keysQuery = useQuery({
     queryKey: ['keys', 'progress'],
@@ -46,6 +47,23 @@ export function App(): React.JSX.Element {
     { label: 'Create key', complete: hasKey, active: location.pathname === '/app/keys' },
     { label: 'First MCP call', complete: hasMcpSuccess, active: location.pathname === '/app/console' },
   ];
+
+  React.useEffect(() => {
+    const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+    if (!raw) return;
+    const params = new URLSearchParams(raw);
+    const flowType = (params.get('type') || '').trim().toLowerCase();
+    const accessToken = (params.get('access_token') || '').trim();
+    if (flowType !== 'recovery' || !accessToken) return;
+    if (location.pathname === '/app/reset-password') return;
+    navigate(
+      {
+        pathname: '/app/reset-password',
+        hash: window.location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.pathname, navigate]);
 
   return (
     <Shell steps={steps}>
