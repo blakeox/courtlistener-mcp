@@ -93,10 +93,12 @@ function buildLowCostSummary(
           const formatted = formatMcpDataForLlm(toolName, parsed);
           if (formatted) {
             return [
-              `**Summary**: Searched CourtListener using \`${toolName}\` for: "${message}"`,
+              `**Legal Analysis**: CourtListener search via \`${toolName}\` returned the following results for: "${message}"`,
               '',
-              `**What MCP Returned**:`,
+              `**Key Cases Found**:`,
               formatted.slice(0, 3000),
+              '',
+              '**Legal Landscape**: This is a fallback summary — the AI analysis model was unavailable. The raw case data above provides the actual court records for your research.',
               '',
               '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
             ].join('\n');
@@ -109,9 +111,9 @@ function buildLowCostSummary(
   const payloadText = JSON.stringify(mcpPayload);
   const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
   return [
-    `**Summary**: Ran \`${toolName}\` for: "${message}"`,
+    `**Legal Analysis**: Ran \`${toolName}\` for: "${message}"`,
     '',
-    '**What MCP Returned** (raw):',
+    '**Raw Data**:',
     compact,
     '',
     '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
@@ -512,7 +514,7 @@ describe('buildLowCostSummary', () => {
 
   it('falls back to raw JSON for non-structured data', () => {
     const result = buildLowCostSummary('test', 'search_cases', { random: 'data' });
-    expect(result).toContain('**What MCP Returned** (raw)');
+    expect(result).toContain('**Raw Data**');
   });
 });
 

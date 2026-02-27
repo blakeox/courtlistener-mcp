@@ -296,8 +296,8 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
 };
 const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.1-8b-instruct-fast';
 const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct-fast';
-const CHEAP_MODE_MAX_TOKENS = 600;
-const BALANCED_MODE_MAX_TOKENS = 1200;
+const CHEAP_MODE_MAX_TOKENS = 800;
+const BALANCED_MODE_MAX_TOKENS = 2000;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -428,10 +428,12 @@ function buildLowCostSummary(
           const formatted = formatMcpDataForLlm(toolName, parsed);
           if (formatted) {
             return [
-              `**Summary**: Searched CourtListener using \`${toolName}\` for: "${message}"`,
+              `**Legal Analysis**: CourtListener search via \`${toolName}\` returned the following results for: "${message}"`,
               '',
-              `**What MCP Returned**:`,
+              `**Key Cases Found**:`,
               formatted.slice(0, 3000),
+              '',
+              '**Legal Landscape**: This is a fallback summary — the AI analysis model was unavailable. The raw case data above provides the actual court records for your research.',
               '',
               '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
             ].join('\n');
@@ -444,9 +446,9 @@ function buildLowCostSummary(
   const payloadText = JSON.stringify(mcpPayload);
   const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
   return [
-    `**Summary**: Ran \`${toolName}\` for: "${message}"`,
+    `**Legal Analysis**: Ran \`${toolName}\` for: "${message}"`,
     '',
-    '**What MCP Returned** (raw):',
+    '**Raw Data**:',
     compact,
     '',
     '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
@@ -2325,20 +2327,30 @@ export default {
         const systemPrompt = testMode
           ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
           : [
-              'You are a legal research assistant with access to CourtListener via MCP tools.',
-              'CRITICAL RULES:',
+              'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database, via MCP tools.',
+              'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data and provide substantive legal insight.',
+              '',
+              'ANALYSIS INSTRUCTIONS:',
+              '- Synthesize the case data into a coherent legal analysis that directly answers the user\'s question.',
+              '- Identify key legal principles, trends, and holdings from the returned cases.',
+              '- Explain how the cases relate to each other and to the user\'s query.',
+              '- Highlight the most important or frequently-cited cases and explain WHY they matter.',
+              '- Note any circuit splits, evolving standards, or notable dissents if apparent from the data.',
+              '',
+              'ACCURACY RULES:',
               '- ONLY cite case names, dates, courts, and holdings that appear in the data below.',
-              '- If the data does not contain specific case names or holdings, say "The search returned N results" and describe what categories of data were found.',
               '- NEVER invent or hallucinate case names, citations, dates, or holdings.',
-              '- If you are unsure about a detail, say so explicitly.',
-              '- Quote directly from the returned data when possible.',
-              'Format your response with these sections:',
-              '**Summary**: A 1-2 sentence overview answering the user question based on the data.',
-              '**What MCP Returned**: Specific findings from the data — case names, citations, holdings, or counts. Only include what is actually in the data.',
-              '**Suggested Follow-up**: One specific follow-up query the user could try.',
+              '- If the data is limited, acknowledge that and work with what you have.',
+              '- Quote directly from snippets when they contain relevant holdings.',
+              '',
+              'FORMAT your response with these sections:',
+              '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question, synthesizing findings from the case data. This should read like expert legal research, not a data report.',
+              '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates, and a brief note on why each matters to the query.',
+              '**Legal Landscape**: 1-2 sentences on the broader legal landscape — are courts aligned? Is the law settled or evolving?',
+              '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
               conversationHistory.length > 0 ? 'Reference prior conversation context when relevant.' : '',
             ].filter(Boolean).join('\n');
-        const dataMaxLen = mode === 'cheap' ? 4000 : 12000;
+        const dataMaxLen = mode === 'cheap' ? 6000 : 16000;
         const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, mcpPayload, dataMaxLen)}`;
 
         const messages: Array<{ role: string; content: string }> = [
