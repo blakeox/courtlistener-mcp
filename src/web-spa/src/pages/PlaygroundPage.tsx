@@ -1,5 +1,5 @@
 import React from 'react';
-import { mcpCall, aiChat, toErrorMessage } from '../lib/api';
+import { mcpCall, aiChat, aiPlain, toErrorMessage } from '../lib/api';
 import { markFirstMcpSuccess, trackEvent } from '../lib/telemetry';
 import { useToken } from '../lib/token-context';
 import { useToast } from '../components/Toast';
@@ -488,6 +488,179 @@ function AiChatPanel(): React.JSX.Element {
   );
 }
 
+// ─── Compare Panel (Side-by-side: MCP vs Plain AI) ──────────────
+
+interface CompareResult {
+  label: string;
+  response: string;
+  latencyMs: number;
+  tool?: string;
+  toolReason?: string;
+  mode: string;
+  hasMcp: boolean;
+}
+
+function ComparePanel(): React.JSX.Element {
+  const { token, tokenMissing, mcpSessionId, setMcpSessionId } = usePlayground();
+  const [prompt, setPrompt] = React.useState('What are the leading Supreme Court cases about free speech in schools?');
+  const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
+  const [aiToolName, setAiToolName] = React.useState('auto');
+  const [running, setRunning] = React.useState(false);
+  const [results, setResults] = React.useState<CompareResult[]>([]);
+  const elapsed = useElapsedTimer(running);
+  const cancelledRef = React.useRef(false);
+  React.useEffect(() => { return () => { cancelledRef.current = true; }; }, []);
+
+  function applyPreset(preset: Preset): void {
+    setAiToolName(preset.toolName);
+    setPrompt(preset.prompt);
+    setResults([]);
+  }
+
+  async function runComparison(): Promise<void> {
+    if (!prompt.trim() || !token.trim()) return;
+    const currentPrompt = prompt.trim();
+    setRunning(true);
+    setResults([]);
+
+    // Fire both requests in parallel
+    const [mcpResult, plainResult] = await Promise.allSettled([
+      aiChat({
+        message: currentPrompt,
+        mcpToken: token,
+        mcpSessionId: mcpSessionId || undefined,
+        toolName: aiToolName,
+        mode: aiMode,
+      }),
+      aiPlain({ message: currentPrompt, mode: aiMode }),
+    ]);
+
+    if (cancelledRef.current) return;
+
+    const newResults: CompareResult[] = [];
+
+    if (mcpResult.status === 'fulfilled') {
+      const r = mcpResult.value;
+      if (r.session_id) setMcpSessionId(r.session_id);
+      newResults.push({
+        label: 'With MCP Tools',
+        response: r.ai_response,
+        latencyMs: 0, // We'll use the wall time below
+        tool: r.tool,
+        toolReason: r.tool_reason,
+        mode: r.mode,
+        hasMcp: true,
+      });
+    } else {
+      newResults.push({
+        label: 'With MCP Tools',
+        response: `Error: ${mcpResult.reason instanceof Error ? mcpResult.reason.message : 'Failed'}`,
+        latencyMs: 0,
+        mode: aiMode,
+        hasMcp: true,
+      });
+    }
+
+    if (plainResult.status === 'fulfilled') {
+      newResults.push({
+        label: 'Without MCP (LLM Only)',
+        response: plainResult.value.ai_response,
+        latencyMs: 0,
+        mode: plainResult.value.mode,
+        hasMcp: false,
+      });
+    } else {
+      newResults.push({
+        label: 'Without MCP (LLM Only)',
+        response: `Error: ${plainResult.reason instanceof Error ? plainResult.reason.message : 'Failed'}`,
+        latencyMs: 0,
+        mode: aiMode,
+        hasMcp: false,
+      });
+    }
+
+    setResults(newResults);
+    setRunning(false);
+  }
+
+  return (
+    <div className="stack">
+      <Card title="Side-by-Side Comparison" subtitle="Send the same prompt with and without MCP tools to see the difference real-time legal data makes.">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+          {AI_PRESETS.slice(0, 4).map((p) => (
+            <Button key={p.label} variant="secondary" onClick={() => applyPreset(p)} style={{ fontSize: '0.85rem' }}>
+              {p.icon} {p.label}
+            </Button>
+          ))}
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); void runComparison(); }}>
+          <FormField id="compareToolName" label="MCP Tool (for MCP side)">
+            <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
+          </FormField>
+          <FormField id="compareMode" label="Cost mode">
+            <select id="compareMode" value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)}>
+              <option value="cheap">cheap (recommended)</option>
+              <option value="balanced">balanced</option>
+            </select>
+          </FormField>
+          <FormField id="comparePrompt" label="Prompt (sent to both)">
+            <textarea id="comparePrompt" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter a legal research question..." />
+          </FormField>
+          <Button type="submit" disabled={running || tokenMissing}>
+            {running ? `Comparing... (${elapsed}s)` : '⚡ Run Comparison'}
+          </Button>
+        </form>
+      </Card>
+
+      {results.length === 2 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {results.map((r) => (
+            <div key={r.label} style={{
+              border: `2px solid ${r.hasMcp ? 'var(--color-primary, #3b82f6)' : 'var(--color-border)'}`,
+              borderRadius: '8px',
+              padding: '16px',
+              background: r.hasMcp ? 'rgba(59,130,246,0.03)' : 'var(--color-surface)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <span style={{ fontSize: '1.2rem' }}>{r.hasMcp ? '🔌' : '🧠'}</span>
+                <strong style={{ fontSize: '0.95rem' }}>{r.label}</strong>
+                {r.hasMcp && <span style={{
+                  background: 'var(--color-primary, #3b82f6)',
+                  color: 'white',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                }}>MCP</span>}
+              </div>
+              {r.tool && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '8px', padding: '4px 8px', background: 'var(--color-surface)', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                  🔧 <strong>{r.tool}</strong>{r.toolReason ? ` — ${r.toolReason}` : ''}
+                </div>
+              )}
+              <div style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
+                {renderMarkdown(r.response)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {results.length === 2 && (
+        <Card title="What this shows">
+          <p style={{ fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+            <strong>With MCP:</strong> The AI queried CourtListener&apos;s live database via the Model Context Protocol, retrieving real case data, citations, and metadata before generating its response.
+            <br />
+            <strong>Without MCP:</strong> The same AI model answered using only its training data — no live data access, no tool calls, no real-time verification.
+            <br /><br />
+            This demonstrates how MCP bridges AI models with authoritative legal data sources, producing responses grounded in real, up-to-date information.
+          </p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ─── Transcript Entry ────────────────────────────────────────────
 
 const ROLE_STYLES: Record<string, { icon: string; color: string }> = {
@@ -592,14 +765,16 @@ export function PlaygroundPage(): React.JSX.Element {
 
 function PlaygroundContent(): React.JSX.Element {
   const { tokenMissing, transcript, clearTranscript, lastRawMcp, protocolLog } = usePlayground();
-  const [activeTab, setActiveTab] = React.useState<'raw' | 'ai'>('ai');
+  const [activeTab, setActiveTab] = React.useState<'compare' | 'ai' | 'raw'>('compare');
   const [showCatalog, setShowCatalog] = React.useState(false);
   const transcriptRef = useAutoScroll<HTMLDivElement>([transcript]);
 
   const rawTabId = 'tab-raw';
   const aiTabId = 'tab-ai';
+  const compareTabId = 'tab-compare';
   const rawPanelId = 'panel-raw';
   const aiPanelId = 'panel-ai';
+  const comparePanelId = 'panel-compare';
 
   function handleExport(): void {
     const data = JSON.stringify({ transcript, protocol: protocolLog }, null, 2);
@@ -630,6 +805,17 @@ function PlaygroundContent(): React.JSX.Element {
       <div className="tabs" role="tablist" aria-label="Playground mode">
         <button
           type="button"
+          id={compareTabId}
+          role="tab"
+          aria-selected={activeTab === 'compare'}
+          aria-controls={comparePanelId}
+          className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
+          onClick={() => setActiveTab('compare')}
+        >
+          ⚡ Compare
+        </button>
+        <button
+          type="button"
           id={aiTabId}
           role="tab"
           aria-selected={activeTab === 'ai'}
@@ -650,6 +836,15 @@ function PlaygroundContent(): React.JSX.Element {
         >
           Raw MCP Console
         </button>
+      </div>
+
+      <div
+        id={comparePanelId}
+        role="tabpanel"
+        aria-labelledby={compareTabId}
+        hidden={activeTab !== 'compare'}
+      >
+        {activeTab === 'compare' && <ComparePanel />}
       </div>
 
       <div

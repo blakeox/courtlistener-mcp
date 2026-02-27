@@ -320,6 +320,24 @@ export async function aiChat(args: {
   return aiChatSchema.parse(payload);
 }
 
+const aiPlainSchema = z.object({
+  ai_response: z.string(),
+  mode: z.enum(['cheap', 'balanced']),
+});
+
+export async function aiPlain(args: {
+  message: string;
+  mode?: 'cheap' | 'balanced';
+  history?: Array<{ role: string; content: string }>;
+}): Promise<z.infer<typeof aiPlainSchema>> {
+  const payload = await request<unknown>('/api/ai-plain', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  return aiPlainSchema.parse(payload);
+}
+
 export function toErrorMessage(error: unknown): string {
   if (!error) return 'Unknown error';
   const candidate = error as ApiError;

@@ -2157,6 +2157,87 @@ export default {
       }
     }
 
+    // ── Plain AI chat (no MCP) for comparison mode ──────────────
+    if (url.pathname === '/api/ai-plain') {
+      if (request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
+      }
+      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
+      if (uiOriginRejection) return uiOriginRejection;
+
+      const authResult = await authenticateUiApiRequest(request, env);
+      if (authResult instanceof Response) return authResult;
+      const aiChatQuota = await applyAiChatLifetimeQuota(env, authResult.userId);
+      if (aiChatQuota) return aiChatQuota;
+      if (authResult.authType === 'session') {
+        const csrfError = requireCsrfToken(request);
+        if (csrfError) return csrfError;
+      }
+
+      const body = await parseJsonBody<{
+        message?: string;
+        mode?: 'cheap' | 'balanced';
+        history?: Array<{ role: string; content: string }>;
+      }>(request);
+      if (!body || !isPlainObject(body)) {
+        return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
+      }
+      if (typeof body.message !== 'string') {
+        return jsonError('message must be a string.', 400, 'invalid_request_schema');
+      }
+      const message = body.message.trim();
+      if (!message || message.length > 10000) {
+        return jsonError('message is required (max 10,000 chars).', 400, 'invalid_message');
+      }
+      const mode = body.mode === 'balanced' ? 'balanced' : 'cheap';
+
+      const rawHistory = Array.isArray(body.history) ? body.history : [];
+      const conversationHistory = rawHistory
+        .filter((h): h is { role: string; content: string } =>
+          isPlainObject(h) && typeof h.role === 'string' && typeof h.content === 'string' &&
+          (h.role === 'user' || h.role === 'assistant'))
+        .slice(-10)
+        .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content.slice(0, 2000) }));
+
+      if (!env.AI || typeof env.AI.run !== 'function') {
+        return jsonError('AI service unavailable.', 502, 'ai_unavailable');
+      }
+      try {
+        const model = env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CF_AI_MODEL;
+        const messages: Array<{ role: string; content: string }> = [
+          {
+            role: 'system',
+            content: 'You are a legal research assistant. Answer legal questions using ONLY your training data — you have NO access to any external databases, APIs, or tools. Keep response under 140 words. Be honest about the limitations of answering without real-time legal data.',
+          },
+        ];
+        for (const turn of conversationHistory) {
+          messages.push(turn);
+        }
+        messages.push({ role: 'user', content: message });
+
+        const completion = await env.AI.run(model, {
+          messages,
+          max_tokens: mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
+          temperature: mode === 'cheap' ? 0 : 0.2,
+        });
+        const aiText =
+          (completion as { response?: string }).response ||
+          (completion as { result?: { response?: string } }).result?.response ||
+          '';
+        if (!aiText.trim()) {
+          return jsonError('AI returned empty response.', 502, 'ai_response_invalid');
+        }
+        return jsonResponse({ ai_response: aiText.trim(), mode });
+      } catch (error) {
+        console.error('[ui-api] ai-plain failed', { error });
+        return jsonError(
+          error instanceof Error ? error.message : 'Failed to generate AI response.',
+          502,
+          'ai_plain_failed',
+        );
+      }
+    }
+
     // Guard MCP endpoints with method/origin/auth/protocol checks
     if (mcpPath) {
       if (!['GET', 'POST', 'DELETE'].includes(request.method)) {
