@@ -305,7 +305,7 @@ export async function mcpCall<T>(
 
 export async function aiChat(args: {
   message: string;
-  mcpToken: string;
+  mcpToken?: string;
   mcpSessionId?: string;
   toolName?: string;
   mode?: 'cheap' | 'balanced';

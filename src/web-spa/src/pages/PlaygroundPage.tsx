@@ -402,7 +402,7 @@ function AiChatPanel(): React.JSX.Element {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
-  useKeyboardShortcut('Enter', () => { void sendAiChat(); }, { disabled: aiRunning || tokenMissing });
+  useKeyboardShortcut('Enter', () => { void sendAiChat(); }, { disabled: aiRunning });
 
   function applyPreset(preset: Preset): void {
     setAiToolName(preset.toolName);
@@ -419,7 +419,6 @@ function AiChatPanel(): React.JSX.Element {
 
   async function sendAiChat(): Promise<void> {
     if (!aiPrompt.trim()) { aiStatus.setError('Enter a prompt.'); return; }
-    if (!token.trim()) { aiStatus.setError('Set a bearer token first (API Keys page).'); return; }
     const currentPrompt = aiPrompt.trim();
     const currentId = msgId;
     setMsgId((v) => v + 2);
@@ -435,7 +434,7 @@ function AiChatPanel(): React.JSX.Element {
       const [mcpResult, plainResult] = await Promise.allSettled([
         aiChat({
           message: currentPrompt,
-          mcpToken: token,
+          mcpToken: token || undefined,
           mcpSessionId: mcpSessionId || undefined,
           toolName: aiToolName,
           mode: aiMode,
@@ -640,7 +639,7 @@ function AiChatPanel(): React.JSX.Element {
               placeholder={chatHistory.length > 0 ? 'Ask a follow-up question...' : 'Ask a legal research question...'}
               style={{ flex: 1, resize: 'vertical' }}
             />
-            <Button type="submit" disabled={aiRunning || tokenMissing} style={{ height: '52px', minWidth: '100px' }}>
+            <Button type="submit" disabled={aiRunning} style={{ height: '52px', minWidth: '100px' }}>
               {aiRunning ? `${elapsed}s...` : 'Send'}
             </Button>
           </div>
@@ -686,7 +685,7 @@ function ComparePanel(): React.JSX.Element {
   }
 
   async function runComparison(): Promise<void> {
-    if (!prompt.trim() || !token.trim()) return;
+    if (!prompt.trim()) return;
     const currentPrompt = prompt.trim();
     setRunning(true);
     setResults([]);
@@ -695,7 +694,7 @@ function ComparePanel(): React.JSX.Element {
     const [mcpResult, plainResult] = await Promise.allSettled([
       aiChat({
         message: currentPrompt,
-        mcpToken: token,
+        mcpToken: token || undefined,
         mcpSessionId: mcpSessionId || undefined,
         toolName: aiToolName,
         mode: aiMode,
@@ -774,7 +773,7 @@ function ComparePanel(): React.JSX.Element {
           <FormField id="comparePrompt" label="Prompt (sent to both)">
             <textarea id="comparePrompt" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter a legal research question..." />
           </FormField>
-          <Button type="submit" disabled={running || tokenMissing}>
+          <Button type="submit" disabled={running}>
             {running ? `Comparing... (${elapsed}s)` : '⚡ Run Comparison'}
           </Button>
         </form>

@@ -41,30 +41,33 @@ function aiToolArguments(toolName: string, prompt: string): Record<string, unkno
     return { text: prompt };
   }
   if (toolName === 'analyze_legal_argument') {
-    return { argument: prompt, keywords: prompt.split(/\s+/).slice(0, 5) };
+    return { argument: prompt, search_query: prompt };
   }
   if (toolName === 'list_courts') {
     return {};
   }
   if (toolName === 'get_comprehensive_judge_profile' || toolName === 'get_judge') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { judge_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { judge_id: idMatch[1] } : { judge_id: '1' };
   }
   if (toolName === 'get_docket_entries') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { docket_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { docket: idMatch[1] } : { docket: '1' };
   }
   if (toolName === 'get_case_details' || toolName === 'get_comprehensive_case_analysis') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { cluster_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { cluster_id: idMatch[1] } : { cluster_id: '1' };
   }
   if (toolName === 'get_opinion_text') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { opinion_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { opinion_id: idMatch[1] } : { opinion_id: '1' };
   }
   if (toolName === 'get_citation_network') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { opinion_id: idMatch[1], depth: 2 } : { query: prompt };
+    return idMatch ? { opinion_id: idMatch[1], depth: 2 } : { opinion_id: '1', depth: 2 };
+  }
+  if (toolName === 'smart_search') {
+    return { query: prompt, max_results: 5 };
   }
   return {
     query: prompt,
@@ -365,15 +368,16 @@ describe('aiToolArguments', () => {
     expect(result).toEqual({ text: 'The court in 410 U.S. 113 held...' });
   });
 
-  it('returns argument and keywords for analyze_legal_argument', () => {
+  it('returns argument and search_query for analyze_legal_argument', () => {
     const result = aiToolArguments('analyze_legal_argument', 'equal protection under the law');
     expect(result.argument).toBe('equal protection under the law');
-    expect(result.keywords).toEqual(['equal', 'protection', 'under', 'the', 'law']);
+    expect(result.search_query).toBe('equal protection under the law');
   });
 
-  it('limits keywords to 5 words', () => {
+  it('passes full prompt as both argument and search_query', () => {
     const result = aiToolArguments('analyze_legal_argument', 'one two three four five six seven');
-    expect((result.keywords as string[]).length).toBe(5);
+    expect(result.argument).toBe('one two three four five six seven');
+    expect(result.search_query).toBe('one two three four five six seven');
   });
 
   it('returns empty object for list_courts', () => {
@@ -385,9 +389,9 @@ describe('aiToolArguments', () => {
     expect(result).toEqual({ judge_id: '12345' });
   });
 
-  it('falls back to query for get_comprehensive_judge_profile without ID', () => {
+  it('falls back to judge_id 1 for get_comprehensive_judge_profile without ID', () => {
     const result = aiToolArguments('get_comprehensive_judge_profile', 'Judge Roberts');
-    expect(result).toEqual({ query: 'Judge Roberts' });
+    expect(result).toEqual({ judge_id: '1' });
   });
 
   it('extracts judge_id for get_judge', () => {
@@ -395,14 +399,14 @@ describe('aiToolArguments', () => {
     expect(result).toEqual({ judge_id: '999' });
   });
 
-  it('extracts docket_id for get_docket_entries', () => {
+  it('extracts docket for get_docket_entries', () => {
     const result = aiToolArguments('get_docket_entries', 'Docket 54321');
-    expect(result).toEqual({ docket_id: '54321' });
+    expect(result).toEqual({ docket: '54321' });
   });
 
-  it('falls back to query for get_docket_entries without ID', () => {
+  it('falls back to docket 1 for get_docket_entries without ID', () => {
     const result = aiToolArguments('get_docket_entries', 'Smith v Jones');
-    expect(result).toEqual({ query: 'Smith v Jones' });
+    expect(result).toEqual({ docket: '1' });
   });
 
   it('extracts cluster_id for get_case_details', () => {
@@ -425,9 +429,9 @@ describe('aiToolArguments', () => {
     expect(result).toEqual({ opinion_id: '55', depth: 2 });
   });
 
-  it('falls back to query for get_citation_network without ID', () => {
+  it('falls back to opinion_id 1 for get_citation_network without ID', () => {
     const result = aiToolArguments('get_citation_network', 'free speech network');
-    expect(result).toEqual({ query: 'free speech network' });
+    expect(result).toEqual({ opinion_id: '1', depth: 2 });
   });
 
   it('returns default search params for unknown tools', () => {

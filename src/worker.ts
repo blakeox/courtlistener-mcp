@@ -363,31 +363,35 @@ function aiToolArguments(toolName: string, prompt: string): Record<string, unkno
     return { text: prompt };
   }
   if (toolName === 'analyze_legal_argument') {
-    return { argument: prompt, keywords: prompt.split(/\s+/).slice(0, 5) };
+    return { argument: prompt, search_query: prompt };
   }
   if (toolName === 'list_courts') {
     return {};
   }
   if (toolName === 'get_comprehensive_judge_profile' || toolName === 'get_judge') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { judge_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { judge_id: idMatch[1] } : { judge_id: '1' };
   }
   if (toolName === 'get_docket_entries') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { docket_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { docket: idMatch[1] } : { docket: '1' };
   }
   if (toolName === 'get_case_details' || toolName === 'get_comprehensive_case_analysis') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { cluster_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { cluster_id: idMatch[1] } : { cluster_id: '1' };
   }
   if (toolName === 'get_opinion_text') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { opinion_id: idMatch[1] } : { query: prompt };
+    return idMatch ? { opinion_id: idMatch[1] } : { opinion_id: '1' };
   }
   if (toolName === 'get_citation_network') {
     const idMatch = prompt.match(/\b(\d+)\b/);
-    return idMatch ? { opinion_id: idMatch[1], depth: 2 } : { query: prompt };
+    return idMatch ? { opinion_id: idMatch[1], depth: 2 } : { opinion_id: '1', depth: 2 };
   }
+  if (toolName === 'smart_search') {
+    return { query: prompt, max_results: 5 };
+  }
+  // Default: works for search_cases, search_opinions, advanced_search
   return {
     query: prompt,
     page_size: 5,
@@ -2188,8 +2192,8 @@ export default {
         return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
       }
 
-      if (typeof body.message !== 'string' || typeof body.mcpToken !== 'string') {
-        return jsonError('message and mcpToken must be strings.', 400, 'invalid_request_schema');
+      if (typeof body.message !== 'string') {
+        return jsonError('message must be a string.', 400, 'invalid_request_schema');
       }
       if (
         typeof body.testMode !== 'undefined' &&
@@ -2202,7 +2206,7 @@ export default {
       if (message.length > 10000) {
         return jsonError('Message too long (max 10,000 characters).', 400, 'message_too_long');
       }
-      const mcpToken = body.mcpToken.trim();
+      const mcpToken = typeof body.mcpToken === 'string' ? body.mcpToken.trim() : '';
       const requestedTool = body.toolName || 'auto';
       const testMode = body.testMode === true;
       const mode = testMode ? 'cheap' : body.mode === 'balanced' ? 'balanced' : 'cheap';
@@ -2226,9 +2230,6 @@ export default {
 
       if (!message) {
         return jsonError('message is required.', 400, 'missing_message');
-      }
-      if (!mcpToken) {
-        return jsonError('mcpToken is required.', 400, 'missing_mcp_token');
       }
       // MCP call with graceful degradation — never return 502, always return a renderable response
       let activeSessionId = priorSessionId;
