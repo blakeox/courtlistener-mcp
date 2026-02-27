@@ -12,6 +12,17 @@ import { PlaygroundProvider, usePlayground } from '../lib/playground-context';
 import type { TranscriptItem } from '../lib/playground-context';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
 
+/** Extract a human-readable message from any rejection reason (Error, ApiError, or unknown). */
+function reasonMessage(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (reason && typeof reason === 'object') {
+    const r = reason as Record<string, unknown>;
+    if (typeof r.message === 'string' && r.message) return r.message;
+    if (typeof r.error === 'string' && r.error) return r.error;
+  }
+  return 'Request failed — please try again.';
+}
+
 // ─── Tool Catalog ────────────────────────────────────────────────
 
 interface ToolInfo {
@@ -435,8 +446,8 @@ function AiChatPanel(): React.JSX.Element {
       if (cancelledRef.current) return;
       const latencyMs = Math.round(performance.now() - started);
 
-      const mcpText = mcpResult.status === 'fulfilled' ? mcpResult.value.ai_response : `Error: ${mcpResult.reason instanceof Error ? mcpResult.reason.message : 'Failed'}`;
-      const plainText = plainResult.status === 'fulfilled' ? plainResult.value.ai_response : `Error: ${plainResult.reason instanceof Error ? plainResult.reason.message : 'Failed'}`;
+      const mcpText = mcpResult.status === 'fulfilled' ? mcpResult.value.ai_response : `Error: ${reasonMessage(mcpResult.reason)}`;
+      const plainText = plainResult.status === 'fulfilled' ? plainResult.value.ai_response : `Error: ${reasonMessage(plainResult.reason)}`;
       const mcpTool = mcpResult.status === 'fulfilled' ? mcpResult.value.tool : undefined;
       const mcpToolReason = mcpResult.status === 'fulfilled' ? mcpResult.value.tool_reason : undefined;
       const mcpFallback = mcpResult.status === 'fulfilled' ? mcpResult.value.fallback_used : undefined;
@@ -711,7 +722,7 @@ function ComparePanel(): React.JSX.Element {
     } else {
       newResults.push({
         label: 'With MCP Tools',
-        response: `Error: ${mcpResult.reason instanceof Error ? mcpResult.reason.message : 'Failed'}`,
+        response: `Error: ${reasonMessage(mcpResult.reason)}`,
         latencyMs: 0,
         mode: aiMode,
         hasMcp: true,
@@ -729,7 +740,7 @@ function ComparePanel(): React.JSX.Element {
     } else {
       newResults.push({
         label: 'Without MCP (LLM Only)',
-        response: `Error: ${plainResult.reason instanceof Error ? plainResult.reason.message : 'Failed'}`,
+        response: `Error: ${reasonMessage(plainResult.reason)}`,
         latencyMs: 0,
         mode: aiMode,
         hasMcp: false,

@@ -2091,118 +2091,126 @@ export default {
       if (!mcpToken) {
         return jsonError('mcpToken is required.', 400, 'missing_mcp_token');
       }
+      // MCP call with graceful degradation — never return 502, always return a renderable response
+      let activeSessionId = priorSessionId;
+      let mcpPayload: unknown = null;
+      let mcpError: string | null = null;
+
       try {
-        const initializeResult = priorSessionId
-          ? null
-          : await callMcpJsonRpc(
-              env,
-              ctx,
-              mcpToken,
-              'initialize',
-              {
-                protocolVersion: '2025-06-18',
-                capabilities: {},
-                clientInfo: { name: 'courtlistener-ai-chat', version: '1.0.0' },
-              },
-              1,
-            );
+        if (!priorSessionId) {
+          const initializeResult = await callMcpJsonRpc(
+            env,
+            ctx,
+            mcpToken,
+            'initialize',
+            {
+              protocolVersion: '2025-06-18',
+              capabilities: {},
+              clientInfo: { name: 'courtlistener-ai-chat', version: '1.0.0' },
+            },
+            1,
+          );
+          activeSessionId = initializeResult?.sessionId || '';
+        }
 
-        const activeSessionId = priorSessionId || initializeResult?.sessionId || '';
         if (!activeSessionId) {
-          return jsonError('Failed to create MCP session.', 502, 'mcp_session_failed');
-        }
-
-        const toolResult = await callMcpJsonRpc(
-          env,
-          ctx,
-          mcpToken,
-          'tools/call',
-          {
-            name: toolName,
-            arguments: aiToolArguments(toolName, message),
-          },
-          2,
-          activeSessionId,
-        );
-        if (!hasValidMcpRpcShape(toolResult.payload)) {
-          return jsonError('Invalid MCP response format.', 502, 'mcp_response_invalid');
-        }
-
-        let completionText = buildLowCostSummary(message, toolName, toolResult.payload);
-        let fallbackUsed = true;
-        if (env.AI && typeof env.AI.run === 'function') {
-          const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
-          const systemPrompt = testMode
-            ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
-            : [
-                'You are a legal research assistant with access to CourtListener via MCP tools.',
-                'CRITICAL RULES:',
-                '- ONLY cite case names, dates, courts, and holdings that appear in the data below.',
-                '- If the data does not contain specific case names or holdings, say "The search returned N results" and describe what categories of data were found.',
-                '- NEVER invent or hallucinate case names, citations, dates, or holdings.',
-                '- If you are unsure about a detail, say so explicitly.',
-                '- Quote directly from the returned data when possible.',
-                'Format your response with these sections:',
-                '**Summary**: A 1-2 sentence overview answering the user question based on the data.',
-                '**What MCP Returned**: Specific findings from the data — case names, citations, holdings, or counts. Only include what is actually in the data.',
-                '**Suggested Follow-up**: One specific follow-up query the user could try.',
-                conversationHistory.length > 0 ? 'Reference prior conversation context when relevant.' : '',
-              ].filter(Boolean).join('\n');
-          const dataMaxLen = mode === 'cheap' ? 4000 : 12000;
-          const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, toolResult.payload, dataMaxLen)}`;
-
-          // Build messages array with conversation history
-          const messages: Array<{ role: string; content: string }> = [
-            { role: 'system', content: systemPrompt },
-          ];
-          // Include prior turns so the LLM can reference earlier conversation
-          for (const turn of conversationHistory) {
-            messages.push(turn);
-          }
-          messages.push({ role: 'user', content: mcpContext });
-
-          try {
-            const completion = await env.AI.run(model, {
-              messages,
-              max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-              temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
-            });
-
-            const aiText =
-              (completion as { response?: string }).response ||
-              (completion as { result?: { response?: string } }).result?.response ||
-              '';
-            if (aiText.trim()) {
-              completionText = aiText.trim();
-              fallbackUsed = false;
-            }
-          } catch (aiError) {
-            console.error('[ui-api] AI.run failed, using fallback summary', { model, error: aiError });
-            // fallbackUsed stays true, completionText stays as buildLowCostSummary
+          mcpError = 'Failed to establish MCP session. Check that your bearer token is valid.';
+        } else {
+          const toolResult = await callMcpJsonRpc(
+            env,
+            ctx,
+            mcpToken,
+            'tools/call',
+            {
+              name: toolName,
+              arguments: aiToolArguments(toolName, message),
+            },
+            2,
+            activeSessionId,
+          );
+          if (!hasValidMcpRpcShape(toolResult.payload)) {
+            mcpError = 'MCP returned an unexpected response format.';
+          } else {
+            mcpPayload = toolResult.payload;
+            activeSessionId = toolResult.sessionId || activeSessionId;
           }
         }
-        if (!completionText.trim()) {
-          return jsonError('Invalid AI response format.', 502, 'ai_response_invalid');
-        }
-
-        return jsonResponse({
-          test_mode: testMode,
-          fallback_used: fallbackUsed,
-          mode,
-          tool: toolName,
-          tool_reason: toolReason,
-          session_id: toolResult.sessionId || activeSessionId,
-          ai_response: completionText,
-          mcp_result: toolResult.payload,
-        });
       } catch (error) {
-        console.error('[ui-api] handler failed', { error });
-        return jsonError(
-          error instanceof Error ? error.message : 'Failed to generate AI response.',
-          502,
-          'ai_chat_failed',
-        );
+        console.error('[ui-api] MCP call failed, will return degraded response', { error });
+        mcpError = error instanceof Error ? error.message : 'MCP tool call failed. The CourtListener server may be temporarily unavailable.';
       }
+
+      // Build the AI response — even if MCP failed, provide a useful message
+      let completionText: string;
+      let fallbackUsed = true;
+
+      if (mcpError) {
+        completionText = `**MCP Tool Error**\n\nThe MCP tool \`${toolName}\` could not complete the request:\n\n> ${mcpError}\n\n**Suggested Fix**: Verify your API key is valid and try again. If the issue persists, the CourtListener API may be temporarily unavailable.`;
+      } else {
+        completionText = buildLowCostSummary(message, toolName, mcpPayload);
+      }
+
+      // Try to enhance with AI summary (only if MCP succeeded and returned data)
+      if (!mcpError && env.AI && typeof env.AI.run === 'function') {
+        const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
+        const systemPrompt = testMode
+          ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
+          : [
+              'You are a legal research assistant with access to CourtListener via MCP tools.',
+              'CRITICAL RULES:',
+              '- ONLY cite case names, dates, courts, and holdings that appear in the data below.',
+              '- If the data does not contain specific case names or holdings, say "The search returned N results" and describe what categories of data were found.',
+              '- NEVER invent or hallucinate case names, citations, dates, or holdings.',
+              '- If you are unsure about a detail, say so explicitly.',
+              '- Quote directly from the returned data when possible.',
+              'Format your response with these sections:',
+              '**Summary**: A 1-2 sentence overview answering the user question based on the data.',
+              '**What MCP Returned**: Specific findings from the data — case names, citations, holdings, or counts. Only include what is actually in the data.',
+              '**Suggested Follow-up**: One specific follow-up query the user could try.',
+              conversationHistory.length > 0 ? 'Reference prior conversation context when relevant.' : '',
+            ].filter(Boolean).join('\n');
+        const dataMaxLen = mode === 'cheap' ? 4000 : 12000;
+        const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, mcpPayload, dataMaxLen)}`;
+
+        const messages: Array<{ role: string; content: string }> = [
+          { role: 'system', content: systemPrompt },
+        ];
+        for (const turn of conversationHistory) {
+          messages.push(turn);
+        }
+        messages.push({ role: 'user', content: mcpContext });
+
+        try {
+          const completion = await env.AI.run(model, {
+            messages,
+            max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
+            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
+          });
+
+          const aiText =
+            (completion as { response?: string }).response ||
+            (completion as { result?: { response?: string } }).result?.response ||
+            '';
+          if (aiText.trim()) {
+            completionText = aiText.trim();
+            fallbackUsed = false;
+          }
+        } catch (aiError) {
+          console.error('[ui-api] AI.run failed, using fallback summary', { model, error: aiError });
+        }
+      }
+
+      return jsonResponse({
+        test_mode: testMode,
+        fallback_used: fallbackUsed,
+        mode,
+        tool: toolName,
+        tool_reason: toolReason,
+        session_id: activeSessionId || '',
+        ai_response: completionText,
+        mcp_result: mcpPayload,
+        ...(mcpError ? { mcp_error: mcpError } : {}),
+      });
     }
 
     // ── Plain AI chat (no MCP) for comparison mode ──────────────
