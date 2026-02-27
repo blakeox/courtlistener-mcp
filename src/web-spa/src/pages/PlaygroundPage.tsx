@@ -356,22 +356,41 @@ function RawMcpPanel(): React.JSX.Element {
 
 // ─── AI Chat Panel ───────────────────────────────────────────────
 
+interface ChatMessage {
+  id: number;
+  role: 'user' | 'comparison' | 'system' | 'error';
+  prompt?: string;
+  mcpResponse?: string;
+  plainResponse?: string;
+  mcpTool?: string;
+  mcpToolReason?: string;
+  mcpFallback?: boolean;
+  text?: string;
+  latencyMs?: number;
+}
+
 function AiChatPanel(): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, setMcpSessionId, append, setLastRawMcp } = usePlayground();
+  const { token, tokenMissing, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
-  const [aiTestMode, setAiTestMode] = React.useState(false);
   const [aiToolName, setAiToolName] = React.useState('auto');
-  const [aiPrompt, setAiPrompt] = React.useState('Find leading Supreme Court cases about free speech in schools and explain what they generally hold.');
+  const [aiPrompt, setAiPrompt] = React.useState('');
   const aiStatus = useStatus();
   const [aiRunning, setAiRunning] = React.useState(false);
   const [step, setStep] = React.useState<string | null>(null);
   const elapsed = useElapsedTimer(aiRunning);
   const cancelledRef = React.useRef(false);
-  // Conversation history for multi-turn chat
   const [chatHistory, setChatHistory] = React.useState<Array<{ role: string; content: string }>>([]);
+  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [msgId, setMsgId] = React.useState(0);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     return () => { cancelledRef.current = true; };
   }, []);
+  React.useEffect(() => {
+    if (typeof chatEndRef.current?.scrollIntoView === 'function') {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
   useKeyboardShortcut('Enter', () => { void sendAiChat(); }, { disabled: aiRunning || tokenMissing });
 
   function applyPreset(preset: Preset): void {
@@ -381,51 +400,76 @@ function AiChatPanel(): React.JSX.Element {
 
   function clearConversation(): void {
     setChatHistory([]);
+    setMessages([]);
+    setMsgId(0);
     setAiPrompt('');
-    aiStatus.setInfo('Conversation cleared. Start a new topic.');
+    aiStatus.setInfo('Conversation cleared.');
   }
 
   async function sendAiChat(): Promise<void> {
     if (!aiPrompt.trim()) { aiStatus.setError('Enter a prompt.'); return; }
     if (!token.trim()) { aiStatus.setError('Set a bearer token first (API Keys page).'); return; }
     const currentPrompt = aiPrompt.trim();
+    const currentId = msgId;
+    setMsgId((v) => v + 2);
     setAiRunning(true);
-    setStep('① Initializing MCP session...');
-    append('user', currentPrompt);
     setAiPrompt('');
-    try {
-      setStep('② Calling MCP tool...');
-      const started = performance.now();
-      const result = await aiChat({
-        message: currentPrompt,
-        mcpToken: token,
-        mcpSessionId: mcpSessionId || undefined,
-        toolName: aiToolName,
-        mode: aiMode,
-        testMode: aiTestMode,
-        history: chatHistory,
-      });
-      if (cancelledRef.current) return;
-      setStep('③ Processing AI response...');
-      const latencyMs = Math.round(performance.now() - started);
-      setMcpSessionId(result.session_id || mcpSessionId);
-      setLastRawMcp(JSON.stringify(result.mcp_result, null, 2));
 
-      // Append to conversation history for next turn
+    // Add user message immediately
+    setMessages((prev) => [...prev, { id: currentId, role: 'user', prompt: currentPrompt }]);
+
+    setStep('Sending to both MCP-powered AI and plain AI...');
+    try {
+      const started = performance.now();
+      const [mcpResult, plainResult] = await Promise.allSettled([
+        aiChat({
+          message: currentPrompt,
+          mcpToken: token,
+          mcpSessionId: mcpSessionId || undefined,
+          toolName: aiToolName,
+          mode: aiMode,
+          history: chatHistory,
+        }),
+        aiPlain({ message: currentPrompt, mode: aiMode, history: chatHistory }),
+      ]);
+      if (cancelledRef.current) return;
+      const latencyMs = Math.round(performance.now() - started);
+
+      const mcpText = mcpResult.status === 'fulfilled' ? mcpResult.value.ai_response : `Error: ${mcpResult.reason instanceof Error ? mcpResult.reason.message : 'Failed'}`;
+      const plainText = plainResult.status === 'fulfilled' ? plainResult.value.ai_response : `Error: ${plainResult.reason instanceof Error ? plainResult.reason.message : 'Failed'}`;
+      const mcpTool = mcpResult.status === 'fulfilled' ? mcpResult.value.tool : undefined;
+      const mcpToolReason = mcpResult.status === 'fulfilled' ? mcpResult.value.tool_reason : undefined;
+      const mcpFallback = mcpResult.status === 'fulfilled' ? mcpResult.value.fallback_used : undefined;
+
+      if (mcpResult.status === 'fulfilled') {
+        if (mcpResult.value.session_id) setMcpSessionId(mcpResult.value.session_id);
+        setLastRawMcp(JSON.stringify(mcpResult.value.mcp_result, null, 2));
+      }
+
+      // Add comparison message
+      setMessages((prev) => [...prev, {
+        id: currentId + 1,
+        role: 'comparison',
+        mcpResponse: mcpText,
+        plainResponse: plainText,
+        mcpTool,
+        mcpToolReason,
+        mcpFallback,
+        latencyMs,
+      }]);
+
+      // Track conversation for multi-turn
       setChatHistory((prev) => [
         ...prev,
         { role: 'user', content: currentPrompt },
-        { role: 'assistant', content: result.ai_response },
+        { role: 'assistant', content: mcpText },
       ]);
 
-      const reasonText = result.tool_reason ? ` — ${result.tool_reason}` : '';
-      append('system', `🔧 Tool: ${result.tool}${reasonText} | Mode: ${result.mode} | ${latencyMs}ms${result.fallback_used ? ' | ⚠️ AI fallback' : ''}`);
-      append('assistant', result.ai_response);
-      aiStatus.setOk(`Response received in ${latencyMs}ms. Reply below to continue the conversation.`);
+      aiStatus.setOk(`Responses received in ${latencyMs}ms. Type a follow-up below.`);
     } catch (error) {
       if (cancelledRef.current) return;
       const message = toErrorMessage(error);
-      append('error', message);
+      setMessages((prev) => [...prev, { id: currentId + 1, role: 'error', text: message }]);
       aiStatus.setError(message);
     } finally {
       if (!cancelledRef.current) {
@@ -436,51 +480,164 @@ function AiChatPanel(): React.JSX.Element {
   }
 
   return (
-    <div className="two-col">
-      <Card title="AI Chat + MCP Tools" subtitle="Multi-turn conversation with AI that uses MCP tools to query CourtListener. 50 turns per account.">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+    <div className="stack">
+      {/* Presets */}
+      <Card title="AI Chat — MCP vs Plain AI" subtitle="Every message is sent to both the MCP-powered AI and a plain LLM side-by-side. Multi-turn conversation supported.">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {AI_PRESETS.map((p) => (
             <Button key={p.label} variant="secondary" onClick={() => applyPreset(p)} style={{ fontSize: '0.85rem' }}>
               {p.icon} {p.label}
             </Button>
           ))}
         </div>
-        {chatHistory.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '6px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '0.85rem', marginTop: '4px' }}>
-            <span>💬 {chatHistory.length / 2} turn{chatHistory.length > 2 ? 's' : ''} in conversation</span>
-            <Button variant="secondary" onClick={clearConversation} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
-              New Conversation
+      </Card>
+
+      {/* Chat thread */}
+      <div style={{ minHeight: '200px', maxHeight: '600px', overflow: 'auto', padding: '8px 0' }}>
+        {messages.length === 0 && (
+          <p className="empty-state" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <span style={{ fontSize: '2rem' }}>💬</span><br />
+            Start a conversation! Ask a legal question and see how MCP-powered AI compares to a plain LLM.
+            <br /><span style={{ fontSize: '0.85rem', opacity: 0.6 }}>Try a preset above or type your own question below.</span>
+          </p>
+        )}
+        {messages.map((msg) => {
+          if (msg.role === 'user') {
+            return (
+              <div key={msg.id} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <div style={{
+                  maxWidth: '80%',
+                  padding: '10px 14px',
+                  borderRadius: '12px 12px 2px 12px',
+                  background: 'var(--color-primary, #3b82f6)',
+                  color: 'white',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5,
+                }}>
+                  {msg.prompt}
+                </div>
+              </div>
+            );
+          }
+          if (msg.role === 'error') {
+            return (
+              <div key={msg.id} style={{ padding: '8px 12px', margin: '0 0 12px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error, #ef4444)', fontSize: '0.85rem' }}>
+                🔴 {msg.text}
+              </div>
+            );
+          }
+          if (msg.role === 'comparison') {
+            return (
+              <div key={msg.id} style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {/* MCP side */}
+                  <div style={{
+                    border: '2px solid var(--color-primary, #3b82f6)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    background: 'rgba(59,130,246,0.03)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid var(--color-border)' }}>
+                      <span style={{ fontSize: '1rem' }}>🔌</span>
+                      <strong style={{ fontSize: '0.85rem' }}>With MCP Tools</strong>
+                      <span style={{
+                        background: 'var(--color-primary, #3b82f6)',
+                        color: 'white',
+                        padding: '1px 6px',
+                        borderRadius: '8px',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                      }}>LIVE DATA</span>
+                    </div>
+                    {msg.mcpTool && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '6px', padding: '3px 6px', background: 'var(--color-surface)', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                        🔧 <strong>{msg.mcpTool}</strong>
+                        {msg.mcpToolReason ? <span style={{ opacity: 0.7 }}> — {msg.mcpToolReason}</span> : null}
+                        {msg.mcpFallback ? <span style={{ color: 'var(--color-warning, #f59e0b)' }}> ⚠️ fallback</span> : null}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>
+                      {renderMarkdown(msg.mcpResponse || '')}
+                    </div>
+                  </div>
+                  {/* Plain AI side */}
+                  <div style={{
+                    border: '2px solid var(--color-border)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    background: 'var(--color-surface)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid var(--color-border)' }}>
+                      <span style={{ fontSize: '1rem' }}>🧠</span>
+                      <strong style={{ fontSize: '0.85rem' }}>Without MCP</strong>
+                      <span style={{
+                        background: 'var(--color-muted, #888)',
+                        color: 'white',
+                        padding: '1px 6px',
+                        borderRadius: '8px',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                      }}>TRAINING ONLY</span>
+                    </div>
+                    <div style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>
+                      {renderMarkdown(msg.plainResponse || '')}
+                    </div>
+                  </div>
+                </div>
+                {msg.latencyMs != null && (
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '4px' }}>
+                    ⏱ {msg.latencyMs}ms
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return null;
+        })}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* Input area */}
+      <Card>
+        <form onSubmit={(e) => { e.preventDefault(); void sendAiChat(); }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 140px', minWidth: '120px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>MCP Tool</label>
+              <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
+            </div>
+            <div style={{ flex: '0 0 130px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Cost mode</label>
+              <select value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)} style={{ width: '100%' }}>
+                <option value="cheap">cheap</option>
+                <option value="balanced">balanced</option>
+              </select>
+            </div>
+            {chatHistory.length > 0 && (
+              <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-end' }}>
+                <Button variant="secondary" onClick={clearConversation} style={{ fontSize: '0.75rem' }}>
+                  🗑 Clear ({chatHistory.length / 2} turn{chatHistory.length > 2 ? 's' : ''})
+                </Button>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            <textarea
+              id="aiChatPrompt"
+              rows={2}
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder={chatHistory.length > 0 ? 'Ask a follow-up question...' : 'Ask a legal research question...'}
+              style={{ flex: 1, resize: 'vertical' }}
+            />
+            <Button type="submit" disabled={aiRunning || tokenMissing} style={{ height: '52px', minWidth: '100px' }}>
+              {aiRunning ? `${elapsed}s...` : 'Send'}
             </Button>
           </div>
-        )}
-      </Card>
-      <Card title={chatHistory.length > 0 ? 'Reply' : 'Send prompt'}>
-        <form onSubmit={(e) => { e.preventDefault(); void sendAiChat(); }}>
-          <FormField id="aiToolName" label="Tool">
-            <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
-          </FormField>
-          <FormField id="aiMode" label="Cost mode">
-            <select id="aiMode" value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)}>
-              <option value="cheap">cheap (recommended)</option>
-              <option value="balanced">balanced</option>
-            </select>
-          </FormField>
-          <label className="inline-check">
-            <input type="checkbox" checked={aiTestMode} onChange={(e) => setAiTestMode(e.target.checked)} />
-            Deterministic test mode
-          </label>
-          <FormField id="aiChatPrompt" label={chatHistory.length > 0 ? 'Follow-up question' : 'Prompt'}>
-            <textarea id="aiChatPrompt" rows={chatHistory.length > 0 ? 2 : 4} value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={chatHistory.length > 0 ? 'Ask a follow-up question...' : 'Enter your legal research question...'} />
-          </FormField>
           {step && (
-            <div style={{ padding: '6px 10px', borderRadius: '6px', background: 'var(--color-info-bg, rgba(59,130,246,0.1))', color: 'var(--color-info, #3b82f6)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 500 }}>
+            <div style={{ padding: '4px 8px', borderRadius: '4px', background: 'var(--color-info-bg, rgba(59,130,246,0.1))', color: 'var(--color-info, #3b82f6)', fontSize: '0.8rem', marginTop: '6px', fontWeight: 500 }}>
               {step}
             </div>
           )}
-          <Button type="submit" disabled={aiRunning || tokenMissing}>
-            {aiRunning ? `Sending... (${elapsed}s)` : chatHistory.length > 0 ? 'Send Reply' : 'Send AI Chat'}
-          </Button>
-          <span className="hint" style={{ marginLeft: '8px' }}>⌘/Ctrl+Enter</span>
           <StatusBanner message={aiStatus.status} type={aiStatus.statusType} />
         </form>
       </Card>
@@ -765,16 +922,16 @@ export function PlaygroundPage(): React.JSX.Element {
 
 function PlaygroundContent(): React.JSX.Element {
   const { tokenMissing, transcript, clearTranscript, lastRawMcp, protocolLog } = usePlayground();
-  const [activeTab, setActiveTab] = React.useState<'compare' | 'ai' | 'raw'>('compare');
+  const [activeTab, setActiveTab] = React.useState<'ai' | 'compare' | 'raw'>('ai');
   const [showCatalog, setShowCatalog] = React.useState(false);
   const transcriptRef = useAutoScroll<HTMLDivElement>([transcript]);
 
-  const rawTabId = 'tab-raw';
   const aiTabId = 'tab-ai';
   const compareTabId = 'tab-compare';
-  const rawPanelId = 'panel-raw';
+  const rawTabId = 'tab-raw';
   const aiPanelId = 'panel-ai';
   const comparePanelId = 'panel-compare';
+  const rawPanelId = 'panel-raw';
 
   function handleExport(): void {
     const data = JSON.stringify({ transcript, protocol: protocolLog }, null, 2);
@@ -805,6 +962,17 @@ function PlaygroundContent(): React.JSX.Element {
       <div className="tabs" role="tablist" aria-label="Playground mode">
         <button
           type="button"
+          id={aiTabId}
+          role="tab"
+          aria-selected={activeTab === 'ai'}
+          aria-controls={aiPanelId}
+          className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ai')}
+        >
+          💬 AI Chat
+        </button>
+        <button
+          type="button"
           id={compareTabId}
           role="tab"
           aria-selected={activeTab === 'compare'}
@@ -816,17 +984,6 @@ function PlaygroundContent(): React.JSX.Element {
         </button>
         <button
           type="button"
-          id={aiTabId}
-          role="tab"
-          aria-selected={activeTab === 'ai'}
-          aria-controls={aiPanelId}
-          className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ai')}
-        >
-          AI Chat
-        </button>
-        <button
-          type="button"
           id={rawTabId}
           role="tab"
           aria-selected={activeTab === 'raw'}
@@ -834,17 +991,8 @@ function PlaygroundContent(): React.JSX.Element {
           className={`tab-btn ${activeTab === 'raw' ? 'active' : ''}`}
           onClick={() => setActiveTab('raw')}
         >
-          Raw MCP Console
+          🔧 Raw MCP Console
         </button>
-      </div>
-
-      <div
-        id={comparePanelId}
-        role="tabpanel"
-        aria-labelledby={compareTabId}
-        hidden={activeTab !== 'compare'}
-      >
-        {activeTab === 'compare' && <ComparePanel />}
       </div>
 
       <div
@@ -857,6 +1005,15 @@ function PlaygroundContent(): React.JSX.Element {
       </div>
 
       <div
+        id={comparePanelId}
+        role="tabpanel"
+        aria-labelledby={compareTabId}
+        hidden={activeTab !== 'compare'}
+      >
+        {activeTab === 'compare' && <ComparePanel />}
+      </div>
+
+      <div
         id={rawPanelId}
         role="tabpanel"
         aria-labelledby={rawTabId}
@@ -865,20 +1022,23 @@ function PlaygroundContent(): React.JSX.Element {
         {activeTab === 'raw' && <RawMcpPanel />}
       </div>
 
-      <Card title="Transcript">
-        <div className="transcript mono" ref={transcriptRef}>
-          {transcript.length === 0 ? <p className="empty-state"><span className="empty-icon">📋</span><br />No messages yet. Try a preset above to get started.</p> : null}
-          {transcript.map((item, i) => (
-            <TranscriptEntry key={`${item.at}-${i}`} item={item} />
-          ))}
-        </div>
-        <div className="row" style={{ gap: '8px' }}>
-          <Button variant="secondary" onClick={clearTranscript}>Clear transcript</Button>
-          {transcript.length > 0 && (
-            <Button variant="secondary" onClick={handleExport}>Export JSON</Button>
-          )}
-        </div>
-      </Card>
+      {/* Transcript for Raw MCP Console */}
+      {activeTab === 'raw' && (
+        <Card title="Transcript">
+          <div className="transcript mono" ref={transcriptRef}>
+            {transcript.length === 0 ? <p className="empty-state"><span className="empty-icon">📋</span><br />No messages yet. Connect and call a tool above.</p> : null}
+            {transcript.map((item, i) => (
+              <TranscriptEntry key={`${item.at}-${i}`} item={item} />
+            ))}
+          </div>
+          <div className="row" style={{ gap: '8px' }}>
+            <Button variant="secondary" onClick={clearTranscript}>Clear transcript</Button>
+            {transcript.length > 0 && (
+              <Button variant="secondary" onClick={handleExport}>Export JSON</Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {activeTab === 'raw' && protocolLog.length > 0 && <ProtocolInspector />}
 
