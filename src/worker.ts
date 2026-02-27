@@ -410,6 +410,105 @@ function hasValidMcpRpcShape(payload: unknown): boolean {
   return false;
 }
 
+/** Build a tool-appropriate system prompt based on what MCP tool was called. */
+function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): string {
+  const commonRules = [
+    'ACCURACY RULES:',
+    '- ONLY cite names, dates, and details that appear in the data below.',
+    '- NEVER invent or hallucinate information not present in the data.',
+    '- If data is limited, acknowledge that and work with what you have.',
+    '- Quote directly from the data when relevant.',
+  ];
+
+  const followUp = hasHistory ? 'Reference prior conversation context when relevant.' : '';
+
+  // Court listing queries
+  if (toolName === 'list_courts' || toolName === 'get_court') {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL court data retrieved from CourtListener. Present this data clearly and completely.',
+      '',
+      ...commonRules,
+      '',
+      'FORMAT your response with these sections:',
+      '**Courts Overview**: A 1-2 sentence summary of what was found.',
+      '**Court Listing**: Present ALL courts from the data in a clear, organized format grouped by jurisdiction type (Federal, State, etc.). Include court name, jurisdiction, and any other available details.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  // Judge queries
+  if (toolName.includes('judge')) {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL judge data retrieved from CourtListener. Present this data clearly.',
+      '',
+      ...commonRules,
+      '',
+      'FORMAT your response with these sections:',
+      '**Judge Profile**: Present the judge information from the data — name, court, appointment details, and any available background.',
+      '**Notable Details**: Any significant details from the data about their career or decisions.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  // Docket queries
+  if (toolName.includes('docket')) {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL docket data retrieved from CourtListener. Present this data clearly.',
+      '',
+      ...commonRules,
+      '',
+      'FORMAT your response with these sections:',
+      '**Docket Summary**: Summarize the docket — case name, court, parties, status.',
+      '**Key Filings**: List the most important entries with dates and descriptions.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  // Citation queries
+  if (toolName === 'lookup_citation' || toolName === 'validate_citations' || toolName === 'get_citation_network') {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL citation data retrieved from CourtListener. Analyze and present it clearly.',
+      '',
+      ...commonRules,
+      '',
+      'FORMAT your response with these sections:',
+      '**Citation Details**: Present the citation information — case name, court, date, and full citation.',
+      '**Significance**: Explain the importance of this case based on citation count and other available data.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  // Default: case search / legal analysis (search_cases, search_opinions, analyze_legal_argument, etc.)
+  return [
+    'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database, via MCP tools.',
+    'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data and provide substantive legal insight.',
+    '',
+    'ANALYSIS INSTRUCTIONS:',
+    '- Synthesize the case data into a coherent legal analysis that directly answers the user\'s question.',
+    '- Identify key legal principles, trends, and holdings from the returned cases.',
+    '- Explain how the cases relate to each other and to the user\'s query.',
+    '- Highlight the most important or frequently-cited cases and explain WHY they matter.',
+    '- Note any circuit splits, evolving standards, or notable dissents if apparent from the data.',
+    '',
+    ...commonRules,
+    '',
+    'FORMAT your response with these sections:',
+    '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question, synthesizing findings from the case data.',
+    '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates, and a brief note on why each matters.',
+    '**Legal Landscape**: 1-2 sentences on the broader legal landscape — are courts aligned? Is the law settled or evolving?',
+    '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
+    followUp,
+  ].filter(Boolean).join('\n');
+}
+
 function buildLowCostSummary(
   message: string,
   toolName: string,
@@ -536,6 +635,34 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
       }
     }
 
+    // Handle court listings (data.courts array from list_courts)
+    const courts = nested.courts as unknown[] | undefined;
+    if (Array.isArray(courts) && courts.length > 0) {
+      lines.push(`\n${courts.length} courts found:`);
+      for (let i = 0; i < courts.length; i++) {
+        const c = courts[i] as Record<string, unknown>;
+        lines.push(formatCourtResult(i + 1, c));
+      }
+    }
+
+    // Handle judge data (data.judges or single judge profile)
+    const judges = nested.judges as unknown[] | undefined;
+    if (Array.isArray(judges) && judges.length > 0) {
+      lines.push(`\n${judges.length} judges found:`);
+      for (let i = 0; i < judges.length; i++) {
+        const j = judges[i] as Record<string, unknown>;
+        const name = j.name_full || j.name || `${j.name_first || ''} ${j.name_last || ''}`.trim() || 'Unknown';
+        const court = j.court || '';
+        const born = j.date_dob || '';
+        const appointed = j.date_nominated || j.date_appointed || '';
+        const parts = [`${i + 1}. ${name}`];
+        if (court) parts.push(`Court: ${court}`);
+        if (born) parts.push(`Born: ${born}`);
+        if (appointed) parts.push(`Appointed: ${appointed}`);
+        lines.push(parts.join(' | '));
+      }
+    }
+
     if (summary) lines.push(`Summary: ${summary}`);
     if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
 
@@ -616,6 +743,26 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
     parts.push(`   Snippet: ${cleanSnippet}`);
   }
 
+  return parts.join('\n');
+}
+
+/** Format a single court into readable text. */
+function formatCourtResult(num: number, court: Record<string, unknown>): string {
+  const name = court.full_name || court.short_name || court.name || 'Unknown Court';
+  const id = court.id || '';
+  const jurisdiction = court.jurisdiction || '';
+  const citationStr = court.citation_string || '';
+  const inUse = court.in_use;
+  const startDate = court.start_date || '';
+  const url = court.url || court.resource_uri || '';
+
+  const parts = [`${num}. ${name}`];
+  if (id) parts.push(`   ID: ${id}`);
+  if (jurisdiction) parts.push(`   Jurisdiction: ${jurisdiction}`);
+  if (citationStr) parts.push(`   Citation format: ${citationStr}`);
+  if (startDate) parts.push(`   Established: ${startDate}`);
+  if (typeof inUse === 'boolean') parts.push(`   Active: ${inUse ? 'Yes' : 'No'}`);
+  if (url) parts.push(`   URL: ${url}`);
   return parts.join('\n');
 }
 
@@ -2326,30 +2473,7 @@ export default {
         const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
         const systemPrompt = testMode
           ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
-          : [
-              'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database, via MCP tools.',
-              'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data and provide substantive legal insight.',
-              '',
-              'ANALYSIS INSTRUCTIONS:',
-              '- Synthesize the case data into a coherent legal analysis that directly answers the user\'s question.',
-              '- Identify key legal principles, trends, and holdings from the returned cases.',
-              '- Explain how the cases relate to each other and to the user\'s query.',
-              '- Highlight the most important or frequently-cited cases and explain WHY they matter.',
-              '- Note any circuit splits, evolving standards, or notable dissents if apparent from the data.',
-              '',
-              'ACCURACY RULES:',
-              '- ONLY cite case names, dates, courts, and holdings that appear in the data below.',
-              '- NEVER invent or hallucinate case names, citations, dates, or holdings.',
-              '- If the data is limited, acknowledge that and work with what you have.',
-              '- Quote directly from snippets when they contain relevant holdings.',
-              '',
-              'FORMAT your response with these sections:',
-              '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question, synthesizing findings from the case data. This should read like expert legal research, not a data report.',
-              '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates, and a brief note on why each matters to the query.',
-              '**Legal Landscape**: 1-2 sentences on the broader legal landscape — are courts aligned? Is the law settled or evolving?',
-              '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
-              conversationHistory.length > 0 ? 'Reference prior conversation context when relevant.' : '',
-            ].filter(Boolean).join('\n');
+          : buildMcpSystemPrompt(toolName, conversationHistory.length > 0);
         const dataMaxLen = mode === 'cheap' ? 6000 : 16000;
         const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, mcpPayload, dataMaxLen)}`;
 

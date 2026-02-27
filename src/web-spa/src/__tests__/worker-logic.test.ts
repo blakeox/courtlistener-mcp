@@ -187,6 +187,34 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
       }
     }
 
+    // Handle court listings (data.courts array from list_courts)
+    const courts = nested.courts as unknown[] | undefined;
+    if (Array.isArray(courts) && courts.length > 0) {
+      lines.push(`\n${courts.length} courts found:`);
+      for (let i = 0; i < courts.length; i++) {
+        const c = courts[i] as Record<string, unknown>;
+        lines.push(formatCourtResult(i + 1, c));
+      }
+    }
+
+    // Handle judge data (data.judges or single judge profile)
+    const judges = nested.judges as unknown[] | undefined;
+    if (Array.isArray(judges) && judges.length > 0) {
+      lines.push(`\n${judges.length} judges found:`);
+      for (let i = 0; i < judges.length; i++) {
+        const j = judges[i] as Record<string, unknown>;
+        const name = j.name_full || j.name || `${j.name_first || ''} ${j.name_last || ''}`.trim() || 'Unknown';
+        const jCourt = j.court || '';
+        const born = j.date_dob || '';
+        const appointed = j.date_nominated || j.date_appointed || '';
+        const jParts = [`${i + 1}. ${name}`];
+        if (jCourt) jParts.push(`Court: ${jCourt}`);
+        if (born) jParts.push(`Born: ${born}`);
+        if (appointed) jParts.push(`Appointed: ${appointed}`);
+        lines.push(jParts.join(' | '));
+      }
+    }
+
     if (summary) lines.push(`Summary: ${summary}`);
     if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
 
@@ -264,6 +292,100 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   }
 
   return parts.join('\n');
+}
+
+function formatCourtResult(num: number, court: Record<string, unknown>): string {
+  const name = court.full_name || court.short_name || court.name || 'Unknown Court';
+  const id = court.id || '';
+  const jurisdiction = court.jurisdiction || '';
+  const citationStr = court.citation_string || '';
+  const inUse = court.in_use;
+  const startDate = court.start_date || '';
+  const url = court.url || court.resource_uri || '';
+
+  const cParts = [`${num}. ${name}`];
+  if (id) cParts.push(`   ID: ${id}`);
+  if (jurisdiction) cParts.push(`   Jurisdiction: ${jurisdiction}`);
+  if (citationStr) cParts.push(`   Citation format: ${citationStr}`);
+  if (startDate) cParts.push(`   Established: ${startDate}`);
+  if (typeof inUse === 'boolean') cParts.push(`   Active: ${inUse ? 'Yes' : 'No'}`);
+  if (url) cParts.push(`   URL: ${url}`);
+  return cParts.join('\n');
+}
+
+function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): string {
+  const commonRules = [
+    'ACCURACY RULES:',
+    '- ONLY cite names, dates, and details that appear in the data below.',
+    '- NEVER invent or hallucinate information not present in the data.',
+    '- If data is limited, acknowledge that and work with what you have.',
+    '- Quote directly from the data when relevant.',
+  ];
+  const followUp = hasHistory ? 'Reference prior conversation context when relevant.' : '';
+
+  if (toolName === 'list_courts' || toolName === 'get_court') {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL court data retrieved from CourtListener. Present this data clearly and completely.',
+      '', ...commonRules, '',
+      'FORMAT your response with these sections:',
+      '**Courts Overview**: A 1-2 sentence summary of what was found.',
+      '**Court Listing**: Present ALL courts from the data in a clear, organized format grouped by jurisdiction type (Federal, State, etc.). Include court name, jurisdiction, and any other available details.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (toolName.includes('judge')) {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL judge data retrieved from CourtListener. Present this data clearly.',
+      '', ...commonRules, '',
+      'FORMAT your response with these sections:',
+      '**Judge Profile**: Present the judge information from the data.',
+      '**Notable Details**: Any significant details from the data.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (toolName.includes('docket')) {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL docket data retrieved from CourtListener. Present this data clearly.',
+      '', ...commonRules, '',
+      'FORMAT your response with these sections:',
+      '**Docket Summary**: Summarize the docket.',
+      '**Key Filings**: List the most important entries with dates and descriptions.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (toolName === 'lookup_citation' || toolName === 'validate_citations' || toolName === 'get_citation_network') {
+    return [
+      'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
+      'You have been given REAL citation data retrieved from CourtListener.',
+      '', ...commonRules, '',
+      'FORMAT your response with these sections:',
+      '**Citation Details**: Present the citation information.',
+      '**Significance**: Explain the importance of this case.',
+      '**Suggested Follow-up**: One specific follow-up query to explore further.',
+      followUp,
+    ].filter(Boolean).join('\n');
+  }
+
+  return [
+    'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database, via MCP tools.',
+    'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data.',
+    '', ...commonRules, '',
+    'FORMAT your response with these sections:',
+    '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question.',
+    '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates.',
+    '**Legal Landscape**: 1-2 sentences on the broader legal landscape.',
+    '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
+    followUp,
+  ].filter(Boolean).join('\n');
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -681,6 +803,27 @@ describe('formatMcpDataForLlm', () => {
     expect(result).toContain('393 U.S. 503');
     expect(result).toContain('Cited 500 times');
   });
+
+  it('formats court listing data from list_courts', () => {
+    const data = {
+      success: true,
+      data: {
+        summary: 'Retrieved 3 courts',
+        courts: [
+          { full_name: 'Supreme Court of the United States', id: 'scotus', jurisdiction: 'F', in_use: true },
+          { full_name: 'Court of Appeals for the First Circuit', id: 'ca1', jurisdiction: 'F', in_use: true },
+          { full_name: 'Court of Appeals for the Second Circuit', id: 'ca2', jurisdiction: 'F', in_use: true },
+        ],
+      },
+    };
+    const result = formatMcpDataForLlm('list_courts', data);
+    expect(result).toContain('3 courts found');
+    expect(result).toContain('Supreme Court of the United States');
+    expect(result).toContain('ID: scotus');
+    expect(result).toContain('Court of Appeals for the First Circuit');
+    expect(result).toContain('Court of Appeals for the Second Circuit');
+    expect(result).toContain('Jurisdiction: F');
+  });
 });
 
 describe('formatSearchResult', () => {
@@ -711,6 +854,69 @@ describe('formatSearchResult', () => {
     expect(result).toContain('3. Untitled');
     expect(result).not.toContain('Court:');
     expect(result).not.toContain('Date:');
+  });
+});
+
+describe('formatCourtResult', () => {
+  it('formats court with all fields', () => {
+    const court = {
+      full_name: 'Supreme Court of the United States',
+      id: 'scotus',
+      jurisdiction: 'F',
+      citation_string: 'U.S.',
+      in_use: true,
+      start_date: '1789-01-01',
+    };
+    const result = formatCourtResult(1, court);
+    expect(result).toContain('1. Supreme Court of the United States');
+    expect(result).toContain('ID: scotus');
+    expect(result).toContain('Jurisdiction: F');
+    expect(result).toContain('Citation format: U.S.');
+    expect(result).toContain('Active: Yes');
+    expect(result).toContain('Established: 1789-01-01');
+  });
+
+  it('handles minimal court data', () => {
+    const result = formatCourtResult(5, { short_name: 'SCOTUS' });
+    expect(result).toContain('5. SCOTUS');
+  });
+});
+
+describe('buildMcpSystemPrompt', () => {
+  it('returns court-specific prompt for list_courts', () => {
+    const prompt = buildMcpSystemPrompt('list_courts', false);
+    expect(prompt).toContain('Courts Overview');
+    expect(prompt).toContain('Court Listing');
+    expect(prompt).not.toContain('Key Cases Found');
+  });
+
+  it('returns judge-specific prompt for judge tools', () => {
+    const prompt = buildMcpSystemPrompt('get_comprehensive_judge_profile', false);
+    expect(prompt).toContain('Judge Profile');
+    expect(prompt).not.toContain('Key Cases Found');
+  });
+
+  it('returns case analysis prompt for search tools', () => {
+    const prompt = buildMcpSystemPrompt('search_cases', false);
+    expect(prompt).toContain('Legal Analysis');
+    expect(prompt).toContain('Key Cases Found');
+  });
+
+  it('returns docket-specific prompt for docket tools', () => {
+    const prompt = buildMcpSystemPrompt('get_docket_entries', false);
+    expect(prompt).toContain('Docket Summary');
+    expect(prompt).toContain('Key Filings');
+  });
+
+  it('returns citation-specific prompt for citation tools', () => {
+    const prompt = buildMcpSystemPrompt('lookup_citation', false);
+    expect(prompt).toContain('Citation Details');
+    expect(prompt).toContain('Significance');
+  });
+
+  it('includes history reference when hasHistory is true', () => {
+    const prompt = buildMcpSystemPrompt('search_cases', true);
+    expect(prompt).toContain('prior conversation context');
   });
 });
 
