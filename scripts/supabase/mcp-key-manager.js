@@ -13,7 +13,7 @@ Usage:
 
 Environment:
   SUPABASE_URL                 Required. Example: https://<project-ref>.supabase.co
-  SUPABASE_SECRET_KEY          Required. Supabase secret key (legacy alias: SUPABASE_SERVICE_ROLE_KEY)
+  SUPABASE_SECRET_KEY          Required. Supabase secret key
   SUPABASE_API_KEYS_TABLE      Optional. Defaults to mcp_api_keys
 `);
 }
@@ -315,7 +315,7 @@ async function main() {
 
   const config = {
     baseUrl: normalizeBaseUrl(readEnv('SUPABASE_URL')),
-    serviceRoleKey: process.env.SUPABASE_SECRET_KEY?.trim() || readEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    serviceRoleKey: readEnv('SUPABASE_SECRET_KEY'),
     table: process.env.SUPABASE_API_KEYS_TABLE?.trim() || DEFAULT_TABLE,
   };
 

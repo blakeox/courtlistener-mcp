@@ -147,7 +147,7 @@ describe('worker-security auth', () => {
       req({ Authorization: 'Bearer sb-valid-key' }),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
       },
       {
         verifySupabaseApiKeyFn: async (token) => token === 'sb-valid-key',
@@ -161,7 +161,7 @@ describe('worker-security auth', () => {
       req({ Authorization: 'Bearer sb-invalid-key' }),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
       },
       {
         verifySupabaseApiKeyFn: async () => false,
@@ -176,7 +176,7 @@ describe('worker-security auth', () => {
       req({ Authorization: 'Bearer static-fallback' }),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
         MCP_AUTH_TOKEN: 'static-fallback',
         MCP_ALLOW_STATIC_FALLBACK: 'true',
       },
@@ -192,7 +192,7 @@ describe('worker-security auth', () => {
       req({ Authorization: 'Bearer static-fallback' }),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
         MCP_AUTH_TOKEN: 'static-fallback',
       },
       {
@@ -208,7 +208,7 @@ describe('worker-security auth', () => {
       req({ Authorization: 'Bearer static-primary' }),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
         MCP_AUTH_TOKEN: 'static-primary',
         MCP_AUTH_PRIMARY: 'static',
       },
@@ -224,7 +224,7 @@ describe('worker-security auth', () => {
       req({}),
       {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_SECRET_KEY: 'service-role-key',
       },
       {
         verifySupabaseApiKeyFn: async () => true,

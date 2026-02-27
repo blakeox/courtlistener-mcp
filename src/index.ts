@@ -79,7 +79,7 @@ export class LegalMCPServer extends BestPracticeLegalMCPServer {
     super();
   }
 }
-export type LegacyLegalMCPServer = BestPracticeLegalMCPServer & {
+export type CompatibleLegalMCPServer = BestPracticeLegalMCPServer & {
   run(): Promise<void>;
   listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;
   handleToolCall(

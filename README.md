@@ -632,9 +632,6 @@ UI instead of localhost defaults. `MCP_UI_INSECURE_COOKIES=true` disables
 `Secure` cookie attributes for localhost HTTP testing only; do not use it in
 production.
 
-Backward compatibility: `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
-still accepted as legacy aliases.
-
 When Supabase auth is configured, users authenticate with:
 
 - `Authorization: Bearer <user_api_key>`
@@ -645,11 +642,10 @@ tool inputs, or usage payloads to Supabase.
 
 Built-in web UI routes (same Worker):
 
-- `GET /` (overview, browser only)
-- `GET /signup` (create account)
-- `GET /login` (authenticate account after email verification)
-- `GET /keys` (list/create/revoke keys)
-- `GET /chat` (sample MCP chat bound to `/mcp`)
+- `GET /app/*` (SPA routes: onboarding, signup, login, keys, console, account)
+- `GET /app/assets/spa.js` (bundled SPA JavaScript)
+- `GET /app/assets/spa.css` (bundled SPA styles)
+- Previous UI routes (`/`, `/signup`, `/login`, `/keys`, `/chat`) redirect to `/app/*`
 - `GET /api/session`
 - `POST /api/login`
 - `POST /api/login/token` (automatic session exchange for Supabase email-confirm
@@ -660,14 +656,7 @@ Built-in web UI routes (same Worker):
 - `POST /api/keys`
 - `POST /api/keys/revoke`
 
-Legacy endpoint (disabled by default):
-
-- `POST /api/signup/issue-key` (enable only with
-  `MCP_ENABLE_SIGNUP_ISSUE_KEY=true`)
-
-Web UI styling is compiled with Tailwind CSS v4 during builds via:
-
-- `npm run generate:web:styles`
+Deprecated endpoint `POST /api/signup/issue-key` has been removed.
 
 Optional signup bot-protection (Turnstile):
 
@@ -687,9 +676,9 @@ schema reference:
 Recommended setup flow:
 
 1. Run `docs/supabase/mcp-auth-schema.sql` in Supabase SQL editor.
-2. Create account at `/signup`, verify email, then login via `/api/login` (or UI
-   on `/login`).
-3. Create your first key from `/keys` (or via `/api/keys` while logged in).
+2. Create account at `/app/signup`, verify email, then login via `/api/login` (or UI
+   on `/app/login`).
+3. Create your first key from `/app/keys` (or via `/api/keys` while logged in).
 4. Sign in with your first user account and run:
    - `select public.bootstrap_first_admin();`
 5. Generate additional user API keys with:
@@ -701,31 +690,31 @@ CLI alternative (service-role admin flow, no manual SQL):
 
 ```bash
 # Create a key for a specific user id
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:create -- --user-id <auth_user_uuid> --label "prod-key" --expires-days 90
 
 # Revoke by key id
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:revoke -- --key-id <mcp_key_uuid>
 
 # Revoke by raw token
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:revoke -- --token <raw_token>
 
 # List keys (redacted hash preview)
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:list -- --active-only true --limit 100
 
 # List keys for one label only
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:list -- --label "prod-key" --limit 100
 
 # List keys by partial label match
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:list -- --label-contains "prod" --limit 100
 
 # List keys by expiration window
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
 pnpm run mcp:key:list -- --expires-before "2026-12-31T00:00:00Z" --expires-after "2026-01-01T00:00:00Z" --limit 100
 ```
 
@@ -809,8 +798,7 @@ wrangler secret put MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS       # default 300
 wrangler secret put MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS        # default 300
 ```
 
-Optional key TTL hard cap (applies to `/api/keys`, and legacy
-`/api/signup/issue-key` if enabled):
+Optional key TTL hard cap (applies to `/api/keys`):
 
 ```bash
 wrangler secret put MCP_API_KEY_MAX_TTL_DAYS                    # default 90

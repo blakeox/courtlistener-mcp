@@ -40,11 +40,10 @@ function ensureNoTrailingSlash(value: string): string {
 export function getSupabaseConfig(env: {
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_API_KEYS_TABLE?: string;
 }): SupabaseAuthConfig | null {
   const url = env.SUPABASE_URL?.trim();
-  const serviceRoleKey = env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const serviceRoleKey = env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !serviceRoleKey) {
     return null;
   }

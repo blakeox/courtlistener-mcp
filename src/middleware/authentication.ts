@@ -2,11 +2,11 @@
  * Authentication middleware for Legal MCP Server
  *
  * Supports two authentication modes:
- *  - Legacy: API key via `x-api-key` header (used for stdio/local connections)
+ *  - API key via `x-api-key` header (used for stdio/local connections)
  *  - Modern: OAuth 2.1 Bearer tokens (handled by the SDK's requireBearerAuth
  *    middleware on the HTTP/SSE transport; see src/auth/oauth-provider.ts)
  *
- * This module implements the legacy API-key path. The OAuth path is wired up
+ * This module implements the API-key path. The OAuth path is wired up
  * at the transport layer and does not flow through this middleware.
  */
 

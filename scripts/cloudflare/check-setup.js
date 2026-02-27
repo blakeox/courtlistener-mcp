@@ -57,8 +57,7 @@ function parseWranglerConfig() {
 function hasSupabaseAuth(secretNames) {
   return (
     secretNames.includes('SUPABASE_URL') &&
-    (secretNames.includes('SUPABASE_SECRET_KEY') ||
-      secretNames.includes('SUPABASE_SERVICE_ROLE_KEY'))
+    secretNames.includes('SUPABASE_SECRET_KEY')
   );
 }
 
@@ -227,12 +226,10 @@ async function main() {
   const staticFallbackEnabled = secretNames.includes('MCP_ALLOW_STATIC_FALLBACK');
 
   const hasSupabaseUrl = secretNames.includes('SUPABASE_URL');
-  const hasSupabaseServerKey =
-    secretNames.includes('SUPABASE_SECRET_KEY') ||
-    secretNames.includes('SUPABASE_SERVICE_ROLE_KEY');
+  const hasSupabaseServerKey = secretNames.includes('SUPABASE_SECRET_KEY');
   if (hasSupabaseUrl !== hasSupabaseServerKey) {
     warn(
-      'Supabase auth is partially configured. Set both `SUPABASE_URL` and (`SUPABASE_SECRET_KEY` or legacy `SUPABASE_SERVICE_ROLE_KEY`).',
+      'Supabase auth is partially configured. Set both `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.',
     );
   }
 
@@ -278,7 +275,7 @@ async function main() {
         warn(`/mcp initialize failed (HTTP ${mcp.status}).`);
         const sse = await checkMcpInitialize(baseUrl, '/sse');
         if (sse.ok) {
-          warn('/sse initialize works; deployment may still be on legacy endpoint shape.');
+          warn('/sse initialize works; deployment may still be on an older endpoint shape.');
         } else {
           warn(`/sse initialize also failed (HTTP ${sse.status}).`);
         }
@@ -294,7 +291,6 @@ async function main() {
   console.log('  wrangler secret put OIDC_ISSUER      # optional JWT auth');
   console.log('  wrangler secret put SUPABASE_URL     # optional Supabase API key auth');
   console.log('  wrangler secret put SUPABASE_SECRET_KEY');
-  console.log('  wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # legacy alias');
   if (hasSupabase) {
     console.log('  Apply docs/supabase/mcp-auth-schema.sql in Supabase SQL editor');
     console.log('  After first sign-in: select public.bootstrap_first_admin();');

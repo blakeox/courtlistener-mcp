@@ -13,7 +13,7 @@ const getCaseDetailsSchema = z
     id: z.union([z.coerce.number().int(), z.string()]).optional(),
   })
   .refine((data) => data.cluster_id !== undefined || data.id !== undefined, {
-    message: 'cluster_id (or legacy id) is required',
+    message: 'cluster_id (or id) is required',
     path: ['cluster_id'],
   })
   .transform((data) => {

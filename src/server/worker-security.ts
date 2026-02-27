@@ -13,7 +13,6 @@ export interface WorkerSecurityEnv {
   OIDC_REQUIRED_SCOPE?: string;
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_API_KEYS_TABLE?: string;
 }
 
@@ -97,8 +96,7 @@ function isAuthConfigured(env: WorkerSecurityEnv): boolean {
   return Boolean(
     getOidcConfig(env) ||
       env.MCP_AUTH_TOKEN?.trim() ||
-      (env.SUPABASE_URL?.trim() &&
-        (env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim())),
+      (env.SUPABASE_URL?.trim() && env.SUPABASE_SECRET_KEY?.trim()),
   );
 }
 

@@ -19,8 +19,6 @@
  *   SUPABASE_URL            — Optional Supabase project URL for API-key auth
  *   SUPABASE_SECRET_KEY     — Optional Supabase secret key for API-key auth and management
  *   SUPABASE_PUBLISHABLE_KEY — Optional Supabase publishable key for public email/password signup
- *   SUPABASE_ANON_KEY       — Legacy alias for publishable key
- *   SUPABASE_SERVICE_ROLE_KEY — Legacy alias for Supabase secret key
  *   SUPABASE_API_KEYS_TABLE — Optional table override (default: mcp_api_keys)
  *   MCP_UI_PUBLIC_ORIGIN    — Optional canonical UI origin used for email confirmation redirects
  *   MCP_AUTH_PRIMARY        — Optional primary auth backend: supabase | oidc | static
@@ -58,17 +56,14 @@ import {
   getSupabaseUserFromAccessToken,
   listApiKeysForUser,
   logAuditEvent,
+  resetPasswordWithAccessToken,
   resolvePrincipalFromApiToken,
   revokeApiKeyForUser,
+  sendPasswordResetEmail,
   signUpSupabaseUser,
 } from './server/supabase-management.js';
-import {
-  renderChatPage,
-  renderKeysPage,
-  renderLoginPage,
-  renderOverviewPage,
-  renderSignupPage,
-} from './web/app.js';
+import { SPA_BUILD_ID, SPA_CSS, SPA_JS } from './web/spa-assets.js';
+import { renderSpaShellHtml } from './web/spa-shell.js';
 
 // ---------------------------------------------------------------------------
 // Cloudflare Worker environment bindings
@@ -101,10 +96,6 @@ interface Env {
   SUPABASE_SECRET_KEY?: string;
   /** Optional Supabase publishable key for public email/password signup */
   SUPABASE_PUBLISHABLE_KEY?: string;
-  /** Legacy alias for publishable key */
-  SUPABASE_ANON_KEY?: string;
-  /** Legacy alias for Supabase secret key */
-  SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Optional Supabase API keys table (default mcp_api_keys) */
   SUPABASE_API_KEYS_TABLE?: string;
   /** Optional canonical UI origin used for email confirmation redirects */
@@ -137,12 +128,10 @@ interface Env {
   MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS?: string;
   /** Maximum allowed API key TTL in days (default 90) */
   MCP_API_KEY_MAX_TTL_DAYS?: string;
-  /** Secret used to sign UI session cookies (falls back to Supabase secret key aliases if unset) */
+  /** Secret used to sign UI session cookies (falls back to SUPABASE_SECRET_KEY if unset) */
   MCP_UI_SESSION_SECRET?: string;
   /** Allow non-Secure UI cookies for local HTTP development (default false) */
   MCP_UI_INSECURE_COOKIES?: string;
-  /** Legacy endpoint toggle for /api/signup/issue-key (default false) */
-  MCP_ENABLE_SIGNUP_ISSUE_KEY?: string;
   /** Durable Object binding (auto-wired by wrangler.jsonc) */
   MCP_OBJECT: DurableObjectNamespace;
   /** Durable Object binding for auth failure rate limiting */
@@ -291,6 +280,24 @@ function jsonResponse(payload: unknown, status = 200, extraHeaders?: HeadersInit
   });
 }
 
+function jsonError(
+  error: string,
+  status: number,
+  errorCode: string,
+  extra?: Record<string, unknown>,
+  extraHeaders?: HeadersInit,
+): Response {
+  return jsonResponse(
+    {
+      error,
+      error_code: errorCode,
+      ...(extra ?? {}),
+    },
+    status,
+    extraHeaders,
+  );
+}
+
 function generateCspNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -315,6 +322,42 @@ function htmlResponse(html: string, nonce: string, extraHeaders?: HeadersInit): 
     status: 200,
     headers,
   });
+}
+
+function redirectResponse(location: string, status = 302, extraHeaders?: HeadersInit): Response {
+  const headers = new Headers({
+    Location: location,
+    'Cache-Control': 'no-store',
+  });
+  if (extraHeaders) {
+    const source = new Headers(extraHeaders);
+    for (const [key, value] of source.entries()) {
+      headers.append(key, value);
+    }
+  }
+  applySecurityHeaders(headers);
+  return new Response(null, { status, headers });
+}
+
+function spaAssetResponse(
+  content: string,
+  contentType: string,
+  buildId: string,
+  extraHeaders?: HeadersInit,
+): Response {
+  const headers = new Headers({
+    'content-type': contentType,
+    'Cache-Control': 'public, max-age=300',
+    ETag: `"${buildId}"`,
+  });
+  if (extraHeaders) {
+    const source = new Headers(extraHeaders);
+    for (const [key, value] of source.entries()) {
+      headers.append(key, value);
+    }
+  }
+  applySecurityHeaders(headers);
+  return new Response(content, { status: 200, headers });
 }
 
 function applySecurityHeaders(headers: Headers, nonce?: string): void {
@@ -384,9 +427,17 @@ function getSignupRedirectUrl(env: Env, requestOrigin: string): string {
   return `${requestOrigin}/login`;
 }
 
-function wantsHtml(request: Request): boolean {
-  const accept = request.headers.get('accept') || '';
-  return accept.toLowerCase().includes('text/html');
+function getPasswordResetRedirectUrl(env: Env, requestOrigin: string): string {
+  const configuredOrigin = env.MCP_UI_PUBLIC_ORIGIN?.trim();
+  if (configuredOrigin) {
+    try {
+      const parsed = new URL(configuredOrigin);
+      return `${parsed.origin}/app/reset-password`;
+    } catch {
+      // Ignore invalid override and fall back to request origin.
+    }
+  }
+  return `${requestOrigin}/app/reset-password`;
 }
 
 async function verifyTurnstileToken(
@@ -420,7 +471,7 @@ async function authenticateUiApiRequest(
 ): Promise<{ userId: string; keyId?: string; authType: 'api_key' | 'session' } | Response> {
   const config = getSupabaseManagementConfig(env);
   if (!config) {
-    return jsonResponse({ error: 'Supabase auth is not configured on this worker.' }, 503);
+    return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
   }
 
   const bearerToken = extractBearerToken(request.headers.get('authorization'));
@@ -429,21 +480,20 @@ async function authenticateUiApiRequest(
     if (principal) {
       return { ...principal, authType: 'api_key' };
     }
-    return jsonResponse({ error: 'Invalid or expired API token.' }, 401);
+    return jsonError('Invalid or expired API token.', 401, 'invalid_api_token');
   }
 
   const sessionSecret = (
     env.MCP_UI_SESSION_SECRET ||
     env.SUPABASE_SECRET_KEY ||
-    env.SUPABASE_SERVICE_ROLE_KEY ||
     ''
   ).trim();
   if (!sessionSecret) {
-    return jsonResponse({ error: 'Missing bearer token.' }, 401);
+    return jsonError('Missing bearer token.', 401, 'missing_bearer_token');
   }
   const sessionUserId = await getUiSessionUserId(request, sessionSecret);
   if (!sessionUserId) {
-    return jsonResponse({ error: 'Missing bearer token.' }, 401);
+    return jsonError('Missing bearer token.', 401, 'missing_bearer_token');
   }
   return { userId: sessionUserId, authType: 'session' };
 }
@@ -571,7 +621,7 @@ function requireCsrfToken(request: Request): Response | null {
   const cookieToken = getCsrfTokenFromCookie(request);
   const headerToken = request.headers.get('x-csrf-token')?.trim() || '';
   if (!cookieToken || !headerToken || headerToken !== cookieToken) {
-    return jsonResponse({ error: 'CSRF token validation failed.' }, 403);
+    return jsonError('CSRF token validation failed.', 403, 'csrf_validation_failed');
   }
   return null;
 }
@@ -746,18 +796,12 @@ async function getAuthRateLimitedResponse(
   if (!limiterState?.blocked) return null;
 
   const retryAfterSeconds = limiterState.retryAfterSeconds;
-  return Response.json(
-    {
-      error: 'rate_limited',
-      message: 'Too many failed authentication attempts',
-      retry_after_seconds: retryAfterSeconds,
-    },
-    {
-      status: 429,
-      headers: {
-        'Retry-After': String(retryAfterSeconds),
-      },
-    },
+  return jsonError(
+    'Too many failed authentication attempts',
+    429,
+    'auth_rate_limited',
+    { retry_after_seconds: retryAfterSeconds },
+    { 'Retry-After': String(retryAfterSeconds) },
   );
 }
 
@@ -838,13 +882,12 @@ async function applyUiRateLimit(
   });
   if (!result?.blocked) return null;
 
-  return jsonResponse(
-    {
-      error: 'rate_limited',
-      message: `Too many ${limitType} requests. Please retry later.`,
-      retry_after_seconds: result.retryAfterSeconds,
-    },
+  return jsonError(
+    `Too many ${limitType} requests. Please retry later.`,
     429,
+    'ui_rate_limited',
+    { retry_after_seconds: result.retryAfterSeconds },
+    { 'Retry-After': String(result.retryAfterSeconds) },
   );
 }
 
@@ -891,7 +934,7 @@ function rejectDisallowedUiOrigin(
 ): Response | null {
   const origin = request.headers.get('Origin');
   if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
-    return jsonResponse({ error: 'Forbidden origin' }, 403);
+    return jsonError('Forbidden origin', 403, 'forbidden_origin');
   }
   return null;
 }
@@ -920,69 +963,62 @@ export default {
       });
     }
 
-    // Helpful root response for browser/manual checks
-    if (url.pathname === '/') {
-      if (request.method === 'GET' && wantsHtml(request)) {
-        const nonce = generateCspNonce();
-        const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-        return htmlResponse(renderOverviewPage(nonce), nonce, csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined);
-      }
-
-      return jsonResponse({
-        service: 'courtlistener-mcp',
-        status: 'ok',
-        message: 'MCP endpoint is available at /mcp (primary) and /sse (compatibility)',
-        endpoints: {
-          health: '/health',
-          mcp: '/mcp',
-          sse_compat: '/sse',
-        },
-      });
+    if (request.method === 'GET' && url.pathname === '/app/assets/spa.js') {
+      return spaAssetResponse(SPA_JS, 'application/javascript; charset=utf-8', SPA_BUILD_ID);
     }
 
-    if (request.method === 'GET' && url.pathname === '/signup') {
+    if (request.method === 'GET' && url.pathname === '/app/assets/spa.css') {
+      return spaAssetResponse(SPA_CSS, 'text/css; charset=utf-8', SPA_BUILD_ID);
+    }
+
+    if (url.pathname.startsWith('/app/assets/') && request.method !== 'GET') {
+      return jsonError('Method not allowed', 405, 'method_not_allowed');
+    }
+
+    if (request.method === 'GET' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) {
+      if (url.pathname.startsWith('/app/assets/')) {
+        return jsonResponse({ error: 'Asset not found', error_code: 'asset_not_found' }, 404);
+      }
       const nonce = generateCspNonce();
-      const turnstileSiteKey = env.TURNSTILE_SITE_KEY?.trim();
       const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
       return htmlResponse(
-        turnstileSiteKey
-          ? renderSignupPage(nonce, {
-              turnstileSiteKey,
-            })
-          : renderSignupPage(nonce),
+        renderSpaShellHtml(),
         nonce,
         csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
       );
     }
 
-    if (request.method === 'GET' && url.pathname === '/login') {
-      const nonce = generateCspNonce();
-      const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-      return htmlResponse(renderLoginPage(nonce), nonce, csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined);
-    }
-
-    if (request.method === 'GET' && url.pathname === '/keys') {
-      const nonce = generateCspNonce();
-      const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-      return htmlResponse(renderKeysPage(nonce), nonce, csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined);
-    }
-
-    if (request.method === 'GET' && url.pathname === '/chat') {
-      const nonce = generateCspNonce();
-      const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-      return htmlResponse(renderChatPage(nonce), nonce, csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined);
+    // Previous UI paths are redirected to the SPA app routes.
+    if (request.method === 'GET') {
+      const previousUiPathMap: Record<string, string> = {
+        '/': '/app/onboarding',
+        '/signup': '/app/signup',
+        '/login': '/app/login',
+        '/reset-password': '/app/reset-password',
+        '/keys': '/app/keys',
+        '/chat': '/app/console',
+      };
+      const redirectedPath = previousUiPathMap[url.pathname];
+      if (redirectedPath) {
+        const redirectUrl = new URL(redirectedPath, request.url);
+        const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
+        return redirectResponse(
+          redirectUrl.toString(),
+          302,
+          csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
+        );
+      }
     }
 
     if (url.pathname === '/api/session') {
       if (request.method !== 'GET') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
       const sessionSecret = (
         env.MCP_UI_SESSION_SECRET ||
         env.SUPABASE_SECRET_KEY ||
-        env.SUPABASE_SERVICE_ROLE_KEY ||
         ''
       ).trim();
       const sessionUserId = sessionSecret ? await getUiSessionUserId(request, sessionSecret) : null;
@@ -991,6 +1027,7 @@ export default {
         {
           authenticated: Boolean(sessionUserId),
           user: sessionUserId ? { id: sessionUserId } : null,
+          turnstile_site_key: env.TURNSTILE_SITE_KEY?.trim() || undefined,
         },
         200,
         csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
@@ -999,7 +1036,7 @@ export default {
 
     if (url.pathname === '/api/login') {
       if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
@@ -1008,7 +1045,7 @@ export default {
 
       const config = getSupabaseManagementConfig(env);
       if (!config) {
-        return jsonResponse({ error: 'Supabase auth is not configured on this worker.' }, 503);
+        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
       }
 
       const body = await parseJsonBody<{ email?: string; password?: string }>(request);
@@ -1019,25 +1056,24 @@ export default {
       if (loginRateLimited) return loginRateLimited;
 
       if (!email || !email.includes('@')) {
-        return jsonResponse({ error: 'A valid email is required.' }, 400);
+        return jsonError('A valid email is required.', 400, 'invalid_email');
       }
       if (password.length < 8) {
-        return jsonResponse({ error: 'Password must be at least 8 characters.' }, 400);
+        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
       }
 
       try {
         const authResult = await authenticateUserWithPassword(config, email, password);
         if (!authResult.user.email_confirmed_at) {
-          return jsonResponse({ error: 'Email verification is required before login.' }, 403);
+          return jsonError('Email verification is required before login.', 403, 'email_not_verified');
         }
         const sessionSecret = (
           env.MCP_UI_SESSION_SECRET ||
           env.SUPABASE_SECRET_KEY ||
-          env.SUPABASE_SERVICE_ROLE_KEY ||
           ''
         ).trim();
         if (!sessionSecret) {
-          return jsonResponse({ error: 'Session signing secret is not configured.' }, 503);
+          return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
         const sessionToken = await createUiSessionToken(authResult.user.id, sessionSecret, 12 * 60 * 60);
         const secureCookies = isSecureCookieRequest(request, env);
@@ -1059,13 +1095,13 @@ export default {
           },
         );
       } catch {
-        return jsonResponse({ error: 'Invalid email or password.' }, 401);
+        return jsonError('Invalid email or password.', 401, 'invalid_credentials');
       }
     }
 
     if (url.pathname === '/api/login/token') {
       if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
@@ -1074,29 +1110,32 @@ export default {
 
       const signupConfig = getSupabaseSignupConfig(env);
       if (!signupConfig) {
-        return jsonResponse({ error: 'Supabase public signup is not configured on this worker.' }, 503);
+        return jsonError(
+          'Supabase public signup is not configured on this worker.',
+          503,
+          'supabase_signup_not_configured',
+        );
       }
 
       const body = await parseJsonBody<{ accessToken?: string }>(request);
       const accessToken = body?.accessToken?.trim() || '';
       if (!accessToken) {
-        return jsonResponse({ error: 'accessToken is required.' }, 400);
+        return jsonError('accessToken is required.', 400, 'missing_access_token');
       }
 
       try {
         const user = await getSupabaseUserFromAccessToken(signupConfig, accessToken);
         if (!user.email_confirmed_at) {
-          return jsonResponse({ error: 'Email verification is required before login.' }, 403);
+          return jsonError('Email verification is required before login.', 403, 'email_not_verified');
         }
 
         const sessionSecret = (
           env.MCP_UI_SESSION_SECRET ||
           env.SUPABASE_SECRET_KEY ||
-          env.SUPABASE_SERVICE_ROLE_KEY ||
           ''
         ).trim();
         if (!sessionSecret) {
-          return jsonResponse({ error: 'Session signing secret is not configured.' }, 503);
+          return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
         const sessionToken = await createUiSessionToken(user.id, sessionSecret, 12 * 60 * 60);
         const secureCookies = isSecureCookieRequest(request, env);
@@ -1118,13 +1157,98 @@ export default {
           },
         );
       } catch {
-        return jsonResponse({ error: 'Invalid or expired signup token.' }, 401);
+        return jsonError('Invalid or expired signup token.', 401, 'invalid_signup_token');
+      }
+    }
+
+    if (url.pathname === '/api/password/forgot') {
+      if (request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
+      }
+      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
+      if (uiOriginRejection) return uiOriginRejection;
+      const csrfError = requireCsrfToken(request);
+      if (csrfError) return csrfError;
+
+      const signupConfig = getSupabaseSignupConfig(env);
+      if (!signupConfig) {
+        return jsonError(
+          'Supabase public signup is not configured on this worker.',
+          503,
+          'supabase_signup_not_configured',
+        );
+      }
+
+      const body = await parseJsonBody<{ email?: string }>(request);
+      const email = body?.email?.trim().toLowerCase() || '';
+
+      const forgotRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
+      if (forgotRateLimited) return forgotRateLimited;
+
+      if (!email || !email.includes('@')) {
+        return jsonError('A valid email is required.', 400, 'invalid_email');
+      }
+
+      try {
+        await sendPasswordResetEmail(signupConfig, email, {
+          redirectTo: getPasswordResetRedirectUrl(env, url.origin),
+        });
+      } catch (error) {
+        console.warn('password_reset_email_failed', error);
+      }
+
+      return jsonResponse(
+        {
+          message:
+            'If the request can be processed, check your email for password reset instructions.',
+        },
+        202,
+      );
+    }
+
+    if (url.pathname === '/api/password/reset') {
+      if (request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
+      }
+      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
+      if (uiOriginRejection) return uiOriginRejection;
+      const csrfError = requireCsrfToken(request);
+      if (csrfError) return csrfError;
+
+      const signupConfig = getSupabaseSignupConfig(env);
+      if (!signupConfig) {
+        return jsonError(
+          'Supabase public signup is not configured on this worker.',
+          503,
+          'supabase_signup_not_configured',
+        );
+      }
+
+      const body = await parseJsonBody<{ accessToken?: string; password?: string }>(request);
+      const accessToken = body?.accessToken?.trim() || '';
+      const password = body?.password || '';
+
+      const resetRateLimited = await applyUiRateLimit(request, env, 'signup');
+      if (resetRateLimited) return resetRateLimited;
+
+      if (!accessToken) {
+        return jsonError('accessToken is required.', 400, 'missing_access_token');
+      }
+      if (password.length < 8) {
+        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
+      }
+
+      try {
+        await resetPasswordWithAccessToken(signupConfig, accessToken, password);
+        return jsonResponse({ message: 'Password has been reset. You can now log in.' }, 200);
+      } catch {
+        return jsonError('Invalid or expired recovery token.', 401, 'invalid_recovery_token');
       }
     }
 
     if (url.pathname === '/api/logout') {
       if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
@@ -1146,14 +1270,18 @@ export default {
 
     if (url.pathname === '/api/signup') {
       if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
 
       const signupConfig = getSupabaseSignupConfig(env);
       if (!signupConfig) {
-        return jsonResponse({ error: 'Supabase public signup is not configured on this worker.' }, 503);
+        return jsonError(
+          'Supabase public signup is not configured on this worker.',
+          503,
+          'supabase_signup_not_configured',
+        );
       }
       const managementConfig = getSupabaseManagementConfig(env);
 
@@ -1179,18 +1307,18 @@ export default {
       }
 
       if (!email || !email.includes('@')) {
-        return jsonResponse({ error: 'A valid email is required.' }, 400);
+        return jsonError('A valid email is required.', 400, 'invalid_email');
       }
       if (password.length < 8) {
-        return jsonResponse({ error: 'Password must be at least 8 characters.' }, 400);
+        return jsonError('Password must be at least 8 characters.', 400, 'invalid_password');
       }
       if (turnstileSecret) {
         if (!turnstileToken) {
-          return jsonResponse({ error: 'Turnstile verification is required.' }, 400);
+          return jsonError('Turnstile verification is required.', 400, 'turnstile_token_required');
         }
         const verified = await verifyTurnstileToken(turnstileSecret, turnstileToken, requestIp);
         if (!verified) {
-          return jsonResponse({ error: 'Turnstile verification failed.' }, 400);
+          return jsonError('Turnstile verification failed.', 400, 'turnstile_verification_failed');
         }
       }
 
@@ -1248,122 +1376,6 @@ export default {
       }
     }
 
-    if (url.pathname === '/api/signup/issue-key') {
-      if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
-      }
-      if (!parseBoolean(env.MCP_ENABLE_SIGNUP_ISSUE_KEY)) {
-        return jsonResponse(
-          {
-            error: 'Legacy endpoint disabled. Use /api/login then /api/keys.',
-          },
-          410,
-        );
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const config = getSupabaseManagementConfig(env);
-      if (!config) {
-        return jsonResponse({ error: 'Supabase auth is not configured on this worker.' }, 503);
-      }
-
-      const body = await parseJsonBody<{
-        email?: string;
-        password?: string;
-        label?: string;
-        expiresDays?: number;
-      }>(request);
-
-      const email = body?.email?.trim().toLowerCase() || '';
-      const password = body?.password || '';
-      const label = body?.label?.trim() || 'primary';
-      const requestIp = getRequestIp(request);
-      const maxTtlDays = getApiKeyMaxTtlDays(env);
-      const expiresAt = getCappedExpiresAtFromDays(body?.expiresDays, 90, maxTtlDays);
-
-      const signupRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
-      if (signupRateLimited) {
-        return signupRateLimited;
-      }
-
-      if (!email || !email.includes('@')) {
-        return jsonResponse({ error: 'A valid email is required.' }, 400);
-      }
-      if (password.length < 8) {
-        return jsonResponse({ error: 'Password must be at least 8 characters.' }, 400);
-      }
-
-      try {
-        const authResult = await authenticateUserWithPassword(config, email, password);
-        if (!authResult.user.email_confirmed_at) {
-          return jsonResponse(
-            {
-              error: 'Unable to issue key. Check credentials and email verification status.',
-            },
-            403,
-          );
-        }
-
-        const createdKey = await createApiKeyForUser(config, {
-          userId: authResult.user.id,
-          label,
-          expiresAt,
-        });
-        try {
-          await logAuditEvent(config, {
-            actorType: 'service',
-            targetUserId: authResult.user.id,
-            apiKeyId: createdKey.key.id,
-            action: 'signup.initial_key_created',
-            status: 'success',
-            requestIp,
-            metadata: { label: createdKey.key.label },
-          });
-        } catch (auditError) {
-          console.warn('audit_log_failed', auditError);
-        }
-        return jsonResponse(
-          {
-            message: 'Initial API key issued.',
-            user: {
-              id: authResult.user.id,
-              email: authResult.user.email ?? email,
-            },
-            api_key: {
-              id: createdKey.key.id,
-              label: createdKey.key.label,
-              created_at: createdKey.key.created_at,
-              expires_at: createdKey.key.expires_at,
-              token: createdKey.token,
-              max_ttl_days: maxTtlDays,
-            },
-          },
-          201,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'issue_key_failed';
-        try {
-          await logAuditEvent(config, {
-            actorType: 'anonymous',
-            action: 'signup.initial_key_created',
-            status: 'error',
-            requestIp,
-            metadata: {
-              email,
-              error: message,
-            },
-          });
-        } catch (auditError) {
-          console.warn('audit_log_failed', auditError);
-        }
-        return jsonResponse(
-          { error: 'Unable to issue key. Check credentials and email verification status.' },
-          403,
-        );
-      }
-    }
-
     if (url.pathname === '/api/keys') {
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
@@ -1389,7 +1401,7 @@ export default {
 
       const config = getSupabaseManagementConfig(env);
       if (!config) {
-        return jsonResponse({ error: 'Supabase auth is not configured on this worker.' }, 503);
+        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
       }
 
       if (request.method === 'GET') {
@@ -1400,7 +1412,7 @@ export default {
             keys,
           });
         } catch {
-          return jsonResponse({ error: 'Failed to list keys.' }, 400);
+          return jsonError('Failed to list keys.', 400, 'keys_list_failed');
         }
       }
 
@@ -1448,16 +1460,16 @@ export default {
             201,
           );
         } catch {
-          return jsonResponse({ error: 'Failed to create key.' }, 400);
+          return jsonError('Failed to create key.', 400, 'key_create_failed');
         }
       }
 
-      return jsonResponse({ error: 'Method not allowed' }, 405);
+      return jsonError('Method not allowed', 405, 'method_not_allowed');
     }
 
     if (url.pathname === '/api/keys/revoke') {
       if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
       }
       const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
       if (uiOriginRejection) return uiOriginRejection;
@@ -1483,7 +1495,7 @@ export default {
 
       const config = getSupabaseManagementConfig(env);
       if (!config) {
-        return jsonResponse({ error: 'Supabase auth is not configured on this worker.' }, 503);
+        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
       }
 
       const body = await parseJsonBody<{ keyId?: string }>(request);
@@ -1493,13 +1505,13 @@ export default {
       }
       const keyId = body?.keyId?.trim();
       if (!keyId) {
-        return jsonResponse({ error: 'keyId is required.' }, 400);
+        return jsonError('keyId is required.', 400, 'missing_key_id');
       }
 
       try {
         const revoked = await revokeApiKeyForUser(config, authResult.userId, keyId);
         if (!revoked) {
-          return jsonResponse({ error: 'Key not found or already revoked.' }, 404);
+          return jsonError('Key not found or already revoked.', 404, 'key_not_found');
         }
         try {
           await logAuditEvent(config, {
@@ -1516,7 +1528,7 @@ export default {
         }
         return jsonResponse({ message: 'Key revoked.' });
       } catch {
-        return jsonResponse({ error: 'Failed to revoke key.' }, 400);
+        return jsonError('Failed to revoke key.', 400, 'key_revoke_failed');
       }
     }
 

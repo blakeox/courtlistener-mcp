@@ -15,13 +15,13 @@ afterEach(() => {
 describe('supabase-auth config', () => {
   it('returns null when required vars are missing', () => {
     assert.equal(getSupabaseConfig({ SUPABASE_URL: 'https://x.supabase.co' }), null);
-    assert.equal(getSupabaseConfig({ SUPABASE_SERVICE_ROLE_KEY: 'k' }), null);
+    assert.equal(getSupabaseConfig({ SUPABASE_SECRET_KEY: 'k' }), null);
   });
 
   it('normalizes URL and default table', () => {
     const config = getSupabaseConfig({
       SUPABASE_URL: 'https://x.supabase.co/',
-      SUPABASE_SERVICE_ROLE_KEY: 'k',
+      SUPABASE_SECRET_KEY: 'k',
     });
     assert.ok(config);
     assert.equal(config.url, 'https://x.supabase.co');
@@ -33,7 +33,7 @@ describe('supabase-auth key validation', () => {
   it('accepts active key record', async () => {
     const config = getSupabaseConfig({
       SUPABASE_URL: 'https://x.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'k',
+      SUPABASE_SECRET_KEY: 'k',
     });
     assert.ok(config);
 
@@ -58,7 +58,7 @@ describe('supabase-auth key validation', () => {
   it('rejects expired key', async () => {
     const config = getSupabaseConfig({
       SUPABASE_URL: 'https://x.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'k',
+      SUPABASE_SECRET_KEY: 'k',
     });
     assert.ok(config);
 
@@ -83,7 +83,7 @@ describe('supabase-auth key validation', () => {
   it('de-duplicates concurrent lookups for same key', async () => {
     const config = getSupabaseConfig({
       SUPABASE_URL: 'https://x.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'k',
+      SUPABASE_SECRET_KEY: 'k',
     });
     assert.ok(config);
 

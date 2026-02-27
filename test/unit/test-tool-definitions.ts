@@ -70,10 +70,10 @@ describe('Tool definition schema integrity (TypeScript)', () => {
       }
     }
 
-    // Check that legacy docket_id is not present
+    // Check that deprecated docket_id is not present
     assert.ok(
       !('docket_id' in properties) || properties.docket_id === undefined,
-      'Legacy docket_id property should be removed from schema'
+      'Deprecated docket_id property should be removed from schema'
     );
   });
 
@@ -147,4 +147,3 @@ describe('Tool definition schema integrity (TypeScript)', () => {
     }
   });
 });
-

@@ -8,7 +8,7 @@ This test verifies the full user journey against a deployed Worker:
 4. Verify `/api/session` authenticated
 5. Logout and verify unauthenticated
 6. Login again
-7. Create API key from the browser UI (`/keys`, "Create key" action)
+7. Create API key from the browser UI (`/app/keys`, "Create key" action)
 8. Call `/mcp` `initialize`
 9. Call `/mcp` `tools/call` (equivalent to chat send)
 

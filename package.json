@@ -18,8 +18,8 @@
   "scripts": {
     "hooks:install": "lefthook install --force",
     "typecheck": "tsc --noEmit",
-    "build": "npm run clean && npm run generate:web:styles && tsc && npm run generate:manifest",
-    "generate:web:styles": "node scripts/web/generate-tailwind-web-styles.mjs",
+    "build": "npm run clean && npm run generate:web:spa && tsc && npm run generate:manifest",
+    "generate:web:spa": "node scripts/web/build-spa-assets.mjs",
     "generate:manifest": "npx tsx scripts/generate-manifest.ts",
     "deploy": "wrangler deploy",
     "cloudflare:check": "node scripts/cloudflare/check-setup.js",
@@ -116,6 +116,7 @@
   "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
+    "@tanstack/react-query": "^5.80.7",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.70.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
@@ -127,6 +128,9 @@
     "helmet": "^8.1.0",
     "jose": "^6.1.3",
     "node-fetch": "^3.3.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
   },
@@ -152,7 +156,9 @@
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.63.0"
+    "vite": "^7.0.4",
+    "wrangler": "^4.63.0",
+    "@vitejs/plugin-react": "^4.5.2"
   },
   "engines": {
     "node": ">=18.0.0"

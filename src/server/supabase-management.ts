@@ -133,7 +133,6 @@ function isKeyExpired(expiresAt: string | null): boolean {
 export function getSupabaseManagementConfig(env: {
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_API_KEYS_TABLE?: string;
 }): SupabaseAuthConfig | null {
   return getSupabaseConfig(env);
@@ -142,10 +141,9 @@ export function getSupabaseManagementConfig(env: {
 export function getSupabaseSignupConfig(env: {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
-  SUPABASE_ANON_KEY?: string;
 }): SupabaseSignupConfig | null {
   const url = env.SUPABASE_URL?.trim();
-  const anonKey = env.SUPABASE_PUBLISHABLE_KEY?.trim() || env.SUPABASE_ANON_KEY?.trim();
+  const anonKey = env.SUPABASE_PUBLISHABLE_KEY?.trim();
   if (!url || !anonKey) {
     return null;
   }
@@ -215,6 +213,54 @@ export async function signUpSupabaseUser(
   return {
     user: payload?.user ?? null,
   };
+}
+
+export async function sendPasswordResetEmail(
+  config: SupabaseSignupConfig,
+  email: string,
+  options: { redirectTo?: string } = {},
+): Promise<void> {
+  const url = `${cleanUrl(config.url)}/auth/v1/recover`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: toPublicJsonHeaders(config.anonKey),
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+      redirect_to: options.redirectTo || undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`password_reset_email_failed:${message}`);
+  }
+}
+
+export async function resetPasswordWithAccessToken(
+  config: SupabaseSignupConfig,
+  accessToken: string,
+  newPassword: string,
+): Promise<void> {
+  const token = accessToken.trim();
+  if (!token) {
+    throw new Error('access_token_required');
+  }
+
+  const url = `${cleanUrl(config.url)}/auth/v1/user`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: toPublicJsonHeaders(config.anonKey, {
+      Authorization: `Bearer ${token}`,
+    }),
+    body: JSON.stringify({
+      password: newPassword,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`password_reset_failed:${message}`);
+  }
 }
 
 export async function authenticateUserWithPassword(

@@ -6,16 +6,16 @@
  * Flow:
  * 1) Create account via /api/signup (with CSRF + cookie jar)
  * 2) Confirm created user via Supabase Admin API (email_confirm=true)
- * 3) Browser login via /login
+ * 3) Browser login via /app/login
  * 4) Browser logout
  * 5) Browser login again
- * 6) Browser create API key via /keys UI and read token from page
+ * 6) Browser create API key via /app/keys UI and read token from page
  * 7) Call MCP initialize + tools/call using the UI-created key
  *
  * Required env:
  *   E2E_BASE_URL
  *   SUPABASE_URL
- *   SUPABASE_SECRET_KEY (legacy alias: SUPABASE_SERVICE_ROLE_KEY)
+ *   SUPABASE_SECRET_KEY
  *
  * Optional env:
  *   E2E_EMAIL
@@ -30,8 +30,7 @@
 const cfg = {
   baseUrl: requiredEnv('E2E_BASE_URL').replace(/\/+$/, ''),
   supabaseUrl: requiredEnv('SUPABASE_URL').replace(/\/+$/, ''),
-  supabaseServiceRoleKey:
-    process.env.SUPABASE_SECRET_KEY?.trim() || requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
+  supabaseServiceRoleKey: requiredEnv('SUPABASE_SECRET_KEY'),
   email:
     process.env.E2E_EMAIL?.trim().toLowerCase() ||
     `e2e-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`,
@@ -136,7 +135,7 @@ async function main() {
     return user.id;
   });
 
-  const apiToken = await step('Browser flow: login, logout/login, create key from /keys', async () => {
+  const apiToken = await step('Browser flow: login, logout/login, create key from /app/keys', async () => {
     const token = await getApiKeyFromBrowserUI(cfg.baseUrl, cfg.email, cfg.password, {
       headless: cfg.browserHeadless,
     });
@@ -226,14 +225,15 @@ async function getApiKeyFromBrowserUI(baseUrl, email, password, options = { head
   const page = await context.newPage();
 
   try {
-    await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${baseUrl}/app/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('#email', email);
     await page.fill('#password', password);
     await Promise.all([
-      page.waitForURL(/\/keys(?:\?|$)/, { timeout: 20_000 }),
+      page.waitForURL(/\/app\/onboarding(?:\?|$)/, { timeout: 20_000 }),
       page.click('#loginBtn'),
     ]);
 
+    await page.goto(`${baseUrl}/app/keys`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#loadKeysBtn', { timeout: 20_000 });
     const firstLoginSession = await page.evaluate(async () => {
       const response = await fetch('/api/session', { credentials: 'same-origin' });
@@ -245,16 +245,17 @@ async function getApiKeyFromBrowserUI(baseUrl, email, password, options = { head
     );
 
     await Promise.all([
-      page.waitForURL(/\/login(?:\?|$)/, { timeout: 20_000 }),
+      page.waitForURL(/\/app\/login(?:\?|$)/, { timeout: 20_000 }),
       page.click('#logoutBtn'),
     ]);
 
     await page.fill('#email', email);
     await page.fill('#password', password);
     await Promise.all([
-      page.waitForURL(/\/keys(?:\?|$)/, { timeout: 20_000 }),
+      page.waitForURL(/\/app\/onboarding(?:\?|$)/, { timeout: 20_000 }),
       page.click('#loginBtn'),
     ]);
+    await page.goto(`${baseUrl}/app/keys`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#createKeyBtn', { timeout: 20_000 });
 
     await page.fill('#newLabel', 'e2e-flow');
