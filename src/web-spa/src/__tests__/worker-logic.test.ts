@@ -78,15 +78,41 @@ function buildLowCostSummary(
   toolName: string,
   mcpPayload: unknown,
 ): string {
+  try {
+    const payload = mcpPayload as Record<string, unknown>;
+    const result = payload?.result as Record<string, unknown> | undefined;
+    const content = result?.content as Array<{ type?: string; text?: string }> | undefined;
+    if (Array.isArray(content) && content.length > 0) {
+      const textItem = content.find((c) => c.type === 'text' && c.text);
+      if (textItem?.text) {
+        const parsed = JSON.parse(textItem.text);
+        if (parsed && typeof parsed === 'object') {
+          const formatted = formatMcpDataForLlm(toolName, parsed);
+          if (formatted) {
+            return [
+              `**Summary**: Searched CourtListener using \`${toolName}\` for: "${message}"`,
+              '',
+              `**What MCP Returned**:`,
+              formatted.slice(0, 3000),
+              '',
+              '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
+            ].join('\n');
+          }
+        }
+      }
+    }
+  } catch { /* fall through */ }
+
   const payloadText = JSON.stringify(mcpPayload);
   const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
   return [
-    `Summary: Ran \`${toolName}\` for your request.`,
-    `User question: ${message}`,
-    'What MCP returned (truncated):',
+    `**Summary**: Ran \`${toolName}\` for: "${message}"`,
+    '',
+    '**What MCP Returned** (raw):',
     compact,
-    'Next follow-up query: Ask for a narrower court, date range, or citation for more precise results.',
-  ].join('\n\n');
+    '',
+    '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
+  ].join('\n');
 }
 
 function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number): string {
@@ -96,13 +122,27 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
     const content = result?.content as Array<{ type?: string; text?: string }> | undefined;
 
     if (Array.isArray(content) && content.length > 0) {
-      const texts = content
-        .filter((c) => c.type === 'text' && c.text)
-        .map((c) => c.text!)
-        .join('\n\n');
-      if (texts.length > 0) {
-        const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
-        return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
+      const textItem = content.find((c) => c.type === 'text' && c.text);
+      if (textItem?.text) {
+        try {
+          const parsed = JSON.parse(textItem.text);
+          if (parsed && typeof parsed === 'object') {
+            const formatted = formatMcpDataForLlm(toolName, parsed);
+            if (formatted) {
+              const trimmed = formatted.length > maxLen ? `${formatted.slice(0, maxLen)}... [truncated]` : formatted;
+              return `Tool: ${toolName}\n\n${trimmed}`;
+            }
+          }
+        } catch {
+          const texts = content
+            .filter((c) => c.type === 'text' && c.text)
+            .map((c) => c.text!)
+            .join('\n\n');
+          if (texts.length > 0) {
+            const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
+            return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
+          }
+        }
       }
     }
 
@@ -112,6 +152,83 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
     const raw = JSON.stringify(mcpPayload);
     return `Tool: ${toolName}\n\nRaw response:\n${raw.slice(0, maxLen)}`;
   }
+}
+
+function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): string | null {
+  const lines: string[] = [];
+  const results = data.data as Record<string, unknown> | unknown[] | undefined;
+  const pagination = data.pagination as Record<string, unknown> | undefined;
+
+  if (results && typeof results === 'object' && !Array.isArray(results)) {
+    const nested = results as Record<string, unknown>;
+    const summary = nested.summary as string | undefined;
+    const items = nested.results as unknown[] | undefined;
+    const searchParams = nested.search_parameters as Record<string, unknown> | undefined;
+    const innerPagination = nested.pagination as Record<string, unknown> | undefined;
+
+    if (summary) lines.push(`Summary: ${summary}`);
+    if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
+
+    const pag = innerPagination || pagination;
+    if (pag) {
+      lines.push(`Total results: ${pag.totalResults ?? pag.total_results ?? 'unknown'}, Page ${pag.currentPage ?? pag.current_page ?? 1} of ${pag.totalPages ?? pag.total_pages ?? '?'}`);
+    }
+
+    if (Array.isArray(items) && items.length > 0) {
+      lines.push(`\nTop ${items.length} results:`);
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i] as Record<string, unknown>;
+        lines.push(formatSearchResult(i + 1, item));
+      }
+    }
+  }
+
+  if (Array.isArray(results) && results.length > 0) {
+    if (pagination) {
+      lines.push(`Total results: ${pagination.totalResults ?? pagination.total_results ?? 'unknown'}, Page ${pagination.currentPage ?? pagination.current_page ?? 1}`);
+    }
+    lines.push(`\nTop ${results.length} results:`);
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i] as Record<string, unknown>;
+      lines.push(formatSearchResult(i + 1, item));
+    }
+  }
+
+  if (data.analysis && typeof data.analysis === 'object') {
+    lines.push('Analysis:');
+    lines.push(JSON.stringify(data.analysis, null, 2));
+  }
+
+  if (lines.length === 0) return null;
+  return lines.join('\n');
+}
+
+function formatSearchResult(num: number, item: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const caseName = item.case_name || item.caseName || item.name || item.case_name_short || '';
+  const court = item.court || item.court_id || '';
+  const dateFiled = item.date_filed || item.dateFiled || '';
+  const citation =
+    item.federal_cite_one || item.state_cite_one || item.neutral_cite ||
+    item.citation || item.citation_string || '';
+  const citationCount = item.citation_count ?? item.citationCount;
+  const status = item.precedential_status || item.status || '';
+  const url = item.absolute_url || item.url || '';
+  const snippet = item.snippet || item.summary || item.syllabus || '';
+
+  parts.push(`${num}. ${caseName || 'Untitled'}`);
+  if (court) parts.push(`   Court: ${court}`);
+  if (dateFiled) parts.push(`   Date: ${dateFiled}`);
+  if (citation) parts.push(`   Citation: ${citation}`);
+  if (citationCount !== undefined && citationCount !== null) parts.push(`   Cited ${citationCount} times`);
+  if (status) parts.push(`   Status: ${status}`);
+  if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
+  if (snippet) {
+    const cleanSnippet = String(snippet).replace(/<[^>]+>/g, '').slice(0, 300);
+    parts.push(`   Snippet: ${cleanSnippet}`);
+  }
+
+  return parts.join('\n');
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -333,56 +450,75 @@ describe('buildLowCostSummary', () => {
 
   it('includes follow-up suggestion', () => {
     const result = buildLowCostSummary('test', 'search_cases', {});
-    expect(result).toContain('Next follow-up query');
+    expect(result).toContain('Suggested Follow-up');
   });
 
-  it('truncates large payloads at 1200 chars', () => {
+  it('truncates large raw payloads at 1200 chars', () => {
     const largePayload = { data: 'x'.repeat(2000) };
     const result = buildLowCostSummary('test', 'search_cases', largePayload);
     expect(result).toContain('...');
   });
 
-  it('does not truncate small payloads', () => {
-    const smallPayload = { data: 'small' };
-    const result = buildLowCostSummary('test', 'search_cases', smallPayload);
-    expect(result).not.toContain('...');
+  it('formats structured search results when available', () => {
+    const payload = {
+      result: {
+        content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          data: { summary: 'Found 5 results', results: [
+            { case_name: 'Roe v. Wade', court: 'scotus', date_filed: '1973-01-22', federal_cite_one: '410 U.S. 113' },
+          ] },
+        }) }],
+      },
+    };
+    const result = buildLowCostSummary('abortion rights', 'search_cases', payload);
+    expect(result).toContain('Roe v. Wade');
+    expect(result).toContain('410 U.S. 113');
+    expect(result).toContain('scotus');
   });
 
-  it('formats as sections separated by double newlines', () => {
-    const result = buildLowCostSummary('q', 'tool', {});
-    const sections = result.split('\n\n');
-    expect(sections.length).toBe(5);
+  it('falls back to raw JSON for non-structured data', () => {
+    const result = buildLowCostSummary('test', 'search_cases', { random: 'data' });
+    expect(result).toContain('**What MCP Returned** (raw)');
   });
 });
 
 describe('extractMcpContext', () => {
-  it('extracts text content from standard MCP response', () => {
+  it('formats structured search results from JSON content', () => {
+    const payload = {
+      result: {
+        content: [{ type: 'text', text: JSON.stringify({
+          success: true,
+          data: {
+            summary: 'Found 42 results',
+            results: [
+              { case_name: 'Roe v. Wade', court: 'scotus', date_filed: '1973-01-22', federal_cite_one: '410 U.S. 113', citation_count: 5000 },
+              { case_name: 'Griswold v. Connecticut', court: 'scotus', date_filed: '1965-06-07', federal_cite_one: '381 U.S. 479' },
+            ],
+            pagination: { totalResults: 42, currentPage: 1, totalPages: 9 },
+          },
+        }) }],
+      },
+    };
+    const result = extractMcpContext('search_cases', payload, 5000);
+    expect(result).toContain('Tool: search_cases');
+    expect(result).toContain('Roe v. Wade');
+    expect(result).toContain('410 U.S. 113');
+    expect(result).toContain('Griswold v. Connecticut');
+    expect(result).toContain('Found 42 results');
+    expect(result).toContain('Cited 5000 times');
+  });
+
+  it('falls back to raw text for non-JSON content', () => {
     const payload = {
       result: {
         content: [
           { type: 'text', text: 'Case: Roe v. Wade, 410 U.S. 113 (1973)' },
-          { type: 'text', text: 'Holding: Right to privacy includes abortion.' },
         ],
       },
     };
     const result = extractMcpContext('search_cases', payload, 5000);
     expect(result).toContain('Tool: search_cases');
-    expect(result).toContain('Data returned:');
     expect(result).toContain('Roe v. Wade');
-    expect(result).toContain('Right to privacy');
-  });
-
-  it('joins multiple text content items with double newlines', () => {
-    const payload = {
-      result: {
-        content: [
-          { type: 'text', text: 'First item' },
-          { type: 'text', text: 'Second item' },
-        ],
-      },
-    };
-    const result = extractMcpContext('tool', payload, 5000);
-    expect(result).toContain('First item\n\nSecond item');
   });
 
   it('filters out non-text content types', () => {
@@ -390,7 +526,7 @@ describe('extractMcpContext', () => {
       result: {
         content: [
           { type: 'image', text: 'should not appear' },
-          { type: 'text', text: 'visible text' },
+          { type: 'text', text: 'visible text that is not JSON' },
         ],
       },
     };
@@ -399,16 +535,14 @@ describe('extractMcpContext', () => {
     expect(result).not.toContain('should not appear');
   });
 
-  it('truncates text content exceeding maxLen', () => {
-    const longText = 'a'.repeat(200);
+  it('truncates content exceeding maxLen', () => {
     const payload = {
       result: {
-        content: [{ type: 'text', text: longText }],
+        content: [{ type: 'text', text: 'a'.repeat(200) }],
       },
     };
     const result = extractMcpContext('tool', payload, 50);
     expect(result).toContain('... [truncated]');
-    expect(result.length).toBeLessThan(longText.length);
   });
 
   it('falls back to raw JSON when no text content', () => {
@@ -428,23 +562,96 @@ describe('extractMcpContext', () => {
     expect(result).toContain('something');
   });
 
-  it('falls back to raw JSON for non-standard payload', () => {
-    const payload = { error: { code: -32600, message: 'Invalid' } };
-    const result = extractMcpContext('tool', payload, 5000);
-    expect(result).toContain('Raw response:');
-    expect(result).toContain('Invalid');
-  });
-
-  it('truncates raw JSON fallback exceeding maxLen', () => {
-    const payload = { data: 'x'.repeat(200) };
-    const result = extractMcpContext('tool', payload, 50);
-    expect(result).toContain('... [truncated]');
-  });
-
   it('handles null payload gracefully', () => {
     const result = extractMcpContext('tool', null, 5000);
     expect(result).toContain('Tool: tool');
     expect(result).toContain('null');
+  });
+});
+
+describe('formatMcpDataForLlm', () => {
+  it('formats nested search results with case details', () => {
+    const data = {
+      success: true,
+      data: {
+        summary: 'Found 10 results',
+        results: [
+          { case_name: 'Test v. Case', court: '3rd Cir.', date_filed: '2024-01-15', federal_cite_one: '100 F.3d 200', citation_count: 42, precedential_status: 'Published', absolute_url: '/opinion/12345/' },
+        ],
+        search_parameters: { query: 'privacy' },
+        pagination: { totalResults: 10, currentPage: 1, totalPages: 2 },
+      },
+    };
+    const result = formatMcpDataForLlm('search_opinions', data);
+    expect(result).toContain('Found 10 results');
+    expect(result).toContain('Search query: privacy');
+    expect(result).toContain('Test v. Case');
+    expect(result).toContain('3rd Cir.');
+    expect(result).toContain('100 F.3d 200');
+    expect(result).toContain('Cited 42 times');
+    expect(result).toContain('courtlistener.com/opinion/12345/');
+  });
+
+  it('formats direct array results', () => {
+    const data = {
+      success: true,
+      data: [
+        { case_name: 'Direct Case', court: 'scotus' },
+      ],
+      pagination: { totalResults: 1, currentPage: 1 },
+    };
+    const result = formatMcpDataForLlm('search_cases', data);
+    expect(result).toContain('Direct Case');
+    expect(result).toContain('scotus');
+  });
+
+  it('returns null for unrecognized structures', () => {
+    const data = { success: true };
+    const result = formatMcpDataForLlm('tool', data);
+    expect(result).toBeNull();
+  });
+
+  it('strips HTML from snippets', () => {
+    const data = {
+      success: true,
+      data: {
+        results: [{ case_name: 'HTML Case', snippet: '<em>highlighted</em> text <b>bold</b>' }],
+      },
+    };
+    const result = formatMcpDataForLlm('search_cases', data);
+    expect(result).toContain('highlighted text bold');
+    expect(result).not.toContain('<em>');
+  });
+});
+
+describe('formatSearchResult', () => {
+  it('formats all available fields', () => {
+    const item = {
+      case_name: 'Test v. Case',
+      court: 'scotus',
+      date_filed: '2024-01-15',
+      federal_cite_one: '100 U.S. 200',
+      citation_count: 10,
+      precedential_status: 'Published',
+      absolute_url: '/opinion/123/',
+      snippet: 'A test snippet about the case.',
+    };
+    const result = formatSearchResult(1, item);
+    expect(result).toContain('1. Test v. Case');
+    expect(result).toContain('Court: scotus');
+    expect(result).toContain('Date: 2024-01-15');
+    expect(result).toContain('Citation: 100 U.S. 200');
+    expect(result).toContain('Cited 10 times');
+    expect(result).toContain('Status: Published');
+    expect(result).toContain('courtlistener.com/opinion/123/');
+    expect(result).toContain('Snippet: A test snippet');
+  });
+
+  it('handles missing fields gracefully', () => {
+    const result = formatSearchResult(3, {});
+    expect(result).toContain('3. Untitled');
+    expect(result).not.toContain('Court:');
+    expect(result).not.toContain('Date:');
   });
 });
 

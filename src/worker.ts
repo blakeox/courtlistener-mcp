@@ -294,10 +294,10 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
-const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.2-1b-instruct';
+const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.1-8b-instruct-fast';
 const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct-fast';
-const CHEAP_MODE_MAX_TOKENS = 350;
-const BALANCED_MODE_MAX_TOKENS = 800;
+const CHEAP_MODE_MAX_TOKENS = 600;
+const BALANCED_MODE_MAX_TOKENS = 1200;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -411,33 +411,78 @@ function buildLowCostSummary(
   toolName: string,
   mcpPayload: unknown,
 ): string {
+  // Try structured formatting first
+  try {
+    const payload = mcpPayload as Record<string, unknown>;
+    const result = payload?.result as Record<string, unknown> | undefined;
+    const content = result?.content as Array<{ type?: string; text?: string }> | undefined;
+    if (Array.isArray(content) && content.length > 0) {
+      const textItem = content.find((c) => c.type === 'text' && c.text);
+      if (textItem?.text) {
+        const parsed = JSON.parse(textItem.text);
+        if (parsed && typeof parsed === 'object') {
+          const formatted = formatMcpDataForLlm(toolName, parsed);
+          if (formatted) {
+            return [
+              `**Summary**: Searched CourtListener using \`${toolName}\` for: "${message}"`,
+              '',
+              `**What MCP Returned**:`,
+              formatted.slice(0, 3000),
+              '',
+              '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
+            ].join('\n');
+          }
+        }
+      }
+    }
+  } catch { /* fall through */ }
+
   const payloadText = JSON.stringify(mcpPayload);
   const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
   return [
-    `Summary: Ran \`${toolName}\` for your request.`,
-    `User question: ${message}`,
-    'What MCP returned (truncated):',
+    `**Summary**: Ran \`${toolName}\` for: "${message}"`,
+    '',
+    '**What MCP Returned** (raw):',
     compact,
-    'Next follow-up query: Ask for a narrower court, date range, or citation for more precise results.',
-  ].join('\n\n');
+    '',
+    '**Suggested Follow-up**: Try narrowing by court, date range, or specific citation for more targeted results.',
+  ].join('\n');
 }
 
-/** Extract key structured fields from MCP response to give the LLM cleaner context. */
+/**
+ * Extract and format key structured fields from MCP response for LLM consumption.
+ * Parses search results into a clean, readable text format instead of raw JSON.
+ */
 function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number): string {
   try {
     const payload = mcpPayload as Record<string, unknown>;
     const result = payload?.result as Record<string, unknown> | undefined;
     const content = result?.content as Array<{ type?: string; text?: string }> | undefined;
 
-    // Most MCP tools return result.content[].text with the actual data
+    // Try to parse structured data from content[].text
     if (Array.isArray(content) && content.length > 0) {
-      const texts = content
-        .filter((c) => c.type === 'text' && c.text)
-        .map((c) => c.text!)
-        .join('\n\n');
-      if (texts.length > 0) {
-        const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
-        return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
+      const textItem = content.find((c) => c.type === 'text' && c.text);
+      if (textItem?.text) {
+        try {
+          const parsed = JSON.parse(textItem.text);
+          if (parsed && typeof parsed === 'object') {
+            const formatted = formatMcpDataForLlm(toolName, parsed);
+            if (formatted) {
+              const trimmed = formatted.length > maxLen ? `${formatted.slice(0, maxLen)}... [truncated]` : formatted;
+              return `Tool: ${toolName}\n\n${trimmed}`;
+            }
+          }
+        } catch {
+          // Not JSON — use as-is
+          const texts = content
+            .filter((c) => c.type === 'text' && c.text)
+            .map((c) => c.text!)
+            .join('\n\n');
+          if (texts.length > 0) {
+            const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
+            return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
+          }
+        }
       }
     }
 
@@ -448,6 +493,95 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
     const raw = JSON.stringify(mcpPayload);
     return `Tool: ${toolName}\n\nRaw response:\n${raw.slice(0, maxLen)}`;
   }
+}
+
+/**
+ * Format structured MCP data into clean, readable text for the LLM.
+ * Handles search results, entity lookups, analyses, etc.
+ */
+function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): string | null {
+  const lines: string[] = [];
+
+  // Handle search results (search_cases, search_opinions, etc.)
+  const results = data.data as Record<string, unknown> | unknown[] | undefined;
+  const pagination = data.pagination as Record<string, unknown> | undefined;
+
+  // Search results with nested data.results pattern
+  if (results && typeof results === 'object' && !Array.isArray(results)) {
+    const nested = results as Record<string, unknown>;
+    const summary = nested.summary as string | undefined;
+    const items = nested.results as unknown[] | undefined;
+    const searchParams = nested.search_parameters as Record<string, unknown> | undefined;
+    const innerPagination = nested.pagination as Record<string, unknown> | undefined;
+
+    if (summary) lines.push(`Summary: ${summary}`);
+    if (searchParams?.query) lines.push(`Search query: ${searchParams.query}`);
+
+    const pag = innerPagination || pagination;
+    if (pag) {
+      lines.push(`Total results: ${pag.totalResults ?? pag.total_results ?? 'unknown'}, Page ${pag.currentPage ?? pag.current_page ?? 1} of ${pag.totalPages ?? pag.total_pages ?? '?'}`);
+    }
+
+    if (Array.isArray(items) && items.length > 0) {
+      lines.push(`\nTop ${items.length} results:`);
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i] as Record<string, unknown>;
+        lines.push(formatSearchResult(i + 1, item));
+      }
+    }
+  }
+
+  // Direct array of results
+  if (Array.isArray(results) && results.length > 0) {
+    if (pagination) {
+      lines.push(`Total results: ${pagination.totalResults ?? pagination.total_results ?? 'unknown'}, Page ${pagination.currentPage ?? pagination.current_page ?? 1}`);
+    }
+    lines.push(`\nTop ${results.length} results:`);
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i] as Record<string, unknown>;
+      lines.push(formatSearchResult(i + 1, item));
+    }
+  }
+
+  // Analysis results
+  if (data.analysis && typeof data.analysis === 'object') {
+    lines.push('Analysis:');
+    lines.push(JSON.stringify(data.analysis, null, 2));
+  }
+
+  // If we couldn't extract structured data, return null to fall back
+  if (lines.length === 0) return null;
+
+  return lines.join('\n');
+}
+
+/** Format a single search result into readable text. */
+function formatSearchResult(num: number, item: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const caseName = item.case_name || item.caseName || item.name || item.case_name_short || '';
+  const court = item.court || item.court_id || '';
+  const dateFiled = item.date_filed || item.dateFiled || '';
+  const citation =
+    item.federal_cite_one || item.state_cite_one || item.neutral_cite ||
+    item.citation || item.citation_string || '';
+  const citationCount = item.citation_count ?? item.citationCount;
+  const status = item.precedential_status || item.status || '';
+  const url = item.absolute_url || item.url || '';
+  const snippet = item.snippet || item.summary || item.syllabus || '';
+
+  parts.push(`${num}. ${caseName || 'Untitled'}`);
+  if (court) parts.push(`   Court: ${court}`);
+  if (dateFiled) parts.push(`   Date: ${dateFiled}`);
+  if (citation) parts.push(`   Citation: ${citation}`);
+  if (citationCount !== undefined && citationCount !== null) parts.push(`   Cited ${citationCount} times`);
+  if (status) parts.push(`   Status: ${status}`);
+  if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
+  if (snippet) {
+    const cleanSnippet = String(snippet).replace(/<[^>]+>/g, '').slice(0, 300);
+    parts.push(`   Snippet: ${cleanSnippet}`);
+  }
+
+  return parts.join('\n');
 }
 
 async function callMcpJsonRpc(
