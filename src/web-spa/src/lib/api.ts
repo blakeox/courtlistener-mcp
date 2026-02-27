@@ -310,6 +310,7 @@ export async function aiChat(args: {
   toolName?: string;
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;
+  history?: Array<{ role: string; content: string }>;
 }): Promise<z.infer<typeof aiChatSchema>> {
   const payload = await request<unknown>('/api/ai-chat', {
     method: 'POST',

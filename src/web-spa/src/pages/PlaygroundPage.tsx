@@ -367,6 +367,8 @@ function AiChatPanel(): React.JSX.Element {
   const [step, setStep] = React.useState<string | null>(null);
   const elapsed = useElapsedTimer(aiRunning);
   const cancelledRef = React.useRef(false);
+  // Conversation history for multi-turn chat
+  const [chatHistory, setChatHistory] = React.useState<Array<{ role: string; content: string }>>([]);
   React.useEffect(() => {
     return () => { cancelledRef.current = true; };
   }, []);
@@ -377,22 +379,31 @@ function AiChatPanel(): React.JSX.Element {
     setAiPrompt(preset.prompt);
   }
 
+  function clearConversation(): void {
+    setChatHistory([]);
+    setAiPrompt('');
+    aiStatus.setInfo('Conversation cleared. Start a new topic.');
+  }
+
   async function sendAiChat(): Promise<void> {
     if (!aiPrompt.trim()) { aiStatus.setError('Enter a prompt.'); return; }
     if (!token.trim()) { aiStatus.setError('Set a bearer token first (API Keys page).'); return; }
+    const currentPrompt = aiPrompt.trim();
     setAiRunning(true);
     setStep('① Initializing MCP session...');
-    append('user', aiPrompt);
+    append('user', currentPrompt);
+    setAiPrompt('');
     try {
       setStep('② Calling MCP tool...');
       const started = performance.now();
       const result = await aiChat({
-        message: aiPrompt,
+        message: currentPrompt,
         mcpToken: token,
         mcpSessionId: mcpSessionId || undefined,
         toolName: aiToolName,
         mode: aiMode,
         testMode: aiTestMode,
+        history: chatHistory,
       });
       if (cancelledRef.current) return;
       setStep('③ Processing AI response...');
@@ -400,10 +411,17 @@ function AiChatPanel(): React.JSX.Element {
       setMcpSessionId(result.session_id || mcpSessionId);
       setLastRawMcp(JSON.stringify(result.mcp_result, null, 2));
 
+      // Append to conversation history for next turn
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'user', content: currentPrompt },
+        { role: 'assistant', content: result.ai_response },
+      ]);
+
       const reasonText = result.tool_reason ? ` — ${result.tool_reason}` : '';
       append('system', `🔧 Tool: ${result.tool}${reasonText} | Mode: ${result.mode} | ${latencyMs}ms${result.fallback_used ? ' | ⚠️ AI fallback' : ''}`);
       append('assistant', result.ai_response);
-      aiStatus.setOk(`Response received in ${latencyMs}ms.`);
+      aiStatus.setOk(`Response received in ${latencyMs}ms. Reply below to continue the conversation.`);
     } catch (error) {
       if (cancelledRef.current) return;
       const message = toErrorMessage(error);
@@ -419,7 +437,7 @@ function AiChatPanel(): React.JSX.Element {
 
   return (
     <div className="two-col">
-      <Card title="AI Chat + MCP Tools" subtitle="Chat with AI that uses MCP tools to query CourtListener. 50 turns per account.">
+      <Card title="AI Chat + MCP Tools" subtitle="Multi-turn conversation with AI that uses MCP tools to query CourtListener. 50 turns per account.">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
           {AI_PRESETS.map((p) => (
             <Button key={p.label} variant="secondary" onClick={() => applyPreset(p)} style={{ fontSize: '0.85rem' }}>
@@ -427,8 +445,16 @@ function AiChatPanel(): React.JSX.Element {
             </Button>
           ))}
         </div>
+        {chatHistory.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '6px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '0.85rem', marginTop: '4px' }}>
+            <span>💬 {chatHistory.length / 2} turn{chatHistory.length > 2 ? 's' : ''} in conversation</span>
+            <Button variant="secondary" onClick={clearConversation} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+              New Conversation
+            </Button>
+          </div>
+        )}
       </Card>
-      <Card title="Send prompt">
+      <Card title={chatHistory.length > 0 ? 'Reply' : 'Send prompt'}>
         <form onSubmit={(e) => { e.preventDefault(); void sendAiChat(); }}>
           <FormField id="aiToolName" label="Tool">
             <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
@@ -443,8 +469,8 @@ function AiChatPanel(): React.JSX.Element {
             <input type="checkbox" checked={aiTestMode} onChange={(e) => setAiTestMode(e.target.checked)} />
             Deterministic test mode
           </label>
-          <FormField id="aiChatPrompt" label="Prompt">
-            <textarea id="aiChatPrompt" rows={4} value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+          <FormField id="aiChatPrompt" label={chatHistory.length > 0 ? 'Follow-up question' : 'Prompt'}>
+            <textarea id="aiChatPrompt" rows={chatHistory.length > 0 ? 2 : 4} value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={chatHistory.length > 0 ? 'Ask a follow-up question...' : 'Enter your legal research question...'} />
           </FormField>
           {step && (
             <div style={{ padding: '6px 10px', borderRadius: '6px', background: 'var(--color-info-bg, rgba(59,130,246,0.1))', color: 'var(--color-info, #3b82f6)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 500 }}>
@@ -452,7 +478,7 @@ function AiChatPanel(): React.JSX.Element {
             </div>
           )}
           <Button type="submit" disabled={aiRunning || tokenMissing}>
-            {aiRunning ? `Sending... (${elapsed}s)` : 'Send AI Chat'}
+            {aiRunning ? `Sending... (${elapsed}s)` : chatHistory.length > 0 ? 'Send Reply' : 'Send AI Chat'}
           </Button>
           <span className="hint" style={{ marginLeft: '8px' }}>⌘/Ctrl+Enter</span>
           <StatusBanner message={aiStatus.status} type={aiStatus.statusType} />

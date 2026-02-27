@@ -2014,6 +2014,7 @@ export default {
         toolName?: string;
         mode?: 'cheap' | 'balanced';
         testMode?: boolean;
+        history?: Array<{ role: string; content: string }>;
       }>(request);
       if (!body || !isPlainObject(body)) {
         return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
@@ -2045,6 +2046,15 @@ export default {
       const toolName = autoResult.tool;
       const toolReason = autoResult.reason;
       const priorSessionId = body?.mcpSessionId?.trim() || '';
+
+      // Parse conversation history (max 10 prior turns to stay within token limits)
+      const rawHistory = Array.isArray(body.history) ? body.history : [];
+      const conversationHistory = rawHistory
+        .filter((h): h is { role: string; content: string } =>
+          isPlainObject(h) && typeof h.role === 'string' && typeof h.content === 'string' &&
+          (h.role === 'user' || h.role === 'assistant'))
+        .slice(-10)
+        .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content.slice(0, 2000) }));
 
       if (!message) {
         return jsonError('message is required.', 400, 'missing_message');
@@ -2093,20 +2103,23 @@ export default {
         let fallbackUsed = true;
         if (env.AI && typeof env.AI.run === 'function') {
           const model = env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CF_AI_MODEL;
+          const systemPrompt = testMode
+            ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
+            : 'You are a legal research assistant having a multi-turn conversation. Keep response under 140 words. Use sections: Summary, What MCP Returned, Next Follow-up Query. Reference prior conversation context when relevant.';
+          const mcpContext = `User question: ${message}\n\nMCP tool used: ${toolName}\n\nMCP raw response JSON:\n${JSON.stringify(toolResult.payload).slice(0, mode === 'cheap' ? 3500 : 10000)}`;
+
+          // Build messages array with conversation history
+          const messages: Array<{ role: string; content: string }> = [
+            { role: 'system', content: systemPrompt },
+          ];
+          // Include prior turns so the LLM can reference earlier conversation
+          for (const turn of conversationHistory) {
+            messages.push(turn);
+          }
+          messages.push({ role: 'user', content: mcpContext });
+
           const completion = await env.AI.run(model, {
-            messages: [
-              {
-                role: 'system',
-                content:
-                  testMode
-                    ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
-                    : 'You are a legal research assistant. Keep response under 140 words. Use sections: Summary, What MCP Returned, Next Follow-up Query.',
-              },
-              {
-                role: 'user',
-                content: `User question: ${message}\n\nMCP tool used: ${toolName}\n\nMCP raw response JSON:\n${JSON.stringify(toolResult.payload).slice(0, mode === 'cheap' ? 3500 : 10000)}`,
-              },
-            ],
+            messages,
             max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
             temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.2,
           });
