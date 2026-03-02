@@ -2,29 +2,35 @@
 
 /**
  * ✅ MCP Server Validation Test Suite (TypeScript)
- * Tests the deployed Cloudflare Workers MCP server using the MCP protocol
+ * - Uses HTTP MCP transport when SERVER_URL is provided
+ * - Falls back to local stdio MCP transport otherwise
  */
 
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..', '..');
 
-const SERVER_URL =
-  process.env.SERVER_URL || 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp';
+const SERVER_URL = process.env.SERVER_URL?.trim();
 const MCP_REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
 
-function buildMcpRequestHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json, text/event-stream',
-    'MCP-Protocol-Version': '2024-11-05',
+interface MCPResponse {
+  jsonrpc?: string;
+  id?: number;
+  result?: {
+    serverInfo?: { name?: string; version?: string };
+    tools?: unknown[];
+    resources?: unknown[];
+    prompts?: unknown[];
+    content?: unknown[];
   };
-  if (MCP_REMOTE_BEARER_TOKEN) {
-    headers.Authorization = `Bearer ${MCP_REMOTE_BEARER_TOKEN}`;
-  }
-  return headers;
+  error?: {
+    code?: number;
+    message?: string;
+  };
 }
 
 interface TestCase {
@@ -47,23 +53,20 @@ interface TestCase {
   ) => boolean;
 }
 
-interface MCPResponse {
-  result?: {
-    serverInfo?: { name?: string; version?: string };
-    tools?: unknown[];
-    content?: unknown[];
+function buildMcpRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+    'MCP-Protocol-Version': '2024-11-05',
   };
-  error?: {
-    code?: number;
-    message?: string;
-  };
+  if (MCP_REMOTE_BEARER_TOKEN) {
+    headers.Authorization = `Bearer ${MCP_REMOTE_BEARER_TOKEN}`;
+  }
+  return headers;
 }
 
-async function testMCPServer(): Promise<boolean> {
-  console.log('🧪 Testing Legal MCP Server');
-  console.log('============================\n');
-
-  const tests: TestCase[] = [
+function getTests(): TestCase[] {
+  return [
     {
       name: 'Initialize Protocol',
       payload: {
@@ -81,7 +84,7 @@ async function testMCPServer(): Promise<boolean> {
           typeof result === 'object' &&
           result !== null &&
           'serverInfo' in result &&
-          (result as { serverInfo?: { name?: string } }).serverInfo?.name === 'Legal MCP Server'
+          typeof (result as { serverInfo?: { name?: string } }).serverInfo?.name === 'string'
         );
       },
     },
@@ -194,51 +197,168 @@ async function testMCPServer(): Promise<boolean> {
       },
     },
   ];
+}
 
-  let passed = 0;
-  const total = tests.length;
+async function sendHttpRequest(payload: object): Promise<{ ok: boolean; response: MCPResponse | null }> {
+  if (!SERVER_URL) {
+    throw new Error('SERVER_URL is required for HTTP transport');
+  }
 
-  for (const test of tests) {
-    console.log(`🔍 Testing: ${test.name}`);
+  const response = await fetch(SERVER_URL, {
+    method: 'POST',
+    headers: buildMcpRequestHeaders(),
+    body: JSON.stringify(payload),
+  });
 
-    try {
-      const response = await fetch(SERVER_URL, {
-        method: 'POST',
-        headers: buildMcpRequestHeaders(),
-        body: JSON.stringify(test.payload),
-      });
+  if (!response.ok) {
+    console.log(`  ❌ HTTP Error: ${response.status} ${response.statusText}`);
+    return { ok: false, response: null };
+  }
 
-      if (!response.ok) {
-        console.log(`  ❌ HTTP Error: ${response.status} ${response.statusText}`);
+  const jsonResponse = (await response.json()) as MCPResponse;
+  return { ok: true, response: jsonResponse };
+}
+
+function createStdioClient(): {
+  server: ChildProcess;
+  send: (payload: { id: number; [key: string]: unknown }) => Promise<MCPResponse>;
+  close: () => void;
+} {
+  const server = spawn('node', [join(projectRoot, 'dist/index.js')], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: projectRoot,
+  });
+
+  let buffer = '';
+  const pending = new Map<number, (response: MCPResponse) => void>();
+
+  server.stdout?.on('data', (data: Buffer) => {
+    buffer += data.toString();
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
         continue;
       }
 
-      const jsonResponse = (await response.json()) as MCPResponse;
-
-      // Check if the test expects an error
-      if (test.validate(jsonResponse.result, jsonResponse)) {
-        console.log(`  ✅ PASSED`);
-        passed++;
-
-        // Log some details for successful tests
-        if (jsonResponse.result?.tools && Array.isArray(jsonResponse.result.tools)) {
-          console.log(`     📋 Found ${jsonResponse.result.tools.length} tools`);
+      try {
+        const parsed = JSON.parse(trimmed) as MCPResponse;
+        if (typeof parsed.id === 'number') {
+          const resolve = pending.get(parsed.id);
+          if (resolve) {
+            pending.delete(parsed.id);
+            resolve(parsed);
+          }
         }
-        if (jsonResponse.result?.serverInfo) {
-          console.log(
-            `     🖥️ Server: ${jsonResponse.result.serverInfo.name} v${jsonResponse.result.serverInfo.version}`,
-          );
-        }
-        if (jsonResponse.error) {
-          console.log(`     ⚠️ Expected error: ${jsonResponse.error.message}`);
-        }
-      } else {
-        console.log(`  ❌ FAILED - Validation failed`);
-        console.log(`     Response:`, JSON.stringify(jsonResponse, null, 2));
+      } catch {
+        // Ignore non-JSON lines
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`  ❌ FAILED - ${errorMessage}`);
+    }
+  });
+
+  server.stderr?.on('data', () => {
+    // Server logs to stderr; keep output clean for test status lines.
+  });
+
+  const send = (payload: { id: number; [key: string]: unknown }): Promise<MCPResponse> => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pending.delete(payload.id);
+        reject(new Error(`Timeout waiting for response to request id=${payload.id}`));
+      }, 10000);
+
+      pending.set(payload.id, (response) => {
+        clearTimeout(timeout);
+        resolve(response);
+      });
+
+      server.stdin?.write(JSON.stringify(payload) + '\n');
+    });
+  };
+
+  const close = (): void => {
+    server.kill('SIGTERM');
+  };
+
+  return { server, send, close };
+}
+
+async function testMCPServer(): Promise<boolean> {
+  console.log('🧪 Testing Legal MCP Server');
+  console.log('============================\n');
+  console.log(SERVER_URL ? `Transport: HTTP (${SERVER_URL})\n` : 'Transport: Local stdio (dist/index.js)\n');
+
+  const tests = getTests();
+  let passed = 0;
+  const total = tests.length;
+
+  if (SERVER_URL) {
+    for (const test of tests) {
+      console.log(`🔍 Testing: ${test.name}`);
+      try {
+        const { ok, response } = await sendHttpRequest(test.payload);
+        if (!ok || response === null) {
+          continue;
+        }
+
+        if (test.validate(response.result, response)) {
+          console.log('  ✅ PASSED');
+          passed++;
+          if (response.result?.tools && Array.isArray(response.result.tools)) {
+            console.log(`     📋 Found ${response.result.tools.length} tools`);
+          }
+          if (response.result?.serverInfo) {
+            console.log(
+              `     🖥️ Server: ${response.result.serverInfo.name} v${response.result.serverInfo.version}`,
+            );
+          }
+          if (response.error) {
+            console.log(`     ⚠️ Expected error: ${response.error.message}`);
+          }
+        } else {
+          console.log('  ❌ FAILED - Validation failed');
+          console.log('     Response:', JSON.stringify(response, null, 2));
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.log(`  ❌ FAILED - ${errorMessage}`);
+      }
+    }
+  } else {
+    const client = createStdioClient();
+
+    try {
+      for (const test of tests) {
+        console.log(`🔍 Testing: ${test.name}`);
+        try {
+          const response = await client.send(test.payload);
+          if (test.validate(response.result, response)) {
+            console.log('  ✅ PASSED');
+            passed++;
+            if (response.result?.tools && Array.isArray(response.result.tools)) {
+              console.log(`     📋 Found ${response.result.tools.length} tools`);
+            }
+            if (response.result?.serverInfo) {
+              console.log(
+                `     🖥️ Server: ${response.result.serverInfo.name} v${response.result.serverInfo.version}`,
+              );
+            }
+            if (response.error) {
+              console.log(`     ⚠️ Expected error: ${response.error.message}`);
+            }
+          } else {
+            console.log('  ❌ FAILED - Validation failed');
+            console.log('     Response:', JSON.stringify(response, null, 2));
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.log(`  ❌ FAILED - ${errorMessage}`);
+        }
+      }
+    } finally {
+      client.close();
     }
   }
 
@@ -247,13 +367,12 @@ async function testMCPServer(): Promise<boolean> {
   if (passed === total) {
     console.log('🎉 All tests passed! MCP server is working correctly.');
     return true;
-  } else {
-    console.log('⚠️ Some tests failed. Please check the server implementation.');
-    return false;
   }
+
+  console.log('⚠️ Some tests failed. Please check the server implementation.');
+  return false;
 }
 
-// Additional function to test specific functionality
 async function testSpecificFunction(
   toolName: string,
   args: Record<string, unknown> = {},
@@ -271,22 +390,33 @@ async function testSpecificFunction(
   };
 
   try {
-    const response = await fetch(SERVER_URL, {
-      method: 'POST',
-      headers: buildMcpRequestHeaders(),
-      body: JSON.stringify(payload),
-    });
-
-    const result = (await response.json()) as MCPResponse;
-
-    if (result.error) {
-      console.log(`❌ Error: ${result.error.message}`);
-      return false;
+    if (SERVER_URL) {
+      const { ok, response } = await sendHttpRequest(payload);
+      if (!ok || response === null) {
+        return false;
+      }
+      if (response.error) {
+        console.log(`❌ Error: ${response.error.message}`);
+        return false;
+      }
+      console.log('✅ Success!');
+      console.log('Response:', JSON.stringify(response.result, null, 2));
+      return true;
     }
 
-    console.log(`✅ Success!`);
-    console.log('Response:', JSON.stringify(result.result, null, 2));
-    return true;
+    const client = createStdioClient();
+    try {
+      const response = await client.send(payload);
+      if (response.error) {
+        console.log(`❌ Error: ${response.error.message}`);
+        return false;
+      }
+      console.log('✅ Success!');
+      console.log('Response:', JSON.stringify(response.result, null, 2));
+      return true;
+    } finally {
+      client.close();
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.log(`❌ Failed: ${errorMessage}`);
@@ -294,23 +424,20 @@ async function testSpecificFunction(
   }
 }
 
-// Run tests
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length > 0 && args[0] === 'test-tool') {
-    // Test specific tool
     const toolName = args[1] || 'list_courts';
     const toolArgs = args[2] ? (JSON.parse(args[2]) as Record<string, unknown>) : {};
-    await testSpecificFunction(toolName, toolArgs);
+    const ok = await testSpecificFunction(toolName, toolArgs);
+    process.exit(ok ? 0 : 1);
   } else {
-    // Run full test suite
     const success = await testMCPServer();
     process.exit(success ? 0 : 1);
   }
 }
 
-// Check if this module is being run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
     console.error('Error running tests:', error);

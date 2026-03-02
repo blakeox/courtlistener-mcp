@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login, loginByAccessToken, requestPasswordReset, toErrorMessage } from '../lib/api';
 import { trackEvent } from '../lib/telemetry';
 import { useAuth } from '../lib/auth';
@@ -12,6 +12,7 @@ import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 export function LoginPage(): React.JSX.Element {
   useDocumentTitle('Login');
   const navigate = useNavigate();
+  const location = useLocation();
   const { refresh } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -20,6 +21,12 @@ export function LoginPage(): React.JSX.Element {
   const [busy, setBusy] = React.useState(false);
   const { status, statusType, setOk, setError, setInfo } = useStatus();
   const backoff = useRateLimitBackoff();
+  const postLoginPath = React.useMemo(() => {
+    const raw = new URLSearchParams(location.search).get('next')?.trim() || '';
+    if (!raw.startsWith('/')) return '/app/keys';
+    if (raw.startsWith('//')) return '/app/keys';
+    return raw;
+  }, [location.search]);
 
   React.useEffect(() => {
     if (isRecoveryHash()) {
@@ -47,7 +54,7 @@ export function LoginPage(): React.JSX.Element {
         await refresh();
         setOk('Email confirmed. Redirecting...');
         trackEvent('login_succeeded', { type: 'hash_token' });
-        setTimeout(() => navigate('/app/keys'), 200);
+        setTimeout(() => navigate(postLoginPath), 200);
       } catch (error) {
         if (cancelled) return;
         setError(toErrorMessage(error));
@@ -59,7 +66,7 @@ export function LoginPage(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [navigate, refresh]);
+  }, [navigate, postLoginPath, refresh]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -71,7 +78,7 @@ export function LoginPage(): React.JSX.Element {
       await refresh();
       setOk('Logged in. Redirecting...');
       trackEvent('login_succeeded', { type: 'password' });
-      setTimeout(() => navigate('/app/keys'), 200);
+      setTimeout(() => navigate(postLoginPath), 200);
     } catch (error) {
       const apiErr = error as { error_code?: string; message?: string; status?: number };
       if (apiErr.error_code === 'email_not_verified') {

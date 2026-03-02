@@ -9,7 +9,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = join(__dirname, '..');
+const projectRoot = join(__dirname, '..', '..');
 
 interface MCPRequest {
   jsonrpc: string;
@@ -145,4 +145,3 @@ testParameterFiltering().catch((error) => {
   console.error('Test failed:', error);
   process.exit(1);
 });
-

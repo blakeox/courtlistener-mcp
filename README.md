@@ -1,69 +1,30 @@
-# Legal MCP Server - CourtListener Integration
+# CourtListener MCP Server
 
-A **best practice Model Context Protocol (MCP) server** providing comprehensive
-access to legal case data via the CourtListener API. Built with enterprise-grade
-features including intelligent caching, structured logging, metrics collection,
-rate limiting, and robust error handling.
+Production-ready Model Context Protocol (MCP) server for CourtListener legal data.
+It exposes legal research tools over MCP (`stdio` and HTTP), with deployment-ready support for Cloudflare Workers, structured logging, caching, auth options, and CI testing.
 
-## 🏆 Production-Ready Features
+## What This Repository Provides
 
-This implementation demonstrates **MCP server best practices** and
-enterprise-grade features:
+- MCP server built on `@modelcontextprotocol/sdk`
+- 33 legal research tools backed by CourtListener API v4
+- Local runtime (`stdio`) and remote runtime (HTTP/Cloudflare Worker)
+- Optional auth layers: static bearer token, Supabase API-key auth, OIDC JWT
+- Built-in health checks and metrics endpoints for operations
+- Prebuilt MCP client config examples in [`configs/`](./configs)
 
-### 🏗️ **Modular Architecture**
+## Repository Structure
 
-- **Separation of concerns**: Clean module boundaries (config, cache, logger,
-  metrics, API client)
-- **Dependency injection**: Configurable components for different environments
-- **Type safety**: Comprehensive TypeScript interfaces and validation
-- **Testable design**: Each module is independently testable
-
-### 📊 **Performance & Reliability**
-
-- **Intelligent caching**: LRU cache with legal-specific TTL strategies
-- **Rate limiting**: Automatic API rate limiting with queue management
-- **Error handling**: Graceful degradation and detailed error context
-- **Health monitoring**: Real-time health checks and performance metrics
-
-### 🔍 **Observability**
-
-- **Structured logging**: JSON-formatted logs with contextual metadata
-- **Metrics collection**: Request rates, success rates, cache effectiveness
-- **Health endpoints**: HTTP endpoints for monitoring and debugging
-- **Performance tracking**: Response times and system resource usage
-
-### ⚙️ **Configuration Management**
-
-- **Environment-based config**: Flexible configuration via environment variables
-- **Validation**: Configuration validation with helpful error messages
-- **Multi-environment**: Development, staging, and production configurations
-- **Documentation**: Clear configuration examples and recommendations
-
-## 🎯 MCP Compliance
-
-This server strictly follows the
-[Model Context Protocol](https://modelcontextprotocol.io/) specification and the
-[official TypeScript SDK guidelines](https://github.com/modelcontextprotocol/typescript-sdk#writing-mcp-clients):
-
-- ✅ **Pure MCP Implementation** - No external APIs or separate applications
-- ✅ **Official SDK Patterns** - Uses `@modelcontextprotocol/sdk` with
-  recommended patterns
-- ✅ **Resources Support** - Implements dynamic resources for direct data access
-- ✅ **Proper Error Handling** - Implements McpError with appropriate ErrorCodes
-- ✅ **JSON Schema Validation** - Enhanced input schemas with validation
-  patterns
-- ✅ **Best Practice Structure** - Follows official server architecture
-  guidelines
-- ✅ **Graceful Startup/Shutdown** - Proper process management and signal
-  handling
-- ✅ **Comprehensive API Coverage** - Complete CourtListener API v4 integration
+- `src/` core server, tool handlers, API integration, worker runtime
+- `configs/` ready-to-use MCP client configs (Claude, Codex, Cursor, ChatGPT, etc.)
+- `docs/` deployment, testing, and operational documentation
+- `test/` unit/integration/e2e test suites
+- `scripts/` deployment helpers, diagnostics, inspector tooling, key management
 
 ## Quick Start
 
-### Option 1: Remote URL (Easiest — Nothing to Install)
+### 1. Use a deployed remote endpoint (fastest)
 
-If someone has already deployed the server to Cloudflare Workers, you just add a
-single URL to your MCP client config — **no install, no API key, nothing**:
+If an instance is already deployed:
 
 ```json
 {
@@ -75,36 +36,19 @@ single URL to your MCP client config — **no install, no API key, nothing**:
 }
 ```
 
-### Option 2: npx (Recommended for Self-Hosting)
+### 2. Run locally with `npx`
 
 ```bash
 npx courtlistener-mcp --setup
 ```
 
-This runs an interactive wizard that detects your MCP client and configures
-everything automatically. Alternatively, run directly:
+Or run directly:
 
 ```bash
 npx courtlistener-mcp
 ```
 
-### Option 3: Docker
-
-```bash
-# Copy the environment template
-cp .env.production .env
-
-# Edit .env with your settings
-# Then start the server
-docker compose -f docker-compose.prod.yml up -d
-```
-
-The Docker setup exposes:
-
-- **Port 3001**: Health check endpoint
-- **Port 3002**: HTTP/SSE transport for remote MCP clients
-
-### Option 4: From Source
+### 3. Run from source
 
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
@@ -114,908 +58,241 @@ pnpm build
 node dist/index.js
 ```
 
-### Deploy to Cloudflare Workers
-
-To host the MCP server on Cloudflare's edge network (so users only need a URL):
+### 4. Run with Docker
 
 ```bash
-# Clone and install
-git clone https://github.com/blakeox/courtlistener-mcp.git
-cd courtlistener-mcp && pnpm install
-
-# Set your CourtListener API key as a Cloudflare secret
-wrangler secret put COURTLISTENER_API_KEY
-
-# Optional: restrict access with a bearer token
-wrangler secret put MCP_AUTH_TOKEN
-
-# Run readiness checks (auth, secrets, endpoint handshake)
-pnpm run cloudflare:check
-
-# Deploy (runs checks first)
-pnpm run cloudflare:deploy
+cp .env.production .env
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-Your server is now live at
-`https://courtlistener-mcp.<subdomain>.workers.dev/mcp`. Share this URL with
-users — they add it to their MCP client and start querying legal data
-immediately.
+## MCP Client Configuration
 
-## Configuration
+Prebuilt configs are provided in [`configs/`](./configs):
 
-### Getting a CourtListener API Key
+- `claude-desktop.json`
+- `claude-desktop-remote.json`
+- `cursor.json`
+- `continue-dev.json`
+- `vscode-copilot.json`
+- `zed.json`
+- `openai-chatgpt.json`
+- `codex.json`
 
-1. Create an account at [courtlistener.com](https://www.courtlistener.com/)
-2. Go to Profile → API Keys
-3. Generate a new token
-4. Set it as `COURTLISTENER_API_KEY` in your environment
+For Codex specifically:
 
-The server works without an API key for public endpoints, but authenticated
-access provides higher rate limits.
+- [`configs/codex.json`](./configs/codex.json) for direct HTTP transport
+- [`mcp-config.json`](./mcp-config.json) for local/bridge variants used in development
 
-### Client Configuration
+## Tool Catalog (33)
 
-Pre-built configuration files for popular MCP clients are available in the
-[`configs/`](./configs/) directory:
+### Search and discovery
 
-- `claude-desktop.json` — Claude Desktop (local stdio)
-- `claude-desktop-remote.json` — Claude Desktop (remote streamable HTTP via
-  Cloudflare)
-- `cursor.json` — Cursor
-- `continue-dev.json` — Continue
-- `vscode-copilot.json` — VS Code GitHub Copilot
-- `zed.json` — Zed
-- `openai-chatgpt.json` — OpenAI ChatGPT
-- `codex.json` — Codex desktop/app
+- `search_opinions`
+- `search_cases`
+- `advanced_search`
+- `smart_search`
 
-Run `npx courtlistener-mcp --setup` to automatically configure your client, or
-copy the appropriate config manually.
+### Cases and opinions
 
-### Codex Integration
+- `get_case_details`
+- `get_related_cases`
+- `get_opinion_text`
+- `lookup_citation`
+- `analyze_case_authorities`
+- `analyze_legal_argument`
+- `get_citation_network`
+- `get_comprehensive_case_analysis`
 
-To connect this server in Codex, use either:
+### Courts and judges
 
-- [`configs/codex.json`](./configs/codex.json) for a direct streamable HTTP
-  connection, or
-- [`mcp-config.json`](./mcp-config.json) for local/bridge variants used during
-  development.
+- `list_courts`
+- `get_judges`
+- `get_judge`
+- `get_comprehensive_judge_profile`
+
+### Dockets and RECAP
+
+- `get_dockets`
+- `get_docket`
+- `get_docket_entries`
+- `get_recap_documents`
+- `get_recap_document`
+- `get_enhanced_recap_data`
+
+### Financial and parties
+
+- `get_financial_disclosures`
+- `get_financial_disclosure`
+- `get_financial_disclosure_details`
+- `get_parties_and_attorneys`
+
+### Analytics and monitoring
+
+- `get_visualization_data`
+- `get_bulk_data`
+- `get_bankruptcy_data`
+- `manage_alerts`
+- `validate_citations`
+
+### Oral arguments
+
+- `get_oral_arguments`
+- `get_oral_argument`
+
+For authoritative tool schema/arguments, use MCP `tools/list` from your client.
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- `pnpm`
+- CourtListener API token (recommended for higher limits)
+
+### Install and build
+
+```bash
+pnpm install
+pnpm build
+```
+
+### Run
+
+```bash
+pnpm run mcp
+```
 
 ### Diagnostics
 
 ```bash
-npx courtlistener-mcp --doctor
-```
-
-Checks Node.js version, API key, API connectivity, and dependencies.
-
-For all available options, run:
-
-```bash
-npx courtlistener-mcp --help
-```
-
-## Features
-
-### 📚 Core Legal Research Tools
-
-- **Case Search**: Advanced search with pagination, sorting, and filtering
-- **Case Details**: Comprehensive case information with full metadata
-- **Opinion Text**: Full legal opinion text with citations and formatting
-- **Citation Lookup**: Legal citation resolution and case finding
-- **Related Cases**: Citation network analysis and case relationships
-- **Court Information**: Complete court directory and jurisdictional data
-- **Legal Argument Analysis**: AI-assisted case law research and analysis
-
-### 🏛️ Comprehensive Court Data Access
-
-- **Dockets**: Case procedural information and docket entries
-- **Judges**: Judicial officer information, appointments, and career data
-- **Oral Arguments**: Audio recordings and argument metadata
-- **Financial Disclosures**: Judge conflict of interest analysis
-- **Parties & Attorneys**: Legal representation and party information
-- **RECAP Documents**: Full court filing access and document analysis
-
-### 📊 Advanced Research Features
-
-- **Advanced Search**: Multi-type search across all data types with filtering
-- **Bulk Data Access**: Efficient large dataset retrieval with auto-pagination
-- **Citation Networks**: Precedent mapping and influence analysis
-- **Case Authorities**: Legal authority analysis and citation patterns
-- **Visualization Data**: Network analysis and judicial analytics
-- **Real-time Alerts**: Legal development monitoring and notifications
-- **Bankruptcy Data**: Specialized bankruptcy court information
-
-### 🔧 Enhanced Functionality
-
-- **Smart Caching**: Legal-intelligent caching with age-based TTLs
-- **Pagination Support**: Comprehensive pagination with metadata
-- **Parameter Validation**: Enhanced input validation and error handling
-- **Bulk Operations**: Efficient handling of large datasets
-- **Research Insights**: Built-in analysis suggestions and tips
-
-## Available Tools (33 Total)
-
-### Core Research (7 tools)
-
-1. `search_cases` - Advanced case search with comprehensive filtering
-2. `get_case_details` - Detailed case information and metadata
-3. `get_opinion_text` - Full opinion text retrieval
-4. `lookup_citation` - Citation-based case lookup
-5. `get_related_cases` - Citation network and related case analysis
-6. `list_courts` - Court directory and jurisdictional information
-7. `analyze_legal_argument` - AI-assisted legal research and analysis
-
-### Comprehensive Data Access (11 tools)
-
-1. `get_dockets` - Case procedural information
-2. `get_docket` - Specific docket details
-3. `get_judges` - Judicial officer search
-4. `get_judge` - Individual judge information
-5. `get_oral_arguments` - Oral argument recordings
-6. `get_oral_argument` - Specific argument details
-7. `get_financial_disclosures` - Judge financial information
-8. `get_financial_disclosure` - Specific disclosure details
-9. `get_parties_and_attorneys` - Legal representation data
-10. `get_recap_documents` - Court document access
-11. `get_recap_document` - Individual document details
-
-### Advanced Features (7 tools)
-
-1. `advanced_search` - Multi-type search with enhanced filtering
-2. `get_bulk_data` - Large dataset retrieval
-3. `get_visualization_data` - Network analysis data
-4. `get_citation_network` - Citation relationship mapping
-5. `analyze_case_authorities` - Legal authority analysis
-6. `manage_alerts` - Real-time monitoring setup
-7. `get_bankruptcy_data` - Specialized bankruptcy information
-
-## � Testing & Quality Assurance
-
-### **Enhanced MCP Inspector Integration** 🆕
-
-This project features **enterprise-grade CI/CD integration** with the official
-MCP Inspector:
-
-#### **Comprehensive Testing Modes**
-
-```bash
-# Enhanced automated testing with performance monitoring
-npm run ci:test-inspector:enhanced
-
-# Extended testing including all 25 tools
-npm run ci:test-inspector:enhanced:extended
-
-# Visual regression testing of Inspector web interface
-npm run ci:test-inspector:visual
-
-# Performance benchmarking and analysis
-npm run ci:test-inspector:performance
-```
-
-#### **Advanced Features**
-
-- ✅ **Compatibility Matrix** - Tests across multiple Inspector & Node.js
-  versions
-- ✅ **Performance Analytics** - Detailed timing and success rate monitoring
-- ✅ **Visual Regression Testing** - Automated Inspector UI validation
-- ✅ **Categorized Testing** - Priority-based test execution
-  (Critical/High/Medium/Low)
-- ✅ **Multi-format Reporting** - JSON, Markdown, and JUnit reports
-- ✅ **GitHub Actions Integration** - Automated CI/CD with artifact collection
-
-### **Quick Testing**
-
-#### **Automated Test Suite**
-
-```bash
-# Complete validation test suite
-npm run test:mcp
-
-# Enhanced Inspector integration testing
-npm run ci:test-inspector:enhanced
-```
-
-#### **Visual Testing with MCP Inspector**
-
-```bash
-# Local development testing
-npm run inspect:local
-
-# Remote server testing
-npm run inspect:remote
-
-# Background testing
-npm run inspect
-```
-
-### **GitHub Actions CI/CD**
-
-The project includes **3 comprehensive GitHub Actions workflows**:
-
-1. **`ci.yml`** - Enhanced CI with Inspector integration testing
-2. **`release.yml`** - Release validation with extended Inspector testing
-3. **`performance.yml`** - Scheduled performance monitoring
-
-Each workflow includes:
-
-- Multi-version compatibility testing
-- Performance regression detection
-- Comprehensive reporting and artifact collection
-
-### Enhanced Configuration
-
-The server supports extensive configuration via environment variables:
-
-```bash
-# Production configuration example
-CACHE_ENABLED=true
-CACHE_TTL=600
-LOG_LEVEL=info
-LOG_FORMAT=json
-METRICS_ENABLED=true
-METRICS_PORT=3001
-NODE_ENV=production
-
-# Remote SSE gateway (Cloudflare Worker)
-# Keep upstream key only on Cloudflare (never in client configs)
-COURTLISTENER_API_KEY=your_courtlistener_api_key
-# Optional bearer token required by clients
-MCP_AUTH_TOKEN=your_shared_secret
-```
-
-### Health Monitoring
-
-When metrics are enabled, the server provides HTTP endpoints for monitoring:
-
-- **Health Check**: `GET http://localhost:3001/health`
-- **Metrics**: `GET http://localhost:3001/metrics`
-- **Cache Stats**: `GET http://localhost:3001/cache`
-
-Example health check response:
-
-```json
-{
-  "status": "healthy",
-  "checks": {
-    "uptime": { "status": "pass", "value": 3600 },
-    "failure_rate": { "status": "pass", "value": 0.02 },
-    "response_time": { "status": "pass", "value": 245 },
-    "cache_performance": { "status": "pass", "value": 0.67 }
-  },
-  "metrics": {
-    "requests_total": 1250,
-    "requests_successful": 1225,
-    "cache_hits": 837,
-    "average_response_time": 245
-  }
-}
-```
-
-## Usage
-
-### Running the MCP Server
-
-The server runs on stdio and communicates using the Model Context Protocol:
-
-```bash
-npm run mcp
-```
-
-### MCP Client Configuration
-
-Add this server to your MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "legal-mcp": {
-      "command": "node",
-      "args": ["/path/to/legal-mcp/dist/index.js"],
-      "env": {
-        "COURTLISTENER_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-## Multi-LLM Client Support
-
-### Supported Clients
-
-This MCP server works with any MCP-compatible client over **stdio** or **HTTP**
-transports:
-
-| Client                        | Transport    | Notes                            |
-| ----------------------------- | ------------ | -------------------------------- |
-| **Claude Desktop** (local)    | stdio        | Local connection, no auth needed |
-| **Claude Desktop** (remote)   | HTTP         | StreamableHTTP transport         |
-| **OpenAI ChatGPT**            | HTTP         | OAuth 2.1 authentication         |
-| **Cursor**                    | stdio        | Local connection                 |
-| **Continue.dev**              | stdio        | Local connection                 |
-| **Zed**                       | stdio        | Local connection                 |
-| **VS Code GitHub Copilot**    | stdio        | Local connection                 |
-| **Any MCP-compatible client** | stdio / HTTP | Both transports supported        |
-
-### Transport Modes
-
-**Stdio (default)** — For local MCP clients:
-
-```bash
-node dist/index.js
-```
-
-**HTTP (remote)** — For remote/web-based MCP clients:
-
-```bash
-node dist/index.js --http
-# or
-TRANSPORT=http node dist/index.js
-```
-
-### Client Configuration
-
-Pre-built configuration files for each supported client are available in the
-[`configs/`](./configs/) directory:
-
-- [`claude-desktop.json`](./configs/claude-desktop.json) — Claude Desktop
-  (stdio)
-- [`claude-desktop-remote.json`](./configs/claude-desktop-remote.json) — Claude
-  Desktop (remote)
-- [`openai-chatgpt.json`](./configs/openai-chatgpt.json) — OpenAI ChatGPT
-- [`codex.json`](./configs/codex.json) — Codex desktop/app
-- [`cursor.json`](./configs/cursor.json) — Cursor
-- [`continue-dev.json`](./configs/continue-dev.json) — Continue.dev
-- [`vscode-copilot.json`](./configs/vscode-copilot.json) — VS Code GitHub
-  Copilot
-- [`zed.json`](./configs/zed.json) — Zed
-
-### OAuth Setup (Remote Deployments)
-
-For HTTP transport with OAuth-enabled clients (e.g., ChatGPT), set the following
-environment variables:
-
-```bash
-OAUTH_ENABLED=true
-OAUTH_ISSUER_URL=https://your-deployment.example.com
-OAUTH_CLIENT_ID=your-client-id
-OAUTH_CLIENT_SECRET=your-client-secret
-```
-
-### Docker
-
-```bash
-# Stdio mode (default)
-docker compose up
-
-# HTTP mode
-docker compose --profile http up
-```
-
-## Available Tools
-
-This Legal MCP Server provides **33 comprehensive tools** for legal research
-through the CourtListener API:
-
-### Core Research Tools (7)
-
-1. **search_cases** - Search for legal cases using various criteria
-2. **get_case_details** - Get detailed information about specific cases
-3. **get_opinion_text** - Retrieve full text of legal opinions
-4. **lookup_citation** - Look up cases by legal citations
-5. **get_related_cases** - Find citing and related cases
-6. **list_courts** - Browse available courts and jurisdictions
-7. **analyze_legal_argument** - Analyze legal arguments with case support
-
-### Advanced Research Tools (18)
-
-1. **get_dockets** - Search dockets and case procedural history
-2. **get_docket** - Get specific docket with full details
-3. **get_judges** - Search judicial officers and appointments
-4. **get_judge** - Get individual judge information and career
-5. **get_oral_arguments** - Access oral argument recordings
-6. **get_oral_argument** - Get specific argument details
-7. **get_financial_disclosures** - Access judge financial disclosures
-8. **get_financial_disclosure** - Get specific disclosure details
-9. **get_parties_and_attorneys** - Research case participants and representation
-10. **get_recap_documents** - Search court documents and filings
-11. **get_recap_document** - Get specific document with full text
-12. **advanced_search** - Multi-type search across all data types
-13. **get_bulk_data** - Large dataset retrieval with pagination
-14. **get_visualization_data** - Network analysis and judicial analytics
-15. **get_citation_network** - Map case citation relationships
-16. **analyze_case_authorities** - Analyze cited authorities in cases
-17. **manage_alerts** - Set up legal monitoring alerts
-18. **get_bankruptcy_data** - Specialized bankruptcy court information
-
-## Tool Examples
-
-### Basic Case Search
-
-```json
-{
-  "name": "search_cases",
-  "arguments": {
-    "query": "privacy rights",
-    "court": "scotus",
-    "date_filed_after": "2020-01-01"
-  }
-}
-```
-
-### Get Case Details
-
-```json
-{
-  "name": "get_case_details",
-  "arguments": {
-    "cluster_id": 108713
-  }
-}
-```
-
-### Citation Lookup
-
-```json
-{
-  "name": "lookup_citation",
-  "arguments": {
-    "citation": "410 U.S. 113"
-  }
-}
-```
-
-### Financial Conflict Analysis
-
-```json
-{
-  "name": "get_financial_disclosures",
-  "arguments": {
-    "judge": "John Roberts",
-    "year": 2023
-  }
-}
-```
-
-### Citation Network Analysis
-
-```json
-{
-  "name": "get_citation_network",
-  "arguments": {
-    "opinion_id": 108713,
-    "depth": 2
-  }
-}
-```
-
-For complete tool documentation and parameters, use the MCP `tools/list` method
-
-## Remote Deployment (Cloudflare Workers)
-
-The server deploys to Cloudflare Workers using Durable Objects for per-session
-state management. Once deployed, users connect with a single URL — no local
-install required.
-
-- **Health**: `GET https://<subdomain>.workers.dev/health`
-- **MCP endpoint (primary)**: `https://<subdomain>.workers.dev/mcp`
-- **SSE compatibility endpoint**: `https://<subdomain>.workers.dev/sse`
-
-### Authentication
-
-Optional bearer-token auth can be enabled by setting `MCP_AUTH_TOKEN`:
-
-```bash
-wrangler secret put MCP_AUTH_TOKEN
-```
-
-When set, all MCP requests must include `Authorization: Bearer <token>`. When
-not set, the endpoint is open.
-
-Supabase-backed API-key auth is also supported for user management without
-storing query payloads:
-
-```bash
-wrangler secret put SUPABASE_URL
-wrangler secret put SUPABASE_PUBLISHABLE_KEY
-wrangler secret put SUPABASE_SECRET_KEY
-wrangler secret put SUPABASE_API_KEYS_TABLE  # optional, defaults to mcp_api_keys
-wrangler secret put MCP_UI_PUBLIC_ORIGIN     # optional, e.g. https://courtlistenermcp.blakeoxford.com
-wrangler secret put MCP_UI_INSECURE_COOKIES  # optional; set true only for local http dev
-```
-
-`SUPABASE_PUBLISHABLE_KEY` is used by `POST /api/signup` to trigger Supabase's
-standard email-confirmation flow. `SUPABASE_SECRET_KEY` is used for login
-validation, API key lifecycle operations, and audit logging.
-`MCP_UI_PUBLIC_ORIGIN` forces email confirmation links to resolve to your hosted
-UI instead of localhost defaults. `MCP_UI_INSECURE_COOKIES=true` disables
-`Secure` cookie attributes for localhost HTTP testing only; do not use it in
-production.
-
-When Supabase auth is configured, users authenticate with:
-
-- `Authorization: Bearer <user_api_key>`
-
-The Worker hashes the bearer token and validates key status in Supabase
-(`active`, `not revoked`, `not expired`). It does not write request prompts,
-tool inputs, or usage payloads to Supabase.
-
-Built-in web UI routes (same Worker):
-
-- `GET /app/*` (SPA routes: onboarding, signup, login, keys, console, account)
-- `GET /app/assets/spa.js` (bundled SPA JavaScript)
-- `GET /app/assets/spa.css` (bundled SPA styles)
-- Previous UI routes (`/`, `/signup`, `/login`, `/keys`, `/chat`) redirect to `/app/*`
-- `GET /api/session`
-- `POST /api/login`
-- `POST /api/login/token` (automatic session exchange for Supabase email-confirm
-  hash tokens)
-- `POST /api/logout`
-- `POST /api/signup`
-- `GET /api/keys`
-- `POST /api/keys`
-- `POST /api/keys/revoke`
-
-Deprecated endpoint `POST /api/signup/issue-key` has been removed.
-
-Optional signup bot-protection (Turnstile):
-
-```bash
-wrangler secret put TURNSTILE_SITE_KEY
-wrangler secret put TURNSTILE_SECRET_KEY
-```
-
-When `TURNSTILE_SECRET_KEY` is set, `/api/signup` requires a valid Turnstile
-token.
-
-Schema reference:
-[`docs/supabase/mcp-auth-schema.sql`](docs/supabase/mcp-auth-schema.sql) Audit
-schema reference:
-[`docs/supabase/mcp-audit-logs.sql`](docs/supabase/mcp-audit-logs.sql)
-
-Recommended setup flow:
-
-1. Run `docs/supabase/mcp-auth-schema.sql` in Supabase SQL editor.
-2. Create account at `/app/signup`, verify email, then login via `/api/login` (or UI
-   on `/app/login`).
-3. Create your first key from `/app/keys` (or via `/api/keys` while logged in).
-4. Sign in with your first user account and run:
-   - `select public.bootstrap_first_admin();`
-5. Generate additional user API keys with:
-   - `select * from public.create_mcp_api_key('primary', now() + interval '90 days');`
-6. Revoke compromised keys with:
-   - `select public.revoke_mcp_api_key('<key-id-uuid>');`
-
-CLI alternative (service-role admin flow, no manual SQL):
-
-```bash
-# Create a key for a specific user id
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:create -- --user-id <auth_user_uuid> --label "prod-key" --expires-days 90
-
-# Revoke by key id
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:revoke -- --key-id <mcp_key_uuid>
-
-# Revoke by raw token
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:revoke -- --token <raw_token>
-
-# List keys (redacted hash preview)
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:list -- --active-only true --limit 100
-
-# List keys for one label only
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:list -- --label "prod-key" --limit 100
-
-# List keys by partial label match
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:list -- --label-contains "prod" --limit 100
-
-# List keys by expiration window
-SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
-pnpm run mcp:key:list -- --expires-before "2026-12-31T00:00:00Z" --expires-after "2026-01-01T00:00:00Z" --limit 100
-```
-
-OIDC JWT validation is also supported for remote deployments:
-
-```bash
-wrangler secret put OIDC_ISSUER
-wrangler secret put OIDC_AUDIENCE        # optional
-wrangler secret put OIDC_JWKS_URL        # optional
-wrangler secret put OIDC_REQUIRED_SCOPE  # optional
-```
-
-When OIDC is configured, the Worker accepts tokens from either:
-
-- `Authorization: Bearer <jwt>`
-- `CF-Access-Jwt-Assertion: <jwt>` (Cloudflare Access)
-
-If OIDC, Supabase, and static token auth are all configured, runtime selection
-is controlled by: `MCP_AUTH_PRIMARY` (default: `supabase` when configured) with
-optional static fallback only when explicitly enabled.
-
-Auth policy controls:
-
-```bash
-# Optional explicit primary auth backend (supabase | oidc | static)
-wrangler secret put MCP_AUTH_PRIMARY
-
-# Optional migration-only fallback. Default is disabled.
-wrangler secret put MCP_ALLOW_STATIC_FALLBACK
-```
-
-Recommended production posture:
-
-- Set `MCP_AUTH_PRIMARY=supabase`
-- Remove `MCP_AUTH_TOKEN` after migration
-- Leave `MCP_ALLOW_STATIC_FALLBACK` unset (or set to `false`)
-- In Supabase Auth settings, enable leaked-password protection and email
-  confirmation
-
-### CORS and Protocol Guards
-
-For browser-based MCP clients, you can restrict cross-origin access:
-
-```bash
-# Comma-separated allow-list; when omitted, any origin is accepted
-wrangler secret put MCP_ALLOWED_ORIGINS
-```
-
-You can also require the protocol header on MCP POST requests:
-
-```bash
-wrangler secret put MCP_REQUIRE_PROTOCOL_VERSION
-```
-
-Set it to `true` to enforce `MCP-Protocol-Version`.
-
-### Auth Failure Rate Limiting
-
-The Worker applies edge-side rate limiting for repeated failed authentication
-attempts on `/mcp` and `/sse` to reduce brute-force attacks.
-
-```bash
-# Optional controls (defaults shown)
-wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED         # default true
-wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_MAX             # default 20
-wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS  # default 300
-wrangler secret put MCP_AUTH_FAILURE_RATE_LIMIT_BLOCK_SECONDS   # default 600
-```
-
-### UI API Rate Limiting
-
-Signup and key-management APIs are also edge-rate-limited:
-
-```bash
-wrangler secret put MCP_UI_RATE_LIMIT_ENABLED                   # default true
-wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_MAX                # default 8
-wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_WINDOW_SECONDS     # default 300
-wrangler secret put MCP_UI_SIGNUP_RATE_LIMIT_BLOCK_SECONDS      # default 900
-wrangler secret put MCP_UI_KEYS_RATE_LIMIT_MAX                  # default 120
-wrangler secret put MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS       # default 300
-wrangler secret put MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS        # default 300
-```
-
-Optional key TTL hard cap (applies to `/api/keys`):
-
-```bash
-wrangler secret put MCP_API_KEY_MAX_TTL_DAYS                    # default 90
-```
-
-### Deployment
-
-```bash
-# Set your CourtListener API key (stored server-side, never exposed to clients)
-wrangler secret put COURTLISTENER_API_KEY
-
-# Deploy to Cloudflare
-wrangler deploy
-```
-
-The `COURTLISTENER_API_KEY` stays on the server — clients never see it.
-
-### Cloudflare Readiness Check
-
-Use the built-in diagnostic before deploys and when troubleshooting:
-
-```bash
+pnpm run doctor
 pnpm run cloudflare:check
 ```
 
-It verifies Wrangler auth, required Worker config, required secrets, and live
-MCP initialize handshake against your configured route.
-
-## MCP Integration
-
-This server implements the
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) specification
-using the
-[official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk),
-enabling seamless integration with AI chat applications that support MCP.
-
-### How Chat Apps Connect
-
-1. **MCP Client Configuration**: Add this server to your MCP-compatible chat
-   application
-2. **Tool Discovery**: The app automatically discovers all 33 legal research
-   tools
-3. **Natural Language**: Ask legal questions naturally - the AI will use
-   appropriate tools
-4. **Rich Responses**: Get comprehensive legal data formatted for easy
-   understanding
-
-### Supported MCP Clients
-
-- Claude Desktop (Anthropic)
-- Continue.dev
-- Zed Editor
-- Any application implementing MCP protocol
-
-### Official MCP Resources
-
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
-- [TypeScript SDK Documentation](https://github.com/modelcontextprotocol/typescript-sdk)
-- [MCP Client Implementation Guide](https://github.com/modelcontextprotocol/typescript-sdk#writing-mcp-clients)
-
-## API Reference
-
-The server uses CourtListener's REST API v4 for all legal data. No additional
-APIs or services required.
-
-## Contributing
-
-Quick start for local development and CI simulation:
-
-- Prerequisites: Node 20+, pnpm, Docker (for act), optional: act
-- Common tasks (VS Code: "Run Task…"):
-  - 🔍 Type Check → runs `pnpm run typecheck`
-  - 🔨 Build TypeScript → runs `pnpm run build`
-  - 👀 Watch TypeScript → runs `pnpm run dev`
-  - 🧪 Run All Tests → runs unit + integration
-  - 🔍 MCP Inspector (Local) → quick local Inspector sanity check
-  - 📊 Analyze Test Coverage → local coverage analysis
-- NPM scripts (CLI):
-  - Unit: `pnpm run test:unit`
-  - Integration: `pnpm run test:integration`
-  - All tests: `pnpm test`
-  - Coverage reports: `pnpm run coverage`
-  - Enforce coverage thresholds: `pnpm run coverage:check`
-
-Run GitHub Actions locally with act (optional):
+## Deployment (Cloudflare Workers)
 
 ```bash
-# Install (macOS)
-brew install act
-
-# Run the main CI workflow
-act -W .github/workflows/ci.yml
-
-# Run a specific job (faster inner loop)
-act -W .github/workflows/ci.yml -j test
-
-# Simulate a pull request event
-act pull_request -W .github/workflows/ci.yml -j required-checks-gate
+pnpm install
+wrangler secret put COURTLISTENER_API_KEY
+# Optional shared token auth
+wrangler secret put MCP_AUTH_TOKEN
+pnpm run cloudflare:check
+pnpm run cloudflare:deploy
 ```
 
-Tips:
+Endpoints after deploy:
 
-- If act prompts for an image, pick a recent ubuntu image (or pass -P to pin
-  one)
-- Ensure Docker is running; act uses containers to mirror GitHub Actions runners
+- `GET /health`
+- `POST /mcp` (primary MCP endpoint)
+- `GET /sse` (SSE compatibility)
 
-**Rate Limiting**: CourtListener API has rate limits. Consider getting a free
-API token for higher limits.
+## Authentication Modes
 
-**Data Coverage**:
+### Static bearer token
 
-- Federal and state court opinions
-- Supreme Court cases back to 1754
-- Circuit and district court cases
-- Judge information and financial disclosures
-- Case parties, attorneys, and documents
-
-## Development
-
-### Project Structure
+Set `MCP_AUTH_TOKEN` secret. Clients send:
 
 ```text
-legal-mcp/
-├── src/
-│   └── index.ts          # Main MCP server implementation
-├── test/
-│   └── test-server.js    # Basic functionality tests
-├── dist/                 # Compiled TypeScript output
-└── README.md            # This file
+Authorization: Bearer <token>
 ```
 
-### Testing
+### Supabase API-key auth
 
-#### Automated Test Suite
+Set:
 
-Run the comprehensive MCP validation test suite:
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY`
+- `SUPABASE_API_KEYS_TABLE` (optional)
+- `MCP_UI_PUBLIC_ORIGIN` (optional)
+- `MCP_UI_INSECURE_COOKIES` (optional, local HTTP only)
+
+Schema files:
+
+- [`docs/supabase/mcp-auth-schema.sql`](./docs/supabase/mcp-auth-schema.sql)
+- [`docs/supabase/mcp-audit-logs.sql`](./docs/supabase/mcp-audit-logs.sql)
+
+Key management CLI:
 
 ```bash
-npm run test:mcp
-# Optional for authenticated deployments:
-# MCP_REMOTE_BEARER_TOKEN=your-token npm run test:mcp
+pnpm run mcp:key:create -- --user-id <auth_user_uuid> --label "prod-key" --expires-days 90
+pnpm run mcp:key:list -- --active-only true --limit 100
+pnpm run mcp:key:revoke -- --key-id <mcp_key_uuid>
 ```
 
-Quick remote handshake test (useful for Codex/client onboarding):
+### OIDC JWT auth
+
+Set:
+
+- `OIDC_ISSUER`
+- `OIDC_AUDIENCE` (optional)
+- `OIDC_JWKS_URL` (optional)
+- `OIDC_REQUIRED_SCOPE` (optional)
+
+### Supabase OAuth Server consent UI
+
+If Supabase OAuth Server is enabled for your project, configure:
+
+- **Site URL**: your deployed app origin (for example `https://courtlistenermcp.blakeoxford.com`)
+- **Authorization Path**: `/oauth/consent`
+
+This repository now implements `GET/POST /oauth/consent` in the Cloudflare Worker:
+
+- renders a first-party consent page for third-party OAuth apps
+- supports approve/deny actions
+- redirects back to the OAuth client via Supabase authorization redirects
+
+## Runtime and Observability
+
+When metrics are enabled, local server endpoints include:
+
+- `GET http://localhost:3001/health`
+- `GET http://localhost:3001/metrics`
+- `GET http://localhost:3001/cache`
+
+Useful runtime variables:
+
+- `CACHE_ENABLED`
+- `CACHE_TTL`
+- `LOG_LEVEL`
+- `LOG_FORMAT`
+- `METRICS_ENABLED`
+- `METRICS_PORT`
+- `NODE_ENV`
+
+## Testing
+
+### Core tests
 
 ```bash
-pnpm run mcp:test:remote
-# Optional for authenticated deployments:
-# MCP_REMOTE_BEARER_TOKEN=your-token pnpm run mcp:test:remote
+pnpm run test:unit
+pnpm run test:integration
+pnpm test
+pnpm run coverage
+pnpm run coverage:check
 ```
 
-#### Visual Testing with MCP Inspector
-
-Launch the MCP Inspector web interface for interactive testing:
-
-**Test Remote Server (Recommended):**
+### MCP protocol and inspector
 
 ```bash
-npm run inspect
+pnpm run test:mcp
+pnpm run ci:test-inspector:enhanced
+pnpm run ci:test-inspector:enhanced:extended
+pnpm run ci:test-inspector:performance
 ```
 
-**Test Local Server:**
+### Optional local GitHub Actions simulation
 
 ```bash
-npm run inspect:local
+act -W .github/workflows/ci.yml
 ```
 
-The inspector provides a visual interface to:
+## Security and Contribution
 
-- Browse and test all available tools
-- View JSON-RPC protocol messages
-- Test with form inputs and see responses
-- Debug MCP protocol compliance
+- Security policy: [`SECURITY.md`](./SECURITY.md)
+- Contribution guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Architecture details: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 
-#### Test Specific Tools
+## License
 
-Test individual functions:
-
-```bash
-npm run test:mcp:tool search_cases '{"query":"privacy rights","court":"scotus","page_size":3}'
-npm run test:mcp:tool list_courts '{"jurisdiction":"F"}'
-# Optional for authenticated deployments:
-# MCP_REMOTE_BEARER_TOKEN=your-token npm run test:mcp:tool search_cases '{"query":"privacy rights"}'
-```
-
-#### Complete Test Suite
-
-Run all tests (unit, integration, and MCP validation):
-
-```bash
-npm test
-```
-
-For detailed testing documentation, see [TESTING.md](TESTING.md).
-
-### Contribution Guidelines
-
-This is a focused MCP server implementation following official guidelines.
-Contributions should:
-
-- Maintain strict MCP protocol compliance
-- Follow
-  [official TypeScript SDK patterns](https://github.com/modelcontextprotocol/typescript-sdk)
-- Add legal research functionality via CourtListener API only
-- Keep the codebase simple and maintainable per MCP best practices
-- Include comprehensive tests for new tools
-- Follow JSON schema validation patterns
-
-**References**:
-
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [MCP Client Guidelines](https://github.com/modelcontextprotocol/typescript-sdk#writing-mcp-clients)
-
-### License
-
-MIT License - see LICENSE file for details.
-
-**Note**: This is a pure MCP server focused on legal research capabilities. It
-integrates with chat applications through the MCP protocol only.
+MIT. See [`LICENSE`](./LICENSE).

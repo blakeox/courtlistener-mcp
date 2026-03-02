@@ -26,11 +26,13 @@ export interface SupabaseUser {
 export interface PasswordAuthResult {
   user: SupabaseUser;
   accessToken: string;
+  accessTokenExpiresAtMs: number | null;
 }
 
 export interface RecoveryExchangeResult {
   user: SupabaseUser;
   accessToken: string;
+  accessTokenExpiresAtMs: number | null;
 }
 
 export interface SupabaseApiKey {
@@ -76,6 +78,34 @@ interface SupabaseErrorPayload {
   message?: string;
   msg?: string;
 }
+
+export interface SupabaseOAuthAuthorizationClient {
+  id: string;
+  name: string;
+  uri: string;
+  logo_uri: string;
+}
+
+export interface SupabaseOAuthAuthorizationDetails {
+  authorization_id: string;
+  redirect_uri: string;
+  client: SupabaseOAuthAuthorizationClient;
+  user: {
+    id: string;
+    email: string;
+  };
+  scope: string;
+}
+
+export type SupabaseOAuthAuthorizationResult =
+  | {
+      type: 'details';
+      details: SupabaseOAuthAuthorizationDetails;
+    }
+  | {
+      type: 'redirect';
+      redirectUrl: string;
+    };
 
 function normalizeLabel(label: string | undefined): string | null {
   const trimmed = label?.trim();
@@ -126,6 +156,14 @@ function toIsoOrNull(expiresAt: string | undefined | null): string | null {
   const parsed = Date.parse(expiresAt);
   if (Number.isNaN(parsed)) return null;
   return new Date(parsed).toISOString();
+}
+
+function getAccessTokenExpiresAtMs(expiresInSeconds: number | undefined): number | null {
+  if (typeof expiresInSeconds !== 'number' || !Number.isFinite(expiresInSeconds)) {
+    return null;
+  }
+  const bounded = Math.max(30, Math.min(Math.floor(expiresInSeconds), 24 * 60 * 60));
+  return Date.now() + bounded * 1000;
 }
 
 function isKeyExpired(expiresAt: string | null): boolean {
@@ -297,6 +335,7 @@ export async function exchangeRecoveryTokenHash(
 
   const payload = (await response.json()) as {
     access_token?: string;
+    expires_in?: number;
     user?: SupabaseUser;
   };
   if (!payload.user?.id || !payload.access_token) {
@@ -306,6 +345,7 @@ export async function exchangeRecoveryTokenHash(
   return {
     user: payload.user,
     accessToken: payload.access_token,
+    accessTokenExpiresAtMs: getAccessTokenExpiresAtMs(payload.expires_in),
   };
 }
 
@@ -346,6 +386,7 @@ export async function authenticateUserWithPassword(
 
   const payload = (await response.json()) as {
     access_token?: string;
+    expires_in?: number;
     user?: SupabaseUser;
   };
 
@@ -356,6 +397,7 @@ export async function authenticateUserWithPassword(
   return {
     user: payload.user,
     accessToken: payload.access_token,
+    accessTokenExpiresAtMs: getAccessTokenExpiresAtMs(payload.expires_in),
   };
 }
 
@@ -379,6 +421,7 @@ export async function authenticateUserWithAnonKey(
 
   const payload = (await response.json()) as {
     access_token?: string;
+    expires_in?: number;
     user?: SupabaseUser;
   };
 
@@ -389,7 +432,123 @@ export async function authenticateUserWithAnonKey(
   return {
     user: payload.user,
     accessToken: payload.access_token,
+    accessTokenExpiresAtMs: getAccessTokenExpiresAtMs(payload.expires_in),
   };
+}
+
+export async function getOAuthAuthorizationDetails(
+  config: SupabaseSignupConfig,
+  accessToken: string,
+  authorizationId: string,
+): Promise<SupabaseOAuthAuthorizationResult> {
+  const token = accessToken.trim();
+  const normalizedAuthorizationId = authorizationId.trim();
+  if (!token) {
+    throw new Error('access_token_required');
+  }
+  if (!normalizedAuthorizationId) {
+    throw new Error('authorization_id_required');
+  }
+
+  const url =
+    `${cleanUrl(config.url)}/auth/v1/oauth/authorizations/` +
+    encodeURIComponent(normalizedAuthorizationId);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: toPublicJsonHeaders(config.anonKey, {
+      Authorization: `Bearer ${token}`,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`oauth_authorization_details_failed:${message}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  if (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'redirect_url' in payload &&
+    typeof (payload as { redirect_url?: unknown }).redirect_url === 'string' &&
+    (payload as { redirect_url: string }).redirect_url
+  ) {
+    return {
+      type: 'redirect',
+      redirectUrl: (payload as { redirect_url: string }).redirect_url,
+    };
+  }
+
+  const detailsPayload = payload as {
+    authorization_id?: string;
+    redirect_uri?: string;
+    client?: SupabaseOAuthAuthorizationClient;
+    user?: { id?: string; email?: string };
+    scope?: string;
+  };
+  if (
+    !detailsPayload.authorization_id ||
+    !detailsPayload.redirect_uri ||
+    !detailsPayload.client?.id ||
+    !detailsPayload.client?.name ||
+    !detailsPayload.user?.id ||
+    typeof detailsPayload.scope !== 'string'
+  ) {
+    throw new Error('oauth_authorization_details_failed:invalid_payload');
+  }
+
+  return {
+    type: 'details',
+    details: {
+      authorization_id: detailsPayload.authorization_id,
+      redirect_uri: detailsPayload.redirect_uri,
+      client: detailsPayload.client,
+      user: {
+        id: detailsPayload.user.id,
+        email: detailsPayload.user.email || '',
+      },
+      scope: detailsPayload.scope,
+    },
+  };
+}
+
+export async function submitOAuthAuthorizationConsent(
+  config: SupabaseSignupConfig,
+  accessToken: string,
+  authorizationId: string,
+  action: 'approve' | 'deny',
+): Promise<{ redirectUrl: string }> {
+  const token = accessToken.trim();
+  const normalizedAuthorizationId = authorizationId.trim();
+  if (!token) {
+    throw new Error('access_token_required');
+  }
+  if (!normalizedAuthorizationId) {
+    throw new Error('authorization_id_required');
+  }
+
+  const url =
+    `${cleanUrl(config.url)}/auth/v1/oauth/authorizations/` +
+    `${encodeURIComponent(normalizedAuthorizationId)}/consent`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: toPublicJsonHeaders(config.anonKey, {
+      Authorization: `Bearer ${token}`,
+    }),
+    body: JSON.stringify({ action }),
+  });
+
+  if (!response.ok) {
+    const message = await readSupabaseError(response);
+    throw new Error(`oauth_authorization_consent_failed:${message}`);
+  }
+
+  const payload = (await response.json()) as { redirect_url?: string };
+  if (!payload.redirect_url) {
+    throw new Error('oauth_authorization_consent_failed:missing_redirect_url');
+  }
+
+  return { redirectUrl: payload.redirect_url };
 }
 
 export async function createApiKeyForUser(

@@ -64,6 +64,9 @@ import {
   revokeApiKeyForUser,
   sendPasswordResetEmail,
   signUpSupabaseUser,
+  getOAuthAuthorizationDetails,
+  submitOAuthAuthorizationConsent,
+  type SupabaseOAuthAuthorizationDetails,
 } from './server/supabase-management.js';
 import { SPA_BUILD_ID, SPA_CSS, SPA_JS } from './web/spa-assets.js';
 import { renderSpaShellHtml } from './web/spa-shell.js';
@@ -258,6 +261,13 @@ interface SessionRevocationRequestBody {
   revokeUntilMs?: number;
 }
 
+interface SessionTokenRequestBody {
+  action: 'session_store_token' | 'session_get_token' | 'session_clear_token';
+  nowMs: number;
+  token?: string;
+  tokenExpiresAtMs?: number;
+}
+
 interface AuthFailureLimiterResponseBody {
   blocked: boolean;
   retryAfterSeconds: number;
@@ -266,6 +276,11 @@ interface AuthFailureLimiterResponseBody {
 
 interface SessionRevocationResponseBody {
   revoked: boolean;
+}
+
+interface SessionTokenResponseBody {
+  hasToken: boolean;
+  token: string | null;
 }
 
 interface LifetimeQuotaRequestBody {
@@ -896,6 +911,113 @@ function htmlResponse(html: string, nonce: string, extraHeaders?: HeadersInit): 
   });
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeExternalHttpUrl(value: string | null | undefined): string | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function renderOAuthConsentHtml(
+  details: SupabaseOAuthAuthorizationDetails,
+  csrfToken: string,
+  nonce: string,
+): string {
+  const clientName = escapeHtml(details.client.name || 'OAuth Application');
+  const safeClientUri = sanitizeExternalHttpUrl(details.client.uri);
+  const safeClientLogoUri = sanitizeExternalHttpUrl(details.client.logo_uri);
+  const clientUri = escapeHtml(safeClientUri || '');
+  const clientLogoUri = escapeHtml(safeClientLogoUri || '');
+  const redirectUri = escapeHtml(details.redirect_uri);
+  const authorizationId = escapeHtml(details.authorization_id);
+  const scopeItems = details.scope
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((scope) => `<li><code>${escapeHtml(scope)}</code></li>`)
+    .join('');
+  const token = escapeHtml(csrfToken);
+  const logoMarkup = clientLogoUri
+    ? `<img src="${clientLogoUri}" alt="" width="64" height="64" style="border-radius:12px;border:1px solid #d4d4d8;object-fit:cover;" />`
+    : '';
+  const homepageMarkup = clientUri
+    ? `<p class="meta"><strong>Website:</strong> <a href="${clientUri}" rel="noreferrer noopener" target="_blank">${clientUri}</a></p>`
+    : '';
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Authorize Application</title>
+    <style nonce="${nonce}">
+      :root { color-scheme: light; }
+      body { margin: 0; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f4f5; color: #111827; }
+      .wrap { max-width: 720px; margin: 48px auto; padding: 0 16px; }
+      .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 24px; box-shadow: 0 8px 28px rgba(17,24,39,0.06); }
+      .header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+      h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+      .meta { margin: 8px 0; color: #374151; }
+      .muted { color: #6b7280; font-size: 0.92rem; }
+      .scopes { margin: 10px 0 0; padding-left: 20px; }
+      .scopes li { margin: 6px 0; }
+      .panel { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-top: 12px; }
+      .actions { display: flex; gap: 10px; margin-top: 20px; }
+      button { border: 0; border-radius: 10px; padding: 10px 14px; font-size: 0.95rem; cursor: pointer; }
+      .allow { background: #065f46; color: #fff; }
+      .deny { background: #dc2626; color: #fff; }
+      .cancel { background: #e5e7eb; color: #111827; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; padding: 10px 14px; font-size: 0.95rem; }
+      code { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 1px 6px; }
+      @media (max-width: 520px) { .actions { flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <div class="header">
+          ${logoMarkup}
+          <div>
+            <h1>Authorize ${clientName}</h1>
+            <p class="muted">This app is requesting access to your CourtListener MCP account.</p>
+          </div>
+        </div>
+        ${homepageMarkup}
+        <div class="panel">
+          <p class="meta"><strong>Redirect URI:</strong> <code>${redirectUri}</code></p>
+          <p class="meta"><strong>Requested scopes:</strong></p>
+          <ul class="scopes">${scopeItems || '<li><code>none</code></li>'}</ul>
+        </div>
+        <form method="post" action="/oauth/consent">
+          <input type="hidden" name="authorization_id" value="${authorizationId}" />
+          <input type="hidden" name="csrf_token" value="${token}" />
+          <div class="actions">
+            <button class="allow" type="submit" name="decision" value="approve">Allow access</button>
+            <button class="deny" type="submit" name="decision" value="deny">Deny</button>
+            <a class="cancel" href="/app/onboarding">Cancel</a>
+          </div>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
 function redirectResponse(location: string, status = 302, extraHeaders?: HeadersInit): Response {
   const headers = new Headers({
     Location: location,
@@ -1195,8 +1317,8 @@ function getSessionRevocationStub(env: Env, sessionJti: string): DurableObjectSt
 async function callSessionRevocation(
   env: Env,
   sessionJti: string,
-  body: SessionRevocationRequestBody,
-): Promise<SessionRevocationResponseBody | null> {
+  body: SessionRevocationRequestBody | SessionTokenRequestBody,
+): Promise<SessionRevocationResponseBody | SessionTokenResponseBody | null> {
   const stub = getSessionRevocationStub(env, sessionJti);
   const response = await stub.fetch('https://auth-failure-limiter/internal', {
     method: 'POST',
@@ -1215,7 +1337,7 @@ async function isUiSessionRevoked(env: Env, sessionJti: string): Promise<boolean
     action: 'session_check',
     nowMs: Date.now(),
   });
-  return result?.revoked === true;
+  return Boolean(result && 'revoked' in result && result.revoked === true);
 }
 
 async function revokeUiSession(env: Env, sessionJti: string, expiresAtEpochSeconds: number): Promise<void> {
@@ -1227,6 +1349,47 @@ async function revokeUiSession(env: Env, sessionJti: string, expiresAtEpochSecon
     nowMs,
     revokeUntilMs,
   });
+}
+
+async function storeUiSessionSupabaseAccessToken(
+  env: Env,
+  sessionJti: string,
+  token: string,
+  tokenExpiresAtMs: number | null,
+): Promise<void> {
+  const nowMs = Date.now();
+  const fallbackExpiresAtMs = nowMs + 50 * 60 * 1000;
+  const response = await callSessionRevocation(env, sessionJti, {
+    action: 'session_store_token',
+    nowMs,
+    token,
+    tokenExpiresAtMs:
+      typeof tokenExpiresAtMs === 'number' && Number.isFinite(tokenExpiresAtMs)
+        ? tokenExpiresAtMs
+        : fallbackExpiresAtMs,
+  } satisfies SessionTokenRequestBody);
+  if (!response) {
+    throw new Error('session_token_store_failed');
+  }
+}
+
+async function getUiSessionSupabaseAccessToken(env: Env, sessionJti: string): Promise<string | null> {
+  const response = await callSessionRevocation(env, sessionJti, {
+    action: 'session_get_token',
+    nowMs: Date.now(),
+  } satisfies SessionTokenRequestBody);
+  if (!response || !('hasToken' in response)) {
+    return null;
+  }
+  const tokenResponse = response as SessionTokenResponseBody;
+  return tokenResponse.hasToken && tokenResponse.token ? tokenResponse.token : null;
+}
+
+async function clearUiSessionSupabaseAccessToken(env: Env, sessionJti: string): Promise<void> {
+  await callSessionRevocation(env, sessionJti, {
+    action: 'session_clear_token',
+    nowMs: Date.now(),
+  } satisfies SessionTokenRequestBody);
 }
 
 async function getUiSessionUserId(request: Request, secret: string): Promise<string | null> {
@@ -1328,7 +1491,10 @@ export class AuthFailureLimiterDO {
     }
 
     const body = await parseJsonBody<
-      AuthFailureLimiterRequestBody | SessionRevocationRequestBody | LifetimeQuotaRequestBody
+      | AuthFailureLimiterRequestBody
+      | SessionRevocationRequestBody
+      | SessionTokenRequestBody
+      | LifetimeQuotaRequestBody
     >(request);
     if (!body) {
       return Response.json({ error: 'invalid_request' }, { status: 400 });
@@ -1357,6 +1523,46 @@ export class AuthFailureLimiterDO {
       }
 
       return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
+    }
+
+    if (
+      body.action === 'session_store_token' ||
+      body.action === 'session_get_token' ||
+      body.action === 'session_clear_token'
+    ) {
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const tokenKey = 'ui_session_supabase_access_token';
+      const expiresAtKey = 'ui_session_supabase_access_token_expires_at_ms';
+
+      if (body.action === 'session_clear_token') {
+        await this.state.storage.delete(tokenKey);
+        await this.state.storage.delete(expiresAtKey);
+        return Response.json({ hasToken: false, token: null } satisfies SessionTokenResponseBody);
+      }
+
+      if (body.action === 'session_store_token') {
+        const token = typeof body.token === 'string' ? body.token.trim() : '';
+        if (!token) {
+          return Response.json({ error: 'invalid_token' }, { status: 400 });
+        }
+        const requestedExpiresAt =
+          typeof body.tokenExpiresAtMs === 'number' && Number.isFinite(body.tokenExpiresAtMs)
+            ? body.tokenExpiresAtMs
+            : nowMs + 50 * 60 * 1000;
+        const expiresAtMs = Math.max(nowMs + 1_000, requestedExpiresAt);
+        await this.state.storage.put(tokenKey, token);
+        await this.state.storage.put(expiresAtKey, expiresAtMs);
+        return Response.json({ hasToken: true, token } satisfies SessionTokenResponseBody);
+      }
+
+      const token = (await this.state.storage.get<string>(tokenKey)) ?? '';
+      const expiresAtMs = (await this.state.storage.get<number>(expiresAtKey)) ?? 0;
+      if (!token || expiresAtMs <= nowMs) {
+        if (token) await this.state.storage.delete(tokenKey);
+        if (expiresAtMs > 0) await this.state.storage.delete(expiresAtKey);
+        return Response.json({ hasToken: false, token: null } satisfies SessionTokenResponseBody);
+      }
+      return Response.json({ hasToken: true, token } satisfies SessionTokenResponseBody);
     }
 
     if (body.action === 'quota_increment_check') {
@@ -1736,6 +1942,135 @@ export default {
       return jsonError('Method not allowed', 405, 'method_not_allowed');
     }
 
+    if (url.pathname === '/oauth/consent') {
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, 'method_not_allowed');
+      }
+      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
+      if (uiOriginRejection) return uiOriginRejection;
+
+      const signupConfig = getSupabaseSignupConfig(env);
+      if (!signupConfig) {
+        return jsonError(
+          'Supabase public signup is not configured on this worker.',
+          503,
+          'supabase_signup_not_configured',
+        );
+      }
+
+      const sessionSecret = getUiSessionSecret(env);
+      if (!sessionSecret) {
+        return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
+      }
+
+      const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
+      const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
+      const sessionUserId = await getUiSessionUserId(request, sessionSecret);
+      const nextPathWithQuery = `${url.pathname}${url.search}`;
+
+      if (!parsedPayload || !sessionUserId || (await isUiSessionRevoked(env, parsedPayload.jti))) {
+        const loginUrl = new URL('/app/login', request.url);
+        loginUrl.searchParams.set('next', nextPathWithQuery);
+        return redirectResponse(loginUrl.toString(), 302);
+      }
+
+      const supabaseAccessToken = await getUiSessionSupabaseAccessToken(env, parsedPayload.jti);
+      if (!supabaseAccessToken) {
+        const loginUrl = new URL('/app/login', request.url);
+        loginUrl.searchParams.set('next', nextPathWithQuery);
+        return redirectResponse(loginUrl.toString(), 302);
+      }
+
+      if (request.method === 'GET') {
+        const authorizationId = url.searchParams.get('authorization_id')?.trim() || '';
+        if (!authorizationId) {
+          return jsonError('authorization_id is required.', 400, 'missing_authorization_id');
+        }
+
+        try {
+          const authorizationResult = await getOAuthAuthorizationDetails(
+            signupConfig,
+            supabaseAccessToken,
+            authorizationId,
+          );
+          if (authorizationResult.type === 'redirect') {
+            const safeRedirectUrl = sanitizeExternalHttpUrl(authorizationResult.redirectUrl);
+            if (!safeRedirectUrl) {
+              return jsonError('Invalid OAuth redirect URL.', 400, 'invalid_oauth_redirect');
+            }
+            return redirectResponse(safeRedirectUrl, 302);
+          }
+
+          const csrfToken = getCsrfTokenFromCookie(request) ?? generateRandomToken(24);
+          const nonce = generateCspNonce();
+          const setCookieHeader = getCsrfTokenFromCookie(request)
+            ? undefined
+            : buildCsrfCookie(csrfToken, isSecureCookieRequest(request, env));
+          return htmlResponse(
+            renderOAuthConsentHtml(authorizationResult.details, csrfToken, nonce),
+            nonce,
+            setCookieHeader ? { 'Set-Cookie': setCookieHeader } : undefined,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('access_token') || message.includes('401') || message.includes('403')) {
+            await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
+            const loginUrl = new URL('/app/login', request.url);
+            loginUrl.searchParams.set('next', nextPathWithQuery);
+            return redirectResponse(loginUrl.toString(), 302);
+          }
+          return jsonError('Failed to load authorization request.', 400, 'oauth_authorization_load_failed');
+        }
+      }
+
+      const form = await request.formData();
+      const authorizationId =
+        (typeof form.get('authorization_id') === 'string' ? (form.get('authorization_id') as string) : '')
+          .trim();
+      const decision =
+        (typeof form.get('decision') === 'string' ? (form.get('decision') as string) : '').trim();
+      const formCsrfToken =
+        (typeof form.get('csrf_token') === 'string' ? (form.get('csrf_token') as string) : '').trim();
+      const cookieCsrfToken = getCsrfTokenFromCookie(request) ?? '';
+
+      if (!authorizationId) {
+        return jsonError('authorization_id is required.', 400, 'missing_authorization_id');
+      }
+      if (decision !== 'approve' && decision !== 'deny') {
+        return jsonError('decision must be approve or deny.', 400, 'invalid_decision');
+      }
+      if (
+        !cookieCsrfToken ||
+        !formCsrfToken ||
+        !constantTimeEqual(cookieCsrfToken, formCsrfToken)
+      ) {
+        return jsonError('CSRF token validation failed.', 403, 'csrf_validation_failed');
+      }
+
+      try {
+        const consentResult = await submitOAuthAuthorizationConsent(
+          signupConfig,
+          supabaseAccessToken,
+          authorizationId,
+          decision,
+        );
+        const safeRedirectUrl = sanitizeExternalHttpUrl(consentResult.redirectUrl);
+        if (!safeRedirectUrl) {
+          return jsonError('Invalid OAuth redirect URL.', 400, 'invalid_oauth_redirect');
+        }
+        return redirectResponse(safeRedirectUrl, 302);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('access_token') || message.includes('401') || message.includes('403')) {
+          await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
+          const loginUrl = new URL('/app/login', request.url);
+          loginUrl.searchParams.set('next', nextPathWithQuery);
+          return redirectResponse(loginUrl.toString(), 302);
+        }
+        return jsonError('Failed to submit authorization decision.', 400, 'oauth_authorization_submit_failed');
+      }
+    }
+
     if (request.method === 'GET' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) {
       if (url.pathname.startsWith('/app/assets/')) {
         return jsonResponse({ error: 'Asset not found', error_code: 'asset_not_found' }, 404);
@@ -1839,6 +2174,15 @@ export default {
           return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
         const sessionToken = await createUiSessionToken(authResult.user.id, sessionSecret, 12 * 60 * 60);
+        const parsedSession = parseUiSessionToken(sessionToken);
+        if (parsedSession) {
+          await storeUiSessionSupabaseAccessToken(
+            env,
+            parsedSession.jti,
+            authResult.accessToken,
+            authResult.accessTokenExpiresAtMs,
+          );
+        }
         const secureCookies = isSecureCookieRequest(request, env);
         const responseHeaders = new Headers();
         responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
@@ -1897,6 +2241,15 @@ export default {
           return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
         }
         const sessionToken = await createUiSessionToken(user.id, sessionSecret, 12 * 60 * 60);
+        const parsedSession = parseUiSessionToken(sessionToken);
+        if (parsedSession) {
+          await storeUiSessionSupabaseAccessToken(
+            env,
+            parsedSession.jti,
+            accessToken,
+            Date.now() + 30 * 60 * 1000,
+          );
+        }
         const secureCookies = isSecureCookieRequest(request, env);
         const responseHeaders = new Headers();
         responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
@@ -2022,6 +2375,15 @@ export default {
         const sessionSecret = getUiSessionSecret(env);
         if (userId && sessionSecret) {
           const sessionToken = await createUiSessionToken(userId, sessionSecret, 12 * 60 * 60);
+          const parsedSession = parseUiSessionToken(sessionToken);
+          if (parsedSession && recoveryAccessToken) {
+            await storeUiSessionSupabaseAccessToken(
+              env,
+              parsedSession.jti,
+              recoveryAccessToken,
+              Date.now() + 30 * 60 * 1000,
+            );
+          }
           const secureCookies = isSecureCookieRequest(request, env);
           const responseHeaders = new Headers();
           responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
@@ -2058,6 +2420,7 @@ export default {
         const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
         if (parsedPayload) {
           await revokeUiSession(env, parsedPayload.jti, parsedPayload.exp);
+          await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
         }
       }
 
