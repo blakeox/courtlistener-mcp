@@ -1,11 +1,13 @@
 import type { OAuthConfig } from '../security/oidc.js';
 import { verifyAccessToken } from '../security/oidc.js';
 import { getSupabaseConfig, validateSupabaseApiKey } from './supabase-auth.js';
+import type { PrincipalContext } from '../infrastructure/principal-context.js';
 
 export interface WorkerSecurityEnv {
   MCP_AUTH_TOKEN?: string;
   MCP_AUTH_PRIMARY?: string;
   MCP_ALLOW_STATIC_FALLBACK?: string;
+  MCP_REQUIRE_PROTOCOL_VERSION?: string;
   MCP_ALLOWED_ORIGINS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
@@ -21,10 +23,19 @@ export interface WorkerSecurityDeps {
     token: string,
     cfg: OAuthConfig,
   ) => Promise<{ payload: Record<string, unknown> }>;
-  verifySupabaseApiKeyFn?: (token: string, env: WorkerSecurityEnv) => Promise<boolean>;
+  verifySupabaseApiKeyFn?: (
+    token: string,
+    env: WorkerSecurityEnv,
+  ) => Promise<boolean | { valid: boolean; userId?: string }>;
 }
 
-type AuthMethod = 'supabase' | 'oidc' | 'static';
+export type AuthMethod = 'supabase' | 'oidc' | 'static';
+export type McpRequestPrincipal = PrincipalContext;
+
+export interface McpAuthorizationResult {
+  authError: Response | null;
+  principal?: McpRequestPrincipal;
+}
 
 export function parseBoolean(value: string | undefined): boolean {
   if (!value) return false;
@@ -92,12 +103,9 @@ function jsonError(status: number, message: string, code: string): Response {
   return Response.json({ error: code, message }, { status });
 }
 
-function isAuthConfigured(env: WorkerSecurityEnv): boolean {
-  return Boolean(
-    getOidcConfig(env) ||
-      env.MCP_AUTH_TOKEN?.trim() ||
-      (env.SUPABASE_URL?.trim() && env.SUPABASE_SECRET_KEY?.trim()),
-  );
+function extractUserIdFromClaims(payload: Record<string, unknown>): string | undefined {
+  const subject = payload.sub;
+  return typeof subject === 'string' && subject.trim().length > 0 ? subject : undefined;
 }
 
 /**
@@ -110,11 +118,11 @@ function isAuthConfigured(env: WorkerSecurityEnv): boolean {
  * MCP_AUTH_PRIMARY (default: supabase when configured), with static fallback
  * only when MCP_ALLOW_STATIC_FALLBACK is true.
  */
-export async function authorizeMcpRequest(
+export async function authorizeMcpRequestWithPrincipal(
   request: Request,
   env: WorkerSecurityEnv,
   deps: WorkerSecurityDeps = {},
-): Promise<Response | null> {
+): Promise<McpAuthorizationResult> {
   const bearerToken = extractBearerToken(request.headers.get('Authorization'));
   const cfAccessJwt = request.headers.get('CF-Access-Jwt-Assertion')?.trim() || null;
   const staticToken = env.MCP_AUTH_TOKEN?.trim();
@@ -133,15 +141,14 @@ export async function authorizeMcpRequest(
   const verifyFn = deps.verifyAccessTokenFn ?? verifyAccessToken;
   const verifySupabaseFn =
     deps.verifySupabaseApiKeyFn ??
-    (async (token: string, securityEnv: WorkerSecurityEnv): Promise<boolean> => {
-      const config = getSupabaseConfig(securityEnv);
-      if (!config) return false;
-      const result = await validateSupabaseApiKey(token, config);
-      return result.valid;
+    (async (token: string): Promise<{ valid: boolean; userId?: string }> => {
+      if (!supabaseConfig) return { valid: false };
+      const result = await validateSupabaseApiKey(token, supabaseConfig);
+      return result;
     });
 
-  if (!isAuthConfigured(env)) {
-    return null;
+  if (configuredMethods.size === 0) {
+    return { authError: null };
   }
 
   const shouldTryOidc = preferredAuthMethod === 'oidc';
@@ -151,70 +158,113 @@ export async function authorizeMcpRequest(
     (staticTokenConfigured && allowStaticFallback);
 
   if (oidcConfig && shouldTryOidc) {
-    const jwtCandidates = [bearerToken, cfAccessJwt].filter(
-      (token): token is string => typeof token === 'string' && token.length > 0,
-    );
-    if (jwtCandidates.length > 0) {
-      let lastError: unknown;
-      for (const jwtCandidate of jwtCandidates) {
-        try {
-          await verifyFn(jwtCandidate, oidcConfig);
-          return null;
-        } catch (error) {
-          lastError = error;
-        }
+    let hasJwtCandidate = false;
+    let lastError: unknown;
+    if (bearerToken) {
+      hasJwtCandidate = true;
+      try {
+        const verified = await verifyFn(bearerToken, oidcConfig);
+        const userId = extractUserIdFromClaims(verified.payload);
+        return {
+          authError: null,
+          principal: {
+            authMethod: 'oidc',
+            ...(userId ? { userId } : {}),
+          },
+        };
+      } catch (error) {
+        lastError = error;
       }
+    }
+    if (cfAccessJwt && cfAccessJwt !== bearerToken) {
+      hasJwtCandidate = true;
+      try {
+        const verified = await verifyFn(cfAccessJwt, oidcConfig);
+        const userId = extractUserIdFromClaims(verified.payload);
+        return {
+          authError: null,
+          principal: {
+            authMethod: 'oidc',
+            ...(userId ? { userId } : {}),
+          },
+        };
+      } catch (error) {
+        lastError = error;
+      }
+    }
 
+    if (hasJwtCandidate) {
       if (!shouldTrySupabase && !shouldTryStatic) {
         const message =
           lastError instanceof Error ? lastError.message : 'token_verification_failed';
         if (message === 'insufficient_scope') {
-          return jsonError(403, 'Token missing required scope', 'insufficient_scope');
+          return {
+            authError: jsonError(403, 'Token missing required scope', 'insufficient_scope'),
+          };
         }
-        return jsonError(401, 'Invalid OIDC access token', 'invalid_token');
+        return { authError: jsonError(401, 'Invalid OIDC access token', 'invalid_token') };
       }
     } else if (!shouldTrySupabase && !shouldTryStatic) {
-      return jsonError(
-        401,
-        'Missing access token (Authorization: Bearer or CF-Access-Jwt-Assertion)',
-        'missing_token',
-      );
+      return {
+        authError: jsonError(
+          401,
+          'Missing access token (Authorization: Bearer or CF-Access-Jwt-Assertion)',
+          'missing_token',
+        ),
+      };
     }
   }
 
   if (supabaseConfig && shouldTrySupabase) {
     if (!bearerToken) {
       if (!shouldTryStatic) {
-        return jsonError(401, 'Missing bearer token', 'missing_token');
+        return { authError: jsonError(401, 'Missing bearer token', 'missing_token') };
       }
     } else {
       try {
-        const validSupabaseKey = await verifySupabaseFn(bearerToken, env);
-        if (validSupabaseKey) {
-          return null;
+        const supabaseResult = await verifySupabaseFn(bearerToken, env);
+        const normalizedResult =
+          typeof supabaseResult === 'boolean' ? { valid: supabaseResult } : supabaseResult;
+        if (normalizedResult.valid) {
+          return {
+            authError: null,
+            principal: {
+              authMethod: 'supabase',
+              ...(normalizedResult.userId ? { userId: normalizedResult.userId } : {}),
+            },
+          };
         }
       } catch {
         if (!shouldTryStatic) {
-          return jsonError(401, 'Invalid Supabase API key', 'invalid_token');
+          return { authError: jsonError(401, 'Invalid Supabase API key', 'invalid_token') };
         }
       }
 
       if (!shouldTryStatic) {
-        return jsonError(401, 'Invalid Supabase API key', 'invalid_token');
+        return { authError: jsonError(401, 'Invalid Supabase API key', 'invalid_token') };
       }
     }
   }
 
   if (staticToken && shouldTryStatic) {
     if (bearerToken === staticToken) {
-      return null;
+      return { authError: null, principal: { authMethod: 'static' } };
     }
     if (preferredAuthMethod === 'static' || allowStaticFallback) {
-      return jsonError(401, 'Invalid static bearer token', 'invalid_token');
+      return { authError: jsonError(401, 'Invalid static bearer token', 'invalid_token') };
     }
   }
 
-  return jsonError(401, 'Unauthorized', 'unauthorized');
+  return { authError: jsonError(401, 'Unauthorized', 'unauthorized') };
+}
+
+export async function authorizeMcpRequest(
+  request: Request,
+  env: WorkerSecurityEnv,
+  deps: WorkerSecurityDeps = {},
+): Promise<Response | null> {
+  const result = await authorizeMcpRequestWithPrincipal(request, env, deps);
+  return result.authError;
 }
 
 export function validateProtocolVersionHeader(

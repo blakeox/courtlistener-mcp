@@ -6,12 +6,24 @@
 import { Metrics } from '../types.js';
 import { Logger } from './logger.js';
 
+type OperationMetrics = {
+  requests_total: number;
+  requests_successful: number;
+  requests_failed: number;
+  cache_hits: number;
+  cache_misses: number;
+};
+
 export class MetricsCollector {
   private metrics: Metrics;
   private startTime: number;
   private logger: Logger;
   private responseTimes: number[] = [];
   private readonly maxResponseTimesSamples = 100;
+  private readonly maxOperationBreakdownEntries = 100;
+  private readonly overflowOperationBucket = 'other';
+  private readonly operationMetrics: Record<string, OperationMetrics> = {};
+  private operationBreakdownSize = 0;
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -31,15 +43,20 @@ export class MetricsCollector {
   /**
    * Record a successful request
    */
-  recordRequest(responseTime: number, fromCache = false): void {
+  recordRequest(responseTime: number, fromCache = false, operation = 'unknown'): void {
     this.metrics.requests_total++;
     this.metrics.requests_successful++;
     this.metrics.last_request_time = new Date().toISOString();
+    const operationMetrics = this.getOrCreateOperationMetrics(operation);
+    operationMetrics.requests_total++;
+    operationMetrics.requests_successful++;
 
     if (fromCache) {
       this.metrics.cache_hits++;
+      operationMetrics.cache_hits++;
     } else {
       this.metrics.cache_misses++;
+      operationMetrics.cache_misses++;
     }
 
     this.updateResponseTime(responseTime);
@@ -47,6 +64,7 @@ export class MetricsCollector {
     this.logger.debug('Request recorded', {
       responseTime,
       fromCache,
+      operation,
       totalRequests: this.metrics.requests_total,
     });
   }
@@ -54,15 +72,19 @@ export class MetricsCollector {
   /**
    * Record a failed request
    */
-  recordFailure(responseTime: number): void {
+  recordFailure(responseTime: number, operation = 'unknown'): void {
     this.metrics.requests_total++;
     this.metrics.requests_failed++;
     this.metrics.last_request_time = new Date().toISOString();
+    const operationMetrics = this.getOrCreateOperationMetrics(operation);
+    operationMetrics.requests_total++;
+    operationMetrics.requests_failed++;
 
     this.updateResponseTime(responseTime);
 
     this.logger.debug('Failed request recorded', {
       responseTime,
+      operation,
       totalRequests: this.metrics.requests_total,
       failureRate: this.getFailureRate(),
     });
@@ -71,15 +93,17 @@ export class MetricsCollector {
   /**
    * Record cache hit
    */
-  recordCacheHit(): void {
+  recordCacheHit(operation = 'unknown'): void {
     this.metrics.cache_hits++;
+    this.getOrCreateOperationMetrics(operation).cache_hits++;
   }
 
   /**
    * Record cache miss
    */
-  recordCacheMiss(): void {
+  recordCacheMiss(operation = 'unknown'): void {
     this.metrics.cache_misses++;
+    this.getOrCreateOperationMetrics(operation).cache_misses++;
   }
 
   /**
@@ -105,6 +129,7 @@ export class MetricsCollector {
     return {
       ...this.metrics,
       uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000),
+      operation_breakdown: { ...this.operationMetrics },
     };
   }
 
@@ -167,6 +192,32 @@ export class MetricsCollector {
     return this.metrics.cache_hits / totalCacheRequests;
   }
 
+  private getOrCreateOperationMetrics(operation: string): OperationMetrics {
+    if (this.operationMetrics[operation]) {
+      return this.operationMetrics[operation];
+    }
+
+    const shouldAggregateIntoOverflowBucket =
+      operation !== this.overflowOperationBucket &&
+      this.operationBreakdownSize >= this.maxOperationBreakdownEntries - 1;
+    const operationKey = shouldAggregateIntoOverflowBucket
+      ? this.overflowOperationBucket
+      : operation;
+
+    if (!this.operationMetrics[operationKey]) {
+      this.operationMetrics[operationKey] = {
+        requests_total: 0,
+        requests_successful: 0,
+        requests_failed: 0,
+        cache_hits: 0,
+        cache_misses: 0,
+      };
+      this.operationBreakdownSize++;
+    }
+
+    return this.operationMetrics[operationKey];
+  }
+
   /**
    * Get performance summary
    */
@@ -218,6 +269,10 @@ export class MetricsCollector {
       uptime_seconds: 0,
     };
     this.responseTimes = [];
+    Object.keys(this.operationMetrics).forEach((key) => {
+      delete this.operationMetrics[key];
+    });
+    this.operationBreakdownSize = 0;
     this.startTime = Date.now();
 
     this.logger.info('Metrics reset');

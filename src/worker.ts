@@ -27,11 +27,22 @@
 
 import { McpAgent } from 'agents/mcp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ErrorCode,
+  McpError,
+  type CallToolRequest,
+  type CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 
+import { generateId } from './common/utils.js';
 import { bootstrapServices } from './infrastructure/bootstrap.js';
 import { container } from './infrastructure/container.js';
-import { SERVER_CAPABILITIES } from './infrastructure/protocol-constants.js';
+import { runWithPrincipalContext } from './infrastructure/principal-context.js';
+import {
+  PREFERRED_MCP_PROTOCOL_VERSION,
+  SERVER_CAPABILITIES,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS as SUPPORTED_MCP_PROTOCOL_VERSION_LIST,
+} from './infrastructure/protocol-constants.js';
 import type { Logger } from './infrastructure/logger.js';
 import type { MetricsCollector } from './infrastructure/metrics.js';
 import { ToolHandlerRegistry } from './server/tool-handler.js';
@@ -40,13 +51,18 @@ import { PromptHandlerRegistry } from './server/prompt-handler.js';
 import { SubscriptionManager } from './server/subscription-manager.js';
 import { buildToolDefinitions, buildEnhancedMetadata } from './server/tool-builder.js';
 import { setupHandlers } from './server/handler-registry.js';
+import { createDirectToolExecutionService } from './server/tool-execution-service.js';
 import {
-  authorizeMcpRequest,
+  handleDelegatedWorkerRoutes,
+  type WorkerDelegatedRouteDeps,
+} from './server/worker-route-composition.js';
+import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
+import { buildMcpCorsHeaders } from './server/transport-boundary-headers.js';
+import {
   extractBearerToken,
   isAllowedOrigin,
   parseAllowedOrigins,
   parseBoolean,
-  validateProtocolVersionHeader,
 } from './server/worker-security.js';
 import {
   authenticateUserWithAnonKey,
@@ -187,6 +203,7 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
     const logger = container.get<Logger>('logger');
     const metrics = container.get<MetricsCollector>('metrics');
     const enhancedMetadata = buildEnhancedMetadata();
+    const toolExecutionService = createDirectToolExecutionService({ toolRegistry, logger });
 
     // Wire all existing MCP protocol handlers onto the low-level Server
     // that lives inside McpServer.  Because we never call
@@ -198,18 +215,42 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
       server: lowLevelServer,
       logger,
       metrics,
-      toolRegistry,
-      resourceRegistry,
-      promptRegistry,
       subscriptionManager: new SubscriptionManager(),
-      isShuttingDown: () => false,
-      activeRequests: new Set<string>(),
-      buildToolDefinitions: () => buildToolDefinitions(toolRegistry, enhancedMetadata),
-      executeToolWithMiddleware: async (
-        req: CallToolRequest,
-        requestId: string,
-      ): Promise<CallToolResult> => {
-        return await toolRegistry.execute(req, { logger, requestId });
+      listTools: async () => ({
+        tools: buildToolDefinitions(toolRegistry, enhancedMetadata),
+        metadata: { categories: toolRegistry.getCategories() },
+      }),
+      listResources: async () => ({ resources: resourceRegistry.getAllResources() }),
+      readResource: async (uri) => {
+        const handler = resourceRegistry.findHandler(uri);
+        if (!handler) {
+          throw new McpError(ErrorCode.InvalidRequest, `Resource not found: ${uri}`);
+        }
+        return handler.read(uri, {
+          logger,
+          requestId: generateId(),
+        });
+      },
+      listPrompts: async () => ({ prompts: promptRegistry.getAllPrompts() }),
+      getPrompt: async (name, args = {}) => {
+        const handler = promptRegistry.findHandler(name);
+        if (!handler) {
+          throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
+        }
+        return handler.getMessages(args);
+      },
+      executeTool: async (req: CallToolRequest): Promise<CallToolResult> => {
+        try {
+          return await toolExecutionService.execute(req, generateId());
+        } catch (error) {
+          if (error instanceof McpError) {
+            throw error;
+          }
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Error executing ${req.params.name}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       },
     });
   }
@@ -221,13 +262,7 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
 
 const mcpStreamableHandler = CourtListenerMCP.serve('/mcp');
 const mcpSseCompatibilityHandler = CourtListenerMCP.serve('/sse');
-const ALLOWED_METHODS = 'GET, POST, DELETE, OPTIONS';
-const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set([
-  '2024-11-05',
-  '2025-03-26',
-  '2025-06-18',
-  '2025-11-25',
-]);
+const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set(SUPPORTED_MCP_PROTOCOL_VERSION_LIST);
 
 const DEFAULT_AUTH_FAILURE_LIMIT_MAX = 20;
 const DEFAULT_AUTH_FAILURE_WINDOW_SECONDS = 300;
@@ -240,6 +275,25 @@ const DEFAULT_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS = 300;
 const DEFAULT_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS = 300;
 const DEFAULT_UI_AI_CHAT_RATE_LIMIT_MAX = 50;
 const DEFAULT_API_KEY_MAX_TTL_DAYS = 90;
+
+interface LatencyStats {
+  count: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+}
+
+type DurableObjectLatencyDimension = 'auth_limiter' | 'session_revocation' | 'ai_chat_quota';
+type LatencySnapshot = { count: number; avg_ms: number; max_ms: number; last_ms: number };
+type SlowOperationSnapshot = LatencySnapshot & { operation: string; slow_score: number };
+type DurableObjectOutlierSignal = LatencySnapshot & {
+  dimension: DurableObjectLatencyDimension;
+  outlier_score: number;
+  is_outlier: boolean;
+};
+const WORKER_EXPORT_TOP_SLOW_OPERATION_LIMIT = 5;
+const WORKER_DO_OUTLIER_SCORE_THRESHOLD = 2.5;
+const WORKER_DO_OUTLIER_MIN_SAMPLES = 3;
 
 interface AuthFailureState {
   count: number;
@@ -309,10 +363,152 @@ const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
+const workerRouteLatency = new Map<string, LatencyStats>();
+const WORKER_ROUTE_LATENCY_MAX_ROUTES = 64;
+const WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE = 'OTHER';
+const allowedOriginsCache = new Map<string, string[]>();
+const durableObjectLatency: Record<DurableObjectLatencyDimension, LatencyStats> = {
+  auth_limiter: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
+  session_revocation: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
+  ai_chat_quota: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
+};
 const DEFAULT_CF_AI_MODEL_CHEAP = '@cf/meta/llama-3.1-8b-instruct-fast';
 const DEFAULT_CF_AI_MODEL_BALANCED = '@cf/meta/llama-3.1-8b-instruct-fast';
 const CHEAP_MODE_MAX_TOKENS = 800;
 const BALANCED_MODE_MAX_TOKENS = 2000;
+
+function recordLatency(stats: LatencyStats, elapsedMs: number): void {
+  const durationMs = Number.isFinite(elapsedMs) && elapsedMs >= 0 ? elapsedMs : 0;
+  stats.count += 1;
+  stats.totalMs += durationMs;
+  if (durationMs > stats.maxMs) {
+    stats.maxMs = durationMs;
+  }
+  stats.lastMs = durationMs;
+}
+
+function normalizeRouteSegment(segment: string): string {
+  if (!segment) return segment;
+  if (/^\d+$/.test(segment)) return ':id';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(segment)) {
+    return ':uuid';
+  }
+  if (/^[A-Za-z0-9_-]{24,}$/.test(segment)) return ':token';
+  return segment;
+}
+
+function buildWorkerRouteMetricKey(method: string, pathname: string): string {
+  const normalizedPath = pathname
+    .split('/')
+    .map((segment) => normalizeRouteSegment(segment))
+    .join('/');
+  return `${method.toUpperCase()} ${normalizedPath || '/'}`;
+}
+
+function recordRouteLatency(route: string, elapsedMs: number): void {
+  const overflowExists = workerRouteLatency.has(WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE);
+  const routeCap = overflowExists ? WORKER_ROUTE_LATENCY_MAX_ROUTES : WORKER_ROUTE_LATENCY_MAX_ROUTES - 1;
+  const routeKey =
+    workerRouteLatency.has(route) || workerRouteLatency.size < routeCap
+      ? route
+      : WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE;
+  const stats = workerRouteLatency.get(routeKey);
+  if (stats) {
+    recordLatency(stats, elapsedMs);
+    return;
+  }
+
+  const durationMs = Number.isFinite(elapsedMs) && elapsedMs >= 0 ? elapsedMs : 0;
+  workerRouteLatency.set(routeKey, {
+    count: 1,
+    totalMs: durationMs,
+    maxMs: durationMs,
+    lastMs: durationMs,
+  });
+}
+
+function recordDurableObjectLatency(dimension: DurableObjectLatencyDimension, elapsedMs: number): void {
+  recordLatency(durableObjectLatency[dimension], elapsedMs);
+}
+
+function getCachedAllowedOrigins(rawAllowedOrigins: string | undefined): string[] {
+  const cacheKey = rawAllowedOrigins ?? '';
+  const cached = allowedOriginsCache.get(cacheKey);
+  if (cached) return cached;
+  const parsed = parseAllowedOrigins(rawAllowedOrigins);
+  allowedOriginsCache.set(cacheKey, parsed);
+  return parsed;
+}
+
+function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
+  return {
+    count: stats.count,
+    avg_ms: stats.count > 0 ? Number((stats.totalMs / stats.count).toFixed(2)) : 0,
+    max_ms: Number(stats.maxMs.toFixed(2)),
+    last_ms: Number(stats.lastMs.toFixed(2)),
+  };
+}
+
+function getWorkerLatencySnapshot(): {
+  routes: Record<string, LatencySnapshot>;
+  durable_objects: Record<DurableObjectLatencyDimension, LatencySnapshot>;
+  export_snapshot: {
+    generated_at: string;
+    top_slow_operations: SlowOperationSnapshot[];
+    durable_object_latency_outliers: DurableObjectOutlierSignal[];
+  };
+} {
+  const routes: Record<string, LatencySnapshot> = {};
+  for (const [route, stats] of workerRouteLatency.entries()) {
+    routes[route] = getLatencySnapshot(stats);
+  }
+
+  const durableObjects = {
+    auth_limiter: getLatencySnapshot(durableObjectLatency.auth_limiter),
+    session_revocation: getLatencySnapshot(durableObjectLatency.session_revocation),
+    ai_chat_quota: getLatencySnapshot(durableObjectLatency.ai_chat_quota),
+  };
+  const topSlowOperations = Object.entries(routes)
+    .map(([operation, snapshot]) => ({
+      operation,
+      ...snapshot,
+      slow_score: Number((snapshot.avg_ms * 0.7 + snapshot.max_ms * 0.3).toFixed(2)),
+    }))
+    .sort((a, b) => b.slow_score - a.slow_score || b.count - a.count)
+    .slice(0, WORKER_EXPORT_TOP_SLOW_OPERATION_LIMIT);
+  const durableObjectSamples = Object.values(durableObjects).filter((snapshot) => snapshot.count > 0);
+  const durableObjectGlobalAvg =
+    durableObjectSamples.length > 0
+      ? durableObjectSamples.reduce((sum, snapshot) => sum + snapshot.avg_ms, 0) / durableObjectSamples.length
+      : 0;
+  const durableObjectLatencyOutliers: DurableObjectOutlierSignal[] = (
+    Object.entries(durableObjects) as Array<[DurableObjectLatencyDimension, LatencySnapshot]>
+  )
+    .map(([dimension, snapshot]) => {
+      const selfRatioAvg = snapshot.avg_ms > 0 ? snapshot.max_ms / snapshot.avg_ms : 0;
+      const selfRatioLast = snapshot.avg_ms > 0 ? snapshot.last_ms / snapshot.avg_ms : 0;
+      const globalRatio = durableObjectGlobalAvg > 0 ? snapshot.avg_ms / durableObjectGlobalAvg : 0;
+      const outlierScore = Number(Math.max(selfRatioAvg, selfRatioLast, globalRatio).toFixed(2));
+      return {
+        dimension,
+        ...snapshot,
+        outlier_score: outlierScore,
+        is_outlier:
+          snapshot.count >= WORKER_DO_OUTLIER_MIN_SAMPLES && outlierScore >= WORKER_DO_OUTLIER_SCORE_THRESHOLD,
+      };
+    })
+    .sort((a, b) => b.outlier_score - a.outlier_score);
+
+  return {
+    routes,
+    durable_objects: durableObjects,
+    export_snapshot: {
+      generated_at: new Date().toISOString(),
+      top_slow_operations: topSlowOperations,
+      durable_object_latency_outliers: durableObjectLatencyOutliers,
+    },
+  };
+}
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -596,7 +792,7 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
           // Not JSON — use as-is
           const texts = content
             .filter((c) => c.type === 'text' && c.text)
-            .map((c) => c.text!)
+            .map((c) => c.text as string)
             .join('\n\n');
           if (texts.length > 0) {
             const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
@@ -799,7 +995,7 @@ async function callMcpJsonRpc(
     authorization: `Bearer ${effectiveToken}`,
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
-    'MCP-Protocol-Version': '2025-06-18',
+    'MCP-Protocol-Version': PREFERRED_MCP_PROTOCOL_VERSION,
   });
   if (sessionId) {
     headers.set('mcp-session-id', sessionId);
@@ -816,23 +1012,19 @@ async function callMcpJsonRpc(
     }),
   });
 
-  const authError = await authorizeMcpRequest(mcpRequest, env);
-  if (authError) {
-    const text = await authError.text();
+  const authResult = await authorizeMcpGatewayRequest({
+    request: mcpRequest,
+    env,
+    supportedProtocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  });
+  if (authResult.authError) {
+    const text = await authResult.authError.text();
     throw new Error(text || 'MCP auth failed');
   }
 
-  const protocolError = validateProtocolVersionHeader(
-    headers.get('MCP-Protocol-Version'),
-    parseBoolean(env.MCP_REQUIRE_PROTOCOL_VERSION),
-    SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  const response = await runWithPrincipalContext(authResult.principal, () =>
+    mcpStreamableHandler.fetch(mcpRequest, env, ctx),
   );
-  if (protocolError) {
-    const text = await protocolError.text();
-    throw new Error(text || 'MCP protocol version check failed');
-  }
-
-  const response = await mcpStreamableHandler.fetch(mcpRequest, env, ctx);
   const raw = await response.text();
   if (!response.ok) {
     throw new Error(raw.slice(0, 1000) || 'MCP request failed');
@@ -851,16 +1043,7 @@ async function callMcpJsonRpc(
 }
 
 function jsonResponse(payload: unknown, status = 200, extraHeaders?: HeadersInit): Response {
-  const headers = new Headers({
-    'Cache-Control': 'no-store',
-  });
-  if (extraHeaders) {
-    const source = new Headers(extraHeaders);
-    for (const [key, value] of source.entries()) {
-      headers.append(key, value);
-    }
-  }
-  applySecurityHeaders(headers);
+  const headers = createSecureResponseHeaders({ 'Cache-Control': 'no-store' }, extraHeaders);
   return Response.json(payload, {
     status,
     headers,
@@ -885,6 +1068,17 @@ function jsonError(
   );
 }
 
+function logWorkerWarning(event: string, error: unknown, meta?: Record<string, unknown>): void {
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      event,
+      error: error instanceof Error ? error.message : String(error),
+      ...(meta ?? {}),
+    }),
+  );
+}
+
 function generateCspNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -894,17 +1088,14 @@ function generateCspNonce(): string {
 }
 
 function htmlResponse(html: string, nonce: string, extraHeaders?: HeadersInit): Response {
-  const headers = new Headers({
-    'content-type': 'text/html; charset=utf-8',
-    'Cache-Control': 'no-store',
-  });
-  if (extraHeaders) {
-    const source = new Headers(extraHeaders);
-    for (const [key, value] of source.entries()) {
-      headers.append(key, value);
-    }
-  }
-  applySecurityHeaders(headers, nonce);
+  const headers = createSecureResponseHeaders(
+    {
+      'content-type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+    extraHeaders,
+    nonce,
+  );
   return new Response(html, {
     status: 200,
     headers,
@@ -1019,17 +1210,13 @@ function renderOAuthConsentHtml(
 }
 
 function redirectResponse(location: string, status = 302, extraHeaders?: HeadersInit): Response {
-  const headers = new Headers({
-    Location: location,
-    'Cache-Control': 'no-store',
-  });
-  if (extraHeaders) {
-    const source = new Headers(extraHeaders);
-    for (const [key, value] of source.entries()) {
-      headers.append(key, value);
-    }
-  }
-  applySecurityHeaders(headers);
+  const headers = createSecureResponseHeaders(
+    {
+      Location: location,
+      'Cache-Control': 'no-store',
+    },
+    extraHeaders,
+  );
   return new Response(null, { status, headers });
 }
 
@@ -1039,19 +1226,30 @@ function spaAssetResponse(
   buildId: string,
   extraHeaders?: HeadersInit,
 ): Response {
-  const headers = new Headers({
-    'content-type': contentType,
-    'Cache-Control': 'public, max-age=300',
-    ETag: `"${buildId}"`,
-  });
-  if (extraHeaders) {
-    const source = new Headers(extraHeaders);
-    for (const [key, value] of source.entries()) {
-      headers.append(key, value);
-    }
-  }
-  applySecurityHeaders(headers);
+  const headers = createSecureResponseHeaders(
+    {
+      'content-type': contentType,
+      'Cache-Control': 'public, max-age=300',
+      ETag: `"${buildId}"`,
+    },
+    extraHeaders,
+  );
   return new Response(content, { status: 200, headers });
+}
+
+function appendHeaders(headers: Headers, extraHeaders?: HeadersInit): void {
+  if (!extraHeaders) return;
+  const source = new Headers(extraHeaders);
+  for (const [key, value] of source.entries()) {
+    headers.append(key, value);
+  }
+}
+
+function createSecureResponseHeaders(baseHeaders: HeadersInit, extraHeaders?: HeadersInit, nonce?: string): Headers {
+  const headers = new Headers(baseHeaders);
+  appendHeaders(headers, extraHeaders);
+  applySecurityHeaders(headers, nonce);
+  return headers;
 }
 
 function applySecurityHeaders(headers: Headers, nonce?: string): void {
@@ -1182,7 +1380,7 @@ async function authenticateUiApiRequest(
     return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
   }
 
-  const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
+  const cookieToken = getCookieValue(request, 'clmcp_ui');
   const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
   if (parsedPayload && (await isUiSessionRevoked(env, parsedPayload.jti))) {
     return jsonError('Session is invalid or expired.', 401, 'invalid_session');
@@ -1204,6 +1402,14 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
     cookies[rawName] = rawValue.join('=');
   }
   return cookies;
+}
+
+function getCookieValue(request: Request, name: string): string | null {
+  return parseCookies(request.headers.get('cookie'))[name] ?? null;
+}
+
+function getRequestOrigin(request: Request): string | null {
+  return request.headers.get('Origin');
 }
 
 function base64UrlEncode(value: string): string {
@@ -1320,15 +1526,20 @@ async function callSessionRevocation(
   body: SessionRevocationRequestBody | SessionTokenRequestBody,
 ): Promise<SessionRevocationResponseBody | SessionTokenResponseBody | null> {
   const stub = getSessionRevocationStub(env, sessionJti);
-  const response = await stub.fetch('https://auth-failure-limiter/internal', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    return null;
+  const startedAt = Date.now();
+  try {
+    const response = await stub.fetch('https://auth-failure-limiter/internal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as SessionRevocationResponseBody;
+  } finally {
+    recordDurableObjectLatency('session_revocation', Date.now() - startedAt);
   }
-  return (await response.json()) as SessionRevocationResponseBody;
 }
 
 async function isUiSessionRevoked(env: Env, sessionJti: string): Promise<boolean> {
@@ -1393,9 +1604,7 @@ async function clearUiSessionSupabaseAccessToken(env: Env, sessionJti: string): 
 }
 
 async function getUiSessionUserId(request: Request, secret: string): Promise<string | null> {
-  const cookieHeader = request.headers.get('cookie');
-  const cookies = parseCookies(cookieHeader);
-  const token = cookies.clmcp_ui;
+  const token = getCookieValue(request, 'clmcp_ui');
   if (!token) return null;
   const [payloadPart, signaturePart] = token.split('.');
   if (!payloadPart || !signaturePart) return null;
@@ -1438,8 +1647,7 @@ function generateRandomToken(byteLength = 24): string {
 }
 
 function getCsrfTokenFromCookie(request: Request): string | null {
-  const cookies = parseCookies(request.headers.get('cookie'));
-  const token = cookies.clmcp_csrf?.trim();
+  const token = getCookieValue(request, 'clmcp_csrf')?.trim();
   if (!token) return null;
   return token;
 }
@@ -1692,22 +1900,27 @@ async function callAuthLimiter(
       };
     })();
   const stub = getAuthLimiterStub(env, clientId);
-  const response = await stub.fetch('https://auth-failure-limiter/internal', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      action,
-      nowMs,
-      maxAttempts: cfg.maxAttempts,
-      windowMs: cfg.windowMs,
-      blockMs: cfg.blockMs,
-    } satisfies AuthFailureLimiterRequestBody),
-  });
-  if (!response.ok) {
-    return null;
+  const startedAt = Date.now();
+  try {
+    const response = await stub.fetch('https://auth-failure-limiter/internal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        nowMs,
+        maxAttempts: cfg.maxAttempts,
+        windowMs: cfg.windowMs,
+        blockMs: cfg.blockMs,
+      } satisfies AuthFailureLimiterRequestBody),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const body = (await response.json()) as AuthFailureLimiterResponseBody;
+    return body;
+  } finally {
+    recordDurableObjectLatency('auth_limiter', Date.now() - startedAt);
   }
-  const body = (await response.json()) as AuthFailureLimiterResponseBody;
-  return body;
 }
 
 function getClientIdentifier(request: Request): string {
@@ -1835,14 +2048,20 @@ async function applyAiChatLifetimeQuota(env: Env, userId: string): Promise<Respo
   );
   const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`ui-ai-chat-quota:user:${userId}`);
   const stub = env.AUTH_FAILURE_LIMITER.get(objectId);
-  const response = await stub.fetch('https://auth-failure-limiter/internal', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      action: 'quota_increment_check',
-      maxAllowed,
-    } satisfies LifetimeQuotaRequestBody),
-  });
+  const startedAt = Date.now();
+  let response: Response;
+  try {
+    response = await stub.fetch('https://auth-failure-limiter/internal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'quota_increment_check',
+        maxAllowed,
+      } satisfies LifetimeQuotaRequestBody),
+    });
+  } finally {
+    recordDurableObjectLatency('ai_chat_quota', Date.now() - startedAt);
+  }
 
   if (!response.ok) {
     return jsonError('Unable to validate hosted AI chat quota.', 503, 'ai_chat_quota_unavailable');
@@ -1863,22 +2082,7 @@ function isMcpPath(pathname: string): boolean {
 }
 
 function buildCorsHeaders(origin: string | null, allowedOrigins: string[]): Headers {
-  const headers = new Headers({
-    'Access-Control-Allow-Methods': ALLOWED_METHODS,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version',
-    'Access-Control-Expose-Headers': 'mcp-session-id, MCP-Protocol-Version',
-    Vary: 'Origin',
-  });
-
-  if (origin) {
-    if (allowedOrigins.length === 0 || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      headers.set('Access-Control-Allow-Origin', origin);
-    }
-  }
-  // When no Origin header is present, do not set CORS headers.
-  // Wildcard CORS is only allowed when an Origin header matches a configured '*'.
-
-  return headers;
+  return buildMcpCorsHeaders(origin, allowedOrigins);
 }
 
 function withCors(response: Response, origin: string | null, allowedOrigins: string[]): Response {
@@ -1896,1159 +2100,155 @@ function withCors(response: Response, origin: string | null, allowedOrigins: str
 }
 
 function rejectDisallowedUiOrigin(
-  request: Request,
+  origin: string | null,
   allowedOrigins: string[],
 ): Response | null {
-  const origin = request.headers.get('Origin');
   if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
     return jsonError('Forbidden origin', 403, 'forbidden_origin');
   }
   return null;
 }
 
+const workerDelegatedRouteDeps = {
+  jsonError,
+  jsonResponse,
+  rejectDisallowedUiOrigin,
+  getSupabaseSignupConfig,
+  getUiSessionSecret,
+  getCookieValue,
+  parseUiSessionToken,
+  getUiSessionUserId,
+  isUiSessionRevoked,
+  redirectResponse,
+  getUiSessionSupabaseAccessToken,
+  getOAuthAuthorizationDetails,
+  sanitizeExternalHttpUrl,
+  getCsrfTokenFromCookie,
+  generateRandomToken,
+  generateCspNonce,
+  buildCsrfCookie,
+  isSecureCookieRequest,
+  htmlResponse,
+  renderOAuthConsentHtml,
+  clearUiSessionSupabaseAccessToken,
+  submitOAuthAuthorizationConsent,
+  constantTimeEqual,
+  getOrCreateCsrfCookieHeader,
+  requireCsrfToken,
+  getSupabaseManagementConfig,
+  parseJsonBody,
+  applyUiRateLimit,
+  authenticateUserWithPassword,
+  authenticateUserWithAnonKey,
+  createUiSessionToken,
+  storeUiSessionSupabaseAccessToken,
+  buildUiSessionCookie,
+  buildUiSessionIndicatorCookie,
+  applySecurityHeaders,
+  getSupabaseUserFromAccessToken,
+  sendPasswordResetEmail,
+  getPasswordResetRedirectUrl,
+  logWorkerWarning,
+  exchangeRecoveryTokenHash,
+  resetPasswordWithAccessToken,
+  confirmUserEmail,
+  revokeUiSession,
+  buildUiSessionCookieClear,
+  buildUiSessionIndicatorCookieClear,
+  getRequestIp,
+  verifyTurnstileToken,
+  signUpSupabaseUser,
+  getSignupRedirectUrl,
+  logAuditEvent,
+  authenticateUiApiRequest,
+  listApiKeysForUser,
+  getApiKeyMaxTtlDays,
+  getCappedExpiresAtFromDays,
+  createApiKeyForUser,
+  revokeApiKeyForUser,
+  applyAiChatLifetimeQuota,
+  isPlainObject,
+  aiToolFromPrompt,
+  callMcpJsonRpc,
+  hasValidMcpRpcShape,
+  aiToolArguments,
+  buildLowCostSummary,
+  buildMcpSystemPrompt,
+  extractMcpContext,
+  preferredMcpProtocolVersion: PREFERRED_MCP_PROTOCOL_VERSION,
+  defaultCfAiModelBalanced: DEFAULT_CF_AI_MODEL_BALANCED,
+  defaultCfAiModelCheap: DEFAULT_CF_AI_MODEL_CHEAP,
+  cheapModeMaxTokens: CHEAP_MODE_MAX_TOKENS,
+  balancedModeMaxTokens: BALANCED_MODE_MAX_TOKENS,
+  spaJs: SPA_JS,
+  spaCss: SPA_CSS,
+  spaBuildId: SPA_BUILD_ID,
+  spaAssetResponse,
+  renderSpaShellHtml,
+  supportedProtocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  mcpStreamableHandler,
+  mcpSseCompatibilityHandler,
+  withCors,
+  buildCorsHeaders,
+  getClientIdentifier,
+  getAuthRateLimitedResponse,
+  recordAuthFailure,
+  clearAuthFailures,
+} satisfies WorkerDelegatedRouteDeps<Env>;
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const origin = request.headers.get('Origin');
-    const allowedOrigins = parseAllowedOrigins(env.MCP_ALLOWED_ORIGINS);
-    const mcpPath = isMcpPath(url.pathname);
+    const requestMethod = request.method;
+    const pathname = url.pathname;
+    const origin = getRequestOrigin(request);
+    const allowedOrigins = getCachedAllowedOrigins(env.MCP_ALLOWED_ORIGINS);
+    const mcpPath = isMcpPath(pathname);
+    const requestStartedAt = Date.now();
+    const routeMetricKey = buildWorkerRouteMetricKey(requestMethod, pathname);
 
-    // CORS preflight (MCP endpoints only)
-    if (request.method === 'OPTIONS' && mcpPath) {
-      if (!isAllowedOrigin(origin, allowedOrigins)) {
-        return new Response('Forbidden origin', { status: 403 });
-      }
-      return new Response(null, { headers: buildCorsHeaders(origin, allowedOrigins) });
-    }
-
-    // Health check
-    if (url.pathname === '/health') {
-      return jsonResponse({
-        status: 'ok',
-        service: 'courtlistener-mcp',
-        transport: 'cloudflare-agents-streamable-http',
-      });
-    }
-
-    if (request.method === 'GET' && url.pathname === '/app/assets/spa.js') {
-      return spaAssetResponse(SPA_JS, 'application/javascript; charset=utf-8', SPA_BUILD_ID);
-    }
-
-    if (request.method === 'GET' && url.pathname === '/app/assets/spa.css') {
-      return spaAssetResponse(SPA_CSS, 'text/css; charset=utf-8', SPA_BUILD_ID);
-    }
-
-    if (url.pathname.startsWith('/app/assets/') && request.method !== 'GET') {
-      return jsonError('Method not allowed', 405, 'method_not_allowed');
-    }
-
-    if (url.pathname === '/oauth/consent') {
-      if (request.method !== 'GET' && request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!signupConfig) {
-        return jsonError(
-          'Supabase public signup is not configured on this worker.',
-          503,
-          'supabase_signup_not_configured',
-        );
-      }
-
-      const sessionSecret = getUiSessionSecret(env);
-      if (!sessionSecret) {
-        return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
-      }
-
-      const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
-      const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
-      const sessionUserId = await getUiSessionUserId(request, sessionSecret);
-      const nextPathWithQuery = `${url.pathname}${url.search}`;
-
-      if (!parsedPayload || !sessionUserId || (await isUiSessionRevoked(env, parsedPayload.jti))) {
-        const loginUrl = new URL('/app/login', request.url);
-        loginUrl.searchParams.set('next', nextPathWithQuery);
-        return redirectResponse(loginUrl.toString(), 302);
-      }
-
-      const supabaseAccessToken = await getUiSessionSupabaseAccessToken(env, parsedPayload.jti);
-      if (!supabaseAccessToken) {
-        const loginUrl = new URL('/app/login', request.url);
-        loginUrl.searchParams.set('next', nextPathWithQuery);
-        return redirectResponse(loginUrl.toString(), 302);
-      }
-
-      if (request.method === 'GET') {
-        const authorizationId = url.searchParams.get('authorization_id')?.trim() || '';
-        if (!authorizationId) {
-          return jsonError('authorization_id is required.', 400, 'missing_authorization_id');
+    try {
+      // CORS preflight (MCP endpoints only)
+      if (requestMethod === 'OPTIONS' && mcpPath) {
+        if (!isAllowedOrigin(origin, allowedOrigins)) {
+          return new Response('Forbidden origin', { status: 403 });
         }
-
-        try {
-          const authorizationResult = await getOAuthAuthorizationDetails(
-            signupConfig,
-            supabaseAccessToken,
-            authorizationId,
-          );
-          if (authorizationResult.type === 'redirect') {
-            const safeRedirectUrl = sanitizeExternalHttpUrl(authorizationResult.redirectUrl);
-            if (!safeRedirectUrl) {
-              return jsonError('Invalid OAuth redirect URL.', 400, 'invalid_oauth_redirect');
-            }
-            return redirectResponse(safeRedirectUrl, 302);
-          }
-
-          const csrfToken = getCsrfTokenFromCookie(request) ?? generateRandomToken(24);
-          const nonce = generateCspNonce();
-          const setCookieHeader = getCsrfTokenFromCookie(request)
-            ? undefined
-            : buildCsrfCookie(csrfToken, isSecureCookieRequest(request, env));
-          return htmlResponse(
-            renderOAuthConsentHtml(authorizationResult.details, csrfToken, nonce),
-            nonce,
-            setCookieHeader ? { 'Set-Cookie': setCookieHeader } : undefined,
-          );
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (message.includes('access_token') || message.includes('401') || message.includes('403')) {
-            await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
-            const loginUrl = new URL('/app/login', request.url);
-            loginUrl.searchParams.set('next', nextPathWithQuery);
-            return redirectResponse(loginUrl.toString(), 302);
-          }
-          return jsonError('Failed to load authorization request.', 400, 'oauth_authorization_load_failed');
-        }
+        return new Response(null, { headers: buildCorsHeaders(origin, allowedOrigins) });
       }
 
-      const form = await request.formData();
-      const authorizationId =
-        (typeof form.get('authorization_id') === 'string' ? (form.get('authorization_id') as string) : '')
-          .trim();
-      const decision =
-        (typeof form.get('decision') === 'string' ? (form.get('decision') as string) : '').trim();
-      const formCsrfToken =
-        (typeof form.get('csrf_token') === 'string' ? (form.get('csrf_token') as string) : '').trim();
-      const cookieCsrfToken = getCsrfTokenFromCookie(request) ?? '';
-
-      if (!authorizationId) {
-        return jsonError('authorization_id is required.', 400, 'missing_authorization_id');
-      }
-      if (decision !== 'approve' && decision !== 'deny') {
-        return jsonError('decision must be approve or deny.', 400, 'invalid_decision');
-      }
-      if (
-        !cookieCsrfToken ||
-        !formCsrfToken ||
-        !constantTimeEqual(cookieCsrfToken, formCsrfToken)
-      ) {
-        return jsonError('CSRF token validation failed.', 403, 'csrf_validation_failed');
-      }
-
-      try {
-        const consentResult = await submitOAuthAuthorizationConsent(
-          signupConfig,
-          supabaseAccessToken,
-          authorizationId,
-          decision,
-        );
-        const safeRedirectUrl = sanitizeExternalHttpUrl(consentResult.redirectUrl);
-        if (!safeRedirectUrl) {
-          return jsonError('Invalid OAuth redirect URL.', 400, 'invalid_oauth_redirect');
-        }
-        return redirectResponse(safeRedirectUrl, 302);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('access_token') || message.includes('401') || message.includes('403')) {
-          await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
-          const loginUrl = new URL('/app/login', request.url);
-          loginUrl.searchParams.set('next', nextPathWithQuery);
-          return redirectResponse(loginUrl.toString(), 302);
-        }
-        return jsonError('Failed to submit authorization decision.', 400, 'oauth_authorization_submit_failed');
-      }
-    }
-
-    if (request.method === 'GET' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) {
-      if (url.pathname.startsWith('/app/assets/')) {
-        return jsonResponse({ error: 'Asset not found', error_code: 'asset_not_found' }, 404);
-      }
-      const nonce = generateCspNonce();
-      const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-      return htmlResponse(
-        renderSpaShellHtml(),
-        nonce,
-        csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
-      );
-    }
-
-    // Previous UI paths are redirected to the SPA app routes.
-    if (request.method === 'GET') {
-      const previousUiPathMap: Record<string, string> = {
-        '/': '/app/onboarding',
-        '/signup': '/app/signup',
-        '/login': '/app/login',
-        '/reset-password': '/app/reset-password',
-        '/keys': '/app/keys',
-        '/chat': '/app/console',
-      };
-      const redirectedPath = previousUiPathMap[url.pathname];
-      if (redirectedPath) {
-        const redirectUrl = new URL(redirectedPath, request.url);
-        const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-        return redirectResponse(
-          redirectUrl.toString(),
-          302,
-          csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
-        );
-      }
-    }
-
-    if (url.pathname === '/api/session') {
-      if (request.method !== 'GET') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const sessionSecret = getUiSessionSecret(env);
-      let sessionUserId: string | null = null;
-      if (sessionSecret) {
-        const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
-        const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
-        if (!parsedPayload || !(await isUiSessionRevoked(env, parsedPayload.jti))) {
-          sessionUserId = await getUiSessionUserId(request, sessionSecret);
-        }
-      }
-      const csrfCookieHeader = getOrCreateCsrfCookieHeader(request, env);
-      return jsonResponse(
-        {
-          authenticated: Boolean(sessionUserId),
-          user: sessionUserId ? { id: sessionUserId } : null,
-          turnstile_site_key: env.TURNSTILE_SITE_KEY?.trim() || undefined,
-        },
-        200,
-        csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
-      );
-    }
-
-    if (url.pathname === '/api/login') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const csrfError = requireCsrfToken(request);
-      if (csrfError) return csrfError;
-
-      const managementConfig = getSupabaseManagementConfig(env);
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!managementConfig && !signupConfig) {
-        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
-      }
-
-      const body = await parseJsonBody<{ email?: string; password?: string }>(request);
-      const email = body?.email?.trim().toLowerCase() || '';
-      const password = body?.password || '';
-
-      const loginRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
-      if (loginRateLimited) return loginRateLimited;
-
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return jsonError('A valid email is required.', 400, 'invalid_email');
-      }
-      if (password.length < 8 || password.length > 256) {
-        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
-      }
-
-      try {
-        const authResult = managementConfig
-          ? await authenticateUserWithPassword(managementConfig, email, password)
-          : await authenticateUserWithAnonKey(signupConfig!, email, password);
-        if (!authResult.user.email_confirmed_at) {
-          return jsonError('Email verification is required before login.', 403, 'email_not_verified');
-        }
-        const sessionSecret = getUiSessionSecret(env);
-        if (!sessionSecret) {
-          return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
-        }
-        const sessionToken = await createUiSessionToken(authResult.user.id, sessionSecret, 12 * 60 * 60);
-        const parsedSession = parseUiSessionToken(sessionToken);
-        if (parsedSession) {
-          await storeUiSessionSupabaseAccessToken(
-            env,
-            parsedSession.jti,
-            authResult.accessToken,
-            authResult.accessTokenExpiresAtMs,
-          );
-        }
-        const secureCookies = isSecureCookieRequest(request, env);
-        const responseHeaders = new Headers();
-        responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
-        responseHeaders.append('Set-Cookie', buildUiSessionIndicatorCookie(secureCookies));
-        applySecurityHeaders(responseHeaders);
-        return Response.json(
-          {
-            message: 'Login successful.',
-            user: {
-              id: authResult.user.id,
-              email: authResult.user.email ?? email,
-            },
+      // Health check
+      if (pathname === '/health') {
+        return jsonResponse({
+          status: 'ok',
+          service: 'courtlistener-mcp',
+          transport: 'cloudflare-agents-streamable-http',
+          metrics: {
+            latency_ms: getWorkerLatencySnapshot(),
           },
-          {
-            status: 200,
-            headers: responseHeaders,
-          },
-        );
-      } catch {
-        return jsonError('Invalid email or password.', 401, 'invalid_credentials');
-      }
-    }
-
-    if (url.pathname === '/api/login/token') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const csrfError = requireCsrfToken(request);
-      if (csrfError) return csrfError;
-
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!signupConfig) {
-        return jsonError(
-          'Supabase public signup is not configured on this worker.',
-          503,
-          'supabase_signup_not_configured',
-        );
-      }
-
-      const body = await parseJsonBody<{ accessToken?: string }>(request);
-      const accessToken = body?.accessToken?.trim() || '';
-      if (!accessToken) {
-        return jsonError('accessToken is required.', 400, 'missing_access_token');
-      }
-
-      try {
-        const user = await getSupabaseUserFromAccessToken(signupConfig, accessToken);
-        if (!user.email_confirmed_at) {
-          return jsonError('Email verification is required before login.', 403, 'email_not_verified');
-        }
-
-        const sessionSecret = getUiSessionSecret(env);
-        if (!sessionSecret) {
-          return jsonError('Session signing secret is not configured.', 503, 'session_secret_missing');
-        }
-        const sessionToken = await createUiSessionToken(user.id, sessionSecret, 12 * 60 * 60);
-        const parsedSession = parseUiSessionToken(sessionToken);
-        if (parsedSession) {
-          await storeUiSessionSupabaseAccessToken(
-            env,
-            parsedSession.jti,
-            accessToken,
-            Date.now() + 30 * 60 * 1000,
-          );
-        }
-        const secureCookies = isSecureCookieRequest(request, env);
-        const responseHeaders = new Headers();
-        responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
-        responseHeaders.append('Set-Cookie', buildUiSessionIndicatorCookie(secureCookies));
-        applySecurityHeaders(responseHeaders);
-        return Response.json(
-          {
-            message: 'Login successful.',
-            user: {
-              id: user.id,
-              email: user.email ?? null,
-            },
-          },
-          {
-            status: 200,
-            headers: responseHeaders,
-          },
-        );
-      } catch {
-        return jsonError('Invalid or expired signup token.', 401, 'invalid_signup_token');
-      }
-    }
-
-    if (url.pathname === '/api/password/forgot') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const csrfError = requireCsrfToken(request);
-      if (csrfError) return csrfError;
-
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!signupConfig) {
-        return jsonError(
-          'Supabase public signup is not configured on this worker.',
-          503,
-          'supabase_signup_not_configured',
-        );
-      }
-
-      const body = await parseJsonBody<{ email?: string }>(request);
-      const email = body?.email?.trim().toLowerCase() || '';
-
-      const forgotRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
-      if (forgotRateLimited) return forgotRateLimited;
-
-      if (!email || !email.includes('@')) {
-        return jsonError('A valid email is required.', 400, 'invalid_email');
-      }
-
-      try {
-        await sendPasswordResetEmail(signupConfig, email, {
-          redirectTo: getPasswordResetRedirectUrl(env, url.origin),
         });
-      } catch (error) {
-        console.warn('password_reset_email_failed', error);
       }
 
-      return jsonResponse(
+      const delegatedRouteResponse = await handleDelegatedWorkerRoutes(
         {
-          message:
-            'If the request can be processed, check your email for password reset instructions.',
-        },
-        202,
-      );
-    }
-
-    if (url.pathname === '/api/password/reset') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const csrfError = requireCsrfToken(request);
-      if (csrfError) return csrfError;
-
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!signupConfig) {
-        return jsonError(
-          'Supabase public signup is not configured on this worker.',
-          503,
-          'supabase_signup_not_configured',
-        );
-      }
-
-      const body = await parseJsonBody<{ accessToken?: string; tokenHash?: string; password?: string }>(request);
-      const accessToken = body?.accessToken?.trim() || '';
-      const tokenHash = body?.tokenHash?.trim() || '';
-      const password = body?.password || '';
-
-      const resetRateLimited = await applyUiRateLimit(request, env, 'signup');
-      if (resetRateLimited) return resetRateLimited;
-
-      if (!accessToken && !tokenHash) {
-        return jsonError('Recovery credential is required.', 400, 'missing_recovery_credential');
-      }
-      if (password.length < 8 || password.length > 256) {
-        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
-      }
-
-      try {
-        let recoveryAccessToken = accessToken;
-        if (!recoveryAccessToken && tokenHash) {
-          const exchanged = await exchangeRecoveryTokenHash(signupConfig, tokenHash);
-          recoveryAccessToken = exchanged.accessToken;
-        }
-
-        const user = await resetPasswordWithAccessToken(signupConfig, recoveryAccessToken, password);
-
-        // Recovery link proves email ownership — confirm email if not yet confirmed
-        const managementConfig = getSupabaseManagementConfig(env);
-        if (managementConfig && user?.id && !user.email_confirmed_at) {
-          try {
-            await confirmUserEmail(managementConfig, user.id);
-          } catch (confirmErr) {
-            console.warn('email_confirm_after_reset_failed', confirmErr);
-          }
-        }
-
-        // Auto-login: create session so user doesn't have to re-enter credentials
-        const userId = user?.id;
-        const sessionSecret = getUiSessionSecret(env);
-        if (userId && sessionSecret) {
-          const sessionToken = await createUiSessionToken(userId, sessionSecret, 12 * 60 * 60);
-          const parsedSession = parseUiSessionToken(sessionToken);
-          if (parsedSession && recoveryAccessToken) {
-            await storeUiSessionSupabaseAccessToken(
-              env,
-              parsedSession.jti,
-              recoveryAccessToken,
-              Date.now() + 30 * 60 * 1000,
-            );
-          }
-          const secureCookies = isSecureCookieRequest(request, env);
-          const responseHeaders = new Headers();
-          responseHeaders.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
-          responseHeaders.append('Set-Cookie', buildUiSessionIndicatorCookie(secureCookies));
-          applySecurityHeaders(responseHeaders);
-          return Response.json(
-            {
-              message: 'Password has been reset. You are now logged in.',
-              autoLogin: true,
-              user: { id: userId, email: user.email ?? null },
-            },
-            { status: 200, headers: responseHeaders },
-          );
-        }
-
-        return jsonResponse({ message: 'Password has been reset. You can now log in.' }, 200);
-      } catch {
-        return jsonError('Invalid or expired recovery token.', 401, 'invalid_recovery_token');
-      }
-    }
-
-    if (url.pathname === '/api/logout') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-      const csrfError = requireCsrfToken(request);
-      if (csrfError) return csrfError;
-
-      const sessionSecret = getUiSessionSecret(env);
-      if (sessionSecret) {
-        const cookieToken = parseCookies(request.headers.get('cookie')).clmcp_ui;
-        const parsedPayload = cookieToken ? parseUiSessionToken(cookieToken) : null;
-        if (parsedPayload) {
-          await revokeUiSession(env, parsedPayload.jti, parsedPayload.exp);
-          await clearUiSessionSupabaseAccessToken(env, parsedPayload.jti);
-        }
-      }
-
-      const secureCookies = isSecureCookieRequest(request, env);
-      const responseHeaders = new Headers();
-      responseHeaders.append('Set-Cookie', buildUiSessionCookieClear(secureCookies));
-      responseHeaders.append('Set-Cookie', buildUiSessionIndicatorCookieClear(secureCookies));
-      applySecurityHeaders(responseHeaders);
-      return Response.json(
-        { message: 'Logged out.' },
-        {
-          status: 200,
-          headers: responseHeaders,
-        },
-      );
-    }
-
-    if (url.pathname === '/api/signup') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const signupConfig = getSupabaseSignupConfig(env);
-      if (!signupConfig) {
-        return jsonError(
-          'Supabase public signup is not configured on this worker.',
-          503,
-          'supabase_signup_not_configured',
-        );
-      }
-      const managementConfig = getSupabaseManagementConfig(env);
-
-      const body = await parseJsonBody<{
-        email?: string;
-        password?: string;
-        fullName?: string;
-        label?: string;
-        expiresDays?: number;
-        turnstileToken?: string;
-      }>(request);
-
-      const email = body?.email?.trim().toLowerCase() || '';
-      const password = body?.password || '';
-      const fullName = (body?.fullName?.trim() || '').slice(0, 256);
-      const turnstileToken = body?.turnstileToken?.trim() || '';
-      const requestIp = getRequestIp(request);
-      const turnstileSecret = env.TURNSTILE_SECRET_KEY?.trim();
-
-      const signupRateLimited = await applyUiRateLimit(request, env, 'signup', email || undefined);
-      if (signupRateLimited) {
-        return signupRateLimited;
-      }
-
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return jsonError('A valid email is required.', 400, 'invalid_email');
-      }
-      if (password.length < 8 || password.length > 256) {
-        return jsonError('Password must be 8–256 characters.', 400, 'invalid_password');
-      }
-      if (turnstileSecret) {
-        if (!turnstileToken) {
-          return jsonError('Turnstile verification is required.', 400, 'turnstile_token_required');
-        }
-        const verified = await verifyTurnstileToken(turnstileSecret, turnstileToken, requestIp);
-        if (!verified) {
-          return jsonError('Turnstile verification failed.', 400, 'turnstile_verification_failed');
-        }
-      }
-
-      try {
-        const signupResult = await signUpSupabaseUser(
-          signupConfig,
-          { email, password, fullName },
-          { emailRedirectTo: getSignupRedirectUrl(env, url.origin) },
-        );
-        if (managementConfig) {
-          try {
-            await logAuditEvent(managementConfig, {
-              actorType: 'anonymous',
-              targetUserId: signupResult.user?.id ?? null,
-              action: 'signup.user_created',
-              status: 'success',
-              requestIp,
-              metadata: { email },
-            });
-          } catch (auditError) {
-            console.warn('audit_log_failed', auditError);
-          }
-        }
-        return jsonResponse(
-          {
-            message:
-              'If the request can be processed, check your email for verification and next steps.',
-          },
-          202,
-        );
-      } catch (error) {
-        if (managementConfig) {
-          try {
-            await logAuditEvent(managementConfig, {
-              actorType: 'anonymous',
-              action: 'signup.user_created',
-              status: 'error',
-              requestIp,
-              metadata: {
-                email,
-                error: error instanceof Error ? error.message : String(error),
-              },
-            });
-          } catch (auditError) {
-            console.warn('audit_log_failed', auditError);
-          }
-        }
-        return jsonResponse(
-          {
-            message:
-              'If the request can be processed, check your email for verification and next steps.',
-          },
-          202,
-        );
-      }
-    }
-
-    if (url.pathname === '/api/keys') {
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const keysRateLimited = await applyUiRateLimit(request, env, 'keys');
-      if (keysRateLimited) {
-        return keysRateLimited;
-      }
-
-      const authResult = await authenticateUiApiRequest(request, env);
-      if (authResult instanceof Response) {
-        return authResult;
-      }
-      const perUserRateLimited = await applyUiRateLimit(
-        request,
-        env,
-        'keys',
-        `user:${authResult.userId}`,
-      );
-      if (perUserRateLimited) {
-        return perUserRateLimited;
-      }
-
-      const config = getSupabaseManagementConfig(env);
-      if (!config) {
-        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
-      }
-
-      if (request.method === 'GET') {
-        try {
-          const keys = await listApiKeysForUser(config, authResult.userId, 100);
-          return jsonResponse({
-            user_id: authResult.userId,
-            keys,
-          });
-        } catch {
-          return jsonError('Failed to list keys.', 400, 'keys_list_failed');
-        }
-      }
-
-      if (request.method === 'POST') {
-        if (authResult.authType === 'session') {
-          const csrfError = requireCsrfToken(request);
-          if (csrfError) return csrfError;
-        }
-        const body = await parseJsonBody<{ label?: string; expiresDays?: number }>(request);
-        const label = (body?.label?.trim() || 'rotation').slice(0, 200);
-        const maxTtlDays = getApiKeyMaxTtlDays(env);
-        const expiresAt = getCappedExpiresAtFromDays(body?.expiresDays, 90, maxTtlDays);
-
-        try {
-          const createdKey = await createApiKeyForUser(config, {
-            userId: authResult.userId,
-            label,
-            expiresAt,
-          });
-          try {
-            await logAuditEvent(config, {
-              actorType: 'user',
-              actorUserId: authResult.userId,
-              targetUserId: authResult.userId,
-              apiKeyId: createdKey.key.id,
-              action: 'keys.created',
-              status: 'success',
-              requestIp: getRequestIp(request),
-              metadata: { label: createdKey.key.label },
-            });
-          } catch (auditError) {
-            console.warn('audit_log_failed', auditError);
-          }
-          return jsonResponse(
-            {
-              message: 'Key created.',
-              api_key: {
-                id: createdKey.key.id,
-                label: createdKey.key.label,
-                created_at: createdKey.key.created_at,
-                expires_at: createdKey.key.expires_at,
-                token: createdKey.token,
-              },
-            },
-            201,
-          );
-        } catch {
-          return jsonError('Failed to create key.', 400, 'key_create_failed');
-        }
-      }
-
-      return jsonError('Method not allowed', 405, 'method_not_allowed');
-    }
-
-    if (url.pathname === '/api/keys/revoke') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const keysRateLimited = await applyUiRateLimit(request, env, 'keys');
-      if (keysRateLimited) {
-        return keysRateLimited;
-      }
-
-      const authResult = await authenticateUiApiRequest(request, env);
-      if (authResult instanceof Response) {
-        return authResult;
-      }
-      const perUserRateLimited = await applyUiRateLimit(
-        request,
-        env,
-        'keys',
-        `user:${authResult.userId}`,
-      );
-      if (perUserRateLimited) {
-        return perUserRateLimited;
-      }
-
-      const config = getSupabaseManagementConfig(env);
-      if (!config) {
-        return jsonError('Supabase auth is not configured on this worker.', 503, 'supabase_not_configured');
-      }
-
-      const body = await parseJsonBody<{ keyId?: string }>(request);
-      if (authResult.authType === 'session') {
-        const csrfError = requireCsrfToken(request);
-        if (csrfError) return csrfError;
-      }
-      const keyId = body?.keyId?.trim();
-      if (!keyId) {
-        return jsonError('keyId is required.', 400, 'missing_key_id');
-      }
-
-      try {
-        const revoked = await revokeApiKeyForUser(config, authResult.userId, keyId);
-        if (!revoked) {
-          return jsonError('Key not found or already revoked.', 404, 'key_not_found');
-        }
-        try {
-          await logAuditEvent(config, {
-            actorType: 'user',
-            actorUserId: authResult.userId,
-            targetUserId: authResult.userId,
-            apiKeyId: keyId,
-            action: 'keys.revoked',
-            status: 'success',
-            requestIp: getRequestIp(request),
-          });
-        } catch (auditError) {
-          console.warn('audit_log_failed', auditError);
-        }
-        return jsonResponse({ message: 'Key revoked.' });
-      } catch {
-        return jsonError('Failed to revoke key.', 400, 'key_revoke_failed');
-      }
-    }
-
-    if (url.pathname === '/api/ai-chat') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const authResult = await authenticateUiApiRequest(request, env);
-      if (authResult instanceof Response) {
-        return authResult;
-      }
-      const aiChatQuota = await applyAiChatLifetimeQuota(env, authResult.userId);
-      if (aiChatQuota) return aiChatQuota;
-      if (authResult.authType === 'session') {
-        const csrfError = requireCsrfToken(request);
-        if (csrfError) return csrfError;
-      }
-
-      const body = await parseJsonBody<{
-        message?: string;
-        mcpToken?: string;
-        mcpSessionId?: string;
-        toolName?: string;
-        mode?: 'cheap' | 'balanced';
-        testMode?: boolean;
-        history?: Array<{ role: string; content: string }>;
-      }>(request);
-      if (!body || !isPlainObject(body)) {
-        return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
-      }
-
-      if (typeof body.message !== 'string') {
-        return jsonError('message must be a string.', 400, 'invalid_request_schema');
-      }
-      if (
-        typeof body.testMode !== 'undefined' &&
-        typeof body.testMode !== 'boolean'
-      ) {
-        return jsonError('testMode must be a boolean.', 400, 'invalid_request_schema');
-      }
-
-      const message = body.message.trim();
-      if (message.length > 10000) {
-        return jsonError('Message too long (max 10,000 characters).', 400, 'message_too_long');
-      }
-      const mcpToken = typeof body.mcpToken === 'string' ? body.mcpToken.trim() : '';
-      const requestedTool = body.toolName || 'auto';
-      const testMode = body.testMode === true;
-      const mode = testMode ? 'cheap' : body.mode === 'balanced' ? 'balanced' : 'cheap';
-      const autoResult = requestedTool === 'auto'
-        ? testMode
-          ? { tool: 'search_cases', reason: 'Test mode defaults to search_cases.' }
-          : aiToolFromPrompt(message)
-        : { tool: requestedTool, reason: `User selected ${requestedTool}.` };
-      const toolName = autoResult.tool;
-      const toolReason = autoResult.reason;
-      const priorSessionId = body?.mcpSessionId?.trim() || '';
-
-      // Parse conversation history (max 10 prior turns to stay within token limits)
-      const rawHistory = Array.isArray(body.history) ? body.history : [];
-      const conversationHistory = rawHistory
-        .filter((h): h is { role: string; content: string } =>
-          isPlainObject(h) && typeof h.role === 'string' && typeof h.content === 'string' &&
-          (h.role === 'user' || h.role === 'assistant'))
-        .slice(-10)
-        .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content.slice(0, 2000) }));
-
-      if (!message) {
-        return jsonError('message is required.', 400, 'missing_message');
-      }
-      // MCP call with graceful degradation — never return 502, always return a renderable response
-      let activeSessionId = priorSessionId;
-      let mcpPayload: unknown = null;
-      let mcpError: string | null = null;
-
-      try {
-        if (!priorSessionId) {
-          const initializeResult = await callMcpJsonRpc(
-            env,
-            ctx,
-            mcpToken,
-            'initialize',
-            {
-              protocolVersion: '2025-06-18',
-              capabilities: {},
-              clientInfo: { name: 'courtlistener-ai-chat', version: '1.0.0' },
-            },
-            1,
-          );
-          activeSessionId = initializeResult?.sessionId || '';
-        }
-
-        if (!activeSessionId) {
-          mcpError = 'Failed to establish MCP session. Check that your bearer token is valid.';
-        } else {
-          const toolResult = await callMcpJsonRpc(
-            env,
-            ctx,
-            mcpToken,
-            'tools/call',
-            {
-              name: toolName,
-              arguments: aiToolArguments(toolName, message),
-            },
-            2,
-            activeSessionId,
-          );
-          if (!hasValidMcpRpcShape(toolResult.payload)) {
-            mcpError = 'MCP returned an unexpected response format.';
-          } else {
-            mcpPayload = toolResult.payload;
-            activeSessionId = toolResult.sessionId || activeSessionId;
-          }
-        }
-      } catch (error) {
-        console.error('[ui-api] MCP call failed, will return degraded response', { error });
-        mcpError = error instanceof Error ? error.message : 'MCP tool call failed. The CourtListener server may be temporarily unavailable.';
-      }
-
-      // Build the AI response — even if MCP failed, provide a useful message
-      let completionText: string;
-      let fallbackUsed = true;
-
-      if (mcpError) {
-        completionText = `**MCP Tool Error**\n\nThe MCP tool \`${toolName}\` could not complete the request:\n\n> ${mcpError}\n\n**Suggested Fix**: Verify your API key is valid and try again. If the issue persists, the CourtListener API may be temporarily unavailable.`;
-      } else {
-        completionText = buildLowCostSummary(message, toolName, mcpPayload);
-      }
-
-      // Try to enhance with AI summary (only if MCP succeeded and returned data)
-      if (!mcpError && env.AI && typeof env.AI.run === 'function') {
-        const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
-        const systemPrompt = testMode
-          ? 'You are a legal research assistant. Deterministic test mode: keep response under 100 words and use sections: Summary, What MCP Returned, Next Follow-up Query.'
-          : buildMcpSystemPrompt(toolName, conversationHistory.length > 0);
-        const dataMaxLen = mode === 'cheap' ? 6000 : 16000;
-        const mcpContext = `User question: ${message}\n\n${extractMcpContext(toolName, mcpPayload, dataMaxLen)}`;
-
-        const messages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: systemPrompt },
-        ];
-        for (const turn of conversationHistory) {
-          messages.push(turn);
-        }
-        messages.push({ role: 'user', content: mcpContext });
-
-        try {
-          const completion = await env.AI.run(model, {
-            messages,
-            max_tokens: testMode ? 120 : mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-            temperature: testMode ? 0 : mode === 'cheap' ? 0 : 0.1,
-          });
-
-          const aiText =
-            (completion as { response?: string }).response ||
-            (completion as { result?: { response?: string } }).result?.response ||
-            '';
-          if (aiText.trim()) {
-            completionText = aiText.trim();
-            fallbackUsed = false;
-          }
-        } catch (aiError) {
-          console.error('[ui-api] AI.run failed, using fallback summary', { model, error: aiError });
-        }
-      }
-
-      return jsonResponse({
-        test_mode: testMode,
-        fallback_used: fallbackUsed,
-        mode,
-        tool: toolName,
-        tool_reason: toolReason,
-        session_id: activeSessionId || '',
-        ai_response: completionText,
-        mcp_result: mcpPayload,
-        ...(mcpError ? { mcp_error: mcpError } : {}),
-      });
-    }
-
-    // ── Plain AI chat (no MCP) for comparison mode ──────────────
-    if (url.pathname === '/api/ai-plain') {
-      if (request.method !== 'POST') {
-        return jsonError('Method not allowed', 405, 'method_not_allowed');
-      }
-      const uiOriginRejection = rejectDisallowedUiOrigin(request, allowedOrigins);
-      if (uiOriginRejection) return uiOriginRejection;
-
-      const authResult = await authenticateUiApiRequest(request, env);
-      if (authResult instanceof Response) return authResult;
-      const aiChatQuota = await applyAiChatLifetimeQuota(env, authResult.userId);
-      if (aiChatQuota) return aiChatQuota;
-      if (authResult.authType === 'session') {
-        const csrfError = requireCsrfToken(request);
-        if (csrfError) return csrfError;
-      }
-
-      const body = await parseJsonBody<{
-        message?: string;
-        mode?: 'cheap' | 'balanced';
-        history?: Array<{ role: string; content: string }>;
-      }>(request);
-      if (!body || !isPlainObject(body)) {
-        return jsonError('Invalid request payload.', 400, 'invalid_request_schema');
-      }
-      if (typeof body.message !== 'string') {
-        return jsonError('message must be a string.', 400, 'invalid_request_schema');
-      }
-      const message = body.message.trim();
-      if (!message || message.length > 10000) {
-        return jsonError('message is required (max 10,000 chars).', 400, 'invalid_message');
-      }
-      const mode = body.mode === 'balanced' ? 'balanced' : 'cheap';
-
-      const rawHistory = Array.isArray(body.history) ? body.history : [];
-      const conversationHistory = rawHistory
-        .filter((h): h is { role: string; content: string } =>
-          isPlainObject(h) && typeof h.role === 'string' && typeof h.content === 'string' &&
-          (h.role === 'user' || h.role === 'assistant'))
-        .slice(-10)
-        .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content.slice(0, 2000) }));
-
-      if (!env.AI || typeof env.AI.run !== 'function') {
-        return jsonError('AI service unavailable.', 502, 'ai_unavailable');
-      }
-      try {
-        const model = env.CLOUDFLARE_AI_MODEL?.trim() || (mode === 'balanced' ? DEFAULT_CF_AI_MODEL_BALANCED : DEFAULT_CF_AI_MODEL_CHEAP);
-        const messages: Array<{ role: string; content: string }> = [
-          {
-            role: 'system',
-            content: [
-              'You are a legal research assistant answering ONLY from your training data.',
-              'You have NO access to any external databases, APIs, or live legal data.',
-              'RULES:',
-              '- Be honest when you are uncertain about specific case names, dates, or holdings.',
-              '- Clearly state when information may be outdated or approximate.',
-              '- Do not fabricate specific case citations or holdings you are not confident about.',
-              '- Suggest the user verify any specific citations with an authoritative source.',
-            ].join('\n'),
-          },
-        ];
-        for (const turn of conversationHistory) {
-          messages.push(turn);
-        }
-        messages.push({ role: 'user', content: message });
-
-        const completion = await env.AI.run(model, {
-          messages,
-          max_tokens: mode === 'cheap' ? CHEAP_MODE_MAX_TOKENS : BALANCED_MODE_MAX_TOKENS,
-          temperature: mode === 'cheap' ? 0 : 0.1,
-        });
-        const aiText =
-          (completion as { response?: string }).response ||
-          (completion as { result?: { response?: string } }).result?.response ||
-          '';
-        if (!aiText.trim()) {
-          return jsonError('AI returned empty response.', 502, 'ai_response_invalid');
-        }
-        return jsonResponse({ ai_response: aiText.trim(), mode });
-      } catch (error) {
-        console.error('[ui-api] ai-plain failed', { error });
-        return jsonError(
-          error instanceof Error ? error.message : 'Failed to generate AI response.',
-          502,
-          'ai_plain_failed',
-        );
-      }
-    }
-
-    // Guard MCP endpoints with method/origin/auth/protocol checks
-    if (mcpPath) {
-      if (!['GET', 'POST', 'DELETE'].includes(request.method)) {
-        return withCors(
-          new Response('Method not allowed', { status: 405 }),
+          request,
+          url,
           origin,
           allowedOrigins,
-        );
-      }
-
-      if (!isAllowedOrigin(origin, allowedOrigins)) {
-        return withCors(new Response('Forbidden origin', { status: 403 }), origin, allowedOrigins);
-      }
-    }
-
-    // MCP endpoint auth (OIDC/Access JWT and/or static bearer token)
-    if (mcpPath) {
-      const clientId = getClientIdentifier(request);
-      const nowMs = Date.now();
-      const rateLimited = await getAuthRateLimitedResponse(clientId, env, nowMs);
-      if (rateLimited) {
-        return withCors(rateLimited, origin, allowedOrigins);
-      }
-
-      const authError = await authorizeMcpRequest(request, env);
-      if (authError) {
-        if (authError.status === 401 || authError.status === 403) {
-          await recordAuthFailure(clientId, env, nowMs);
-          const postFailureRateLimited = await getAuthRateLimitedResponse(clientId, env, nowMs);
-          if (postFailureRateLimited) {
-            return withCors(postFailureRateLimited, origin, allowedOrigins);
-          }
-        }
-        return withCors(authError, origin, allowedOrigins);
-      }
-
-      await clearAuthFailures(clientId, env, nowMs);
-    }
-
-    // Optional strict protocol version gate
-    if (mcpPath && request.method === 'POST') {
-      const requireProtocolVersion = parseBoolean(env.MCP_REQUIRE_PROTOCOL_VERSION);
-      const protocolVersion = request.headers.get('MCP-Protocol-Version');
-      const protocolError = validateProtocolVersionHeader(
-        protocolVersion,
-        requireProtocolVersion,
-        SUPPORTED_MCP_PROTOCOL_VERSIONS,
+          env,
+          ctx,
+          pathname,
+          requestMethod,
+          mcpPath,
+        },
+        workerDelegatedRouteDeps,
       );
-      if (protocolError) {
-        return withCors(protocolError, origin, allowedOrigins);
+      if (delegatedRouteResponse) {
+        return delegatedRouteResponse;
       }
-    }
 
-    // Friendly guidance when /sse is called without MCP-required Accept header
-    if (url.pathname === '/sse') {
-      const accept = request.headers.get('Accept') ?? '';
-      if (!accept.includes('text/event-stream')) {
-        return Response.json(
-          {
-            error: 'Not Acceptable',
-            message: 'Client must include Accept: application/json, text/event-stream',
-            example:
-              'curl -i https://courtlistenermcp.blakeoxford.com/sse -H \'Accept: application/json, text/event-stream\' -H \'Content-Type: application/json\' -d \'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}\'',
-          },
-          { status: 406, headers: buildCorsHeaders(origin, allowedOrigins) },
-        );
-      }
+      return new Response('Not found', { status: 404 });
+    } finally {
+      recordRouteLatency(routeMetricKey, Date.now() - requestStartedAt);
     }
-
-    if (url.pathname === '/mcp') {
-      const response = await mcpStreamableHandler.fetch(request, env, ctx);
-      return withCors(response, origin, allowedOrigins);
-    }
-
-    if (url.pathname === '/sse') {
-      const response = await mcpSseCompatibilityHandler.fetch(request, env, ctx);
-      return withCors(response, origin, allowedOrigins);
-    }
-
-    return new Response('Not found', { status: 404 });
   },
 };

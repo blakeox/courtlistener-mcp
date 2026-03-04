@@ -91,7 +91,7 @@ export class ErrorFactory {
     details?: Record<string, unknown>,
     context?: ErrorContext,
   ): ValidationError {
-    const error = new ValidationError(message, details);
+    const error = new ValidationError(message, [], details ? { additionalData: details } : {});
     if (context) {
       this.addContext(error, context);
     }
@@ -111,7 +111,7 @@ export class ErrorFactory {
     details?: Record<string, unknown>,
     context?: ErrorContext,
   ): ConfigurationError {
-    const error = new ConfigurationError(message, details);
+    const error = new ConfigurationError(message, undefined, details ? { additionalData: details } : {});
     if (context) {
       this.addContext(error, context);
     }
@@ -165,7 +165,10 @@ export class ErrorFactory {
     details?: Record<string, unknown>,
     context?: ErrorContext,
   ): RateLimitError {
-    const error = new RateLimitError(message, retryAfter);
+    const limit = typeof details?.limit === 'number' ? details.limit : 0;
+    const windowMs = typeof details?.windowMs === 'number' ? details.windowMs : retryAfter * 1000;
+    const error = new RateLimitError(limit, windowMs, retryAfter, details ? { additionalData: details } : {});
+    error.message = message;
     if (context || details) {
       this.addContext(error, { ...context, ...details });
     }
@@ -305,16 +308,16 @@ export class ErrorFactory {
       return {
         message: error.message,
         code: error.code,
-        statusCode: error.statusCode,
+        ...(error.statusCode !== undefined && { statusCode: error.statusCode }),
         details: { ...(error.details || {}), ...(context || {}) },
-        stack: error.stack,
+        ...(error.stack !== undefined && { stack: error.stack }),
       };
     }
 
     if (error instanceof Error) {
       return {
         message: error.message,
-        stack: error.stack,
+        ...(error.stack !== undefined && { stack: error.stack }),
       };
     }
 

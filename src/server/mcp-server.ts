@@ -14,7 +14,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { generateId, retry } from '../common/utils.js';
+import { generateId } from '../common/utils.js';
 import { GracefulShutdown, createGracefulShutdown } from '../graceful-shutdown.js';
 import { HealthServer } from '../http-server.js';
 import { CacheManager } from '../infrastructure/cache.js';
@@ -22,7 +22,7 @@ import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
 import { container } from '../infrastructure/container.js';
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
-import { MiddlewareFactory, RequestContext } from '../infrastructure/middleware-factory.js';
+import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
 import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ServerConfig } from '../types.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
@@ -33,6 +33,10 @@ import { SubscriptionManager } from './subscription-manager.js';
 import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
 import { setupHandlers } from './handler-registry.js';
 import { buildToolDefinitions, buildEnhancedMetadata, ToolMetadata } from './tool-builder.js';
+import {
+  createMiddlewareToolExecutionService,
+  type ToolExecutionService,
+} from './tool-execution-service.js';
 
 /**
  * Best Practice Legal MCP Server
@@ -80,6 +84,7 @@ export class BestPracticeLegalMCPServer {
   private readonly cache: CacheManager;
   private readonly samplingService: SamplingService;
   private readonly subscriptionManager: SubscriptionManager;
+  private readonly toolExecutionService: ToolExecutionService;
 
   private healthServer?: HealthServer;
   private transport?: Transport;
@@ -119,6 +124,15 @@ export class BestPracticeLegalMCPServer {
 
     this.samplingService = new SamplingService(this.server, this.config, this.logger);
     this.subscriptionManager = new SubscriptionManager();
+    this.toolExecutionService = createMiddlewareToolExecutionService({
+      toolRegistry: this.toolRegistry,
+      logger: this.logger,
+      metrics: this.metrics,
+      middlewareFactory: this.middlewareFactory,
+      config: this.config,
+      cache: this.cache,
+      sampling: this.samplingService,
+    });
 
     this.setupHealthServer();
 
@@ -126,14 +140,13 @@ export class BestPracticeLegalMCPServer {
       server: this.server,
       logger: this.logger,
       metrics: this.metrics,
-      toolRegistry: this.toolRegistry,
-      resourceRegistry: this.resourceRegistry,
-      promptRegistry: this.promptRegistry,
       subscriptionManager: this.subscriptionManager,
-      isShuttingDown: () => this.isShuttingDown,
-      activeRequests: this.activeRequests,
-      buildToolDefinitions: () => this.buildToolDefinitions(),
-      executeToolWithMiddleware: (req, id) => this.executeToolWithMiddleware(req, id),
+      listTools: () => this.listToolsCore(),
+      listResources: () => this.listResourcesCore(),
+      readResource: (uri) => this.readResourceCore(uri),
+      listPrompts: () => this.listPromptsCore(),
+      getPrompt: (name, args) => this.getPromptCore(name, args),
+      executeTool: (request) => this.executeToolCore(request),
     });
 
     this.setupLifecycleHooks();
@@ -227,8 +240,7 @@ export class BestPracticeLegalMCPServer {
     }
 
     if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = undefined;
+      this.stopHeartbeat();
     }
 
     await this.server.close();
@@ -244,10 +256,7 @@ export class BestPracticeLegalMCPServer {
    * Destroy the server instance for cleanup (useful in tests)
    */
   destroy(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = undefined;
-    }
+    this.stopHeartbeat();
     this.isShuttingDown = true;
   }
 
@@ -258,19 +267,14 @@ export class BestPracticeLegalMCPServer {
     const timer = this.logger.startTimer('list_tools_direct');
 
     try {
-      const tools = this.buildToolDefinitions();
-      const duration = timer.end(true, { toolCount: tools.length });
-      this.metrics.recordRequest(duration, false);
+      const result = await this.listToolsCore();
+      const duration = timer.end(true, { toolCount: result.tools.length });
+      this.metrics.recordRequest(duration, false, 'mcp.list_tools_direct');
 
-      return {
-        tools,
-        metadata: {
-          categories: this.toolRegistry.getCategories(),
-        },
-      };
+      return result;
     } catch (error) {
       const duration = timer.endWithError(error as Error);
-      this.metrics.recordFailure(duration);
+      this.metrics.recordFailure(duration, 'mcp.list_tools_direct');
       throw error;
     }
   }
@@ -279,41 +283,28 @@ export class BestPracticeLegalMCPServer {
    * Direct access to list resources
    */
   async listResources(): Promise<{ resources: Resource[] }> {
-    const resources = await this.resourceRegistry.getAllResources();
-    return { resources };
+    return this.listResourcesCore();
   }
 
   /**
    * Direct access to read resource
    */
   async readResource(uri: string): Promise<ReadResourceResult> {
-    const handler = this.resourceRegistry.findHandler(uri);
-    if (!handler) {
-      throw new McpError(ErrorCode.InvalidRequest, `Resource not found: ${uri}`);
-    }
-    return handler.read(uri, {
-      logger: this.logger,
-      requestId: generateId(),
-    });
+    return this.readResourceCore(uri);
   }
 
   /**
    * Direct access to list prompts
    */
   async listPrompts(): Promise<{ prompts: Prompt[] }> {
-    const prompts = await this.promptRegistry.getAllPrompts();
-    return { prompts };
+    return this.listPromptsCore();
   }
 
   /**
    * Direct access to get prompt
    */
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
-    const handler = this.promptRegistry.findHandler(name);
-    if (!handler) {
-      throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
-    }
-    return handler.getMessages(args || {});
+    return this.getPromptCore(name, args);
   }
 
   /**
@@ -327,10 +318,6 @@ export class BestPracticeLegalMCPServer {
           arguments?: Record<string, unknown>;
         },
   ): Promise<CallToolResult> {
-    if (this.isShuttingDown) {
-      throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
-    }
-
     const request =
       'params' in input
         ? input
@@ -347,16 +334,7 @@ export class BestPracticeLegalMCPServer {
       throw new McpError(ErrorCode.InvalidParams, 'Invalid tool call arguments');
     }
 
-    const requestId = generateId();
-    this.activeRequests.add(requestId);
-
-    try {
-      return await this.executeToolWithMiddleware(validation.data, requestId);
-    } catch (error) {
-      throw error;
-    } finally {
-      this.activeRequests.delete(requestId);
-    }
+    return this.executeToolCore(validation.data);
   }
 
   /**
@@ -378,6 +356,69 @@ export class BestPracticeLegalMCPServer {
       circuitBreakersHealthy: this.circuitBreakers.areAllHealthy(),
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private async listToolsCore(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }> {
+    return {
+      tools: this.buildToolDefinitions(),
+      metadata: {
+        categories: this.toolRegistry.getCategories(),
+      },
+    };
+  }
+
+  private async listResourcesCore(): Promise<{ resources: Resource[] }> {
+    return { resources: this.resourceRegistry.getAllResources() };
+  }
+
+  private async readResourceCore(uri: string): Promise<ReadResourceResult> {
+    const handler = this.resourceRegistry.findHandler(uri);
+    if (!handler) {
+      throw new McpError(ErrorCode.InvalidRequest, `Resource not found: ${uri}`);
+    }
+    return handler.read(uri, {
+      logger: this.logger,
+      requestId: generateId(),
+    });
+  }
+
+  private async listPromptsCore(): Promise<{ prompts: Prompt[] }> {
+    return { prompts: this.promptRegistry.getAllPrompts() };
+  }
+
+  private async getPromptCore(
+    name: string,
+    args: Record<string, string> = {},
+  ): Promise<GetPromptResult> {
+    const handler = this.promptRegistry.findHandler(name);
+    if (!handler) {
+      throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
+    }
+    return handler.getMessages(args);
+  }
+
+  private async executeToolCore(request: CallToolRequest): Promise<CallToolResult> {
+    if (this.isShuttingDown) {
+      throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
+    }
+
+    const requestId = generateId();
+    this.activeRequests.add(requestId);
+
+    try {
+      return await this.toolExecutionService.execute(request, requestId);
+    } catch (error) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Error executing ${request.params.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      this.activeRequests.delete(requestId);
+    }
   }
 
   private setupHealthServer(): void {
@@ -419,8 +460,6 @@ export class BestPracticeLegalMCPServer {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
       });
-
-      this.metrics.recordRequest(0, false);
     }, SESSION.HEARTBEAT_INTERVAL_MS);
   }
 
@@ -437,102 +476,6 @@ export class BestPracticeLegalMCPServer {
 
   private buildToolDefinitions(): Tool[] {
     return buildToolDefinitions(this.toolRegistry, this.enhancedToolMetadata);
-  }
-
-  private async executeToolWithMiddleware(
-    request: CallToolRequest,
-    requestId: string,
-  ): Promise<CallToolResult> {
-    const startTime = Date.now();
-    const context: RequestContext = {
-      requestId,
-      startTime,
-      metadata: {
-        toolName: request.params.name,
-        arguments: request.params.arguments,
-      },
-    };
-
-    const middlewares = this.middlewareFactory.createMiddlewareStack(this.config);
-
-    const executeTool = async () =>
-      this.toolRegistry.execute(request, {
-        logger: this.logger.child(`Tool:${request.params.name}`),
-        requestId,
-        cache: this.cache,
-        metrics: this.metrics,
-        config: this.config,
-        sampling: this.samplingService,
-      });
-
-    try {
-      const result = (await this.middlewareFactory.executeMiddlewareStack(
-        middlewares,
-        context,
-        () =>
-          retry(executeTool, {
-            maxAttempts: 3,
-            baseDelay: 750,
-            maxDelay: 5_000,
-          }),
-      )) as CallToolResult;
-
-      const duration = Date.now() - startTime;
-
-      if ((result as CallToolResult).isError) {
-        this.metrics.recordFailure(duration);
-        let message = `Tool ${request.params.name} failed`;
-        try {
-          const errorResult = result as CallToolResult;
-          if (
-            errorResult.content &&
-            Array.isArray(errorResult.content) &&
-            errorResult.content.length > 0
-          ) {
-            const firstContent = errorResult.content[0];
-            if (
-              firstContent &&
-              firstContent.type === 'text' &&
-              'text' in firstContent &&
-              typeof firstContent.text === 'string'
-            ) {
-              try {
-                const parsed = JSON.parse(firstContent.text);
-                if (parsed && typeof parsed === 'object' && 'error' in parsed) {
-                  message = String(parsed.error);
-                } else if (typeof parsed === 'string') {
-                  message = parsed;
-                } else {
-                  message = firstContent.text;
-                }
-              } catch {
-                message = firstContent.text;
-              }
-            }
-          }
-        } catch {
-          // ignore JSON parse issues, keep default message
-        }
-
-        this.logger.toolExecution(request.params.name, duration, false, {
-          requestId,
-          error: message,
-        });
-        throw new Error(message);
-      }
-
-      this.metrics.recordRequest(duration, false);
-      this.logger.toolExecution(request.params.name, duration, true, { requestId });
-      return result;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      this.metrics.recordFailure(duration);
-      this.logger.toolExecution(request.params.name, duration, false, {
-        requestId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
   }
 
   private registerShutdownHooks(): void {

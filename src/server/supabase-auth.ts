@@ -19,6 +19,7 @@ export interface SupabaseAuthDeps {
 export interface SupabaseApiKeyValidationResult {
   valid: boolean;
   reason?: string;
+  userId?: string;
 }
 
 const DEFAULT_API_KEYS_TABLE = 'mcp_api_keys';
@@ -132,7 +133,11 @@ export async function validateSupabaseApiKey(
         } else if (isExpired(record.expires_at)) {
           result = { valid: false, reason: 'api_key_expired' };
         } else {
-          result = { valid: true };
+          const userId =
+            typeof record.user_id === 'string' && record.user_id.trim().length > 0
+              ? record.user_id
+              : undefined;
+          result = { valid: true, ...(userId ? { userId } : {}) };
         }
       }
     }

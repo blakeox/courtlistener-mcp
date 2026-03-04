@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -36,6 +36,8 @@ vi.mock('../lib/auth', () => ({
   useAuth: vi.fn().mockReturnValue({
     session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' },
     loading: false,
+    sessionReady: true,
+    sessionError: '',
     refresh: vi.fn(),
     logout: vi.fn(),
   }),
@@ -231,6 +233,7 @@ describe('PlaygroundPage', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', createStorageMock());
     vi.stubGlobal('sessionStorage', createStorageMock());
+    vi.clearAllMocks();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -310,5 +313,171 @@ describe('PlaygroundPage', () => {
     render(<PlaygroundPage />, { wrapper: Wrapper });
     const rawPanel = document.getElementById('panel-raw');
     expect(rawPanel?.hidden).toBe(true);
+  });
+
+  it('uses live tools/list discovery for catalog count when available', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') {
+        return {
+          body: {
+            jsonrpc: '2.0',
+            result: {
+              tools: [{
+                name: 'live_lookup_tool',
+                description: 'Live-discovered tool',
+                inputSchema: { type: 'object', properties: { citation: { type: 'string' } }, required: ['citation'] },
+                metadata: { category: 'Live' },
+              }],
+              metadata: { categories: ['Live'] },
+            },
+          },
+          sessionId: 'sid',
+        };
+      }
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /show tool catalog \(1\)/i })).toBeInTheDocument();
+    });
+    expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(expect.objectContaining({ method: 'tools/list' }), 'test-token');
+  });
+
+  it('falls back to static catalog when tools/list discovery fails', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') throw new Error('discovery failed');
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(expect.objectContaining({ method: 'tools/list' }), 'test-token');
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /show tool catalog/i }).textContent).not.toContain('(1)');
+    });
+  });
+
+  it('builds schema-driven tool arguments in Raw MCP Console', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') {
+        return {
+          body: {
+            result: {
+              tools: [{
+                name: 'live_lookup_tool',
+                description: 'Live-discovered tool',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    citation: { type: 'string', description: 'Citation text' },
+                    page_size: { type: 'integer', description: 'Number of results' },
+                  },
+                  required: ['citation'],
+                },
+                metadata: { category: 'Live' },
+              }],
+              metadata: { categories: ['Live'] },
+            },
+          },
+          sessionId: 'sid',
+        };
+      }
+      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
+      if (args.method === 'tools/call') return { body: { result: { ok: true } }, sessionId: 'sid' };
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/citation/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const discoveryCalls = vi.mocked(api.mcpCall).mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
+      expect(discoveryCalls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    fireEvent.change(screen.getByLabelText(/citation/i), { target: { value: '410 U.S. 113' } });
+    fireEvent.change(screen.getByLabelText(/page_size/i), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      const toolCall = vi.mocked(api.mcpCall).mock.calls.find(([call]) => (call as { method?: string }).method === 'tools/call');
+      expect(toolCall).toBeTruthy();
+      expect((toolCall?.[0] as { params: unknown }).params).toMatchObject({
+        name: 'live_lookup_tool',
+        arguments: { citation: '410 U.S. 113', page_size: 2 },
+      });
+    });
+  });
+
+  it('validates required schema fields before tool call', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') {
+        return {
+          body: {
+            result: {
+              tools: [{
+                name: 'live_lookup_tool',
+                description: 'Live-discovered tool',
+                inputSchema: {
+                  type: 'object',
+                  properties: { citation: { type: 'string' } },
+                  required: ['citation'],
+                },
+                metadata: { category: 'Live' },
+              }],
+              metadata: { categories: ['Live'] },
+            },
+          },
+          sessionId: 'sid',
+        };
+      }
+      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/citation/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const discoveryCalls = vi.mocked(api.mcpCall).mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
+      expect(discoveryCalls.length).toBeGreaterThanOrEqual(2);
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/fix argument errors before sending/i)).toBeInTheDocument();
+    });
+    expect(vi.mocked(api.mcpCall).mock.calls.some(([call]) => (call as { method?: string }).method === 'tools/call')).toBe(false);
   });
 });

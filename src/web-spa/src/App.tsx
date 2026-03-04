@@ -13,8 +13,10 @@ import { PlaygroundPage } from './pages/PlaygroundPage';
 import { AccountPage } from './pages/AccountPage';
 import { useAuth } from './lib/auth';
 import { listKeys } from './lib/api';
-import { TokenProvider } from './lib/token-context';
+import { keysQueryKey } from './lib/query-keys';
+import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
+import { verifyMcpRuntimeReadiness } from './lib/mcp-runtime-readiness';
 
 function PageLoader(): React.JSX.Element {
   return (
@@ -26,23 +28,37 @@ function PageLoader(): React.JSX.Element {
 }
 
 export function App(): React.JSX.Element {
+  return (
+    <TokenProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </TokenProvider>
+  );
+}
+
+function AppContent(): React.JSX.Element {
   const { session } = useAuth();
+  const { token } = useToken();
   const location = useLocation();
 
   const keysQuery = useQuery({
-    queryKey: ['keys', 'progress'],
+    queryKey: keysQueryKey,
     queryFn: () => listKeys(),
     enabled: Boolean(session?.authenticated),
   });
 
-  const hasAccount = Boolean(localStorage.getItem('clmcp_signup_started_at'));
+  const hasAccount = Boolean(session?.user?.id) || Boolean(localStorage.getItem('clmcp_signup_started_at'));
   const hasVerifiedAndLoggedIn = Boolean(session?.authenticated);
   const hasKey = (keysQuery.data?.keys.length ?? 0) > 0;
-  const hasMcpSuccess = Boolean(
-    localStorage
-      .getItem('clmcp_telemetry_events')
-      ?.includes('first_mcp_call_succeeded'),
-  );
+  const hasToken = Boolean(token.trim());
+  const mcpReadinessQuery = useQuery({
+    queryKey: ['mcp-runtime-readiness', token],
+    queryFn: () => verifyMcpRuntimeReadiness(token),
+    enabled: hasVerifiedAndLoggedIn && hasKey && hasToken,
+    retry: false,
+  });
+  const hasMcpSuccess = Boolean(mcpReadinessQuery.data?.ready);
 
   const steps = [
     { label: 'Create account', complete: hasAccount, active: location.pathname === '/app/signup', to: '/app/signup' },
@@ -53,15 +69,19 @@ export function App(): React.JSX.Element {
       to: '/app/login',
     },
     { label: 'Create key', complete: hasKey, active: location.pathname === '/app/keys', to: '/app/keys', disabled: !hasVerifiedAndLoggedIn },
-    { label: 'First MCP call', complete: hasMcpSuccess, active: location.pathname === '/app/playground', to: '/app/playground', disabled: !hasKey },
+    {
+      label: 'MCP runtime ready',
+      complete: hasMcpSuccess,
+      active: location.pathname === '/app/playground',
+      to: '/app/playground',
+      disabled: !hasKey || !hasToken,
+    },
   ];
 
   return (
-    <TokenProvider>
-      <ToastProvider>
-        <Shell steps={steps}>
-          <ErrorBoundary>
-          <React.Suspense fallback={<PageLoader />}>
+    <Shell steps={steps}>
+      <ErrorBoundary>
+        <React.Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/app/signup" element={<SignupPage />} />
             <Route path="/app/login" element={<LoginPage />} />
@@ -93,11 +113,9 @@ export function App(): React.JSX.Element {
             />
             <Route path="*" element={<SmartRedirect hasAccount={hasAccount} hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasKey={hasKey} hasMcpSuccess={hasMcpSuccess} />} />
           </Routes>
-          </React.Suspense>
-          </ErrorBoundary>
-        </Shell>
-      </ToastProvider>
-    </TokenProvider>
+        </React.Suspense>
+      </ErrorBoundary>
+    </Shell>
   );
 }
 

@@ -74,21 +74,37 @@ export function withCache(config: CacheConfig = {}) {
         context.logger?.info(`${this.name} served from cache`, {
           requestId: context.requestId,
         });
-        return this.success(cached);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(cached, null, 2) }],
+          structuredContent: cached,
+        };
       }
 
       // Execute original method
       const result = await originalMethod.call(this, input, context);
 
       // Cache successful results
-      if (!result.isError && result.content) {
-        const content = result.content[0];
-        if (content?.type === 'text') {
-          try {
-            const data = JSON.parse(content.text) as Record<string, unknown>;
-            context.cache.set(cacheKey, input as Record<string, unknown>, data, ttl);
-          } catch {
-            // Not JSON, skip caching
+      if (!result.isError) {
+        if (
+          result.structuredContent &&
+          typeof result.structuredContent === 'object' &&
+          !Array.isArray(result.structuredContent)
+        ) {
+          context.cache.set(
+            cacheKey,
+            input as Record<string, unknown>,
+            result.structuredContent as Record<string, unknown>,
+            ttl,
+          );
+        } else if (result.content) {
+          const content = result.content[0];
+          if (content?.type === 'text') {
+            try {
+              const data = JSON.parse(content.text) as Record<string, unknown>;
+              context.cache.set(cacheKey, input as Record<string, unknown>, data, ttl);
+            } catch {
+              // Not JSON, skip caching
+            }
           }
         }
       }

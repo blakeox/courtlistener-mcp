@@ -176,16 +176,7 @@ const defaultConfig: ServerConfig = {
  */
 export function getConfig(): ServerConfig {
   const config = validateConfig(defaultConfig);
-
-  // Additional Zod validation for type safety
-  try {
-    return validateConfigWithZod(config);
-  } catch (error) {
-    // If Zod validation fails, log but still return the config
-    // (existing validation should have caught most issues)
-    console.warn('Zod validation warning:', error);
-    return config;
-  }
+  return validateConfigWithZod(config);
 }
 
 function validateConfig(config: ServerConfig): ServerConfig {

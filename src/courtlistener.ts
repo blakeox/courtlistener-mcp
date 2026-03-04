@@ -18,11 +18,22 @@ import { CacheManager } from './infrastructure/cache.js';
 import { Logger } from './infrastructure/logger.js';
 import { MetricsCollector } from './infrastructure/metrics.js';
 
+type EndpointCacheClass =
+  | 'default'
+  | 'search'
+  | 'detail'
+  | 'staticReference'
+  | 'financial'
+  | 'recap';
+
 export class CourtListenerAPI {
-  private rateLimitQueue: Array<() => void> = [];
+  private readonly maxRateLimitQueueSize = 1000;
+  private rateLimitQueue: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
   private isProcessingQueue = false;
-  private requestCount = 0;
-  private windowStart = Date.now();
+  private availableTokens: number;
+  private lastRefillTime = Date.now();
+  private refillTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly cacheTtlByClass: Record<EndpointCacheClass, number>;
 
   constructor(
     private config: CourtListenerConfig,
@@ -30,9 +41,12 @@ export class CourtListenerAPI {
     private logger: Logger,
     private metrics: MetricsCollector,
   ) {
+    this.availableTokens = this.config.rateLimitPerMinute;
+    this.cacheTtlByClass = this.buildCacheTtlPolicy();
     this.logger.info('CourtListener API client initialized', {
       baseUrl: this.config.baseUrl,
       rateLimitPerMinute: this.config.rateLimitPerMinute,
+      cacheTtlPolicy: this.cacheTtlByClass,
     });
   }
 
@@ -45,14 +59,15 @@ export class CourtListenerAPI {
     options: { useCache?: boolean; cacheTtlOverride?: number } = {},
   ): Promise<T> {
     const timer = this.logger.startTimer(`API ${endpoint}`);
-    const { useCache = true, cacheTtlOverride: _cacheTtlOverride } = options;
+    const { useCache = true, cacheTtlOverride } = options;
+    const operation = `courtlistener.${this.endpointToOperation(endpoint)}`;
 
     try {
       // Check cache first
       if (useCache && this.cache.isEnabled()) {
         const cached = this.cache.get<T>(endpoint, params);
         if (cached !== null) {
-          this.metrics.recordRequest(timer.end(), true);
+          this.metrics.recordRequest(timer.end(), true, operation);
           return cached;
         }
       }
@@ -76,28 +91,111 @@ export class CourtListenerAPI {
 
       // Cache successful responses
       if (useCache && this.cache.isEnabled() && response.ok && params) {
-        this.cache.set(endpoint, params, data);
+        this.cache.set(endpoint, params, data, this.resolveCacheTtl(endpoint, cacheTtlOverride));
       }
 
       const duration = timer.end();
-      this.metrics.recordRequest(duration, false);
+      this.metrics.recordRequest(duration, false, operation);
 
       this.logger.apiCall('GET', endpoint, duration, response.status, {
-        params,
         cached: false,
+        ...this.createParamLogMetadata(params),
       });
 
       return data;
     } catch (error) {
       const duration = timer.endWithError(error as Error);
-      this.metrics.recordFailure(duration);
+      this.metrics.recordFailure(duration, operation);
 
       if (error instanceof Error) {
-        this.logger.error(`API request failed: ${endpoint}`, error, { params });
+        this.logger.error(`API request failed: ${endpoint}`, error, this.createParamLogMetadata(params));
       }
 
       throw error;
     }
+  }
+
+  private endpointToOperation(endpoint: string): string {
+    const normalized = endpoint.replace(/^\/+|\/+$/g, '').replace(/[^a-zA-Z0-9]+/g, '_');
+    return normalized || 'root';
+  }
+
+  private buildCacheTtlPolicy(): Record<EndpointCacheClass, number> {
+    const baseTtl = Number.parseInt(process.env.CACHE_TTL || '300', 10);
+    const defaultTtl = Number.isFinite(baseTtl) && baseTtl >= 0 ? baseTtl : 300;
+
+    const defaults: Record<EndpointCacheClass, number> = {
+      default: defaultTtl,
+      search: defaultTtl,
+      detail: Math.max(defaultTtl, 600),
+      staticReference: Math.max(defaultTtl, 1800),
+      financial: Math.max(defaultTtl, 900),
+      recap: Math.max(defaultTtl, 600),
+    };
+
+    return this.applyCacheTtlOverrides(defaults, process.env.CACHE_TTL_CLASS_OVERRIDES);
+  }
+
+  private applyCacheTtlOverrides(
+    defaults: Record<EndpointCacheClass, number>,
+    overrides: string | undefined,
+  ): Record<EndpointCacheClass, number> {
+    if (!overrides) return defaults;
+
+    const applied = { ...defaults };
+    const validClasses = new Set<EndpointCacheClass>([
+      'default',
+      'search',
+      'detail',
+      'staticReference',
+      'financial',
+      'recap',
+    ]);
+
+    for (const rawEntry of overrides.split(',')) {
+      const [rawClass, rawTtl] = rawEntry.split(':').map((part) => part.trim());
+      if (!rawClass || !rawTtl || !validClasses.has(rawClass as EndpointCacheClass)) {
+        continue;
+      }
+      const ttl = Number.parseInt(rawTtl, 10);
+      if (Number.isFinite(ttl) && ttl >= 0) {
+        applied[rawClass as EndpointCacheClass] = ttl;
+      }
+    }
+
+    return applied;
+  }
+
+  private resolveCacheClass(endpoint: string): EndpointCacheClass {
+    if (/^\/search\/?$/.test(endpoint)) return 'search';
+    if (/^\/(courts|citation-lookup|schools|tags|docket-tags)\/?$/.test(endpoint)) {
+      return 'staticReference';
+    }
+    if (
+      /^\/(clusters|opinions|people|dockets|docket-entries|audio|positions|alerts|docket-alerts)\/\d+\/?$/.test(
+        endpoint,
+      )
+    ) {
+      return 'detail';
+    }
+    if (
+      /^\/(financial-disclosures|agreements|debts|gifts|investments|non-investment-incomes|disclosure-positions|reimbursements|spouse-incomes)\/?$/.test(
+        endpoint,
+      )
+    ) {
+      return 'financial';
+    }
+    if (/^\/(recap|recap-fetch|recap-query|recap-email)\/?$/.test(endpoint)) {
+      return 'recap';
+    }
+    return 'default';
+  }
+
+  private resolveCacheTtl(endpoint: string, cacheTtlOverride?: number): number {
+    if (typeof cacheTtlOverride === 'number' && cacheTtlOverride >= 0) {
+      return cacheTtlOverride;
+    }
+    return this.cacheTtlByClass[this.resolveCacheClass(endpoint)] ?? this.cacheTtlByClass.default;
   }
 
   /**
@@ -110,20 +208,14 @@ export class CourtListenerAPI {
       return baseUrl;
     }
 
-    // Filter out undefined, null, and empty string values
-    // Cast to Record for iteration since we accept any object type
-    const paramsRecord = params as Record<string, unknown>;
-    const cleanParams = Object.entries(paramsRecord)
-      .filter(([, value]) => value !== undefined && value !== null && value !== '')
-      .reduce<Record<string, string>>(
-        (obj, [key, value]) => ({ ...obj, [key]: String(value) }),
-        {},
-      );
-
+    // Filter out undefined, null, and empty string values while building query params
     const searchParams = new URLSearchParams();
-    Object.entries(cleanParams).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(params as Record<string, unknown>)) {
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
       searchParams.append(key, String(value));
-    });
+    }
 
     return `${baseUrl}?${searchParams.toString()}`;
   }
@@ -152,7 +244,7 @@ export class CourtListenerAPI {
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(`Request attempt ${attempt} failed`, {
-          url,
+          ...this.createUrlLogMetadata(url),
           error: lastError.message,
           attempt,
           maxAttempts: this.config.retryAttempts,
@@ -168,6 +260,34 @@ export class CourtListenerAPI {
     }
 
     throw lastError || new Error('Request failed after all retry attempts');
+  }
+
+  private createParamLogMetadata(params?: object): Record<string, unknown> {
+    if (!params || Object.keys(params).length === 0) {
+      return { paramCount: 0 };
+    }
+
+    const keys = Object.keys(params);
+    return {
+      paramCount: keys.length,
+      paramKeys: keys.slice(0, 10),
+      ...(keys.length > 10 && { truncatedParamKeys: keys.length - 10 }),
+    };
+  }
+
+  private createUrlLogMetadata(url: string): Record<string, unknown> {
+    try {
+      const parsedUrl = new URL(url);
+      return {
+        path: parsedUrl.pathname,
+        queryParamCount: Array.from(parsedUrl.searchParams.keys()).length,
+      };
+    } catch {
+      return {
+        urlPreview: `${url.slice(0, 120)}${url.length > 120 ? '…' : ''}`,
+        urlLength: url.length,
+      };
+    }
   }
 
   /**
@@ -221,49 +341,61 @@ export class CourtListenerAPI {
    * Rate limiting implementation
    */
   private async rateLimit(): Promise<void> {
-    return new Promise((resolve) => {
-      this.rateLimitQueue.push(resolve);
+    return new Promise((resolve, reject) => {
+      if (this.rateLimitQueue.length >= this.maxRateLimitQueueSize) {
+        const error = new Error(
+          `Rate limit queue overloaded: ${this.rateLimitQueue.length}/${this.maxRateLimitQueueSize}`
+        );
+        this.logger.warn('Rate limit queue capacity exceeded', {
+          queueLength: this.rateLimitQueue.length,
+          maxQueueLength: this.maxRateLimitQueueSize,
+          rateLimitPerMinute: this.config.rateLimitPerMinute,
+        });
+        reject(error);
+        return;
+      }
+
+      this.rateLimitQueue.push({ resolve, reject });
       this.processQueue();
     });
   }
 
   /**
-   * Process rate limit queue
+   * Process rate limit queue using token-bucket scheduling
    */
   private processQueue(): void {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
-    const processNext = () => {
-      const now = Date.now();
+    const ratePerMillisecond = this.config.rateLimitPerMinute / 60000;
+    const now = Date.now();
+    const elapsed = now - this.lastRefillTime;
 
-      // Reset window if needed
-      if (now - this.windowStart >= 60000) {
-        this.requestCount = 0;
-        this.windowStart = now;
+    if (elapsed > 0) {
+      this.availableTokens = Math.min(
+        this.config.rateLimitPerMinute,
+        this.availableTokens + elapsed * ratePerMillisecond,
+      );
+      this.lastRefillTime = now;
+    }
+
+    while (this.rateLimitQueue.length > 0 && this.availableTokens >= 1) {
+      this.availableTokens -= 1;
+      const queuedRequest = this.rateLimitQueue.shift();
+      if (queuedRequest) {
+        queuedRequest.resolve();
       }
+    }
 
-      if (this.rateLimitQueue.length === 0) {
-        this.isProcessingQueue = false;
-        return;
-      }
+    if (this.rateLimitQueue.length > 0 && this.refillTimer === null) {
+      const millisecondsUntilNextToken = Math.ceil((1 - this.availableTokens) / ratePerMillisecond);
+      this.refillTimer = setTimeout(() => {
+        this.refillTimer = null;
+        this.processQueue();
+      }, Math.max(1, millisecondsUntilNextToken));
+    }
 
-      if (this.requestCount < this.config.rateLimitPerMinute) {
-        const resolve = this.rateLimitQueue.shift();
-        if (!resolve) return; // Queue was empty, shouldn't happen but handle gracefully
-        this.requestCount++;
-        resolve();
-
-        // Process next immediately if under limit
-        setImmediate(processNext);
-      } else {
-        // Wait until next window
-        const waitTime = 60000 - (now - this.windowStart);
-        setTimeout(processNext, waitTime);
-      }
-    };
-
-    processNext();
+    this.isProcessingQueue = false;
   }
 
   // API Methods
@@ -433,7 +565,10 @@ export class CourtListenerAPI {
     const response = await this.searchOpinions(searchParams);
     const results = response?.results || [];
 
-    const topCases = results.slice(0, 10).map((r: Record<string, unknown>) => ({
+    const topCases = results.slice(0, 10).map(
+      (
+        r: OpinionCluster & { caseName?: string; court_id?: string; dateFiled?: string; snippet?: string },
+      ) => ({
       case_name: r.case_name || r.caseName || 'Unknown',
       court: r.court || r.court_id || '',
       date_filed: r.date_filed || r.dateFiled || '',
@@ -442,7 +577,8 @@ export class CourtListenerAPI {
       precedential_status: r.precedential_status || '',
       absolute_url: r.absolute_url || '',
       snippet: r.snippet || r.summary || '',
-    }));
+      }),
+    );
 
     return {
       analysis: {

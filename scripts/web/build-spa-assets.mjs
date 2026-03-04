@@ -10,6 +10,25 @@ const spaRoot = resolve(repoRoot, 'src/web-spa');
 const outDir = resolve(repoRoot, '.spa-dist');
 const manifestPath = resolve(outDir, '.vite/manifest.json');
 const outputFile = resolve(repoRoot, 'src/web/spa-assets.ts');
+const DEFAULT_JS_BUDGET_BYTES = 450_000;
+const DEFAULT_CSS_BUDGET_BYTES = 20_000;
+
+function readBudget(envName, defaultValue) {
+  const raw = process.env[envName];
+  if (!raw) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${envName} value "${raw}". Expected a positive integer (bytes).`);
+  }
+  return parsed;
+}
+
+function formatKiB(bytes) {
+  return `${(bytes / 1024).toFixed(2)} KiB`;
+}
 
 function runBuild() {
   execSync('pnpm exec vite build --config src/web-spa/vite.config.ts', {
@@ -32,6 +51,21 @@ function main() {
   if (!entry?.file) {
     throw new Error('Missing index.html entry in Vite manifest');
   }
+  const importedChunks = Array.isArray(entry.imports) ? entry.imports : [];
+  const dynamicImportedChunks = Array.isArray(entry.dynamicImports) ? entry.dynamicImports : [];
+  const jsChunks = [entry.file, ...importedChunks, ...dynamicImportedChunks];
+  if (jsChunks.length > 1) {
+    throw new Error(
+      `Unsupported SPA build output: index.html resolves to multiple JS chunks (${jsChunks.join(', ')}). ` +
+      'This worker only serves a single inlined /app/assets/spa.js bundle.',
+    );
+  }
+  if (Array.isArray(entry.css) && entry.css.length > 1) {
+    throw new Error(
+      `Unsupported SPA build output: index.html resolves to multiple CSS files (${entry.css.join(', ')}). ` +
+      'This worker only serves a single inlined /app/assets/spa.css bundle.',
+    );
+  }
 
   const jsPath = resolve(outDir, entry.file);
   const cssFile = Array.isArray(entry.css) && entry.css.length > 0 ? entry.css[0] : null;
@@ -39,6 +73,25 @@ function main() {
 
   const jsContent = readFileSync(jsPath, 'utf8');
   const cssContent = cssPath ? readFileSync(cssPath, 'utf8') : '';
+  const jsBytes = Buffer.byteLength(jsContent, 'utf8');
+  const cssBytes = Buffer.byteLength(cssContent, 'utf8');
+  const jsBudget = readBudget('SPA_JS_BUDGET_BYTES', DEFAULT_JS_BUDGET_BYTES);
+  const cssBudget = readBudget('SPA_CSS_BUDGET_BYTES', DEFAULT_CSS_BUDGET_BYTES);
+
+  if (jsBytes > jsBudget || cssBytes > cssBudget) {
+    const failures = [];
+    if (jsBytes > jsBudget) {
+      failures.push(`JS ${formatKiB(jsBytes)} > budget ${formatKiB(jsBudget)} (SPA_JS_BUDGET_BYTES)`);
+    }
+    if (cssBytes > cssBudget) {
+      failures.push(`CSS ${formatKiB(cssBytes)} > budget ${formatKiB(cssBudget)} (SPA_CSS_BUDGET_BYTES)`);
+    }
+
+    throw new Error(
+      `SPA payload budget exceeded:\n- ${failures.join('\n- ')}\n` +
+      `Set SPA_JS_BUDGET_BYTES and/or SPA_CSS_BUDGET_BYTES to adjust thresholds.`,
+    );
+  }
 
   const buildId = createHash('sha256')
     .update(jsContent)

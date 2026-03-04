@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createKey, listKeys, revokeKey, toErrorMessage } from '../lib/api';
+import { keysQueryKey } from '../lib/query-keys';
 import { trackEvent } from '../lib/telemetry';
 import { useToken } from '../lib/token-context';
 import { useToast } from '../components/Toast';
@@ -18,7 +19,7 @@ function statusForKey(key: ApiKeyRecord): 'active' | 'revoked' | 'expired' {
 export function KeysPage(): React.JSX.Element {
   useDocumentTitle('API Keys');
   const queryClient = useQueryClient();
-  const { token, persisted: persistToken, setToken: setGlobalToken, clear: clearGlobalToken } = useToken();
+  const { token, setToken: setGlobalToken, clear: clearGlobalToken } = useToken();
   const { toast } = useToast();
   const [label, setLabel] = React.useState('rotation');
   const [expiryPreset, setExpiryPreset] = React.useState('30');
@@ -27,6 +28,9 @@ export function KeysPage(): React.JSX.Element {
   const [newToken, setNewToken] = React.useState('');
   const newTokenRef = React.useRef<HTMLDivElement>(null);
   const [revokeId, setRevokeId] = React.useState('');
+  const [pendingPromotionToken, setPendingPromotionToken] = React.useState('');
+  const [previousActiveKey, setPreviousActiveKey] = React.useState<{ id: string; label: string } | null>(null);
+  const [revokePreviousKey, setRevokePreviousKey] = React.useState<{ id: string; label: string } | null>(null);
 
   React.useEffect(() => {
     if (newToken && newTokenRef.current) {
@@ -35,7 +39,7 @@ export function KeysPage(): React.JSX.Element {
   }, [newToken]);
 
   const keysQuery = useQuery({
-    queryKey: ['keys'],
+    queryKey: keysQueryKey,
     queryFn: () => listKeys(token || undefined),
   });
 
@@ -55,22 +59,16 @@ export function KeysPage(): React.JSX.Element {
       const created = data.api_key?.token ?? '';
       setNewToken(created);
       if (created) {
-        setGlobalToken(created, true);
-        toast('New key created and set as active token', 'ok');
-        // One-time warning about localStorage persistence
-        const warned = sessionStorage.getItem('clmcp_storage_warned');
-        if (!warned) {
-          sessionStorage.setItem('clmcp_storage_warned', '1');
-          toast('Token saved to localStorage — any script on this page can read it. Use Account page to clear.', 'info');
-        }
-      }
-      if (created) {
-        setOk('New key created. Save it now.');
+        const prior = rows.find((item) => statusForKey(item) === 'active');
+        setPendingPromotionToken(created);
+        setPreviousActiveKey(prior ? { id: prior.id, label: prior.label || prior.id } : null);
+        setInfo('New key created. Save it now, then choose whether to promote it as active token.');
+        toast('New key created. Save it now before continuing rotation.', 'info');
       } else {
         setError('Key created, but token missing in response.');
       }
       trackEvent('key_created');
-      await queryClient.invalidateQueries({ queryKey: ['keys'] });
+      await queryClient.invalidateQueries({ queryKey: keysQueryKey });
     },
     onError: (error) => {
       setError(toErrorMessage(error));
@@ -81,9 +79,9 @@ export function KeysPage(): React.JSX.Element {
   const revokeMutation = useMutation({
     mutationFn: async (keyId: string) => revokeKey(keyId, token || undefined),
     onMutate: async (keyId: string) => {
-      await queryClient.cancelQueries({ queryKey: ['keys'] });
-      const previous = queryClient.getQueryData<{ keys: ApiKeyRecord[] }>(['keys']);
-      queryClient.setQueryData<{ keys: ApiKeyRecord[] } | undefined>(['keys'], (old) => {
+      await queryClient.cancelQueries({ queryKey: keysQueryKey });
+      const previous = queryClient.getQueryData<{ keys: ApiKeyRecord[] }>(keysQueryKey);
+      queryClient.setQueryData<{ keys: ApiKeyRecord[] } | undefined>(keysQueryKey, (old) => {
         if (!old) return old;
         return {
           ...old,
@@ -100,13 +98,13 @@ export function KeysPage(): React.JSX.Element {
     },
     onError: (error, _keyId, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(['keys'], context.previous);
+        queryClient.setQueryData(keysQueryKey, context.previous);
       }
       setError(toErrorMessage(error));
       toast('Failed to revoke key — reverted', 'error');
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['keys'] });
+      await queryClient.invalidateQueries({ queryKey: keysQueryKey });
     },
   });
 
@@ -115,7 +113,7 @@ export function KeysPage(): React.JSX.Element {
   return (
     <div className="stack">
       <div className="two-col">
-        <Card title="Bearer token" subtitle="Your token is managed globally. Create a key below and it will auto-set.">
+        <Card title="Bearer token" subtitle="Your token is managed globally. Promote a new key when you are ready.">
           <dl className="dl-grid">
             <dt>Token status</dt>
             <dd>{token ? '✓ Set' : '✗ Not set'}</dd>
@@ -127,7 +125,7 @@ export function KeysPage(): React.JSX.Element {
           )}
         </Card>
 
-        <Card title="Create rotation key" subtitle="One-time token reveal. Store it immediately.">
+        <Card title="Create rotation key" subtitle="One-time token reveal with guided promotion and optional revoke.">
           <FormField id="newLabel" label="Label">
             <Input id="newLabel" value={label} onChange={(event) => setLabel(event.target.value)} />
           </FormField>
@@ -262,6 +260,83 @@ export function KeysPage(): React.JSX.Element {
           </Button>
           <Button variant="secondary" onClick={() => setRevokeId('')}>
             Cancel
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(pendingPromotionToken)}
+        title="Promote new key"
+        onClose={() => {
+          setPendingPromotionToken('');
+          setPreviousActiveKey(null);
+        }}
+      >
+        <p>
+          Your new key was created successfully. Promote it to become the active bearer token for this browser session.
+        </p>
+        <div className="row">
+          <Button
+            onClick={() => {
+              const createdToken = pendingPromotionToken;
+              const prior = previousActiveKey;
+              setPendingPromotionToken('');
+              setPreviousActiveKey(null);
+              setGlobalToken(createdToken, true);
+              setOk('New key promoted to active token.');
+              toast('New key promoted as active token', 'ok');
+              const warned = sessionStorage.getItem('clmcp_storage_warned');
+              if (!warned) {
+                sessionStorage.setItem('clmcp_storage_warned', '1');
+                toast('Token saved to localStorage — any script on this page can read it. Use Account page to clear.', 'info');
+              }
+              if (prior) {
+                setRevokePreviousKey(prior);
+                setInfo('New key promoted. Revoke old key only after all clients are updated.');
+              }
+            }}
+          >
+            Promote key
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPendingPromotionToken('');
+              setPreviousActiveKey(null);
+              setInfo('Promotion skipped. New key is shown above for manual rollout.');
+              toast('Promotion skipped. Continue rollout and switch tokens when ready.', 'info');
+            }}
+          >
+            Not now
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(revokePreviousKey)} title="Revoke old key" onClose={() => setRevokePreviousKey(null)}>
+        <p>
+          Old key: <span className="mono">{revokePreviousKey?.label ?? ''}</span>
+        </p>
+        <p>Revoke it only after all clients have switched to the new key. Revocation is permanent.</p>
+        <div className="row">
+          <Button
+            variant="danger"
+            onClick={async () => {
+              const key = revokePreviousKey;
+              if (!key) return;
+              setRevokePreviousKey(null);
+              await revokeMutation.mutateAsync(key.id);
+            }}
+          >
+            Revoke old key now
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setRevokePreviousKey(null);
+              setInfo('Old key kept active for now. Revoke it later after rollout is complete.');
+            }}
+          >
+            Keep old key for now
           </Button>
         </div>
       </Modal>

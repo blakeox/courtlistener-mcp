@@ -320,6 +320,16 @@ export interface Metrics {
   average_response_time: number;
   last_request_time: string;
   uptime_seconds: number;
+  operation_breakdown?: Record<
+    string,
+    {
+      requests_total: number;
+      requests_successful: number;
+      requests_failed: number;
+      cache_hits: number;
+      cache_misses: number;
+    }
+  >;
 }
 
 // Tool Definition Enhancement

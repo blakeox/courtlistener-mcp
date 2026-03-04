@@ -224,12 +224,26 @@ async function main() {
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
   const hasSupabase = hasSupabaseAuth(secretNames);
   const staticFallbackEnabled = secretNames.includes('MCP_ALLOW_STATIC_FALLBACK');
+  const hasSupabasePublishable = secretNames.includes('SUPABASE_PUBLISHABLE_KEY');
+  const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
 
   const hasSupabaseUrl = secretNames.includes('SUPABASE_URL');
   const hasSupabaseServerKey = secretNames.includes('SUPABASE_SECRET_KEY');
   if (hasSupabaseUrl !== hasSupabaseServerKey) {
     warn(
       'Supabase auth is partially configured. Set both `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.',
+    );
+  }
+
+  if (hasSupabasePublishable && !hasSupabaseUrl) {
+    warn(
+      'SUPABASE_PUBLISHABLE_KEY is set but SUPABASE_URL is missing. Public auth and UI flows may fail.',
+    );
+  }
+
+  if ((hasSupabase || hasSupabasePublishable) && !hasUiSessionSecret && !hasSupabasePublishable) {
+    warn(
+      'UI session secret source is missing. Set MCP_UI_SESSION_SECRET (or SUPABASE_PUBLISHABLE_KEY for derived secret).',
     );
   }
 

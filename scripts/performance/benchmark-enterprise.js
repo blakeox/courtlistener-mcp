@@ -9,13 +9,48 @@ import { performance } from 'perf_hooks';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
+import path from 'path';
 
 const execAsync = promisify(exec);
+
+function sanitizeLabel(value, fallback) {
+  return String(value || fallback).trim().replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase();
+}
+
+async function getCommitShaLabel() {
+  const envSha = process.env.PERF_COMMIT_SHA || process.env.GITHUB_SHA;
+  if (envSha) return sanitizeLabel(envSha.slice(0, 12), 'unknown-sha');
+  try {
+    const { stdout } = await execAsync('git rev-parse --short=12 HEAD');
+    return sanitizeLabel(stdout, 'unknown-sha');
+  } catch {
+    return 'unknown-sha';
+  }
+}
+
+function getRuntimeModeLabel() {
+  return sanitizeLabel(
+    process.env.PERF_RUNTIME_MODE || process.env.MCP_RUNTIME_MODE || process.env.NODE_ENV,
+    'default'
+  );
+}
 
 class PerformanceBenchmark {
   constructor() {
     this.results = [];
     this.baselineMetrics = null;
+    this.healthPort = parseInt(process.env.METRICS_PORT || '3001', 10);
+    this.healthUrl =
+      process.env.BENCHMARK_HEALTH_URL || `http://localhost:${this.healthPort}/health`;
+    this.baseFeatureEnv = {
+      AUTH_ENABLED: 'false',
+      SANITIZATION_ENABLED: 'false',
+      AUDIT_ENABLED: 'false',
+      COMPRESSION_ENABLED: 'false',
+      RATE_LIMIT_ENABLED: 'false',
+      CIRCUIT_BREAKER_ENABLED: 'false',
+      GRACEFUL_SHUTDOWN_ENABLED: 'false',
+    };
   }
 
   /**
@@ -33,13 +68,15 @@ class PerformanceBenchmark {
       {
         name: 'Authentication Only',
         env: {
-          SECURITY_AUTHENTICATION_ENABLED: 'true'
+          AUTH_ENABLED: 'true',
+          AUTH_API_KEYS: 'benchmark-api-key',
+          AUTH_ALLOW_ANONYMOUS: 'false'
         }
       },
       {
         name: 'Input Sanitization Only',
         env: {
-          SECURITY_SANITIZATION_ENABLED: 'true'
+          SANITIZATION_ENABLED: 'true'
         }
       },
       {
@@ -51,17 +88,19 @@ class PerformanceBenchmark {
       {
         name: 'Rate Limiting Only',
         env: {
-          RATE_LIMITING_PER_CLIENT_ENABLED: 'true'
+          RATE_LIMIT_ENABLED: 'true'
         }
       },
       {
         name: 'All Enterprise Features',
         env: {
-          SECURITY_AUTHENTICATION_ENABLED: 'true',
-          SECURITY_SANITIZATION_ENABLED: 'true',
+          AUTH_ENABLED: 'true',
+          AUTH_API_KEYS: 'benchmark-api-key',
+          AUTH_ALLOW_ANONYMOUS: 'false',
+          SANITIZATION_ENABLED: 'true',
           AUDIT_ENABLED: 'true',
           COMPRESSION_ENABLED: 'true',
-          RATE_LIMITING_PER_CLIENT_ENABLED: 'true',
+          RATE_LIMIT_ENABLED: 'true',
           CIRCUIT_BREAKER_ENABLED: 'true',
           GRACEFUL_SHUTDOWN_ENABLED: 'true'
         }
@@ -128,14 +167,17 @@ class PerformanceBenchmark {
    * Start the server with specific environment variables
    */
   async startServer(envVars) {
-    const envString = Object.entries(envVars)
-      .map(([key, value]) => `${key}=${value}`)
-      .join(' ');
-
-    const command = `${envString} node dist/index.js`;
+    const command = 'node dist/index.js';
+    const env = {
+      ...process.env,
+      ...this.baseFeatureEnv,
+      METRICS_ENABLED: 'true',
+      METRICS_PORT: String(this.healthPort),
+      ...envVars
+    };
     
     // Start server in background
-    this.serverProcess = exec(command, { detached: true });
+    this.serverProcess = exec(command, { env });
     
     // Give server time to start
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -150,7 +192,7 @@ class PerformanceBenchmark {
 
     while (attempts < maxAttempts) {
       try {
-        const response = await fetch('http://localhost:3001/health');
+        const response = await fetch(this.healthUrl);
         if (response.ok) {
           return;
         }
@@ -271,7 +313,7 @@ class PerformanceBenchmark {
     const start = performance.now();
     
     try {
-      const response = await fetch('http://localhost:3001/health', {
+      const response = await fetch(this.healthUrl, {
         timeout: 5000
       });
       
@@ -292,8 +334,13 @@ class PerformanceBenchmark {
     console.log('\n📊 PERFORMANCE BENCHMARK RESULTS');
     console.log('=====================================\n');
 
+    const artifactLabels = {
+      commitSha: await getCommitShaLabel(),
+      runtimeMode: getRuntimeModeLabel(),
+    };
     const report = {
       timestamp: new Date().toISOString(),
+      artifactLabels,
       baseline: this.baselineMetrics,
       results: this.results,
       analysis: this.analyzeResults()
@@ -328,12 +375,20 @@ class PerformanceBenchmark {
     }
 
     // Save detailed report
-    await fs.writeFile(
-      'performance-benchmark-report.json',
-      JSON.stringify(report, null, 2)
+    const reportPath = 'performance-benchmark-report.json';
+    const labeledReportPath = path.join(
+      process.cwd(),
+      `performance-benchmark-report-${artifactLabels.runtimeMode}-${artifactLabels.commitSha}.json`
     );
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2));
+    if (labeledReportPath !== path.join(process.cwd(), reportPath)) {
+      await fs.writeFile(labeledReportPath, JSON.stringify(report, null, 2));
+    }
 
     console.log('💾 Detailed report saved to: performance-benchmark-report.json');
+    if (labeledReportPath !== path.join(process.cwd(), reportPath)) {
+      console.log(`🏷️  Labeled report saved to: ${labeledReportPath}`);
+    }
     console.log('\n🎯 RECOMMENDATIONS');
     console.log('==================');
     this.generateRecommendations();

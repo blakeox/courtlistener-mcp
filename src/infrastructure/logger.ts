@@ -25,6 +25,8 @@ export interface LogEntry {
 export class Logger {
   private config: LogConfig;
   private component: string;
+  private static readonly MAX_METADATA_FIELDS = 20;
+  private static readonly MAX_STRING_LENGTH = 300;
 
   constructor(config: LogConfig, component = 'LegalMCP') {
     this.config = config;
@@ -131,7 +133,7 @@ export class Logger {
       level,
       message,
       component: this.component,
-      ...(metadata && { metadata }),
+      ...(metadata && { metadata: this.sanitizeMetadata(metadata) }),
       ...(error && { error }),
     };
 
@@ -139,6 +141,44 @@ export class Logger {
 
     // Route all logging to stderr to avoid interfering with MCP protocol on stdout
     console.error(output);
+  }
+
+  private sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+    const entries = Object.entries(metadata);
+    const limitedEntries = entries.slice(0, Logger.MAX_METADATA_FIELDS);
+
+    const sanitized = Object.fromEntries(
+      limitedEntries.map(([key, value]) => [key, this.sanitizeValue(value)])
+    ) as Record<string, unknown>;
+
+    if (entries.length > Logger.MAX_METADATA_FIELDS) {
+      sanitized.__truncatedFields = entries.length - Logger.MAX_METADATA_FIELDS;
+    }
+
+    return sanitized;
+  }
+
+  private sanitizeValue(value: unknown): unknown {
+    if (typeof value === 'string') {
+      return value.length > Logger.MAX_STRING_LENGTH
+        ? `${value.slice(0, Logger.MAX_STRING_LENGTH)}…(${value.length} chars)`
+        : value;
+    }
+
+    if (Array.isArray(value)) {
+      return `[array:${value.length}]`;
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const keys = Object.keys(value as Record<string, unknown>);
+      return {
+        type: 'object',
+        keyCount: keys.length,
+        keys: keys.slice(0, 10),
+      };
+    }
+
+    return value;
   }
 
   /**

@@ -49,7 +49,15 @@ export const SERVER_INFO = {
 /**
  * MCP Protocol Version
  */
-export const PROTOCOL_VERSION = '2024-11-05' as const;
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = [
+  '2024-11-05',
+  '2025-03-26',
+  '2025-06-18',
+  '2025-11-25',
+] as const;
+
+export const PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
+export const PREFERRED_MCP_PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[2];
 
 /**
  * Feature flags for MCP capabilities

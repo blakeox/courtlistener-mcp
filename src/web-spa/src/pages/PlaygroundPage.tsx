@@ -30,6 +30,16 @@ interface ToolInfo {
   description: string;
   category: string;
   argHint: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+type SchemaValueType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'unknown';
+
+interface SchemaField {
+  name: string;
+  type: SchemaValueType;
+  required: boolean;
+  description: string;
 }
 
 const TOOL_CATALOG: ToolInfo[] = [
@@ -75,36 +85,209 @@ const TOOL_CATALOG: ToolInfo[] = [
   { name: 'get_oral_argument', description: 'Get a specific oral argument by ID', category: 'Oral Args', argHint: 'argument_id' },
 ];
 
-const CATEGORIES = [...new Set(TOOL_CATALOG.map((t) => t.category))];
+const TOOL_CATALOG_BY_NAME = new Map(TOOL_CATALOG.map((tool) => [tool.name, tool]));
 
-function toolArguments(toolName: string, prompt: string): Record<string, unknown> {
-  const tool = TOOL_CATALOG.find((t) => t.name === toolName);
-  if (!tool) return { query: prompt };
-  if (toolName === 'lookup_citation') return { citation: prompt };
-  if (toolName === 'validate_citations') return { text: prompt };
-  if (toolName === 'list_courts') return {};
-  if (toolName === 'analyze_legal_argument') return { argument: prompt, keywords: prompt.split(/\s+/).slice(0, 5) };
-  if (tool.argHint === 'query') return { query: prompt, page_size: 5, order_by: 'score desc' };
-  const idMatch = prompt.match(/\b(\d+)\b/);
-  if (idMatch && ['cluster_id', 'opinion_id', 'judge_id', 'docket_id', 'document_id', 'disclosure_id', 'argument_id'].includes(tool.argHint)) {
-    return { [tool.argHint]: idMatch[1] };
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function normalizeCategory(category: string): string {
+  const spaced = category.replace(/[_-]+/g, ' ').trim();
+  if (!spaced) return 'Other';
+  return spaced.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function inferCategoryFromName(toolName: string, categories: string[]): string {
+  const lower = toolName.toLowerCase();
+  if (lower.includes('oral_argument')) return 'Oral Args';
+  if (lower.startsWith('search_') || lower.includes('search')) return 'Search';
+  if (lower.includes('citation') || lower.includes('opinion')) return 'Opinions';
+  if (lower.includes('court') || lower.includes('judge')) return 'Courts';
+  if (lower.includes('docket') || lower.includes('recap') || lower.includes('parties')) return 'Dockets';
+  if (lower.includes('case')) return 'Cases';
+  if (lower.includes('enhanced') || lower.includes('comprehensive') || lower.includes('visualization') || lower.includes('bulk')) return 'Enhanced';
+  const metadataCategory = categories.find((category) =>
+    lower.includes(category.toLowerCase().replace(/\s+/g, '_')),
+  );
+  return metadataCategory ? normalizeCategory(metadataCategory) : 'Other';
+}
+
+function inferArgHint(inputSchema: unknown, fallback = ''): string {
+  const schema = asRecord(inputSchema);
+  if (!schema) return fallback;
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+  if (required.length > 0) return required[0]!;
+  const properties = asRecord(schema.properties);
+  if (!properties) return fallback;
+  const propNames = Object.keys(properties);
+  if (propNames.length === 0) return fallback;
+  const preferred = ['query', 'citation', 'text', 'argument', 'cluster_id', 'opinion_id', 'judge_id', 'docket_id', 'document_id', 'disclosure_id', 'argument_id']
+    .find((key) => propNames.includes(key));
+  return preferred ?? propNames[0] ?? fallback;
+}
+
+function toSchemaType(property: Record<string, unknown>): SchemaValueType {
+  const rawType = property.type;
+  const normalized = typeof rawType === 'string'
+    ? rawType
+    : Array.isArray(rawType)
+      ? rawType.find((entry): entry is string => typeof entry === 'string')
+      : undefined;
+  if (!normalized) return 'unknown';
+  if (normalized === 'string' || normalized === 'number' || normalized === 'integer' || normalized === 'boolean' || normalized === 'array' || normalized === 'object') {
+    return normalized;
   }
-  return { query: prompt, page_size: 5 };
+  return 'unknown';
+}
+
+function schemaFieldsForTool(tool: ToolInfo | undefined): SchemaField[] {
+  const schema = asRecord(tool?.inputSchema);
+  const properties = asRecord(schema?.properties);
+  if (!properties) return [];
+  const required = new Set(
+    Array.isArray(schema.required)
+      ? schema.required.filter((value): value is string => typeof value === 'string')
+      : [],
+  );
+  return Object.entries(properties)
+    .map(([name, entry]) => {
+      const property = asRecord(entry);
+      return {
+        name,
+        type: property ? toSchemaType(property) : 'unknown',
+        required: required.has(name),
+        description: typeof property?.description === 'string' ? property.description : '',
+      };
+    })
+    .sort((a, b) => Number(b.required) - Number(a.required) || a.name.localeCompare(b.name));
+}
+
+function initialSchemaValues(tool: ToolInfo | undefined, fields: SchemaField[]): Record<string, string | boolean> {
+  const schema = asRecord(tool?.inputSchema);
+  const properties = asRecord(schema?.properties);
+  if (!properties) return {};
+  const values: Record<string, string | boolean> = {};
+  for (const field of fields) {
+    const property = asRecord(properties[field.name]);
+    const fallback = field.type === 'boolean' ? false : '';
+    const defaultValue = property?.default;
+    if (typeof defaultValue === 'boolean') {
+      values[field.name] = defaultValue;
+    } else if (typeof defaultValue === 'number' || typeof defaultValue === 'string') {
+      values[field.name] = String(defaultValue);
+    } else if (Array.isArray(defaultValue) || asRecord(defaultValue)) {
+      values[field.name] = JSON.stringify(defaultValue);
+    } else if (field.required) {
+      values[field.name] = fallback;
+    }
+  }
+  return values;
+}
+
+function buildArgumentsFromSchema(
+  fields: SchemaField[],
+  values: Record<string, string | boolean | undefined>,
+  enforceRequired: boolean,
+): { arguments: Record<string, unknown>; errors: Record<string, string> } {
+  const args: Record<string, unknown> = {};
+  const errors: Record<string, string> = {};
+  for (const field of fields) {
+    const raw = values[field.name];
+    const empty = raw === undefined || (typeof raw === 'string' && raw.trim() === '');
+    if (empty) {
+      if (field.required && enforceRequired) {
+        errors[field.name] = `${field.name} is required.`;
+      }
+      continue;
+    }
+
+    if (field.type === 'boolean') {
+      args[field.name] = typeof raw === 'boolean' ? raw : String(raw).toLowerCase() === 'true';
+      continue;
+    }
+    if (field.type === 'string' || field.type === 'unknown') {
+      args[field.name] = String(raw);
+      continue;
+    }
+    if (field.type === 'number' || field.type === 'integer') {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || (field.type === 'integer' && !Number.isInteger(parsed))) {
+        errors[field.name] = `${field.name} must be a ${field.type}.`;
+      } else {
+        args[field.name] = parsed;
+      }
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (field.type === 'array' && !Array.isArray(parsed)) {
+        errors[field.name] = `${field.name} must be a JSON array.`;
+      } else if (field.type === 'object' && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
+        errors[field.name] = `${field.name} must be a JSON object.`;
+      } else {
+        args[field.name] = parsed;
+      }
+    } catch {
+      errors[field.name] = `${field.name} must be valid JSON (${field.type}).`;
+    }
+  }
+  return { arguments: args, errors };
+}
+
+function normalizeDiscoveredTools(body: unknown): ToolInfo[] {
+  const envelope = asRecord(body);
+  const payload = asRecord(envelope?.result) ?? envelope;
+  if (!payload) return [];
+  const tools = Array.isArray(payload.tools) ? payload.tools : [];
+  const metadata = asRecord(payload.metadata);
+  const metadataCategories = Array.isArray(metadata?.categories)
+    ? metadata.categories.filter((category): category is string => typeof category === 'string')
+    : [];
+
+  const discovered = new Map<string, ToolInfo>();
+  for (const entry of tools) {
+    const tool = asRecord(entry);
+    const name = typeof tool?.name === 'string' ? tool.name.trim() : '';
+    if (!name || discovered.has(name)) continue;
+    const fallback = TOOL_CATALOG_BY_NAME.get(name);
+    const entryMetadata = asRecord(tool?.metadata);
+    const category =
+      (typeof entryMetadata?.category === 'string' && normalizeCategory(entryMetadata.category)) ||
+      (typeof tool?.category === 'string' && normalizeCategory(tool.category)) ||
+      fallback?.category ||
+      inferCategoryFromName(name, metadataCategories);
+    const description = typeof tool?.description === 'string' && tool.description.trim()
+      ? tool.description
+      : (fallback?.description ?? 'No description available.');
+    discovered.set(name, {
+      name,
+      description,
+      category,
+      argHint: inferArgHint(tool?.inputSchema, fallback?.argHint ?? ''),
+      inputSchema: asRecord(tool?.inputSchema) ?? undefined,
+    });
+  }
+  return Array.from(discovered.values());
 }
 
 // ─── Tool Select Dropdown (shared) ──────────────────────────────
 
-function ToolSelect({ value, onChange, includeAuto }: {
+function ToolSelect({ value, onChange, includeAuto, tools }: {
   value: string;
   onChange: (v: string) => void;
   includeAuto?: boolean;
+  tools: ToolInfo[];
 }): React.JSX.Element {
+  const categories = React.useMemo(() => [...new Set(tools.map((t) => t.category))], [tools]);
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
       {includeAuto && <option value="auto">🤖 auto (AI selects best tool)</option>}
-      {CATEGORIES.map((cat) => (
+      {categories.map((cat) => (
         <optgroup key={cat} label={cat}>
-          {TOOL_CATALOG.filter((t) => t.category === cat).map((t) => (
+          {tools.filter((t) => t.category === cat).map((t) => (
             <option key={t.name} value={t.name} title={t.description}>
               {t.name}
             </option>
@@ -189,20 +372,21 @@ const AI_PRESETS: Preset[] = [
 
 // ─── Tool Catalog Panel ─────────────────────────────────────────
 
-function ToolCatalogPanel(): React.JSX.Element {
+function ToolCatalogPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const [expanded, setExpanded] = React.useState(false);
+  const categories = React.useMemo(() => [...new Set(tools.map((t) => t.category))], [tools]);
   return (
-    <Card title={`Available MCP Tools (${TOOL_CATALOG.length})`} subtitle="All tools accessible through the Model Context Protocol.">
+    <Card title={`Available MCP Tools (${tools.length})`} subtitle="All tools accessible through the Model Context Protocol.">
       <Button variant="secondary" onClick={() => setExpanded(!expanded)}>
         {expanded ? 'Hide catalog' : 'Show all tools'}
       </Button>
       {expanded && (
         <div style={{ marginTop: '12px' }}>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <div key={cat} style={{ marginBottom: '12px' }}>
               <h4 style={{ margin: '0 0 6px', color: 'var(--color-primary)' }}>{cat}</h4>
               <div style={{ display: 'grid', gap: '6px' }}>
-                {TOOL_CATALOG.filter((t) => t.category === cat).map((t) => (
+                {tools.filter((t) => t.category === cat).map((t) => (
                   <div key={t.name} style={{
                     padding: '8px 12px',
                     background: 'var(--color-surface)',
@@ -226,7 +410,7 @@ function ToolCatalogPanel(): React.JSX.Element {
 
 // ─── Session Badge ──────────────────────────────────────────────
 
-function SessionBadge(): React.JSX.Element {
+function SessionBadge({ toolCount }: { toolCount: number }): React.JSX.Element {
   const { mcpSessionId } = usePlayground();
   const connected = mcpSessionId.length > 0;
   return (
@@ -243,18 +427,21 @@ function SessionBadge(): React.JSX.Element {
     }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: connected ? '#22c55e' : '#888', display: 'inline-block' }} />
       {connected ? `Session: ${mcpSessionId.slice(0, 8)}…` : 'No session'}
-      {connected && <span style={{ opacity: 0.6 }}>| {TOOL_CATALOG.length} tools</span>}
+      {connected && <span style={{ opacity: 0.6 }}>| {toolCount} tools</span>}
     </div>
   );
 }
 
 // ─── Raw MCP Panel ───────────────────────────────────────────────
 
-function RawMcpPanel(): React.JSX.Element {
+function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { token, tokenMissing, mcpSessionId, setMcpSessionId, append, addProtocolEntry } = usePlayground();
   const { toast } = useToast();
-  const [toolName, setToolName] = React.useState('search_cases');
-  const [prompt, setPrompt] = React.useState('Roe v Wade abortion rights');
+  const [toolName, setToolName] = React.useState(() => tools[0]?.name ?? '');
+  const [argsMode, setArgsMode] = React.useState<'schema' | 'json'>('schema');
+  const [schemaValues, setSchemaValues] = React.useState<Record<string, string | boolean>>({});
+  const [schemaErrors, setSchemaErrors] = React.useState<Record<string, string>>({});
+  const [rawArguments, setRawArguments] = React.useState('{}');
   const connectStatus = useStatus();
   const chatStatus = useStatus();
   const [rpcId, setRpcId] = React.useState(1);
@@ -262,9 +449,35 @@ function RawMcpPanel(): React.JSX.Element {
   const [sending, setSending] = React.useState(false);
   const elapsed = useElapsedTimer(sending);
   const cancelledRef = React.useRef(false);
+  const selectedTool = React.useMemo(() => tools.find((tool) => tool.name === toolName), [toolName, tools]);
+  const schemaFields = React.useMemo(() => schemaFieldsForTool(selectedTool), [selectedTool]);
+  const hasSchemaFields = schemaFields.length > 0;
+
   React.useEffect(() => {
     return () => { cancelledRef.current = true; };
   }, []);
+
+  React.useEffect(() => {
+    if (tools.length === 0) return;
+    if (!tools.some((tool) => tool.name === toolName)) {
+      setToolName(tools[0]!.name);
+    }
+  }, [toolName, tools]);
+
+  React.useEffect(() => {
+    const nextValues = initialSchemaValues(selectedTool, schemaFields);
+    setSchemaValues(nextValues);
+    setSchemaErrors({});
+    if (hasSchemaFields) {
+      setArgsMode('schema');
+      const preview = buildArgumentsFromSchema(schemaFields, nextValues, false).arguments;
+      setRawArguments(JSON.stringify(preview, null, 2));
+    } else {
+      setArgsMode('json');
+      setRawArguments('{}');
+    }
+  }, [hasSchemaFields, schemaFields, selectedTool]);
+
   useKeyboardShortcut('Enter', () => { void sendRaw(); }, { disabled: sending || tokenMissing });
 
   async function connect(): Promise<void> {
@@ -306,15 +519,41 @@ function RawMcpPanel(): React.JSX.Element {
   }
 
   async function sendRaw(): Promise<void> {
-    if (!prompt.trim()) { chatStatus.setError('Enter a prompt.'); return; }
     if (!mcpSessionId) { chatStatus.setError('Connect MCP session first.'); return; }
+    if (!toolName) { chatStatus.setError('No tool available.'); return; }
+
+    let args: Record<string, unknown>;
+    if (argsMode === 'json' || !hasSchemaFields) {
+      try {
+        const parsed = JSON.parse(rawArguments || '{}');
+        const asObj = asRecord(parsed);
+        if (!asObj) {
+          chatStatus.setError('Arguments must be a JSON object.');
+          return;
+        }
+        args = asObj;
+      } catch {
+        chatStatus.setError('Arguments must be valid JSON.');
+        return;
+      }
+      setSchemaErrors({});
+    } else {
+      const validation = buildArgumentsFromSchema(schemaFields, schemaValues, true);
+      setSchemaErrors(validation.errors);
+      if (Object.keys(validation.errors).length > 0) {
+        chatStatus.setError('Fix argument errors before sending.');
+        return;
+      }
+      args = validation.arguments;
+    }
+
     setSending(true);
     chatStatus.setInfo(`Calling ${toolName}...`);
-    append('user', prompt);
+    append('user', `${toolName} ${JSON.stringify(args)}`);
     try {
       const nextId = rpcId;
       setRpcId((v) => v + 1);
-      const reqPayload = { method: 'tools/call', params: { name: toolName, arguments: toolArguments(toolName, prompt) }, sessionId: mcpSessionId, id: nextId };
+      const reqPayload = { method: 'tools/call', params: { name: toolName, arguments: args }, sessionId: mcpSessionId, id: nextId };
       addProtocolEntry('request', reqPayload);
       const started = performance.now();
       const result = await mcpCall<unknown>(reqPayload, token);
@@ -349,11 +588,89 @@ function RawMcpPanel(): React.JSX.Element {
       <Card title="Tool call" subtitle="Step 2: call a tool inside the active session.">
         <form onSubmit={(e) => { e.preventDefault(); void sendRaw(); }}>
           <FormField id="toolName" label="Tool">
-            <ToolSelect value={toolName} onChange={setToolName} />
+            <ToolSelect value={toolName} onChange={setToolName} tools={tools} />
           </FormField>
-          <FormField id="chatPrompt" label="Prompt / Arguments">
-            <Input id="chatPrompt" type="text" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={TOOL_CATALOG.find((t) => t.name === toolName)?.argHint || 'Enter value...'} />
+          <FormField id="argsMode" label="Arguments mode" hint={hasSchemaFields ? 'Schema form uses tool inputSchema with validation.' : 'Schema unavailable for this tool.'}>
+            <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+              <Button
+                type="button"
+                variant={argsMode === 'schema' ? 'primary' : 'secondary'}
+                disabled={!hasSchemaFields}
+                onClick={() => setArgsMode('schema')}
+              >
+                Schema form
+              </Button>
+              <Button
+                type="button"
+                variant={argsMode === 'json' ? 'primary' : 'secondary'}
+                onClick={() => {
+                  const preview = buildArgumentsFromSchema(schemaFields, schemaValues, false).arguments;
+                  setRawArguments(JSON.stringify(preview, null, 2));
+                  setArgsMode('json');
+                }}
+              >
+                Raw JSON
+              </Button>
+            </div>
           </FormField>
+          {argsMode === 'schema' && hasSchemaFields ? (
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {schemaFields.map((field) => (
+                <FormField
+                  key={field.name}
+                  id={`arg-${field.name}`}
+                  label={field.required ? `${field.name} *` : field.name}
+                  hint={field.description || `Expected type: ${field.type}`}
+                  error={schemaErrors[field.name]}
+                >
+                  {field.type === 'boolean' ? (
+                    <input
+                      id={`arg-${field.name}`}
+                      type="checkbox"
+                      checked={Boolean(schemaValues[field.name])}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setSchemaValues((existing) => ({ ...existing, [field.name]: checked }));
+                      }}
+                    />
+                  ) : field.type === 'array' || field.type === 'object' ? (
+                    <textarea
+                      id={`arg-${field.name}`}
+                      className="mono"
+                      rows={3}
+                      value={typeof schemaValues[field.name] === 'string' ? schemaValues[field.name] : ''}
+                      placeholder={field.type === 'array' ? '[]' : '{}'}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setSchemaValues((existing) => ({ ...existing, [field.name]: next }));
+                      }}
+                    />
+                  ) : (
+                    <Input
+                      id={`arg-${field.name}`}
+                      type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'}
+                      value={typeof schemaValues[field.name] === 'string' ? schemaValues[field.name] : ''}
+                      placeholder={field.description || `Enter ${field.name}`}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setSchemaValues((existing) => ({ ...existing, [field.name]: next }));
+                      }}
+                    />
+                  )}
+                </FormField>
+              ))}
+            </div>
+          ) : (
+            <FormField id="chatArguments" label="Arguments JSON" hint="Advanced mode: provide a raw JSON object for tool arguments.">
+              <textarea
+                id="chatArguments"
+                className="mono"
+                rows={8}
+                value={rawArguments}
+                onChange={(event) => setRawArguments(event.target.value)}
+              />
+            </FormField>
+          )}
           <Button id="sendBtn" type="submit" disabled={sending || tokenMissing}>
             {sending ? `Sending... (${elapsed}s)` : 'Send'}
           </Button>
@@ -380,7 +697,7 @@ interface ChatMessage {
   latencyMs?: number;
 }
 
-function AiChatPanel(): React.JSX.Element {
+function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { token, tokenMissing, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
   const [aiToolName, setAiToolName] = React.useState('auto');
@@ -402,6 +719,11 @@ function AiChatPanel(): React.JSX.Element {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+  React.useEffect(() => {
+    if (aiToolName !== 'auto' && !tools.some((tool) => tool.name === aiToolName)) {
+      setAiToolName('auto');
+    }
+  }, [aiToolName, tools]);
   useKeyboardShortcut('Enter', () => { void sendAiChat(); }, { disabled: aiRunning });
 
   function applyPreset(preset: Preset): void {
@@ -613,7 +935,7 @@ function AiChatPanel(): React.JSX.Element {
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 140px', minWidth: '120px' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>MCP Tool</label>
-              <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
+              <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto tools={tools} />
             </div>
             <div style={{ flex: '0 0 130px' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Cost mode</label>
@@ -667,7 +989,7 @@ interface CompareResult {
   hasMcp: boolean;
 }
 
-function ComparePanel(): React.JSX.Element {
+function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { token, tokenMissing, mcpSessionId, setMcpSessionId } = usePlayground();
   const [prompt, setPrompt] = React.useState('What are the leading Supreme Court cases about free speech in schools?');
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
@@ -677,6 +999,11 @@ function ComparePanel(): React.JSX.Element {
   const elapsed = useElapsedTimer(running);
   const cancelledRef = React.useRef(false);
   React.useEffect(() => { return () => { cancelledRef.current = true; }; }, []);
+  React.useEffect(() => {
+    if (aiToolName !== 'auto' && !tools.some((tool) => tool.name === aiToolName)) {
+      setAiToolName('auto');
+    }
+  }, [aiToolName, tools]);
 
   function applyPreset(preset: Preset): void {
     setAiToolName(preset.toolName);
@@ -762,7 +1089,7 @@ function ComparePanel(): React.JSX.Element {
         </div>
         <form onSubmit={(e) => { e.preventDefault(); void runComparison(); }}>
           <FormField id="compareToolName" label="MCP Tool (for MCP side)">
-            <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto />
+            <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto tools={tools} />
           </FormField>
           <FormField id="compareMode" label="Cost mode">
             <select id="compareMode" value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)}>
@@ -931,10 +1258,12 @@ export function PlaygroundPage(): React.JSX.Element {
 }
 
 function PlaygroundContent(): React.JSX.Element {
-  const { tokenMissing, transcript, clearTranscript, lastRawMcp, protocolLog } = usePlayground();
+  const { token, tokenMissing, mcpSessionId, transcript, clearTranscript, lastRawMcp, protocolLog } = usePlayground();
   const [activeTab, setActiveTab] = React.useState<'ai' | 'compare' | 'raw'>('ai');
   const [showCatalog, setShowCatalog] = React.useState(false);
+  const [toolCatalog, setToolCatalog] = React.useState<ToolInfo[]>(TOOL_CATALOG);
   const transcriptRef = useAutoScroll<HTMLDivElement>([transcript]);
+  const discoveryRpcIdRef = React.useRef(10000);
 
   const aiTabId = 'tab-ai';
   const compareTabId = 'tab-compare';
@@ -942,6 +1271,33 @@ function PlaygroundContent(): React.JSX.Element {
   const aiPanelId = 'panel-ai';
   const comparePanelId = 'panel-compare';
   const rawPanelId = 'panel-raw';
+
+  React.useEffect(() => {
+    if (tokenMissing) {
+      setToolCatalog(TOOL_CATALOG);
+      return;
+    }
+
+    let cancelled = false;
+    async function discoverTools(): Promise<void> {
+      try {
+        const result = await mcpCall<unknown>({
+          method: 'tools/list',
+          params: {},
+          sessionId: mcpSessionId || undefined,
+          id: discoveryRpcIdRef.current++,
+        }, token);
+        if (cancelled) return;
+        const discovered = normalizeDiscoveredTools(result.body);
+        setToolCatalog(discovered.length > 0 ? discovered : TOOL_CATALOG);
+      } catch {
+        if (!cancelled) setToolCatalog(TOOL_CATALOG);
+      }
+    }
+
+    void discoverTools();
+    return () => { cancelled = true; };
+  }, [mcpSessionId, token, tokenMissing]);
 
   function handleExport(): void {
     const data = JSON.stringify({ transcript, protocol: protocolLog }, null, 2);
@@ -957,13 +1313,13 @@ function PlaygroundContent(): React.JSX.Element {
   return (
     <div className="stack">
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <SessionBadge />
+        <SessionBadge toolCount={toolCatalog.length} />
         <Button variant="secondary" onClick={() => setShowCatalog(!showCatalog)} style={{ fontSize: '0.8rem' }}>
-          {showCatalog ? 'Hide' : 'Show'} Tool Catalog ({TOOL_CATALOG.length})
+          {showCatalog ? 'Hide' : 'Show'} Tool Catalog ({toolCatalog.length})
         </Button>
       </div>
 
-      {showCatalog && <ToolCatalogPanel />}
+      {showCatalog && <ToolCatalogPanel tools={toolCatalog} />}
 
       {tokenMissing && (
         <StatusBanner role="alert" message="No bearer token set. Go to API Keys to create and save a token first." type="error" />
@@ -1011,7 +1367,7 @@ function PlaygroundContent(): React.JSX.Element {
         aria-labelledby={aiTabId}
         hidden={activeTab !== 'ai'}
       >
-        {activeTab === 'ai' && <AiChatPanel />}
+        {activeTab === 'ai' && <AiChatPanel tools={toolCatalog} />}
       </div>
 
       <div
@@ -1020,7 +1376,7 @@ function PlaygroundContent(): React.JSX.Element {
         aria-labelledby={compareTabId}
         hidden={activeTab !== 'compare'}
       >
-        {activeTab === 'compare' && <ComparePanel />}
+        {activeTab === 'compare' && <ComparePanel tools={toolCatalog} />}
       </div>
 
       <div
@@ -1029,7 +1385,7 @@ function PlaygroundContent(): React.JSX.Element {
         aria-labelledby={rawTabId}
         hidden={activeTab !== 'raw'}
       >
-        {activeTab === 'raw' && <RawMcpPanel />}
+        {activeTab === 'raw' && <RawMcpPanel tools={toolCatalog} />}
       </div>
 
       {/* Transcript for Raw MCP Console */}
