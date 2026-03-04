@@ -15,7 +15,7 @@ import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
 
 // Import the actual CourtListener API
-const { CourtListenerAPI } = await import('../../dist/courtlistener.js');
+const { CourtListenerAPI } = await import('../../src/courtlistener.js');
 
 /**
  * 🎭 Advanced API Mocking Framework
@@ -430,6 +430,7 @@ class MockLogger implements Partial<Logger> {
 class MockCacheManager implements Partial<CacheManager> {
   private cache: Map<string, unknown> = new Map();
   private enabled: boolean = true;
+  private setCalls: Array<{ endpoint: string; params: Record<string, unknown>; ttl?: number }> = [];
 
   isEnabled(): boolean {
     return this.enabled;
@@ -451,15 +452,22 @@ class MockCacheManager implements Partial<CacheManager> {
   set<T>(
     endpoint: string,
     params: Record<string, unknown>,
-    data: T
+    data: T,
+    ttl?: number
   ): void {
     if (!this.enabled) return;
     const key = `${endpoint}:${JSON.stringify(params || {})}`;
     this.cache.set(key, data);
+    this.setCalls.push({ endpoint, params, ttl });
   }
 
   clear(): void {
     this.cache.clear();
+    this.setCalls = [];
+  }
+
+  getLastSetCall(): { endpoint: string; params: Record<string, unknown>; ttl?: number } | undefined {
+    return this.setCalls[this.setCalls.length - 1];
   }
 }
 
@@ -642,6 +650,50 @@ describe('CourtListener API Integration (TypeScript)', () => {
       const stats = mockMetrics.getStats();
       assert.ok(stats.totalRequests >= 1, 'Should have at least one request recorded');
     });
+
+    it('should apply endpoint-class TTL tuning for static reference data', async () => {
+      mockServer.mockResponse('/api/rest/v4/courts/', {}, MockDataFactory.createSearchResponse([]));
+
+      await courtListenerAPI.getCourts({});
+
+      const lastSet = mockCache.getLastSetCall();
+      assert.ok(lastSet);
+      assert.strictEqual(lastSet?.endpoint, '/courts/');
+      assert.strictEqual(lastSet?.ttl, 1800);
+    });
+
+    it('should allow cache TTL class overrides from environment', async () => {
+      const previous = process.env.CACHE_TTL_CLASS_OVERRIDES;
+      process.env.CACHE_TTL_CLASS_OVERRIDES = 'staticReference:120';
+
+      try {
+        const customClient = new CourtListenerAPI(
+          {
+            baseUrl: `${mockServer.baseUrl}/api/rest/v4`,
+            version: 'v4',
+            timeout: 5000,
+            retryAttempts: 3,
+            rateLimitPerMinute: 100,
+          },
+          mockCache as CacheManager,
+          mockLogger as Logger,
+          mockMetrics as MetricsCollector
+        );
+
+        mockServer.mockResponse('/api/rest/v4/courts/', {}, MockDataFactory.createSearchResponse([]));
+        await customClient.getCourts({});
+
+        const lastSet = mockCache.getLastSetCall();
+        assert.ok(lastSet);
+        assert.strictEqual(lastSet?.ttl, 120);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.CACHE_TTL_CLASS_OVERRIDES;
+        } else {
+          process.env.CACHE_TTL_CLASS_OVERRIDES = previous;
+        }
+      }
+    });
   });
 
   describe('Error Handling', () => {
@@ -770,4 +822,3 @@ describe('CourtListener API Integration (TypeScript)', () => {
     });
   });
 });
-

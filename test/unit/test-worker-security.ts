@@ -4,10 +4,16 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   authorizeMcpRequest,
+  authorizeMcpRequestWithPrincipal,
   isAllowedOrigin,
   parseAllowedOrigins,
   validateProtocolVersionHeader,
 } from '../../src/server/worker-security.js';
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from '../../src/infrastructure/protocol-constants.js';
+import {
+  runAuthFailureContract,
+  runProtocolHeaderNegotiationContract,
+} from '../utils/mcp-contract-harness.js';
 
 function req(headers: Record<string, string> = {}): Request {
   return new Request('https://example.workers.dev/mcp', {
@@ -30,23 +36,12 @@ describe('worker-security origin helpers', () => {
 });
 
 describe('worker-security protocol header validation', () => {
-  const supported = new Set(['2024-11-05']);
-
-  it('requires header when strict mode is enabled', () => {
-    const res = validateProtocolVersionHeader(null, true, supported);
-    assert.ok(res);
-    assert.equal(res.status, 400);
-  });
-
-  it('rejects unsupported protocol versions', () => {
-    const res = validateProtocolVersionHeader('2099-01-01', false, supported);
-    assert.ok(res);
-    assert.equal(res.status, 400);
-  });
-
-  it('accepts supported versions', () => {
-    const res = validateProtocolVersionHeader('2024-11-05', true, supported);
-    assert.equal(res, null);
+  const supported = new Set(SUPPORTED_MCP_PROTOCOL_VERSIONS);
+  it('matches protocol negotiation contract', async () => {
+    await runProtocolHeaderNegotiationContract(
+      { supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS[0] },
+      async (fixture) => validateProtocolVersionHeader(fixture.headerValue, fixture.required, supported),
+    );
   });
 });
 
@@ -56,10 +51,18 @@ describe('worker-security auth', () => {
     assert.equal(res, null);
   });
 
-  it('enforces static bearer token', async () => {
-    const missing = await authorizeMcpRequest(req(), { MCP_AUTH_TOKEN: 'secret' });
-    assert.ok(missing);
-    assert.equal(missing.status, 401);
+  it('enforces static bearer token with consistent auth error shape', async () => {
+    await runAuthFailureContract(
+      [
+        { name: 'missing token', expectedStatus: 401, expectedError: 'invalid_token' },
+        { name: 'wrong token', expectedStatus: 401, expectedError: 'invalid_token' },
+      ],
+      async (failure) =>
+        authorizeMcpRequest(
+          failure.name === 'wrong token' ? req({ Authorization: 'Bearer wrong' }) : req(),
+          { MCP_AUTH_TOKEN: 'secret' },
+        ),
+    );
 
     const ok = await authorizeMcpRequest(req({ Authorization: 'Bearer secret' }), {
       MCP_AUTH_TOKEN: 'secret',
@@ -76,6 +79,19 @@ describe('worker-security auth', () => {
       },
     );
     assert.equal(res, null);
+  });
+
+  it('returns OIDC principal userId when available', async () => {
+    const result = await authorizeMcpRequestWithPrincipal(
+      req({ Authorization: 'Bearer jwt-token' }),
+      { OIDC_ISSUER: 'https://issuer.example.com' },
+      {
+        verifyAccessTokenFn: async () => ({ payload: { sub: 'user-123' } }),
+      },
+    );
+    assert.equal(result.authError, null);
+    assert.equal(result.principal?.authMethod, 'oidc');
+    assert.equal(result.principal?.userId, 'user-123');
   });
 
   it('accepts valid Cloudflare Access assertion token', async () => {
@@ -154,6 +170,25 @@ describe('worker-security auth', () => {
       },
     );
     assert.equal(res, null);
+  });
+
+  it('returns Supabase principal userId when available', async () => {
+    const result = await authorizeMcpRequestWithPrincipal(
+      req({ Authorization: 'Bearer sb-valid-key' }),
+      {
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_SECRET_KEY: 'service-role-key',
+      },
+      {
+        verifySupabaseApiKeyFn: async (token) => ({
+          valid: token === 'sb-valid-key',
+          userId: 'sb-user-1',
+        }),
+      },
+    );
+    assert.equal(result.authError, null);
+    assert.equal(result.principal?.authMethod, 'supabase');
+    assert.equal(result.principal?.userId, 'sb-user-1');
   });
 
   it('rejects invalid Supabase API key when static fallback is not configured', async () => {

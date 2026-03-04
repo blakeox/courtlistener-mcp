@@ -224,5 +224,20 @@ describe('Metrics Collector (TypeScript)', () => {
       assert.strictEqual(resetMetrics.average_response_time, 0);
     });
   });
-});
 
+  describe('Operation Breakdown Cardinality', () => {
+    it('should cap operation breakdown and aggregate overflow into other bucket', () => {
+      for (let i = 0; i < 105; i++) {
+        metrics.recordRequest(100, false, `operation-${i}`);
+      }
+
+      const metricsData = metrics.getMetrics();
+      const operationBreakdown = metricsData.operation_breakdown ?? {};
+
+      assert.ok(Object.keys(operationBreakdown).length <= 100);
+      assert.strictEqual(operationBreakdown.other?.requests_total, 6);
+      assert.strictEqual(operationBreakdown.other?.requests_successful, 6);
+      assert.strictEqual(operationBreakdown.other?.cache_misses, 6);
+    });
+  });
+});

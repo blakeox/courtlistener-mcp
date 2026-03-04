@@ -53,6 +53,7 @@ describe('supabase-auth key validation', () => {
     });
 
     assert.equal(result.valid, true);
+    assert.equal(result.userId, 'u1');
   });
 
   it('rejects expired key', async () => {

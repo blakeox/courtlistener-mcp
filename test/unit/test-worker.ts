@@ -136,4 +136,35 @@ describe('Worker SSE rate limiting (TypeScript)', () => {
       resOk.body.getReader().cancel();
     }
   });
+
+  it('caps worker route latency metric cardinality with overflow bucket', async () => {
+    const env: WorkerEnv = { MCP_OBJECT: {} };
+
+    for (let i = 0; i < 80; i += 1) {
+      await worker.default.fetch(mockRequest(`/route-${i}-key`), env, {});
+    }
+
+    const healthRes = await worker.default.fetch(mockRequest('/health'), env, {});
+    assert.equal(healthRes.status, 200);
+    const health = (await healthRes.json()) as {
+      metrics?: {
+        latency_ms?: {
+          routes?: Record<string, unknown>;
+          export_snapshot?: {
+            top_slow_operations?: unknown[];
+            durable_object_latency_outliers?: unknown[];
+          };
+        };
+      };
+    };
+    const routes = health.metrics?.latency_ms?.routes ?? {};
+    const routeKeys = Object.keys(routes);
+    const exportSnapshot = health.metrics?.latency_ms?.export_snapshot;
+
+    assert.ok(routeKeys.length <= 64);
+    assert.ok(routeKeys.includes('OTHER'));
+    assert.ok(Array.isArray(exportSnapshot?.top_slow_operations));
+    assert.ok((exportSnapshot?.top_slow_operations?.length ?? 0) <= 5);
+    assert.ok(Array.isArray(exportSnapshot?.durable_object_latency_outliers));
+  });
 });
