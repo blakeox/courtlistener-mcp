@@ -66,16 +66,32 @@ jobs:
           pnpm run test:mcp:tool search_cases '{"query": "constitutional"}'
           pnpm run test:mcp:tool get_case_details '{"cluster_id": 1}'
 
-      - name: Performance regression check
+      - name: Performance hardening gates
+        env:
+          PERF_GATE_POLICY_MODE: fail
+          PERF_GATE_REQUIRE_FILES: 'true'
         run: |
-          echo "⚡ Running performance regression checks..."
-          pnpm run test:performance > performance-results.txt
+          echo "⚡ Running release performance hardening gates..."
+          mkdir -p performance-data
+          pnpm start > performance-data/release-gate-server.log 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill "$SERVER_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
 
-          # Compare with baseline if available
-          if [ -f performance-baseline.txt ]; then
-            echo "Comparing with performance baseline..."
-            node scripts/performance/compare-performance.js performance-baseline.txt performance-results.txt
-          fi
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3001/health >/dev/null
+
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-baseline.json
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-current.json
+          pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
+          pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
 
       - name: Test against multiple environments
         run: |
@@ -108,7 +124,7 @@ jobs:
           - ✅ Build successful  
           - ✅ Full test suite passed
           - ✅ MCP Inspector validation passed
-          - ✅ Performance regression check
+          - ✅ Performance hardening gates
           - ✅ Multi-environment testing
 
           ## MCP Protocol Compliance
@@ -121,7 +137,7 @@ jobs:
           ## Performance Metrics
 
           \`\`\`
-          $(cat performance-results.txt | head -20)
+          $(node -e "const fs=require('fs');const p='performance-data/load-profile-current.json';if(!fs.existsSync(p)){process.exit(0)};const d=JSON.parse(fs.readFileSync(p,'utf8'));console.log(JSON.stringify(d.summary||{},null,2));")
           \`\`\`
 
           ## Ready for Release ✅
@@ -135,7 +151,10 @@ jobs:
           name: release-validation-${{ github.ref_name }}
           path: |
             release-validation-report.md
-            performance-results.txt
+            performance-data/load-profile-baseline.json
+            performance-data/load-profile-current.json
+            performance-data/hardening-soak-leak.json
+            performance-data/release-gate-server.log
             test-output/
 
       - name: Comment on release

@@ -281,6 +281,16 @@ pnpm run ci:test-inspector:enhanced:extended
 pnpm run ci:test-inspector:performance
 ```
 
+### Release hardening performance gates
+
+```bash
+pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001
+pnpm run ci:perf-gate -- baseline.json current.json
+pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001
+```
+
+CI runs these gates in warn mode for pull requests/non-protected branches, and strict fail mode for `main`/`master`/`release/*` and `v*` tags.
+
 ### Optional local GitHub Actions simulation
 
 ```bash

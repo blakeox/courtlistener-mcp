@@ -99,11 +99,106 @@ jobs:
       - name: Run performance tests
         run: pnpm run test:performance
 
+      - name: Run performance regression gate
+        env:
+          PERF_BASELINE_FILE: ${{ vars.PERF_BASELINE_FILE }}
+          PERF_CURRENT_FILE: ${{ vars.PERF_CURRENT_FILE }}
+          PERF_COMMIT_SHA: ${{ github.sha }}
+          PERF_RUNTIME_MODE: node-${{ matrix.node-version }}
+        run: pnpm run ci:perf-gate
+
       - name: Install MCP Inspector
         run: pnpm add -g @modelcontextprotocol/inspector
 
       - name: Run MCP protocol validation
         run: pnpm run test:mcp
+
+      - name: Run runtime parity smoke tests
+        run: pnpm run test:infra:parity
+
+  hardening-release-gates:
+    name: Hardening Release Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+            pnpm install
+          else
+            pnpm install --frozen-lockfile
+          fi
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Resolve gate policy
+        id: gate_policy
+        run: |
+          strict=false
+          policy=warn
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            if [[ "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == "refs/heads/master" || "${GITHUB_REF}" == refs/heads/release/* || "${GITHUB_REF}" == refs/tags/v* ]]; then
+              strict=true
+              policy=fail
+            fi
+          fi
+          echo "strict_mode=${strict}" >> "$GITHUB_OUTPUT"
+          echo "policy_mode=${policy}" >> "$GITHUB_OUTPUT"
+
+      - name: Run load/soak release checklist gates
+        env:
+          PERF_GATE_POLICY_MODE: ${{ steps.gate_policy.outputs.policy_mode }}
+          PERF_GATE_REQUIRE_FILES: ${{ steps.gate_policy.outputs.strict_mode }}
+        run: |
+          mkdir -p performance-data
+          pnpm start > performance-data/local-gate-server.log 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill "$SERVER_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3001/health >/dev/null
+
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-baseline.json
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-current.json
+          pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
+
+          if [[ "${{ steps.gate_policy.outputs.strict_mode }}" == "true" ]]; then
+            pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
+          else
+            pnpm run ci:hardening:soak-leak-checks -- --light --warn-only --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
+          fi
+
+      - name: Upload hardening gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: hardening-release-gates
+          path: |
+            performance-data/load-profile-baseline.json
+            performance-data/load-profile-current.json
+            performance-data/hardening-soak-leak.json
+            performance-data/local-gate-server.log
+          retention-days: 7
 
   mcp-compliance:
     name: MCP Protocol Compliance
@@ -249,19 +344,20 @@ jobs:
   required-checks-gate:
     name: Required Checks Gate
     runs-on: ubuntu-latest
-    needs: [test, mcp-compliance, security-check]
+    needs: [test, hardening-release-gates, mcp-compliance, security-check]
     if: always()
     steps:
       - name: Summarize upstream job results
         run: |
           echo "Test Suite result: ${{ needs.test.result }}"
+          echo "Hardening Release Gates result: ${{ needs['hardening-release-gates'].result }}"
           echo "MCP Compliance result: ${{ needs['mcp-compliance'].result }}"
           echo "Security & Code Quality result: ${{ needs['security-check'].result }}"
       - name: Fail if any required check failed
-        if: ${{ needs.test.result != 'success' || needs['mcp-compliance'].result != 'success' || needs['security-check'].result != 'success' }}
+        if: ${{ needs.test.result != 'success' || needs['hardening-release-gates'].result != 'success' || needs['mcp-compliance'].result != 'success' || needs['security-check'].result != 'success' }}
         run: |
           echo "One or more required checks failed" >&2
           exit 1
       - name: All required checks passed
-        if: ${{ needs.test.result == 'success' && needs['mcp-compliance'].result == 'success' && needs['security-check'].result == 'success' }}
+        if: ${{ needs.test.result == 'success' && needs['hardening-release-gates'].result == 'success' && needs['mcp-compliance'].result == 'success' && needs['security-check'].result == 'success' }}
         run: echo "All required checks passed"
