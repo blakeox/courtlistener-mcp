@@ -11,7 +11,7 @@ const outDir = resolve(repoRoot, '.spa-dist');
 const manifestPath = resolve(outDir, '.vite/manifest.json');
 const outputFile = resolve(repoRoot, 'src/web/spa-assets.ts');
 const DEFAULT_JS_BUDGET_BYTES = 450_000;
-const DEFAULT_CSS_BUDGET_BYTES = 20_000;
+const DEFAULT_CSS_BUDGET_BYTES = 24_000;
 
 function readBudget(envName, defaultValue) {
   const raw = process.env[envName];

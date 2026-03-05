@@ -186,6 +186,15 @@ Endpoints after deploy:
 - `POST /mcp` (primary MCP endpoint)
 - `GET /sse` (SSE compatibility)
 
+## Web UX Wave (SPA)
+
+- ✅ **UX15–UX19 complete**: accessibility AA hardening, design-system consolidation, performance UX optimizations, and dark-mode visual parity are now shipped.
+- ✅ **Validation safety pass**: `pnpm run test:spa`, `pnpm run build`, and `pnpm run typecheck` are the required UX-wave release gate.
+- **Control Center** (`/app/control-center`): live session/auth/key/runtime posture with a guided MCP checklist.
+- **Protocol explorer**: initialize/tool/resource/prompt discovery surfaced directly in Control Center metadata panels.
+- **Async operator workspace** (`/app/playground`): queue async tool calls (`__mcp_async`), monitor lifecycle state, deep-link job details, cancel/retry, and fetch results.
+- **Recovery UX**: cross-page recovery status banners plus safe fallback routes back to login, keys, and Control Center.
+
 ## Authentication Modes
 
 ### Static bearer token
@@ -242,6 +251,15 @@ This repository now implements `GET/POST /oauth/consent` in the Cloudflare Worke
 - supports approve/deny actions
 - redirects back to the OAuth client via Supabase authorization redirects
 
+Hosted OAuth entry points are also exposed on the Worker:
+
+- `GET/POST /authorize` (forwards authorization requests to Supabase Auth)
+- `POST /token` (forwards token exchange requests to Supabase Auth)
+- `GET /.well-known/oauth-authorization-server` (OAuth metadata for discovery)
+- `GET /.well-known/oauth-protected-resource` (OAuth protected resource metadata)
+
+Canonical hosted OAuth contract values (paths, grants, response types, scopes, PKCE methods, priority clients) live in `src/auth/oauth-contract.ts`.
+
 ## Runtime and Observability
 
 When metrics are enabled, local server endpoints include:
@@ -284,9 +302,10 @@ pnpm run ci:test-inspector:performance
 ### Release hardening performance gates
 
 ```bash
-pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001
+pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002
 pnpm run ci:perf-gate -- baseline.json current.json
-pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001
+pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3002
+pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002
 ```
 
 CI runs these gates in warn mode for pull requests/non-protected branches, and strict fail mode for `main`/`master`/`release/*` and `v*` tags.

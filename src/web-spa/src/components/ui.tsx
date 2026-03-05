@@ -42,6 +42,16 @@ export function StatusBanner(props: {
   );
 }
 
+export function Badge(props: {
+  tone?: 'neutral' | 'ok' | 'warn';
+  children: React.ReactNode;
+  className?: string;
+}): React.JSX.Element {
+  const tone = props.tone ?? 'neutral';
+  const toneClass = tone === 'ok' ? 'active' : tone === 'warn' ? 'warn' : '';
+  return <span className={`chip ${toneClass} ${props.className ?? ''}`.trim()}>{props.children}</span>;
+}
+
 export function FormField(props: {
   id: string;
   label: string;

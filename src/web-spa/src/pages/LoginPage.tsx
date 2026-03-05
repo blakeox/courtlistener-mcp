@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
 import { isRecoveryHash, readLoginHashToken } from '../lib/hash-utils';
+import { consumeOperationalStatus, rememberOperationalStatus, shouldCarryOperationalStatus, withRecoveryHint } from '../lib/operational-status';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
 import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 
@@ -27,6 +28,14 @@ export function LoginPage(): React.JSX.Element {
     if (raw.startsWith('//')) return '/app/keys';
     return raw;
   }, [location.search]);
+
+  React.useEffect(() => {
+    const carried = consumeOperationalStatus();
+    if (!carried?.message) return;
+    if (carried.type === 'ok') setOk(carried.message);
+    else if (carried.type === 'error') setError(carried.message);
+    else setInfo(carried.message);
+  }, [setError, setInfo, setOk]);
 
   React.useEffect(() => {
     if (isRecoveryHash()) {
@@ -84,9 +93,15 @@ export function LoginPage(): React.JSX.Element {
       if (apiErr.error_code === 'email_not_verified') {
         setError('Email verification is required. Check your inbox or request a password reset to verify.');
       } else if (apiErr.message) {
-        setError(apiErr.message);
+        const message = withRecoveryHint(error, apiErr.message);
+        setError(message);
+        if (shouldCarryOperationalStatus(error, message)) rememberOperationalStatus(message, 'info');
       } else {
-        setError('Login failed. Check your credentials and try again.');
+        const message = withRecoveryHint(error, 'Login failed. Check your credentials and try again.');
+        setError(message);
+        if (shouldCarryOperationalStatus(error, message)) {
+          rememberOperationalStatus(message, 'info');
+        }
       }
       backoff.trigger(error);
       trackEvent('login_failed', { category: 'auth' });
@@ -155,6 +170,12 @@ export function LoginPage(): React.JSX.Element {
           <Button id="loginBtn" type="submit" disabled={busy || backoff.blocked}>
             {backoff.blocked ? `Rate limited (${backoff.secondsLeft}s)` : busy ? 'Logging in...' : 'Login'}
           </Button>
+          {backoff.blocked ? (
+            <p className="hint" role="status">
+              Recovery: wait for the timer, then retry. If the lockout persists, use{' '}
+              <Link to="/app/reset-password" className="text-link">password reset</Link>.
+            </p>
+          ) : null}
           <StatusBanner id="loginStatus" message={status} type={statusType} />
           </fieldset>
         </form>
@@ -165,6 +186,7 @@ export function LoginPage(): React.JSX.Element {
           <li>Use the same email used at signup</li>
           <li>Confirm your inbox verification completed</li>
           <li>If needed, request a password reset email</li>
+          <li>For service incidents, wait about a minute and retry from Playground diagnostics</li>
         </ul>
         <div className="stack">
           <Button

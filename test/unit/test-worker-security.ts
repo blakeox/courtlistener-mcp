@@ -7,6 +7,7 @@ import {
   authorizeMcpRequestWithPrincipal,
   isAllowedOrigin,
   parseAllowedOrigins,
+  validateProtocolHeaderNegotiation,
   validateProtocolVersionHeader,
 } from '../../src/server/worker-security.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from '../../src/infrastructure/protocol-constants.js';
@@ -42,6 +43,15 @@ describe('worker-security protocol header validation', () => {
       { supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS[0] },
       async (fixture) => validateProtocolVersionHeader(fixture.headerValue, fixture.required, supported),
     );
+  });
+
+  it('returns profile fallback diagnostics for unsupported capability profiles on legacy protocol', () => {
+    const result = validateProtocolHeaderNegotiation('2024-11-05', 'async', false, supported);
+    assert.equal(result.error, null);
+    assert.equal(result.diagnostics.accepted, true);
+    assert.equal(result.diagnostics.reason, 'profile_fallback');
+    assert.equal(result.diagnostics.acceptedCapabilityProfile, 'extended');
+    assert.equal(result.diagnostics.profileReason, 'fallback_unsupported_profile');
   });
 });
 
@@ -252,6 +262,58 @@ describe('worker-security auth', () => {
       },
     );
     assert.equal(res, null);
+  });
+
+  it('supports oauth primary alias for OIDC verification', async () => {
+    const res = await authorizeMcpRequest(
+      req({ Authorization: 'Bearer oauth-token' }),
+      {
+        OIDC_ISSUER: 'https://issuer.example.com',
+        MCP_AUTH_PRIMARY: 'oauth',
+      },
+      {
+        verifyAccessTokenFn: async () => ({ payload: { sub: 'user-oauth' } }),
+      },
+    );
+    assert.equal(res, null);
+  });
+
+  it('prioritizes internal service-token header over supabase primary', async () => {
+    const result = await authorizeMcpRequestWithPrincipal(
+      req({
+        Authorization: 'Bearer not-a-valid-supabase-key',
+        'x-mcp-service-token': 'edge-service-secret',
+      }),
+      {
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_SECRET_KEY: 'service-role-key',
+        MCP_AUTH_TOKEN: 'edge-service-secret',
+      },
+      {
+        verifySupabaseApiKeyFn: async () => false,
+      },
+    );
+    assert.equal(result.authError, null);
+    assert.equal(result.principal?.authMethod, 'static');
+  });
+
+  it('fails closed when a service-token header is present but invalid', async () => {
+    const result = await authorizeMcpRequestWithPrincipal(
+      req({
+        Authorization: 'Bearer sb-valid-key',
+        'x-mcp-service-token': 'wrong-service-secret',
+      }),
+      {
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_SECRET_KEY: 'service-role-key',
+        MCP_AUTH_TOKEN: 'edge-service-secret',
+      },
+      {
+        verifySupabaseApiKeyFn: async () => true,
+      },
+    );
+    assert.ok(result.authError);
+    assert.equal(result.authError?.status, 401);
   });
 
   it('requires Authorization bearer token for Supabase auth', async () => {

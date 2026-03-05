@@ -7,6 +7,7 @@ import { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/au
 import { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
 import crypto from 'node:crypto';
 import { getConfig } from '../infrastructure/config.js';
+import { buildHostedMcpDefaultClientAttributes } from './oauth-service.js';
 
 export class LegalOAuthClientsStore implements OAuthRegisteredClientsStore {
   private clients = new Map<string, OAuthClientInformationFull>();
@@ -26,11 +27,8 @@ export class LegalOAuthClientsStore implements OAuthRegisteredClientsStore {
       client_secret: clientSecret,
       client_id_issued_at: Math.floor(Date.now() / 1000),
       redirect_uris: ['http://localhost:3000/callback'],
-      token_endpoint_auth_method: clientSecret ? 'client_secret_post' : 'none',
-      grant_types: ['authorization_code', 'refresh_token'],
-      response_types: ['code'],
       client_name: 'Legal MCP Default Client',
-      scope: 'legal:read legal:search legal:analyze',
+      ...buildHostedMcpDefaultClientAttributes(clientSecret),
     };
 
     this.clients.set(clientId, client);

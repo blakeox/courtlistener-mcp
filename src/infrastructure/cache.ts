@@ -48,6 +48,7 @@ import { Logger } from './logger.js';
 export class CacheManager {
   private cache = new Map<string, CacheEntry>();
   private accessOrder = new Map<string, number>();
+  private inFlightRequests = new Map<string, Promise<unknown>>();
   private accessCounter = 0;
   private logger: Logger;
   private cleanupInterval: NodeJS.Timeout | undefined;
@@ -72,18 +73,59 @@ export class CacheManager {
    * Generate cache key from endpoint and parameters
    */
   private generateKey(endpoint: string, params?: object): string {
-    if (!params || Object.keys(params).length === 0) return endpoint;
+    const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+    if (!params || Object.keys(params).length === 0) return normalizedEndpoint;
 
-    // Sort parameters for consistent keys
-    const paramsRecord = params as Record<string, unknown>;
-    const sortedParams = Object.keys(paramsRecord)
-      .sort()
-      .reduce<Record<string, unknown>>((obj, key) => {
-        obj[key] = paramsRecord[key];
-        return obj;
-      }, {});
+    const normalizedParams = this.normalizeCacheKeyValue(params) as Record<string, unknown>;
+    return `${normalizedEndpoint}:${JSON.stringify(normalizedParams)}`;
+  }
 
-    return `${endpoint}:${JSON.stringify(sortedParams)}`;
+  private normalizeEndpoint(endpoint: string): string {
+    const trimmed = endpoint.trim();
+    if (!trimmed) return endpoint;
+    const hasNonHttpScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !/^[a-z]+:\/\//i.test(trimmed);
+    if (hasNonHttpScheme) {
+      return trimmed.replace(/\/+$/, '') || '/';
+    }
+    try {
+      const isAbsolute = /^[a-z]+:\/\//i.test(trimmed);
+      const url = new URL(trimmed, 'https://cache.local');
+      const sortedEntries = [...url.searchParams.entries()].sort(([leftKey, leftValue], [rightKey, rightValue]) =>
+        leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
+      );
+      url.search = '';
+      for (const [key, value] of sortedEntries) {
+        url.searchParams.append(key, value);
+      }
+      const normalizedPath = url.pathname.replace(/\/+$/, '') || '/';
+      if (isAbsolute) {
+        return `${url.origin}${normalizedPath}${url.search}`;
+      }
+      return `${normalizedPath}${url.search}`;
+    } catch {
+      return trimmed.replace(/\/+$/, '') || '/';
+    }
+  }
+
+  private normalizeCacheKeyValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((entry) => this.normalizeCacheKeyValue(entry));
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const normalizedEntries = Object.entries(record)
+        .filter(([, currentValue]) => currentValue !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, currentValue]) => [key, this.normalizeCacheKeyValue(currentValue)] as const);
+      return Object.fromEntries(normalizedEntries);
+    }
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      return String(value);
+    }
+    return value;
   }
 
   /**
@@ -114,6 +156,38 @@ export class CacheManager {
     this.logger.debug('Cache hit', { key });
 
     return entry.data as T;
+  }
+
+  async getOrSetCoalesced<T>(
+    endpoint: string,
+    params: object,
+    loader: () => Promise<T>,
+    customTtl?: number,
+  ): Promise<T> {
+    const cached = this.get<T>(endpoint, params);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const key = this.generateKey(endpoint, params);
+    const pending = this.inFlightRequests.get(key);
+    if (pending) {
+      return pending as Promise<T>;
+    }
+
+    const next = (async (): Promise<T> => {
+      const loaded = await loader();
+      if (customTtl === undefined) {
+        this.set(endpoint, params, loaded);
+      } else {
+        this.set(endpoint, params, loaded, customTtl);
+      }
+      return loaded;
+    })().finally(() => {
+      this.inFlightRequests.delete(key);
+    });
+    this.inFlightRequests.set(key, next as Promise<unknown>);
+    return next;
   }
 
   /**
@@ -157,6 +231,7 @@ export class CacheManager {
     const size = this.cache.size;
     this.cache.clear();
     this.accessOrder.clear();
+    this.inFlightRequests.clear();
     this.accessCounter = 0;
     this.logger.info('Cache cleared', { entriesRemoved: size });
   }
@@ -262,6 +337,7 @@ export class CacheManager {
     }
     this.cache.clear();
     this.accessOrder.clear();
+    this.inFlightRequests.clear();
     this.logger.info('Cache manager destroyed');
   }
 }

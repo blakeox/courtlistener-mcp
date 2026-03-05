@@ -203,7 +203,8 @@ export function KeysPage(): React.JSX.Element {
           </div>
         ) : null}
         {!!rows.length ? (
-          <table className="table" aria-label="API keys">
+          <div className="table-scroll">
+            <table className="table" aria-label="API keys">
             <thead>
               <tr>
                 <th scope="col">Label</th>
@@ -241,7 +242,8 @@ export function KeysPage(): React.JSX.Element {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         ) : null}
       </Card>
 

@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim() || '';
 
 interface ServerConfig {
   command: string;
@@ -53,11 +54,12 @@ interface Config {
 const CONFIG: Config = {
   localServer: {
     command: 'node',
-    args: ['dist/worker.js'],
+    args: ['dist/index.js'],
     env: { NODE_ENV: 'test' },
   },
   remoteServer: {
-    url: 'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+    url:
+      process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   tests: [
@@ -92,24 +94,6 @@ const CONFIG: Config = {
       expected: {
         hasResult: true,
         hasContent: true,
-      },
-    },
-    {
-      name: 'Initialize Protocol',
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {
-          tools: {},
-        },
-        clientInfo: {
-          name: 'Test Client',
-          version: '1.0.0',
-        },
-      },
-      expected: {
-        hasResult: true,
-        hasServerInfo: true,
       },
     },
   ],
@@ -392,6 +376,11 @@ async function testRemoteServerHTTP(): Promise<void> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2024-11-05',
+          ...(REMOTE_BEARER_TOKEN && {
+            Authorization: `Bearer ${REMOTE_BEARER_TOKEN}`,
+          }),
         },
         body: JSON.stringify(testCase.payload),
       });

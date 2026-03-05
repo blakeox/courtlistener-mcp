@@ -2,7 +2,13 @@
   "mcpServers": {
     "courtlistener": {
       "url": "https://courtlistenermcp.blakeoxford.com/mcp",
-      "transport": "streamable-http"
+      "transport": "streamable-http",
+      "auth": {
+        "type": "oauth2",
+        "authorizationUrl": "https://courtlistenermcp.blakeoxford.com/authorize",
+        "tokenUrl": "https://courtlistenermcp.blakeoxford.com/token",
+        "scopes": ["legal:read", "legal:search", "legal:analyze"]
+      }
     },
     "courtlistener-local": {
       "command": "node",

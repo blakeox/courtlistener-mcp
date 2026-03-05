@@ -24,6 +24,9 @@ export class GracefulShutdown {
   private isShuttingDown = false;
   private logger: Logger;
   private shutdownPromise?: Promise<void>;
+  private signalShutdownInitiated = false;
+  private exitInitiated = false;
+  private forceExitTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private config: ShutdownConfig,
@@ -112,56 +115,61 @@ export class GracefulShutdown {
    * Execute all cleanup hooks with timeout protection
    */
   private async executeCleanupHooks(): Promise<void> {
-    const promises = this.hooks.map(async (hook) => {
+    const orderedHooks = [...this.hooks].sort((a, b) => a.priority - b.priority);
+    if (orderedHooks.length === 0) {
+      return;
+    }
+
+    const shutdownDeadline = Date.now() + this.config.timeout;
+
+    for (const [index, hook] of orderedHooks.entries()) {
+      const remainingBudgetMs = shutdownDeadline - Date.now();
+
+      if (remainingBudgetMs <= 0) {
+        this.logger.error('Shutdown budget exhausted before all hooks completed', undefined, {
+          hooksTotal: orderedHooks.length,
+          hooksCompleted: index,
+          hooksSkipped: orderedHooks.length - index,
+        });
+        break;
+      }
+
+      const remainingHooks = orderedHooks.length - index;
+      const perHookTimeoutMs = Math.max(1, Math.floor(remainingBudgetMs / remainingHooks));
       const timer = this.logger.startTimer(`shutdown_${hook.name}`);
 
       try {
-        await Promise.race([hook.cleanup(), this.createTimeoutPromise(hook.name)]);
+        await Promise.race([hook.cleanup(), this.createTimeoutPromise(hook.name, perHookTimeoutMs)]);
 
         const duration = timer.end();
         this.logger.debug('Shutdown hook completed', {
           name: hook.name,
+          priority: hook.priority,
           duration,
+          timeoutMs: perHookTimeoutMs,
+          remainingBudgetMs: shutdownDeadline - Date.now(),
         });
       } catch (error) {
         const duration = timer.endWithError(error as Error);
         this.logger.warn('Shutdown hook failed', {
           name: hook.name,
+          priority: hook.priority,
           duration,
+          timeoutMs: perHookTimeoutMs,
           error: error instanceof Error ? error.message : String(error),
         });
       }
-    });
-
-    // Wait for all hooks with overall timeout
-    try {
-      await Promise.race([Promise.all(promises), this.createOverallTimeoutPromise()]);
-    } catch (error) {
-      this.logger.error('Shutdown hooks timed out', undefined, {
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
     }
   }
 
   /**
    * Create timeout promise for individual hook
    */
-  private createTimeoutPromise(hookName: string): Promise<never> {
+  private createTimeoutPromise(hookName: string, timeoutMs: number): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Shutdown hook '${hookName}' timed out`));
-      }, this.config.timeout / this.hooks.length);
-    });
-  }
-
-  /**
-   * Create timeout promise for overall shutdown
-   */
-  private createOverallTimeoutPromise(): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Overall shutdown timed out'));
-      }, this.config.timeout);
+      }, timeoutMs);
     });
   }
 
@@ -173,10 +181,16 @@ export class GracefulShutdown {
       process.on(signal as NodeJS.Signals, () => {
         this.logger.info(`Received ${signal} signal`);
 
+        if (this.signalShutdownInitiated) {
+          this.logger.warn('Signal received while graceful shutdown already in progress', { signal });
+          return;
+        }
+        this.signalShutdownInitiated = true;
+
         this.shutdown(`Signal: ${signal}`)
           .then(() => {
             this.logger.info('Graceful shutdown complete, exiting');
-            process.exit(0);
+            this.exitProcess(0);
           })
           .catch((error) => {
             this.logger.error('Graceful shutdown failed', undefined, {
@@ -207,10 +221,27 @@ export class GracefulShutdown {
    * Force exit after timeout
    */
   private forceExit(): void {
-    setTimeout(() => {
+    if (this.forceExitTimer) {
+      return;
+    }
+
+    this.forceExitTimer = setTimeout(() => {
       this.logger.error('Force exiting after timeout');
-      process.exit(1);
+      this.exitProcess(1);
     }, this.config.forceTimeout);
+  }
+
+  private exitProcess(code: number): void {
+    if (this.exitInitiated) {
+      return;
+    }
+
+    this.exitInitiated = true;
+    if (this.forceExitTimer) {
+      clearTimeout(this.forceExitTimer);
+      this.forceExitTimer = undefined;
+    }
+    process.exit(code);
   }
 
   /**

@@ -67,6 +67,31 @@ describe('authorizeMcpGatewayRequest', () => {
     );
   });
 
+  it('returns protocol negotiation diagnostics for profile fallback decisions', async () => {
+    const result = await authorizeMcpGatewayRequest({
+      request: new Request('https://example.com/mcp', {
+        method: 'POST',
+        headers: {
+          'MCP-Protocol-Version': '2025-03-26',
+          'MCP-Capability-Profile': 'experimental',
+        },
+      }),
+      env: { MCP_REQUIRE_PROTOCOL_VERSION: 'true' },
+      supportedProtocolVersions: SUPPORTED,
+      deps: {
+        authorizeMcpRequestWithPrincipalFn: async () => ({
+          authError: null,
+          principal: { authMethod: 'static' },
+        }),
+      },
+    });
+
+    assert.equal(result.authError, null);
+    assert.equal(result.protocolNegotiation?.accepted, true);
+    assert.equal(result.protocolNegotiation?.reason, 'profile_fallback');
+    assert.equal(result.protocolNegotiation?.acceptedCapabilityProfile, 'extended');
+  });
+
   it('skips protocol validation for GET requests', async () => {
     const result = await authorizeMcpGatewayRequest({
       request: new Request('https://example.com/mcp', { method: 'GET' }),

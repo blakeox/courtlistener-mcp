@@ -9,8 +9,11 @@ import { Logger } from '../infrastructure/logger.js';
 export interface ResourceHandler {
   readonly uriTemplate: string;
   readonly name: string;
+  readonly title?: string;
   readonly description?: string;
   readonly mimeType?: string;
+  readonly tags?: string[];
+  readonly examples?: string[];
 
   /**
    * Check if this handler can handle the given URI
@@ -54,6 +57,32 @@ export class ResourceHandlerRegistry {
    * Get all listed resources from all handlers
    */
   getAllResources(): Resource[] {
-    return this.handlers.flatMap(h => h.list());
+    return this.handlers.flatMap((handler) =>
+      handler.list().map((resource) => {
+        const tags = handler.tags ?? [
+          'resource',
+          ...handler.name
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean),
+        ];
+        const examples = handler.examples ?? [resource.uri];
+        return {
+          ...resource,
+          title: resource.title ?? handler.title ?? resource.name,
+          _meta: {
+            ...(resource._meta ?? {}),
+            'courtlistener/discoverability': {
+              tags: [...new Set(tags)].slice(0, 8),
+              examples,
+              descriptors: {
+                uriTemplate: handler.uriTemplate,
+                dynamic: handler.uriTemplate.includes('{'),
+              },
+            },
+          },
+        };
+      }),
+    );
   }
 }

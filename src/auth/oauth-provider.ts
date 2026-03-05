@@ -17,12 +17,11 @@ import {
 import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import crypto from 'node:crypto';
 import { LegalOAuthClientsStore } from './oauth-clients-store.js';
+import { resolveHostedMcpRequestedScopes } from './oauth-service.js';
 
 const ACCESS_TOKEN_TTL_SECONDS = 3600; // 1 hour
 const REFRESH_TOKEN_TTL_SECONDS = 86400; // 24 hours
 const AUTH_CODE_TTL_MS = 600_000; // 10 minutes
-
-const SUPPORTED_SCOPES = ['legal:read', 'legal:search', 'legal:analyze'];
 
 interface StoredAuthCode {
   clientId: string;
@@ -177,12 +176,7 @@ export class LegalOAuthProvider implements OAuthServerProvider {
   }
 
   private validateScopes(scopes?: string[]): string[] {
-    if (!scopes?.length) return [...SUPPORTED_SCOPES];
-    const valid = scopes.filter((s) => SUPPORTED_SCOPES.includes(s));
-    if (valid.length === 0) {
-      throw new Error(`No valid scopes requested. Supported: ${SUPPORTED_SCOPES.join(', ')}`);
-    }
-    return valid;
+    return resolveHostedMcpRequestedScopes(scopes);
   }
 
   private issueTokens(clientId: string, scopes: string[], resource?: URL): OAuthTokens {

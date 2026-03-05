@@ -182,6 +182,9 @@ export const HttpTransportConfigSchema = z.object({
   enableSessions: z.boolean(),
   enableResumability: z.boolean(),
   enableDnsRebindingProtection: z.boolean(),
+  maxConcurrentRequests: z.number().int().positive().optional(),
+  maxConcurrentSessionInitializations: z.number().int().positive().optional(),
+  maxActiveSessions: z.number().int().positive().optional(),
   allowedOrigins: z.array(z.string()).optional(),
   allowedHosts: z.array(z.string()).optional(),
 });
@@ -194,6 +197,22 @@ export const OAuthConfigSchema = z.object({
   issuerUrl: z.string().optional(),
   clientId: z.string().optional(),
   clientSecret: z.string().optional(),
+});
+
+/**
+ * Zod schema for Async Execution configuration
+ */
+export const AsyncExecutionConfigSchema = z.object({
+  enabled: z.boolean(),
+  queueConcurrency: z.number().int().positive(),
+  queueBatchSize: z.number().int().positive(),
+  defaultMaxAttempts: z.number().int().positive(),
+  defaultRetryDelayMs: z.number().int().min(0),
+  defaultTtlSeconds: z.number().int().positive(),
+  maxStoredJobs: z.number().int().positive(),
+  maxQueueDepth: z.number().int().positive(),
+  queueLatencyGuardrailMs: z.number().int().positive(),
+  completionLatencyGuardrailMs: z.number().int().positive(),
 });
 
 /**
@@ -215,6 +234,7 @@ export const ServerConfigSchema = z.object({
   gracefulShutdown: GracefulShutdownConfigSchema.optional(),
   httpTransport: HttpTransportConfigSchema.optional(),
   oauth: OAuthConfigSchema.optional(),
+  asyncExecution: AsyncExecutionConfigSchema.optional(),
 });
 
 /**

@@ -6,13 +6,25 @@
 import {
   ConnectionPoolManager,
   RequestQueueManager,
-  CircuitBreaker,
-  CircuitBreakerOptions,
 } from './async-patterns.js';
+import {
+  CircuitBreaker,
+  type ResiliencePolicy,
+  type ResiliencePolicyInput,
+  createResiliencePolicy,
+} from './circuit-breaker.js';
 import { Logger } from './logger.js';
 import { CacheManager } from './cache.js';
 import { MetricsCollector } from './metrics.js';
 import { cryptoId } from '../common/utils.js';
+
+interface LegacyCircuitBreakerOptions {
+  failureThreshold?: number;
+  successThreshold?: number;
+  timeout?: number;
+  resetTimeout?: number;
+  monitoringWindow?: number;
+}
 
 export interface EnhancedAPIOptions {
   baseUrl: string;
@@ -20,7 +32,8 @@ export interface EnhancedAPIOptions {
   timeout?: number;
   retryAttempts?: number;
   enableCircuitBreaker?: boolean;
-  circuitBreakerOptions?: CircuitBreakerOptions;
+  circuitBreakerOptions?: LegacyCircuitBreakerOptions;
+  resiliencePolicy?: ResiliencePolicyInput;
   connectionPool?: {
     maxConnections?: number;
     maxIdleTime?: number;
@@ -28,6 +41,8 @@ export interface EnhancedAPIOptions {
   requestQueue?: {
     maxConcurrent?: number;
     rateLimit?: number;
+    retryAttempts?: number;
+    retryDelay?: number;
   };
 }
 
@@ -46,6 +61,7 @@ export class EnhancedCourtListenerAPIClient {
   private connectionPool: ConnectionPoolManager;
   private requestQueue: RequestQueueManager;
   private circuitBreaker?: CircuitBreaker;
+  private resiliencePolicy: ResiliencePolicy;
 
   constructor(
     options: EnhancedAPIOptions,
@@ -63,13 +79,10 @@ export class EnhancedCourtListenerAPIClient {
     this.options = {
       ...options,
       timeout: options.timeout || 30000,
-      retryAttempts: options.retryAttempts || 3,
+      retryAttempts: options.retryAttempts ?? 3,
       enableCircuitBreaker: options.enableCircuitBreaker !== false,
-      circuitBreakerOptions: {
-        failureThreshold: 5,
-        timeout: 60000,
-        ...options.circuitBreakerOptions,
-      },
+      circuitBreakerOptions: options.circuitBreakerOptions ?? {},
+      resiliencePolicy: options.resiliencePolicy ?? {},
       connectionPool: {
         maxConnections: 10,
         maxIdleTime: 30000,
@@ -78,25 +91,44 @@ export class EnhancedCourtListenerAPIClient {
       requestQueue: {
         maxConcurrent: 5,
         rateLimit: 10, // 10 requests per second
+        retryAttempts: options.retryAttempts ?? 3,
+        retryDelay: 1000,
         ...options.requestQueue,
       },
     };
+
+    this.resiliencePolicy = createResiliencePolicy({
+      retry: {
+        attempts:
+          this.options.resiliencePolicy?.retry?.attempts ?? this.options.retryAttempts ?? 3,
+        backoffMs: this.options.resiliencePolicy?.retry?.backoffMs ?? 1000,
+      },
+      circuitBreaker: {
+        ...this.options.circuitBreakerOptions,
+        ...this.options.resiliencePolicy?.circuitBreaker,
+        enabled:
+          this.options.resiliencePolicy?.circuitBreaker?.enabled ??
+          this.options.enableCircuitBreaker ??
+          true,
+      },
+    });
 
     // Initialize async patterns
     this.connectionPool = new ConnectionPoolManager(this.logger);
     this.requestQueue = new RequestQueueManager(this.logger);
 
-    if (this.options.enableCircuitBreaker) {
+    if (this.resiliencePolicy.circuitBreaker.enabled) {
       this.circuitBreaker = new CircuitBreaker(
         'courtlistener-api',
-        this.options.circuitBreakerOptions,
+        this.resiliencePolicy.circuitBreaker,
         this.logger,
       );
     }
 
     this.logger.info('Enhanced API client initialized', {
       baseUrl: this.baseUrl,
-      circuitBreakerEnabled: this.options.enableCircuitBreaker,
+      circuitBreakerEnabled: this.resiliencePolicy.circuitBreaker.enabled,
+      resiliencePolicy: this.resiliencePolicy,
       connectionPoolConfig: this.options.connectionPool,
       requestQueueConfig: this.options.requestQueue,
     });

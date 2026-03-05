@@ -3,9 +3,6 @@
  * Advanced patterns for improved performance and concurrency
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Note: any types required for generic Promise/Queue patterns that can't be typed more strictly
-
 import { Logger } from './logger.js';
 import { cryptoId } from '../common/utils.js'; /**
  * Connection Pool Manager
@@ -315,7 +312,7 @@ export class RequestQueue {
   async enqueue<T>(
     operation: () => Promise<T>,
     priority: number = 0,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<T> {
     if (this.closed) {
       throw new Error('Request queue is closed');
@@ -327,7 +324,7 @@ export class RequestQueue {
         operation,
         priority,
         ...(metadata !== undefined && { metadata }),
-        resolve,
+        resolve: (result) => resolve(result as T),
         reject,
         attempts: 0,
         createdAt: Date.now(),
@@ -479,87 +476,6 @@ export class RequestQueue {
   }
 }
 
-/**
- * Circuit Breaker Pattern
- * Prevents cascading failures and improves resilience
- */
-export class CircuitBreaker {
-  private failureCount = 0;
-  private lastFailureTime = 0;
-  private state: CircuitBreakerState = 'CLOSED';
-  private nextAttemptTime = 0;
-  private logger: Logger;
-
-  constructor(
-    private name: string,
-    private options: CircuitBreakerOptions,
-    logger: Logger,
-  ) {
-    this.logger = logger.child(`CircuitBreaker:${name}`);
-  }
-
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.state === 'OPEN') {
-      if (Date.now() < this.nextAttemptTime) {
-        throw new Error(`Circuit breaker is OPEN for ${this.name}`);
-      }
-      this.state = 'HALF_OPEN';
-      this.logger.info('Circuit breaker transitioning to HALF_OPEN', {
-        name: this.name,
-      });
-    }
-
-    try {
-      const result = await operation();
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
-  }
-
-  private onSuccess(): void {
-    this.failureCount = 0;
-    if (this.state === 'HALF_OPEN') {
-      this.state = 'CLOSED';
-      this.logger.info('Circuit breaker closed after successful request', {
-        name: this.name,
-      });
-    }
-  }
-
-  private onFailure(): void {
-    this.failureCount++;
-    this.lastFailureTime = Date.now();
-
-    if (this.failureCount >= this.options.failureThreshold) {
-      this.state = 'OPEN';
-      this.nextAttemptTime = Date.now() + this.options.timeout;
-
-      this.logger.warn('Circuit breaker opened due to failures', {
-        name: this.name,
-        failureCount: this.failureCount,
-        nextAttemptTime: this.nextAttemptTime,
-      });
-    }
-  }
-
-  getState(): CircuitBreakerState {
-    return this.state;
-  }
-
-  getStats(): CircuitBreakerStats {
-    return {
-      name: this.name,
-      state: this.state,
-      failureCount: this.failureCount,
-      lastFailureTime: this.lastFailureTime,
-      nextAttemptTime: this.nextAttemptTime,
-    };
-  }
-}
-
 // Type definitions
 export interface ConnectionPoolOptions {
   maxConnections?: number;
@@ -607,10 +523,10 @@ export interface RequestQueueOptions {
 
 export interface QueuedRequest {
   id: string;
-  operation: () => Promise<any>;
+  operation: () => Promise<unknown>;
   priority: number;
-  metadata?: Record<string, any>;
-  resolve: (result: any) => void;
+  metadata?: Record<string, unknown>;
+  resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   attempts: number;
   createdAt: number;
@@ -627,19 +543,4 @@ export interface QueueStats {
 export interface RequestQueueStats {
   totalQueues: number;
   queues: Record<string, QueueStats>;
-}
-
-export interface CircuitBreakerOptions {
-  failureThreshold: number;
-  timeout: number; // Recovery timeout in ms
-}
-
-export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
-
-export interface CircuitBreakerStats {
-  name: string;
-  state: CircuitBreakerState;
-  failureCount: number;
-  lastFailureTime: number;
-  nextAttemptTime: number;
 }

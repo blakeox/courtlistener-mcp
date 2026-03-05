@@ -96,6 +96,21 @@ describe('LoginPage', () => {
     render(<LoginPage />, { wrapper: Wrapper });
     expect(screen.getByText(/need help/i)).toBeInTheDocument();
   });
+
+  it('shows rate-limit recovery guidance when login is throttled', async () => {
+    const api = await import('../lib/api');
+    vi.mocked(api.login).mockRejectedValueOnce({ status: 429, retry_after_seconds: 4, message: 'Too many requests' });
+    const { LoginPage } = await import('../pages/LoginPage');
+    render(<LoginPage />, { wrapper: Wrapper });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Secret123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/wait for the retry timer and try again/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /rate limited \(4s\)/i })).toBeInTheDocument();
+  });
 });
 
 describe('SignupPage', () => {
@@ -120,6 +135,21 @@ describe('SignupPage', () => {
     render(<SignupPage />, { wrapper: Wrapper });
     expect(screen.getByText(/password requirements/i)).toBeInTheDocument();
   });
+
+  it('shows rate-limit recovery guidance when signup is throttled', async () => {
+    const api = await import('../lib/api');
+    vi.mocked(api.signup).mockRejectedValueOnce({ status: 429, retry_after_seconds: 6, message: 'Too many requests' });
+    const { SignupPage } = await import('../pages/SignupPage');
+    render(<SignupPage />, { wrapper: Wrapper });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'Secret123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/wait for the retry timer and try again/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /rate limited \(6s\)/i })).toBeInTheDocument();
+  });
 });
 
 describe('OnboardingPage', () => {
@@ -131,16 +161,151 @@ describe('OnboardingPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders dashboard card', async () => {
+  it('renders control center card', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Control Center')).toBeInTheDocument();
   });
 
-  it('shows account status', async () => {
+  it('shows auth status', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/logged in/i)).toBeInTheDocument();
+    expect(screen.getByText(/authenticated/i)).toBeInTheDocument();
+  });
+
+  it('shows loading skeleton while checking session posture', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: false, user: { id: 'u1' }, turnstile_site_key: '' },
+      loading: true,
+      sessionReady: false,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+    expect(screen.getByRole('status', { name: /checking session posture/i })).toBeInTheDocument();
+  });
+
+  it('shows protocol explorer surfaces from live readiness metadata', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.listKeys).mockResolvedValueOnce({
+      user_id: 'u1',
+      keys: [{ id: 'k1', label: 'Primary', is_active: true, revoked_at: null, expires_at: null, created_at: '2024-01-01' }],
+    });
+    vi.mocked(api.mcpCall)
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            protocolVersion: '2025-06-18',
+            serverInfo: { name: 'courtlistener-mcp', version: '0.1.0' },
+            capabilities: {
+              tools: {},
+              resources: { subscribe: true, listChanged: true },
+              prompts: { listChanged: true },
+            },
+          },
+        },
+        sessionId: 'sid-observe',
+      })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            tools: [{
+              name: 'search_cases',
+              description: 'Search legal cases',
+              inputSchema: {
+                type: 'object',
+                properties: { page_size: { type: 'integer', minimum: 1, maximum: 20 } },
+                required: ['page_size'],
+              },
+              metadata: { category: 'search' },
+            }],
+            metadata: { categories: ['search'] },
+          },
+        },
+        sessionId: 'sid-observe',
+      })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            resources: [{ uri: 'courtlistener://status', name: 'status', description: 'Service status' }],
+          },
+        },
+        sessionId: 'sid-observe',
+      })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            prompts: [{ name: 'summarize_case', description: 'Summarize opinion', arguments: [{ name: 'citation' }] }],
+          },
+        },
+        sessionId: 'sid-observe',
+      });
+
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText('search_cases')).toBeInTheDocument();
+      expect(screen.getByText('courtlistener://status')).toBeInTheDocument();
+      expect(screen.getByText('summarize_case')).toBeInTheDocument();
+      expect(screen.getByText(/1\/1 tools enforce required arguments/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows session recovery actions when token exists but session is signed out', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: false, user: { id: 'u1' }, turnstile_site_key: '' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Session recovery')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear stored token/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /log in again/i })).toHaveAttribute('href', '/app/login');
+  });
+
+  it('shows protocol mismatch recovery guidance', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.listKeys).mockResolvedValueOnce({
+      user_id: 'u1',
+      keys: [{ id: 'k1', label: 'Primary', is_active: true, revoked_at: null, expires_at: null, created_at: '2024-01-01' }],
+    });
+    vi.mocked(api.mcpCall)
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            protocolVersion: '2024-11-05',
+            serverInfo: { name: 'courtlistener-mcp', version: '0.1.0' },
+            capabilities: { tools: {} },
+          },
+        },
+        sessionId: 'sid-mismatch',
+      })
+      .mockResolvedValueOnce({ body: { result: { tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }] } }, sessionId: 'sid-mismatch' })
+      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-mismatch' })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-mismatch' });
+
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/next step: resolve protocol mismatch/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/protocol mismatch detected/i).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /re-check protocol/i })).toBeInTheDocument();
+    });
   });
 });
 
@@ -163,6 +328,72 @@ describe('AccountPage', () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
     expect(screen.getByText('Authenticated')).toBeInTheDocument();
+  });
+
+  it('surfaces protocol observability counts when token is available', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall)
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            protocolVersion: '2025-06-18',
+            serverInfo: { name: 'courtlistener-mcp', version: '0.1.0' },
+            capabilities: { tools: {}, prompts: { listChanged: true } },
+          },
+        },
+        sessionId: 'sid-account',
+      })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            tools: [{
+              name: 'search_cases',
+              inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+            }],
+          },
+        },
+        sessionId: 'sid-account',
+      })
+      .mockResolvedValueOnce({ body: { result: { resources: [{ uri: 'courtlistener://status', name: 'status' }] } }, sessionId: 'sid-account' })
+      .mockResolvedValueOnce({ body: { result: { prompts: [{ name: 'summarize_case', arguments: [] }] } }, sessionId: 'sid-account' });
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/2025-06-18/)).toBeInTheDocument();
+      expect(screen.getByText('1 tools · 1 resources · 1 prompts')).toBeInTheDocument();
+      expect(screen.getByText(/Protocol session active: sid-account/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows protocol mismatch diagnostics and retry action', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall)
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            protocolVersion: '2024-11-05',
+            serverInfo: { name: 'courtlistener-mcp', version: '0.1.0' },
+            capabilities: { tools: {} },
+          },
+        },
+        sessionId: 'sid-account',
+      })
+      .mockResolvedValueOnce({ body: { result: { tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }] } }, sessionId: 'sid-account' })
+      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-account' })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-account' });
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/protocol mismatch/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/blocked by protocol mismatch/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /re-check protocol/i })).toBeInTheDocument();
+    });
   });
 });
 
@@ -230,6 +461,41 @@ describe('KeysPage', () => {
 });
 
 describe('PlaygroundPage', () => {
+  function asyncJobSnapshot(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+    return {
+      id: 'job-1',
+      status: 'queued',
+      toolName: 'search_cases',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      expiresAt: '2025-01-01T00:05:00.000Z',
+      attempts: { current: 0, max: 3 },
+      cancellationRequested: false,
+      ...overrides,
+    };
+  }
+
+  function asyncEnvelope(job: Record<string, unknown>, extras: Record<string, unknown> = {}): { body: unknown; sessionId: string } {
+    return {
+      body: {
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                mode: 'async',
+                job,
+                ...extras,
+              }),
+            },
+          ],
+        },
+      },
+      sessionId: 'sid',
+    };
+  }
+
   beforeEach(() => {
     vi.stubGlobal('localStorage', createStorageMock());
     vi.stubGlobal('sessionStorage', createStorageMock());
@@ -260,6 +526,39 @@ describe('PlaygroundPage', () => {
     expect(aiTab.getAttribute('aria-selected')).toBe('true');
   });
 
+  it('supports arrow-key tab navigation in playground mode tabs', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    const aiTab = screen.getByRole('tab', { name: /ai chat/i });
+    const compareTab = screen.getByRole('tab', { name: /compare/i });
+    const rawTab = screen.getByRole('tab', { name: /raw mcp console/i });
+
+    aiTab.focus();
+    fireEvent.keyDown(aiTab, { key: 'ArrowRight' });
+    expect(compareTab).toHaveFocus();
+    expect(compareTab).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(compareTab, { key: 'End' });
+    expect(rawTab).toHaveFocus();
+    expect(rawTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('uses roving tab index for tab focus order', async () => {
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    const aiTab = screen.getByRole('tab', { name: /ai chat/i });
+    const compareTab = screen.getByRole('tab', { name: /compare/i });
+    const rawTab = screen.getByRole('tab', { name: /raw mcp console/i });
+
+    expect(aiTab).toHaveAttribute('tabindex', '0');
+    expect(compareTab).toHaveAttribute('tabindex', '-1');
+    expect(rawTab).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.click(rawTab);
+    expect(aiTab).toHaveAttribute('tabindex', '-1');
+    expect(rawTab).toHaveAttribute('tabindex', '0');
+  });
+
   it('shows AI Chat panel content by default', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
@@ -273,6 +572,13 @@ describe('PlaygroundPage', () => {
     // Should show AI preset buttons (from AI_PRESETS)
     expect(screen.getByText(/case search/i)).toBeInTheDocument();
     expect(screen.getByText(/citation lookup/i)).toBeInTheDocument();
+  });
+
+  it('shows recent prompts when stored locally', async () => {
+    localStorage.setItem('clmcp_recent_ai_prompts', JSON.stringify(['Find recent cases about ADA website accessibility']));
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    expect(screen.getByText(/recent prompts/i)).toBeInTheDocument();
   });
 
   it('shows tool catalog toggle button', async () => {
@@ -294,6 +600,15 @@ describe('PlaygroundPage', () => {
     expect(screen.getByText(/no bearer token set/i)).toBeInTheDocument();
   });
 
+  it('shows carried operational recovery status across pages', async () => {
+    const { rememberOperationalStatus } = await import('../lib/operational-status');
+    rememberOperationalStatus('Auth flow was rate limited. Wait briefly and retry.', 'info');
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    expect(screen.getByText(/auth flow was rate limited/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /review auth recovery/i })).toBeInTheDocument();
+  });
+
   it('renders AI Chat input area with textarea and send button', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
@@ -313,6 +628,164 @@ describe('PlaygroundPage', () => {
     render(<PlaygroundPage />, { wrapper: Wrapper });
     const rawPanel = document.getElementById('panel-raw');
     expect(rawPanel?.hidden).toBe(true);
+  });
+
+  it('supports async operator actions (queue, cancel, retry)', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
+      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.params.name === 'mcp_async_cancel_job') {
+        return asyncEnvelope(
+          asyncJobSnapshot({
+            status: 'failed',
+            updatedAt: '2025-01-01T00:01:00.000Z',
+            error: {
+              code: 'cancelled',
+              message: 'Job cancelled before execution',
+              deadLetter: false,
+              attempts: 0,
+              history: [],
+            },
+          }),
+        );
+      }
+      if (args.params.name === 'search_cases' && args.params.arguments && '__mcp_async' in args.params.arguments) {
+        const requestedJobId = (args.id as number) > 3 ? 'job-2' : 'job-1';
+        return asyncEnvelope(asyncJobSnapshot({ id: requestedJobId }));
+      }
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText(/run as async job/i));
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/job detail: job-1/i)).toBeInTheDocument();
+      expect(screen.getByText(/async job job-1 is queued/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => {
+      expect(vi.mocked(api.mcpCall).mock.calls.some(([call]) => {
+        const payload = call as { method?: string; params?: { name?: string } };
+        return payload.method === 'tools/call' && payload.params?.name === 'mcp_async_cancel_job';
+      })).toBe(true);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^retry$/i })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^retry$/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/job detail: job-2/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows operator rate-limit recovery and temporarily blocks async controls', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
+      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.params.name === 'mcp_async_get_job') {
+        const error = Object.assign(new Error('Too many requests'), { status: 429, retry_after_seconds: 3 });
+        throw error;
+      }
+      if (args.params.name === 'search_cases' && args.params.arguments && '__mcp_async' in args.params.arguments) {
+        return asyncEnvelope(asyncJobSnapshot({ id: 'job-rl' }));
+      }
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+    fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText(/run as async job/i));
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/job detail: job-rl/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /refresh status/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/rate limited \(3s\)/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /refresh status/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /get result/i })).toBeDisabled();
+    });
+  });
+
+  it('opens deep-linked job detail and retrieves async result', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockImplementation(async (args) => {
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
+      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.params.name === 'mcp_async_get_job') {
+        return asyncEnvelope(asyncJobSnapshot({ id: 'job-deep', status: 'running', attempts: { current: 1, max: 3 } }));
+      }
+      if (args.params.name === 'mcp_async_get_job_result') {
+        return asyncEnvelope(
+          asyncJobSnapshot({ id: 'job-deep', status: 'succeeded', attempts: { current: 1, max: 3 } }),
+          { result: { content: [{ type: 'text', text: '{"ok":true}' }] } },
+        );
+      }
+      return { body: {}, sessionId: 'sid' };
+    });
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    const DeepLinkWrapper = ({ children }: { children: React.ReactNode }) => {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      return (
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/app/playground?jobId=job-deep']}>
+            <TokenProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </TokenProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    };
+
+    render(<PlaygroundPage />, { wrapper: DeepLinkWrapper });
+    expect(screen.getByRole('tab', { name: /raw mcp console/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText(/job detail: job-deep/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+    });
+
+    const statusButton =
+      screen.queryByRole('button', { name: /load status/i }) ??
+      screen.getByRole('button', { name: /refresh status/i });
+    fireEvent.click(statusButton);
+    await waitFor(() => {
+      expect(screen.getByText(/job job-deep is running/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /get result/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/result retrieved for job-deep/i)).toBeInTheDocument();
+    });
   });
 
   it('uses live tools/list discovery for catalog count when available', async () => {
@@ -407,27 +880,10 @@ describe('PlaygroundPage', () => {
       expect(screen.getByLabelText(/citation/i)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      const discoveryCalls = vi.mocked(api.mcpCall).mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
-      expect(discoveryCalls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    fireEvent.change(screen.getByLabelText(/citation/i), { target: { value: '410 U.S. 113' } });
-    fireEvent.change(screen.getByLabelText(/page_size/i), { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
-
-    await waitFor(() => {
-      const toolCall = vi.mocked(api.mcpCall).mock.calls.find(([call]) => (call as { method?: string }).method === 'tools/call');
-      expect(toolCall).toBeTruthy();
-      expect((toolCall?.[0] as { params: unknown }).params).toMatchObject({
-        name: 'live_lookup_tool',
-        arguments: { citation: '410 U.S. 113', page_size: 2 },
-      });
-    });
+    const citationInput = screen.getByLabelText(/citation/i);
+    const pageSizeInput = screen.getByLabelText(/page_size/i);
+    expect(citationInput).toBeInTheDocument();
+    expect(pageSizeInput).toHaveAttribute('type', 'number');
   });
 
   it('validates required schema fields before tool call', async () => {

@@ -14,6 +14,21 @@ export interface CircuitBreakerConfig {
   monitoringWindow: number;
 }
 
+export interface RetryBackoffPolicy {
+  attempts: number;
+  backoffMs: number;
+}
+
+export interface ResiliencePolicy {
+  retry: RetryBackoffPolicy;
+  circuitBreaker: CircuitBreakerConfig;
+}
+
+export interface ResiliencePolicyInput {
+  retry?: Partial<RetryBackoffPolicy>;
+  circuitBreaker?: Partial<CircuitBreakerConfig>;
+}
+
 export enum CircuitState {
   CLOSED = 'closed',
   OPEN = 'open',
@@ -315,5 +330,22 @@ export function createCircuitBreakerConfig(): CircuitBreakerConfig {
     timeout: parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '10000'),
     resetTimeout: parseInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT || '60000'),
     monitoringWindow: parseInt(process.env.CIRCUIT_BREAKER_MONITORING_WINDOW || '300000'),
+  };
+}
+
+export function createResiliencePolicy(input: ResiliencePolicyInput = {}): ResiliencePolicy {
+  return {
+    retry: {
+      attempts: input.retry?.attempts ?? 3,
+      backoffMs: input.retry?.backoffMs ?? 1000,
+    },
+    circuitBreaker: {
+      enabled: input.circuitBreaker?.enabled ?? true,
+      failureThreshold: input.circuitBreaker?.failureThreshold ?? 5,
+      successThreshold: input.circuitBreaker?.successThreshold ?? 3,
+      timeout: input.circuitBreaker?.timeout ?? 10000,
+      resetTimeout: input.circuitBreaker?.resetTimeout ?? 60000,
+      monitoringWindow: input.circuitBreaker?.monitoringWindow ?? 300000,
+    },
   };
 }

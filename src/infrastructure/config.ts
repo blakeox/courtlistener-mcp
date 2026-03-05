@@ -6,6 +6,12 @@
 import { parseLogFormat, parseLogLevel, parsePositiveInt } from '../common/validation.js';
 import { ServerConfig } from '../types.js';
 import { validateConfigWithZod } from './config-schema.js';
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from './protocol-constants.js';
+import {
+  type AuthPolicyDiagnostics,
+  evaluateAuthPolicyMatrix,
+} from './auth-policy-matrix.js';
+import { redactSecretsInText } from './secret-redaction.js';
 
 const defaultConfig: ServerConfig = {
   courtListener: {
@@ -129,6 +135,19 @@ const defaultConfig: ServerConfig = {
     enableSessions: process.env.MCP_SESSIONS !== 'false',
     enableResumability: process.env.MCP_RESUMABILITY === 'true',
     enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
+    ...(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS !== undefined && {
+      maxConcurrentRequests: parsePositiveInt(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS, 256, 1),
+    }),
+    ...(process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS !== undefined && {
+      maxConcurrentSessionInitializations: parsePositiveInt(
+        process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS,
+        32,
+        1,
+      ),
+    }),
+    ...(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS !== undefined && {
+      maxActiveSessions: parsePositiveInt(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS, 1024, 1),
+    }),
     ...(process.env.MCP_ALLOWED_ORIGINS !== undefined && {
       allowedOrigins: process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
     }),
@@ -143,6 +162,22 @@ const defaultConfig: ServerConfig = {
     ...(process.env.OAUTH_CLIENT_SECRET !== undefined && {
       clientSecret: process.env.OAUTH_CLIENT_SECRET,
     }),
+  },
+  asyncExecution: {
+    enabled: process.env.MCP_ASYNC_EXECUTION_ENABLED !== 'false',
+    queueConcurrency: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_CONCURRENCY, 1, 1),
+    queueBatchSize: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_BATCH_SIZE, 1, 1),
+    defaultMaxAttempts: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_MAX_ATTEMPTS, 3, 1),
+    defaultRetryDelayMs: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_RETRY_DELAY_MS, 500, 0),
+    defaultTtlSeconds: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
+    maxStoredJobs: parsePositiveInt(process.env.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
+    maxQueueDepth: parsePositiveInt(process.env.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
+    queueLatencyGuardrailMs: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS, 2_000, 1),
+    completionLatencyGuardrailMs: parsePositiveInt(
+      process.env.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
+      15_000,
+      1,
+    ),
   },
 };
 
@@ -177,6 +212,51 @@ const defaultConfig: ServerConfig = {
 export function getConfig(): ServerConfig {
   const config = validateConfig(defaultConfig);
   return validateConfigWithZod(config);
+}
+
+interface StartupInvariantReport {
+  errors: string[];
+  warnings: string[];
+  authPolicy: AuthPolicyDiagnostics;
+}
+
+function evaluateStartupInvariants(config: ServerConfig): StartupInvariantReport {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const sessionsEnabled = config.httpTransport?.enableSessions ?? true;
+  const resumabilityEnabled = config.httpTransport?.enableResumability ?? false;
+  const authPolicy = evaluateAuthPolicyMatrix(config);
+  errors.push(...authPolicy.errors);
+  warnings.push(...authPolicy.warnings);
+
+  if (config.oauth?.enabled && !sessionsEnabled) {
+    errors.push('OAuth requires MCP HTTP sessions to be enabled');
+  }
+
+  if (resumabilityEnabled && !sessionsEnabled) {
+    errors.push('MCP resumability requires sessions to be enabled');
+  }
+
+  const requireProtocolVersion = process.env.MCP_REQUIRE_PROTOCOL_VERSION;
+  if (
+    requireProtocolVersion !== undefined &&
+    requireProtocolVersion !== 'true' &&
+    requireProtocolVersion !== 'false'
+  ) {
+    warnings.push('MCP_REQUIRE_PROTOCOL_VERSION should be either "true" or "false"');
+  }
+
+  if (requireProtocolVersion === 'true' && !sessionsEnabled) {
+    warnings.push(
+      'MCP protocol-version enforcement is enabled while sessions are disabled; verify client compatibility for stateless calls',
+    );
+  }
+
+  return {
+    errors: errors.map((message) => redactSecretsInText(message)),
+    warnings: warnings.map((message) => redactSecretsInText(message)),
+    authPolicy: authPolicy.diagnostics,
+  };
 }
 
 function validateConfig(config: ServerConfig): ServerConfig {
@@ -248,6 +328,11 @@ function validateConfig(config: ServerConfig): ServerConfig {
     throw new Error('Compression threshold must be non-negative');
   }
 
+  const startupInvariants = evaluateStartupInvariants(config);
+  if (startupInvariants.errors.length > 0) {
+    throw new Error(`Startup invariants failed:\n${startupInvariants.errors.join('\n')}`);
+  }
+
   return config;
 }
 
@@ -267,6 +352,7 @@ export function getEnvironmentInfo() {
  */
 export function getConfigSummary() {
   const config = getConfig();
+  const startupInvariants = evaluateStartupInvariants(config);
 
   return {
     features: {
@@ -285,6 +371,13 @@ export function getConfigSummary() {
       rateLimitPerMinute: config.courtListener.rateLimitPerMinute,
       requestTimeout: config.courtListener.timeout,
       circuitBreakerThreshold: config.circuitBreaker.failureThreshold,
+      httpMaxConcurrentRequests: config.httpTransport?.maxConcurrentRequests ?? null,
+      httpMaxConcurrentSessionInitializations:
+        config.httpTransport?.maxConcurrentSessionInitializations ?? null,
+      httpMaxActiveSessions: config.httpTransport?.maxActiveSessions ?? null,
+      asyncQueueConcurrency: config.asyncExecution?.queueConcurrency ?? null,
+      asyncQueueBatchSize: config.asyncExecution?.queueBatchSize ?? null,
+      asyncMaxQueueDepth: config.asyncExecution?.maxQueueDepth ?? null,
     },
     security: {
       authEnabled: config.security.authEnabled,
@@ -292,5 +385,97 @@ export function getConfigSummary() {
       apiKeysConfigured: config.security.apiKeys.length,
       corsOrigins: config.security.corsOrigins.length,
     },
+    startupDiagnostics: {
+      status: startupInvariants.errors.length === 0 ? 'ok' : 'error',
+      invariants: startupInvariants,
+      authPolicy: startupInvariants.authPolicy,
+      protocol: {
+        requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
+        supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
+      },
+    },
   };
+}
+
+export function getStartupDiagnostics() {
+  try {
+    const config = getConfig();
+    const invariants = evaluateStartupInvariants(config);
+
+    return {
+      status: invariants.errors.length === 0 ? 'ok' : 'error',
+      invariants,
+      auth: {
+        oauthEnabled: config.oauth?.enabled ?? false,
+        apiKeyAuthEnabled: config.security.authEnabled,
+        gatewayTokenConfigured: Boolean(process.env.MCP_AUTH_TOKEN),
+      },
+      authPolicy: invariants.authPolicy,
+      session: {
+        sessionsEnabled: config.httpTransport?.enableSessions ?? true,
+        resumabilityEnabled: config.httpTransport?.enableResumability ?? false,
+        maxConcurrentRequests: config.httpTransport?.maxConcurrentRequests ?? null,
+        maxConcurrentSessionInitializations:
+          config.httpTransport?.maxConcurrentSessionInitializations ?? null,
+        maxActiveSessions: config.httpTransport?.maxActiveSessions ?? null,
+      },
+      protocol: {
+        requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
+        supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
+      },
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      invariants: {
+        errors: [redactSecretsInText(error instanceof Error ? error.message : String(error))],
+        warnings: [] as string[],
+        authPolicy: {
+          precedence: ['oauth', 'serviceToken', 'supabase', 'oidc', 'staticToken'],
+          configured: {
+            oauth: process.env.OAUTH_ENABLED === 'true',
+            apiKeyAuth: process.env.AUTH_ENABLED === 'true',
+            serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
+            oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
+            supabase: Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SECRET_KEY?.trim()),
+            staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
+          },
+          requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,
+          effectivePrimary: null,
+          staticFallbackEnabled: process.env.MCP_ALLOW_STATIC_FALLBACK === 'true',
+          incompatibleRulesTriggered: [],
+        },
+      },
+      auth: {
+        oauthEnabled: process.env.OAUTH_ENABLED === 'true',
+        apiKeyAuthEnabled: process.env.AUTH_ENABLED === 'true',
+        gatewayTokenConfigured: Boolean(process.env.MCP_AUTH_TOKEN),
+      },
+      authPolicy: {
+        precedence: ['oauth', 'serviceToken', 'supabase', 'oidc', 'staticToken'],
+        configured: {
+          oauth: process.env.OAUTH_ENABLED === 'true',
+          apiKeyAuth: process.env.AUTH_ENABLED === 'true',
+          serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
+          oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
+          supabase: Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SECRET_KEY?.trim()),
+          staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
+        },
+        requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,
+        effectivePrimary: null,
+        staticFallbackEnabled: process.env.MCP_ALLOW_STATIC_FALLBACK === 'true',
+        incompatibleRulesTriggered: [],
+      },
+      session: {
+        sessionsEnabled: process.env.MCP_SESSIONS !== 'false',
+        resumabilityEnabled: process.env.MCP_RESUMABILITY === 'true',
+      },
+      protocol: {
+        requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
+        supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

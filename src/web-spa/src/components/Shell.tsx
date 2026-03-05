@@ -19,7 +19,25 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
   const mainRef = React.useRef<HTMLElement | null>(null);
 
   const authed = Boolean(session?.authenticated);
+  const hasLocalToken = Boolean(token.trim());
   const { toast } = useToast();
+  const navGroups: Array<{ label: string; items: Array<{ label: string; to: string; requiresAuth?: boolean }> }> = [
+    {
+      label: 'MCP Overview',
+      items: [{ label: 'Control Center', to: '/app/control-center' }],
+    },
+    {
+      label: 'MCP Operations',
+      items: [
+        { label: 'MCP Keys', to: '/app/keys', requiresAuth: true },
+        { label: 'MCP Playground', to: '/app/playground', requiresAuth: true },
+      ],
+    },
+    {
+      label: 'Session',
+      items: [{ label: 'Session & Account', to: '/app/account', requiresAuth: true }],
+    },
+  ];
 
   useSessionHeartbeat(5 * 60 * 1000, {
     enabled: authed,
@@ -46,8 +64,25 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
           You're offline — changes may not save.
         </div>
       )}
+      {!loading && !authed && hasLocalToken ? (
+        <div className="status info" role="status" aria-live="polite">
+          <strong>Session recovery:</strong> A local bearer token is stored, but this browser session is signed out.
+          <div className="row status-actions">
+            <Link to="/app/login" className="btn secondary">Log in again</Link>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                clear();
+                toast('Stored token cleared', 'info');
+              }}
+            >
+              Clear stored token
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <header className="topbar">
-        <Link to="/app/onboarding" className="brand">
+        <Link to="/app/control-center" className="brand">
           CourtListener MCP
           <small>Access Portal</small>
         </Link>
@@ -70,8 +105,8 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
               <NavLink to="/app/account" className="pill primary">
                 Account
               </NavLink>
-              <span className={`token-badge ${token ? 'set' : 'unset'}`}>
-                {token ? '🔑 Token set' : '🔑 No token'}
+              <span className={`token-badge ${hasLocalToken ? 'set' : 'unset'}`}>
+                {hasLocalToken ? '🔑 Token set' : '🔑 No token'}
               </span>
               <button
                 type="button"
@@ -95,50 +130,60 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       </header>
 
       <div className="main-layout">
-        <button type="button" className="mobile-menu-btn" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle navigation menu">
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label="Toggle navigation menu"
+          aria-expanded={sidebarOpen}
+          aria-controls="primary-navigation"
+        >
           ☰ Menu
         </button>
-        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <h1>Setup Progress</h1>
+        <aside id="primary-navigation" className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <h1>MCP Control Center</h1>
           <Stepper steps={props.steps} />
           <div className="menu">
-            <NavLink to="/app/onboarding" className={({ isActive }) => (isActive ? 'active' : '')}>
-              Dashboard
-            </NavLink>
-            <NavLink
-              to="/app/keys"
-              className={({ isActive }) => (isActive ? 'active' : '')}
-              {...(!authed ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e: React.MouseEvent) => e.preventDefault(), style: { opacity: 0.5, pointerEvents: 'none' as const } } : {})}
-            >
-              API Keys
-            </NavLink>
-            <NavLink
-              to="/app/playground"
-              className={({ isActive }) => (isActive ? 'active' : '')}
-              {...(!authed ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e: React.MouseEvent) => e.preventDefault(), style: { opacity: 0.5, pointerEvents: 'none' as const } } : {})}
-            >
-              Playground
-            </NavLink>
-            <NavLink
-              to="/app/account"
-              className={({ isActive }) => (isActive ? 'active' : '')}
-              {...(!authed ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e: React.MouseEvent) => e.preventDefault(), style: { opacity: 0.5, pointerEvents: 'none' as const } } : {})}
-            >
-              Account
-            </NavLink>
+            {navGroups.map((group) => (
+              <div key={group.label} className="menu-group">
+                <p className="menu-group-label">{group.label}</p>
+                {group.items.map((item) => {
+                  const disabled = Boolean(item.requiresAuth && !authed);
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) => `${isActive ? 'active' : ''} ${disabled ? 'disabled' : ''}`.trim()}
+                      {...(disabled
+                        ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e: React.MouseEvent) => e.preventDefault() }
+                        : {})}
+                    >
+                      {item.label}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ))}
             {!authed && (
-              <>
+              <div className="menu-group">
+                <p className="menu-group-label">Session access</p>
                 <NavLink to="/app/signup" className={({ isActive }) => (isActive ? 'active' : '')}>
                   Create Account
                 </NavLink>
                 <NavLink to="/app/login" className={({ isActive }) => (isActive ? 'active' : '')}>
                   Login
                 </NavLink>
-              </>
+              </div>
             )}
           </div>
+          {authed ? (
+            <div className="sidebar-shortcuts">
+              <Link to="/app/playground" className="btn secondary">Open MCP Playground</Link>
+              <Link to="/app/keys" className="btn">Manage MCP Keys</Link>
+            </div>
+          ) : null}
         </aside>
-        <main id="main-content" ref={mainRef} tabIndex={-1} className="content" style={{ outline: 'none' }}>{props.children}</main>
+        <main id="main-content" ref={mainRef} tabIndex={-1} className="content">{props.children}</main>
       </div>
 
       <footer>

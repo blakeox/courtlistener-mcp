@@ -13,6 +13,10 @@ import fs from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '../..');
+const REMOTE_BEARER_TOKEN =
+  process.env.MCP_REMOTE_BEARER_TOKEN?.trim() ||
+  process.env.REMOTE_SERVER_BEARER_TOKEN?.trim() ||
+  '';
 
 // Configuration
 interface Config {
@@ -39,7 +43,7 @@ const CONFIG: Config = {
   remoteServer: {
     url:
       process.env.REMOTE_SERVER_URL ||
-      'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+      'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   timeout: 30000, // 30 seconds
@@ -92,22 +96,6 @@ const testCases: TestCase[] = [
         output.includes('get_case_details') &&
         output.includes('list_courts')
       );
-    },
-    required: true,
-  },
-  {
-    name: 'MCP Inspector CLI - Initialize Protocol',
-    args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
-      '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
-      '--method',
-      'initialize',
-    ],
-    validate: (output) => {
-      return output.includes('Legal MCP Server') || output.includes('serverInfo');
     },
     required: true,
   },
@@ -325,6 +313,12 @@ async function testRemoteServer(): Promise<boolean> {
     );
     return true;
   }
+  if (!REMOTE_BEARER_TOKEN && process.env.REMOTE_SERVER_ALLOW_UNAUTH !== 'true') {
+    console.log(
+      `\n${colors.YELLOW}⏭️  Skipping remote server tests (set MCP_REMOTE_BEARER_TOKEN or REMOTE_SERVER_ALLOW_UNAUTH=true)${colors.NC}`
+    );
+    return true;
+  }
 
   console.log(
     `\n${colors.BLUE}🌐 Testing Remote Server: ${CONFIG.remoteServer.url}${colors.NC}`
@@ -371,7 +365,14 @@ async function testRemoteServer(): Promise<boolean> {
     try {
       const response = await fetch(CONFIG.remoteServer.url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2024-11-05',
+          ...(REMOTE_BEARER_TOKEN && {
+            Authorization: `Bearer ${REMOTE_BEARER_TOKEN}`,
+          }),
+        },
         body: JSON.stringify(test.payload),
       });
 

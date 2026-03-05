@@ -2,7 +2,9 @@ import type { McpAuthorizationResult, WorkerSecurityEnv, WorkerSecurityDeps } fr
 import {
   authorizeMcpRequestWithPrincipal,
   parseBoolean,
+  validateProtocolHeaderNegotiation,
   validateProtocolVersionHeader,
+  type ProtocolHeaderValidationResult,
 } from './worker-security.js';
 
 interface McpGatewayAuthDeps {
@@ -16,6 +18,12 @@ interface McpGatewayAuthDeps {
     required: boolean,
     supportedVersions: ReadonlySet<string>,
   ) => Response | null;
+  validateProtocolHeaderNegotiationFn?: (
+    protocolVersion: string | null,
+    capabilityProfile: string | null,
+    required: boolean,
+    supportedVersions: ReadonlySet<string>,
+  ) => ProtocolHeaderValidationResult;
   parseBooleanFn?: (value: string | undefined) => boolean;
 }
 
@@ -33,6 +41,8 @@ export async function authorizeMcpGatewayRequest(
   const authorize = deps?.authorizeMcpRequestWithPrincipalFn ?? authorizeMcpRequestWithPrincipal;
   const parse = deps?.parseBooleanFn ?? parseBoolean;
   const validate = deps?.validateProtocolVersionHeaderFn ?? validateProtocolVersionHeader;
+  const validateNegotiation =
+    deps?.validateProtocolHeaderNegotiationFn ?? validateProtocolHeaderNegotiation;
 
   const authResult = await authorize(request, env);
   if (authResult.authError) {
@@ -42,10 +52,30 @@ export async function authorizeMcpGatewayRequest(
   if (request.method === 'POST') {
     const requireProtocolVersion = parse(env.MCP_REQUIRE_PROTOCOL_VERSION);
     const protocolVersion = request.headers.get('MCP-Protocol-Version');
-    const protocolError = validate(protocolVersion, requireProtocolVersion, supportedProtocolVersions);
+    const capabilityProfile = request.headers.get('MCP-Capability-Profile');
+    const negotiation = validateNegotiation(
+      protocolVersion,
+      capabilityProfile,
+      requireProtocolVersion,
+      supportedProtocolVersions,
+    );
+    const protocolError =
+      negotiation.error ??
+      (deps?.validateProtocolHeaderNegotiationFn === undefined &&
+      deps?.validateProtocolVersionHeaderFn !== undefined
+        ? validate(protocolVersion, requireProtocolVersion, supportedProtocolVersions)
+        : null);
     if (protocolError) {
-      return { authError: protocolError, ...(authResult.principal ? { principal: authResult.principal } : {}) };
+      return {
+        authError: protocolError,
+        ...(authResult.principal ? { principal: authResult.principal } : {}),
+        protocolNegotiation: negotiation.diagnostics,
+      };
     }
+    return {
+      ...authResult,
+      protocolNegotiation: negotiation.diagnostics,
+    };
   }
 
   return authResult;

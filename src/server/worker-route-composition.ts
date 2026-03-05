@@ -5,6 +5,10 @@ import type {
   SupabaseSignupConfig,
 } from './supabase-management.js';
 import {
+  handleWorkerOAuthRoutes,
+  type WorkerOAuthRouteDeps,
+} from './worker-oauth-routes.js';
+import {
   handleWorkerOAuthConsentRoutes,
   type OAuthConsentRouteDeps,
 } from './worker-oauth-consent-routes.js';
@@ -15,7 +19,11 @@ import {
   handleWorkerUiShellRoutes,
   type HandleWorkerUiShellRoutesDeps,
 } from './worker-ui-shell-routes.js';
-import { handleMcpGatewayRoute } from './worker-mcp-gateway.js';
+import {
+  buildMcpGatewayRouteParams,
+  handleMcpGatewayRoute,
+  type McpGatewayBoundaryPolicyParams,
+} from './worker-mcp-gateway.js';
 import { runWorkerRouteHandlers, type WorkerRouteHandler } from './worker-route-orchestration.js';
 
 type WorkerDelegatedRouteEnv = WorkerSecurityEnv & {
@@ -31,13 +39,19 @@ type WorkerAuthRouteDeps<TEnv extends WorkerDelegatedRouteEnv> = Parameters<
   typeof handleWorkerAuthRoutes<TEnv, SupabaseAuthConfig, SupabaseSignupConfig>
 >[1];
 
+type WorkerOAuthRouteDepsShared<TEnv extends WorkerDelegatedRouteEnv> = WorkerOAuthRouteDeps<
+  TEnv,
+  SupabaseSignupConfig
+>;
+
 type WorkerOAuthConsentDeps<TEnv extends WorkerDelegatedRouteEnv> = OAuthConsentRouteDeps<
   TEnv,
   SupabaseSignupConfig,
   SupabaseOAuthAuthorizationDetails
 >;
 
-type WorkerDelegatedSharedDeps<TEnv extends WorkerDelegatedRouteEnv> = WorkerAuthRouteDeps<TEnv> &
+type WorkerDelegatedSharedDeps<TEnv extends WorkerDelegatedRouteEnv> = WorkerOAuthRouteDepsShared<TEnv> &
+  WorkerAuthRouteDeps<TEnv> &
   WorkerOAuthConsentDeps<TEnv> &
   HandleUiKeysRoutesDeps<TEnv> &
   HandleWorkerAiUiRoutesDeps<TEnv, ExecutionContext> &
@@ -61,18 +75,14 @@ export interface WorkerDelegatedRouteContext<TEnv extends WorkerDelegatedRouteEn
 
 export interface WorkerDelegatedRouteDeps<TEnv extends WorkerDelegatedRouteEnv>
   extends WorkerDelegatedSharedDeps<TEnv> {
-  supportedProtocolVersions: ReadonlySet<string>;
-  mcpStreamableHandler: McpHandler<TEnv>;
-  mcpSseCompatibilityHandler: McpHandler<TEnv>;
-  withCors: (response: Response, origin: string | null, allowedOrigins: string[]) => Response;
-  buildCorsHeaders: (origin: string | null, allowedOrigins: string[]) => Headers;
-  getClientIdentifier: (request: Request) => string;
-  getAuthRateLimitedResponse: (clientId: string, env: TEnv, nowMs: number) => Promise<Response | null>;
-  recordAuthFailure: (clientId: string, env: TEnv, nowMs: number) => Promise<void>;
-  clearAuthFailures: (clientId: string, env: TEnv, nowMs: number) => Promise<void>;
+  mcpBoundaryPolicy: McpGatewayBoundaryPolicyParams<TEnv> & {
+    mcpStreamableHandler: McpHandler<TEnv>;
+    mcpSseCompatibilityHandler: McpHandler<TEnv>;
+  };
 }
 
 export interface WorkerDelegatedRouteCompositionHandlers {
+  oauth: WorkerRouteHandler;
   oauthConsent: WorkerRouteHandler;
   auth: WorkerRouteHandler;
   uiKeys: WorkerRouteHandler;
@@ -85,6 +95,7 @@ export function composeWorkerDelegatedRouteHandlers(
   handlers: WorkerDelegatedRouteCompositionHandlers,
 ): readonly WorkerRouteHandler[] {
   return [
+    handlers.oauth,
     handlers.oauthConsent,
     handlers.auth,
     handlers.uiKeys,
@@ -102,6 +113,7 @@ export async function handleDelegatedWorkerRoutes<TEnv extends WorkerDelegatedRo
 
   return runWorkerRouteHandlers(
     composeWorkerDelegatedRouteHandlers({
+      oauth: async () => handleWorkerOAuthRoutes({ request, url, env }, deps),
       oauthConsent: async () =>
         handleWorkerOAuthConsentRoutes({ request, url, origin, allowedOrigins, env }, deps),
       auth: async () => handleWorkerAuthRoutes({ request, url, origin, allowedOrigins, env }, deps),
@@ -127,25 +139,21 @@ export async function handleDelegatedWorkerRoutes<TEnv extends WorkerDelegatedRo
           deps,
         }),
       mcpGateway: async () =>
-        handleMcpGatewayRoute({
-          request,
-          env,
-          ctx,
-          pathname,
-          requestMethod,
-          origin,
-          allowedOrigins,
-          mcpPath,
-          supportedProtocolVersions: deps.supportedProtocolVersions,
-          mcpStreamableHandler: deps.mcpStreamableHandler,
-          mcpSseCompatibilityHandler: deps.mcpSseCompatibilityHandler,
-          withCors: deps.withCors,
-          buildCorsHeaders: deps.buildCorsHeaders,
-          getClientIdentifier: deps.getClientIdentifier,
-          getAuthRateLimitedResponse: deps.getAuthRateLimitedResponse,
-          recordAuthFailure: deps.recordAuthFailure,
-          clearAuthFailures: deps.clearAuthFailures,
-        }),
+        handleMcpGatewayRoute(
+          buildMcpGatewayRouteParams(
+            {
+              request,
+              env,
+              ctx,
+              pathname,
+              requestMethod,
+              origin,
+              allowedOrigins,
+              mcpPath,
+            },
+            deps.mcpBoundaryPolicy,
+          ),
+        ),
     }),
   );
 }

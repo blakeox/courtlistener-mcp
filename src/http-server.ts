@@ -7,7 +7,7 @@ import http from 'http';
 import { Logger } from './infrastructure/logger.js';
 import { MetricsCollector } from './infrastructure/metrics.js';
 import { CacheManager } from './infrastructure/cache.js';
-import { getConfigSummary } from './infrastructure/config.js';
+import { getConfigSummary, getStartupDiagnostics } from './infrastructure/config.js';
 import { CircuitBreakerManager } from './infrastructure/circuit-breaker.js';
 
 export class HealthServer {
@@ -49,6 +49,8 @@ export class HealthServer {
         this.handleCacheStats(res);
       } else if (url === '/config') {
         this.handleConfigSummary(res);
+      } else if (url === '/startup-diagnostics') {
+        this.handleStartupDiagnostics(res);
       } else if (url === '/circuit-breakers') {
         this.handleCircuitBreakers(res);
       } else if (url === '/security') {
@@ -134,6 +136,23 @@ export class HealthServer {
     );
   }
 
+  private handleStartupDiagnostics(res: http.ServerResponse) {
+    const diagnostics = getStartupDiagnostics();
+    const statusCode = diagnostics.status === 'ok' ? 200 : 503;
+
+    res.writeHead(statusCode);
+    res.end(
+      JSON.stringify(
+        {
+          ...diagnostics,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+  }
+
   private handleCircuitBreakers(res: http.ServerResponse) {
     if (!this.circuitBreakerManager) {
       res.writeHead(200);
@@ -206,6 +225,7 @@ export class HealthServer {
             '/metrics': 'Performance metrics',
             '/cache': 'Cache statistics',
             '/config': 'Configuration summary',
+            '/startup-diagnostics': 'Startup invariant diagnostics',
             '/circuit-breakers': 'Circuit breaker status',
             '/security': 'Security status and compliance',
             '/': 'This information',
@@ -236,6 +256,7 @@ export class HealthServer {
           '/metrics',
           '/cache',
           '/config',
+          '/startup-diagnostics',
           '/circuit-breakers',
           '/security',
           '/',

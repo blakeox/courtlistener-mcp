@@ -29,16 +29,16 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     return (
-      <div className="stack" style={{ padding: '32px', maxWidth: '600px', margin: '0 auto' }}>
+      <div className="stack error-boundary-shell">
         <section className="ui-card">
           <h2>Something went wrong</h2>
           <p className="muted">
-            An unexpected error occurred. You can try again or return to the dashboard.
+            An unexpected error occurred. You can try again or return to the control center.
           </p>
           <div className="status error" role="alert">
             {this.state.error?.message || 'An unknown error occurred.'}
           </div>
-          <div className="row" style={{ marginTop: '16px' }}>
+          <div className="row error-boundary-actions">
             <button
               type="button"
               className="btn primary"
@@ -46,8 +46,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             >
               Try again
             </button>
-            <a href="/app/onboarding" className="btn secondary">
-              Go to Dashboard
+            <a href="/app/control-center" className="btn secondary">
+              Go to Control Center
             </a>
           </div>
         </section>

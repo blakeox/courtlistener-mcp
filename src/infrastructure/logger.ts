@@ -4,6 +4,7 @@
  */
 
 import { LogConfig } from '../types.js';
+import { isSensitiveKeyName, redactSecretsInText } from './secret-redaction.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -68,8 +69,8 @@ export class Logger {
     const errorData = error
       ? {
           name: error.name,
-          message: error.message,
-          ...(error.stack !== undefined && { stack: error.stack }),
+          message: redactSecretsInText(error.message),
+          ...(error.stack !== undefined && { stack: redactSecretsInText(error.stack) }),
         }
       : undefined;
 
@@ -148,7 +149,10 @@ export class Logger {
     const limitedEntries = entries.slice(0, Logger.MAX_METADATA_FIELDS);
 
     const sanitized = Object.fromEntries(
-      limitedEntries.map(([key, value]) => [key, this.sanitizeValue(value)])
+      limitedEntries.map(([key, value]) => [
+        key,
+        isSensitiveKeyName(key) ? '[REDACTED]' : this.sanitizeValue(value),
+      ])
     ) as Record<string, unknown>;
 
     if (entries.length > Logger.MAX_METADATA_FIELDS) {
@@ -160,9 +164,10 @@ export class Logger {
 
   private sanitizeValue(value: unknown): unknown {
     if (typeof value === 'string') {
-      return value.length > Logger.MAX_STRING_LENGTH
-        ? `${value.slice(0, Logger.MAX_STRING_LENGTH)}…(${value.length} chars)`
-        : value;
+      const redacted = redactSecretsInText(value);
+      return redacted.length > Logger.MAX_STRING_LENGTH
+        ? `${redacted.slice(0, Logger.MAX_STRING_LENGTH)}…(${redacted.length} chars)`
+        : redacted;
     }
 
     if (Array.isArray(value)) {

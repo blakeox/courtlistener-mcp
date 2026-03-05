@@ -11,11 +11,10 @@ import type { Logger } from '../../src/infrastructure/logger.js';
 import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
 
-// Import compiled JS artifacts
-const { HealthServer } = await import('../../dist/http-server.js');
-const { Logger: LoggerClass } = await import('../../dist/infrastructure/logger.js');
-const { MetricsCollector: MetricsCollectorClass } = await import('../../dist/infrastructure/metrics.js');
-const { CacheManager: CacheManagerClass } = await import('../../dist/infrastructure/cache.js');
+import { HealthServer } from '../../src/http-server.js';
+import { Logger as LoggerClass } from '../../src/infrastructure/logger.js';
+import { MetricsCollector as MetricsCollectorClass } from '../../src/infrastructure/metrics.js';
+import { CacheManager as CacheManagerClass } from '../../src/infrastructure/cache.js';
 
 // Simple helpers
 function getFreePort(server: { address: () => { port: number } | null | string }): number {
@@ -131,6 +130,19 @@ describe('HealthServer endpoints (TypeScript)', () => {
     assert.ok(data.features !== undefined);
   });
 
+  it('GET /startup-diagnostics returns startup invariant diagnostics', async () => {
+    const res = await fetch(`${baseUrl}/startup-diagnostics`);
+    assert.ok([200, 503].includes(res.status), `Unexpected status: ${res.status}`);
+    const data = (await res.json()) as {
+      status?: string;
+      invariants?: { errors?: unknown[]; warnings?: unknown[] };
+      authPolicy?: { precedence?: unknown[] };
+    };
+    assert.ok(data.status === 'ok' || data.status === 'error');
+    assert.ok(data.invariants !== undefined);
+    assert.ok(Array.isArray(data.authPolicy?.precedence));
+  });
+
   it('GET /circuit-breakers returns status', async () => {
     const res = await fetch(`${baseUrl}/circuit-breakers`);
     assert.equal(res.status, 200);
@@ -152,4 +164,3 @@ describe('HealthServer endpoints (TypeScript)', () => {
     assert.ok(data.security_config !== undefined);
   });
 });
-

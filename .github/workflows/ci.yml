@@ -117,8 +117,19 @@ jobs:
         run: pnpm run test:infra:parity
 
   hardening-release-gates:
-    name: Hardening Release Gates
+    name: Hardening Release Gates (${{ matrix.gate }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gate:
+          - protocol-contract
+          - auth-security-matrix
+          - auth-release-gate
+          - stress-reliability
+          - runtime-parity-security-async
+          - release-readiness
+          - startup-diagnostics
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -157,47 +168,118 @@ jobs:
           echo "strict_mode=${strict}" >> "$GITHUB_OUTPUT"
           echo "policy_mode=${policy}" >> "$GITHUB_OUTPUT"
 
-      - name: Run load/soak release checklist gates
+      - name: Run selected release policy gate
         env:
           PERF_GATE_POLICY_MODE: ${{ steps.gate_policy.outputs.policy_mode }}
           PERF_GATE_REQUIRE_FILES: ${{ steps.gate_policy.outputs.strict_mode }}
         run: |
-          mkdir -p performance-data
-          pnpm start > performance-data/local-gate-server.log 2>&1 &
-          SERVER_PID=$!
-          cleanup() {
-            kill "$SERVER_PID" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
+          case "${{ matrix.gate }}" in
+            protocol-contract)
+              pnpm run test:mcp
+              npx tsx --test test/unit/test-protocol-governance.ts
+              ;;
+            auth-security-matrix)
+              npx tsx --test test/unit/test-mcp-gateway-auth.ts
+              npx tsx --test test/unit/test-worker-security.ts
+              ;;
+            auth-release-gate)
+              pnpm run ci:auth-release-gate
+              ;;
+            startup-diagnostics)
+              npx tsx --test test/unit/test-http-server.ts
+              npx tsx --test test/integration/test-http-transport.ts
+              ;;
+            stress-reliability)
+              mkdir -p performance-data
+              TRANSPORT=http MCP_HTTP_PORT=3002 METRICS_ENABLED=true METRICS_PORT=3001 pnpm start > performance-data/local-gate-server.log 2>&1 &
+              SERVER_PID=$!
+              cleanup() {
+                kill "$SERVER_PID" >/dev/null 2>&1 || true
+              }
+              trap cleanup EXIT
 
-          for _ in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:3001/health >/dev/null
+              for _ in $(seq 1 30); do
+                if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 1
+              done
+              curl -fsS http://127.0.0.1:3001/health >/dev/null
 
-          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-baseline.json
-          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-current.json
-          pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
+              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-baseline.json
+              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-current.json
+              pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
 
-          if [[ "${{ steps.gate_policy.outputs.strict_mode }}" == "true" ]]; then
-            pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
-          else
-            pnpm run ci:hardening:soak-leak-checks -- --light --warn-only --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
-          fi
+              if [[ "${{ steps.gate_policy.outputs.strict_mode }}" == "true" ]]; then
+                pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3002 --output performance-data/hardening-soak-leak.json
+              else
+                pnpm run ci:hardening:soak-leak-checks -- --light --warn-only --base-url http://127.0.0.1:3002 --output performance-data/hardening-soak-leak.json
+                fi
+              ;;
+            runtime-parity-security-async)
+              RUNTIME_SAFETY_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} pnpm run ci:runtime-safety-gate
+              ;;
+            release-readiness)
+              mkdir -p performance-data test-output
+              TRANSPORT=http MCP_HTTP_PORT=3002 METRICS_ENABLED=true METRICS_PORT=3001 pnpm start > performance-data/local-release-readiness-server.log 2>&1 &
+              SERVER_PID=$!
+              cleanup() {
+                kill "$SERVER_PID" >/dev/null 2>&1 || true
+              }
+              trap cleanup EXIT
+
+              for _ in $(seq 1 30); do
+                if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 1
+              done
+              curl -fsS http://127.0.0.1:3001/health >/dev/null
+
+              RELEASE_READINESS_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
+              RUNTIME_SAFETY_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
+              pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002
+              ;;
+            *)
+              echo "Unknown gate: ${{ matrix.gate }}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Upload hardening gate artifacts
-        if: always()
+        if: always() && matrix.gate == 'stress-reliability'
         uses: actions/upload-artifact@v6
         with:
-          name: hardening-release-gates
+          name: hardening-release-gates-${{ matrix.gate }}
           path: |
             performance-data/load-profile-baseline.json
             performance-data/load-profile-current.json
             performance-data/hardening-soak-leak.json
             performance-data/local-gate-server.log
+          retention-days: 7
+
+      - name: Upload runtime parity gate artifacts
+        if: always() && matrix.gate == 'runtime-parity-security-async'
+        uses: actions/upload-artifact@v6
+        with:
+          name: hardening-release-gates-${{ matrix.gate }}
+          path: |
+            test-output/runtime-parity/certification-report.json
+            test-output/runtime-parity/runtime-safety-gate.json
+          retention-days: 7
+
+      - name: Upload release readiness gate artifacts
+        if: always() && matrix.gate == 'release-readiness'
+        uses: actions/upload-artifact@v6
+        with:
+          name: hardening-release-gates-${{ matrix.gate }}
+          path: |
+            test-output/release-readiness/release-readiness-gate.json
+            test-output/runtime-parity/certification-report.json
+            test-output/runtime-parity/runtime-safety-gate.json
+            performance-data/load-profile-baseline.json
+            performance-data/load-profile-current.json
+            performance-data/local-release-readiness-server.log
           retention-days: 7
 
   mcp-compliance:

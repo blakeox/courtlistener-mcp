@@ -146,6 +146,27 @@ describe('Cache Manager (TypeScript)', () => {
       assert.deepStrictEqual(retrieved, testData2); // Should get the second one
     });
 
+    it('should normalize nested parameter ordering and query-string keys', () => {
+      const first = { result: 'nested-1' };
+      const second = { result: 'nested-2' };
+      cache.set(
+        '/endpoint/search?b=2&a=1',
+        { filters: { court: 'scotus', year: 2024 }, tags: ['federal', 'civil'] },
+        first
+      );
+      cache.set(
+        '/endpoint/search?a=1&b=2',
+        { tags: ['federal', 'civil'], filters: { year: 2024, court: 'scotus' } },
+        second
+      );
+
+      const retrieved = cache.get<Record<string, unknown>>('/endpoint/search?a=1&b=2', {
+        filters: { court: 'scotus', year: 2024 },
+        tags: ['federal', 'civil'],
+      });
+      assert.deepStrictEqual(retrieved, second);
+    });
+
     it('should handle undefined parameters', () => {
       const testData: Record<string, unknown> = { result: 'test' };
 
@@ -449,6 +470,23 @@ describe('Cache Manager (TypeScript)', () => {
         largeCache.destroy();
       }
     });
+
+    it('should coalesce concurrent cache misses into a single loader call', async () => {
+      let loads = 0;
+      const loader = async () => {
+        loads += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return { ok: true };
+      };
+
+      const [first, second] = await Promise.all([
+        cache.getOrSetCoalesced('coalesced-endpoint', { id: 1 }, loader),
+        cache.getOrSetCoalesced('coalesced-endpoint', { id: 1 }, loader),
+      ]);
+
+      assert.deepStrictEqual(first, { ok: true });
+      assert.deepStrictEqual(second, { ok: true });
+      assert.strictEqual(loads, 1);
+    });
   });
 });
-

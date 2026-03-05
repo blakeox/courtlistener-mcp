@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { Card, Button, StatusBanner, FormField, Input, Stepper, formatDate } from '../components/ui';
+import { Badge, Card, Button, StatusBanner, FormField, Input, Stepper, formatDate } from '../components/ui';
 
 describe('Card', () => {
   it('renders children', () => {
@@ -74,6 +74,18 @@ describe('StatusBanner', () => {
   it('renders with alert role', () => {
     render(<StatusBanner message="Alert!" role="alert" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Alert!');
+  });
+});
+
+describe('Badge', () => {
+  it('renders with neutral tone by default', () => {
+    render(<Badge>Neutral</Badge>);
+    expect(screen.getByText('Neutral').className).toContain('chip');
+  });
+
+  it('renders warn tone class', () => {
+    render(<Badge tone="warn">Warn</Badge>);
+    expect(screen.getByText('Warn').className).toContain('warn');
   });
 });
 

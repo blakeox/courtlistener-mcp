@@ -6,6 +6,7 @@ import { markSignupStarted, trackEvent } from '../lib/telemetry';
 import { useAuth } from '../lib/auth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
+import { consumeOperationalStatus, rememberOperationalStatus, shouldCarryOperationalStatus, withRecoveryHint } from '../lib/operational-status';
 import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
 import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 
@@ -22,6 +23,14 @@ export function SignupPage(): React.JSX.Element {
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
   const turnstileSiteKey = session?.turnstile_site_key ?? '';
+
+  React.useEffect(() => {
+    const carried = consumeOperationalStatus();
+    if (!carried?.message) return;
+    if (carried.type === 'ok') setOk(carried.message);
+    else if (carried.type === 'error') setError(carried.message);
+    else setInfo(carried.message);
+  }, [setError, setInfo, setOk]);
 
   React.useEffect(() => {
     if (!turnstileSiteKey) return;
@@ -59,7 +68,10 @@ export function SignupPage(): React.JSX.Element {
       setSubmitted(true);
       trackEvent('signup_succeeded');
     } catch (error) {
-      setError(toErrorMessage(error));
+      const baseMessage = toErrorMessage(error);
+      const message = withRecoveryHint(error, baseMessage);
+      setError(message);
+      if (shouldCarryOperationalStatus(error, message)) rememberOperationalStatus(message, 'info');
       backoff.trigger(error);
       trackEvent('signup_failed', { category: 'auth' });
     } finally {
@@ -135,6 +147,12 @@ export function SignupPage(): React.JSX.Element {
           <Button id="signupBtn" type="submit" disabled={busy || backoff.blocked}>
             {backoff.blocked ? `Rate limited (${backoff.secondsLeft}s)` : busy ? 'Creating...' : 'Create account'}
           </Button>
+          {backoff.blocked ? (
+            <p className="hint" role="status">
+              Recovery: wait for the timer, then retry account creation. If needed, continue from{' '}
+              <Link to="/app/login" className="text-link">login</Link> once the window clears.
+            </p>
+          ) : null}
           <StatusBanner id="signupStatus" message={status} type={statusType} />
           </fieldset>
         </form>

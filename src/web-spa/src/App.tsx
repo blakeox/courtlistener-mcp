@@ -52,27 +52,39 @@ function AppContent(): React.JSX.Element {
   const hasVerifiedAndLoggedIn = Boolean(session?.authenticated);
   const hasKey = (keysQuery.data?.keys.length ?? 0) > 0;
   const hasToken = Boolean(token.trim());
+  const expectedProtocolVersion = '2025-06-18';
   const mcpReadinessQuery = useQuery({
     queryKey: ['mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
     enabled: hasVerifiedAndLoggedIn && hasKey && hasToken,
     retry: false,
   });
-  const hasMcpSuccess = Boolean(mcpReadinessQuery.data?.ready);
+  const hasProtocolMismatch = Boolean(
+    mcpReadinessQuery.data?.protocolVersion
+      && mcpReadinessQuery.data.protocolVersion !== expectedProtocolVersion,
+  );
+  const hasMcpSuccess = Boolean(mcpReadinessQuery.data?.ready) && !hasProtocolMismatch;
+  const isPath = (paths: string[]): boolean => paths.includes(location.pathname);
 
   const steps = [
-    { label: 'Create account', complete: hasAccount, active: location.pathname === '/app/signup', to: '/app/signup' },
+    { label: 'Session setup', complete: hasAccount, active: isPath(['/app/signup']), to: '/app/signup' },
     {
-      label: 'Verify & Login',
+      label: 'Session auth',
       complete: hasVerifiedAndLoggedIn,
-      active: location.pathname === '/app/login' || location.pathname === '/app/reset-password',
+      active: isPath(['/app/login', '/app/reset-password']),
       to: '/app/login',
     },
-    { label: 'Create key', complete: hasKey, active: location.pathname === '/app/keys', to: '/app/keys', disabled: !hasVerifiedAndLoggedIn },
     {
-      label: 'MCP runtime ready',
+      label: 'MCP key ready',
+      complete: hasKey,
+      active: isPath(['/app/keys']),
+      to: '/app/keys',
+      disabled: !hasVerifiedAndLoggedIn,
+    },
+    {
+      label: 'MCP protocol ready',
       complete: hasMcpSuccess,
-      active: location.pathname === '/app/playground',
+      active: isPath(['/app/playground', '/app/control-center', '/app']),
       to: '/app/playground',
       disabled: !hasKey || !hasToken,
     },
@@ -83,10 +95,12 @@ function AppContent(): React.JSX.Element {
       <ErrorBoundary>
         <React.Suspense fallback={<PageLoader />}>
           <Routes>
+            <Route path="/app" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/control-center" element={<OnboardingPage />} />
             <Route path="/app/signup" element={<SignupPage />} />
             <Route path="/app/login" element={<LoginPage />} />
             <Route path="/app/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/app/onboarding" element={<OnboardingPage />} />
+            <Route path="/app/onboarding" element={<Navigate to="/app/control-center" replace />} />
             <Route
               path="/app/keys"
               element={
@@ -111,7 +125,7 @@ function AppContent(): React.JSX.Element {
                 </AuthRequired>
               }
             />
-            <Route path="*" element={<SmartRedirect hasAccount={hasAccount} hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasKey={hasKey} hasMcpSuccess={hasMcpSuccess} />} />
+            <Route path="*" element={<SmartRedirect hasAccount={hasAccount} hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasKey={hasKey} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />} />
           </Routes>
         </React.Suspense>
       </ErrorBoundary>
@@ -119,9 +133,10 @@ function AppContent(): React.JSX.Element {
   );
 }
 
-function SmartRedirect(props: { hasAccount: boolean; hasVerifiedAndLoggedIn: boolean; hasKey: boolean; hasMcpSuccess: boolean }): React.JSX.Element {
+function SmartRedirect(props: { hasAccount: boolean; hasVerifiedAndLoggedIn: boolean; hasKey: boolean; hasMcpSuccess: boolean; hasProtocolMismatch: boolean }): React.JSX.Element {
   let target = '/app/signup';
-  if (props.hasMcpSuccess) target = '/app/onboarding';
+  if (props.hasMcpSuccess) target = '/app/control-center';
+  else if (props.hasProtocolMismatch) target = '/app/control-center';
   else if (props.hasKey) target = '/app/playground';
   else if (props.hasVerifiedAndLoggedIn) target = '/app/keys';
   else if (props.hasAccount) target = '/app/login';

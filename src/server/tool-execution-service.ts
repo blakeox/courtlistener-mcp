@@ -7,6 +7,12 @@ import { MetricsCollector } from '../infrastructure/metrics.js';
 import { MiddlewareFactory, RequestContext } from '../infrastructure/middleware-factory.js';
 import { getPrincipalContext } from '../infrastructure/principal-context.js';
 import { ServerConfig } from '../types.js';
+import {
+  AsyncToolWorkflowOrchestrator,
+  createAsyncEnvelope,
+  isAsyncControlToolName,
+  parseAsyncExecutionDirective,
+} from './async-tool-workflow.js';
 import { SamplingService } from './sampling-service.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
 
@@ -17,6 +23,7 @@ export interface ToolExecutionService {
 interface DirectToolExecutionServiceParams {
   toolRegistry: ToolHandlerRegistry;
   logger: Logger;
+  asyncWorkflow?: AsyncToolWorkflowOrchestrator;
 }
 
 interface MiddlewareToolExecutionServiceParams extends DirectToolExecutionServiceParams {
@@ -31,11 +38,43 @@ export function createDirectToolExecutionService(
   params: DirectToolExecutionServiceParams,
 ): ToolExecutionService {
   const { toolRegistry, logger } = params;
+  const asyncWorkflow = params.asyncWorkflow ?? new AsyncToolWorkflowOrchestrator(logger);
 
   return {
     execute: async (request, requestId) => {
+      if (isAsyncControlToolName(request.params.name)) {
+        return asyncWorkflow.handleControlToolCall(request);
+      }
+
+      const parsedRequest = parseAsyncExecutionDirective(request);
       const principal = getPrincipalContext();
-      return await toolRegistry.execute(request, {
+
+      if (parsedRequest.directive?.mode === 'async') {
+        if (!asyncWorkflow.isEnabled()) {
+          return createAsyncEnvelope(
+            {
+              success: false,
+              error: 'Async tool execution is disabled',
+            },
+            true,
+          );
+        }
+
+        return asyncWorkflow.enqueueToolCall({
+          request: parsedRequest.request,
+          requestId,
+          directive: parsedRequest.directive,
+          execute: async (queuedRequest, queuedRequestId) =>
+            await toolRegistry.execute(queuedRequest, {
+              logger,
+              requestId: queuedRequestId,
+              ...(principal?.userId ? { userId: principal.userId } : {}),
+            }),
+          ...(principal?.userId ? { userId: principal.userId } : {}),
+        });
+      }
+
+      return await toolRegistry.execute(parsedRequest.request, {
         logger,
         requestId,
         ...(principal?.userId ? { userId: principal.userId } : {}),
@@ -48,62 +87,110 @@ export function createMiddlewareToolExecutionService(
   params: MiddlewareToolExecutionServiceParams,
 ): ToolExecutionService {
   const { toolRegistry, logger, metrics, middlewareFactory, config, cache, sampling } = params;
+  const asyncWorkflow =
+    params.asyncWorkflow ??
+    new AsyncToolWorkflowOrchestrator(logger, {
+      ...config.asyncExecution,
+      recordLatencyMetric: (metric, durationMs) => {
+        metrics.recordLatencyMetric(metric, durationMs);
+      },
+      recordCostGuardrail: (metric, value, threshold) => {
+        metrics.recordCostGuardrail(`async.${metric}`, value, threshold);
+      },
+    });
+
+  const executeWithMiddleware = async (
+    request: CallToolRequest,
+    requestId: string,
+    disableInlineRetry: boolean,
+  ): Promise<CallToolResult> => {
+    const startTime = Date.now();
+    const context: RequestContext = {
+      requestId,
+      startTime,
+      metadata: {
+        toolName: request.params.name,
+        arguments: request.params.arguments,
+      },
+    };
+    const middlewares = middlewareFactory.createMiddlewareStack(config);
+
+    const executeTool = async () => {
+      const principal = getPrincipalContext();
+      return await toolRegistry.execute(request, {
+        logger: logger.child(`Tool:${request.params.name}`),
+        requestId,
+        cache,
+        metrics,
+        config,
+        sampling,
+        ...(principal?.userId ? { userId: principal.userId } : {}),
+      });
+    };
+
+    try {
+      const result = (await middlewareFactory.executeMiddlewareStack(
+        middlewares,
+        context,
+        () =>
+          disableInlineRetry
+            ? executeTool()
+            : retry(executeTool, {
+                maxAttempts: 3,
+                baseDelay: 750,
+                maxDelay: 5_000,
+              }),
+      )) as CallToolResult;
+
+      const duration = Date.now() - startTime;
+      if (result.isError) {
+        throw new Error(extractToolErrorMessage(result, request.params.name));
+      }
+
+      metrics.recordRequest(duration, false, `mcp.tool.${request.params.name}`);
+      logger.toolExecution(request.params.name, duration, true, { requestId });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      metrics.recordFailure(duration, `mcp.tool.${request.params.name}`);
+      logger.toolExecution(request.params.name, duration, false, {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  };
 
   return {
     execute: async (request, requestId) => {
-      const startTime = Date.now();
-      const context: RequestContext = {
-        requestId,
-        startTime,
-        metadata: {
-          toolName: request.params.name,
-          arguments: request.params.arguments,
-        },
-      };
-      const middlewares = middlewareFactory.createMiddlewareStack(config);
+      if (isAsyncControlToolName(request.params.name)) {
+        return asyncWorkflow.handleControlToolCall(request);
+      }
 
-      const executeTool = async () => {
-        const principal = getPrincipalContext();
-        return await toolRegistry.execute(request, {
-          logger: logger.child(`Tool:${request.params.name}`),
-          requestId,
-          cache,
-          metrics,
-          config,
-          sampling,
-          ...(principal?.userId ? { userId: principal.userId } : {}),
-        });
-      };
-
-      try {
-        const result = (await middlewareFactory.executeMiddlewareStack(
-          middlewares,
-          context,
-          () =>
-            retry(executeTool, {
-              maxAttempts: 3,
-              baseDelay: 750,
-              maxDelay: 5_000,
-            }),
-        )) as CallToolResult;
-
-        const duration = Date.now() - startTime;
-        if (result.isError) {
-          throw new Error(extractToolErrorMessage(result, request.params.name));
+      const parsedRequest = parseAsyncExecutionDirective(request);
+      const principal = getPrincipalContext();
+      if (parsedRequest.directive?.mode === 'async') {
+        if (!asyncWorkflow.isEnabled()) {
+          return createAsyncEnvelope(
+            {
+              success: false,
+              error: 'Async tool execution is disabled',
+            },
+            true,
+          );
         }
 
-        metrics.recordRequest(duration, false, `mcp.tool.${request.params.name}`);
-        logger.toolExecution(request.params.name, duration, true, { requestId });
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        metrics.recordFailure(duration, `mcp.tool.${request.params.name}`);
-        logger.toolExecution(request.params.name, duration, false, {
+        return asyncWorkflow.enqueueToolCall({
+          request: parsedRequest.request,
           requestId,
-          error: error instanceof Error ? error.message : String(error),
+          directive: parsedRequest.directive,
+          execute: async (queuedRequest, queuedRequestId) =>
+            await executeWithMiddleware(queuedRequest, queuedRequestId, true),
+          ...(principal?.userId ? { userId: principal.userId } : {}),
         });
-        throw error;
       }
+
+      return executeWithMiddleware(parsedRequest.request, requestId, false);
     },
   };
 }

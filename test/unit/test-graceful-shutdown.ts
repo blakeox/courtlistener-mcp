@@ -1,23 +1,13 @@
 #!/usr/bin/env node
 
-/**
- * ✅ COMPREHENSIVE Unit Tests for Graceful Shutdown (TypeScript)
- * Tests shutdown hooks, signal handling, and cleanup
- */
-
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import type { Logger } from '../../src/infrastructure/logger.js';
+import { GracefulShutdown } from '../../src/graceful-shutdown.js';
+import { Logger } from '../../src/infrastructure/logger.js';
 
-// Import compiled JS from dist
-const { GracefulShutdown } = await import('../../dist/graceful-shutdown.js');
-const { Logger: LoggerClass } = await import('../../dist/infrastructure/logger.js');
-
-// Create a minimal test logger using the real logger's API
 function createTestLogger(): Logger {
-  const base = new LoggerClass({ level: 'error', format: 'json', enabled: false }, 'Test');
-  // Ensure child() is available and returns a logger
-  return base.child('Test');
+  const base = new Logger({ level: 'error', format: 'json', enabled: false }, 'test');
+  return base.child('GracefulShutdownTest');
 }
 
 interface ProcessEventHandler {
@@ -25,146 +15,142 @@ interface ProcessEventHandler {
   handler: (...args: unknown[]) => void;
 }
 
-describe('GracefulShutdown (TypeScript)', () => {
+describe('GracefulShutdown', () => {
   let originalOn: typeof process.on;
-  let addedHandlers: ProcessEventHandler[];
-  let originalExit: typeof process.exit;
-  let exitCalls: number[];
+  let registeredHandlers: ProcessEventHandler[];
 
   beforeEach(() => {
-    // Stub process.on to capture handlers without installing real ones
     originalOn = process.on;
-    addedHandlers = [];
+    registeredHandlers = [];
     process.on = ((event: string, handler: (...args: unknown[]) => void) => {
-      addedHandlers.push({ event, handler });
+      registeredHandlers.push({ event, handler });
       return process;
     }) as typeof process.on;
-
-    // Stub process.exit to prevent actual exit
-    originalExit = process.exit;
-    exitCalls = [];
-    // Override for test
-    (process as { exit: (code?: number) => void }).exit = (code?: number): void => {
-      exitCalls.push(code ?? 0);
-    };
   });
 
   afterEach(() => {
     process.on = originalOn;
-    (process as { exit: typeof process.exit }).exit = originalExit;
-    addedHandlers = [];
   });
 
-  it('registers hooks and reports status', async () => {
+  it('registers process listeners when enabled', () => {
     const logger = createTestLogger();
-    const gs = new GracefulShutdown(
-      { enabled: true, timeout: 100, forceTimeout: 50, signals: ['SIGINT'] },
-      logger
+    new GracefulShutdown(
+      {
+        enabled: true,
+        timeout: 100,
+        forceTimeout: 25,
+        signals: ['SIGINT', 'SIGTERM'],
+      },
+      logger,
     );
 
-    assert.strictEqual(gs.getStatus().hooksRegistered, 0);
-    assert.strictEqual(gs.getStatus().isShuttingDown, false);
+    const events = registeredHandlers.map((entry) => entry.event);
+    assert.ok(events.includes('SIGINT'));
+    assert.ok(events.includes('SIGTERM'));
+    assert.ok(events.includes('uncaughtException'));
+    assert.ok(events.includes('unhandledRejection'));
+  });
 
-    let ran = false;
-    gs.addHook({
-      name: 'test-hook',
-      handler: async () => {
-        ran = true;
+  it('tracks hooks and status', () => {
+    const logger = createTestLogger();
+    const shutdown = new GracefulShutdown(
+      {
+        enabled: false,
+        timeout: 100,
+        forceTimeout: 25,
+        signals: [],
+      },
+      logger,
+    );
+
+    assert.equal(shutdown.getStatus().hooksRegistered, 0);
+    shutdown.addHook({
+      name: 'cleanup-a',
+      priority: 10,
+      cleanup: async () => {},
+    });
+    assert.equal(shutdown.getStatus().hooksRegistered, 1);
+
+    shutdown.removeHook('cleanup-a');
+    assert.equal(shutdown.getStatus().hooksRegistered, 0);
+  });
+
+  it('executes hooks once under concurrent shutdown calls', async () => {
+    const logger = createTestLogger();
+    const shutdown = new GracefulShutdown(
+      {
+        enabled: false,
+        timeout: 200,
+        forceTimeout: 25,
+        signals: [],
+      },
+      logger,
+    );
+
+    let callCount = 0;
+    shutdown.addHook({
+      name: 'cleanup-once',
+      priority: 10,
+      cleanup: async () => {
+        callCount++;
+        await new Promise((resolve) => setTimeout(resolve, 25));
       },
     });
 
-    assert.strictEqual(gs.getStatus().hooksRegistered, 1);
-    assert.strictEqual(ran, false);
+    await Promise.all([
+      shutdown.shutdown('a'),
+      shutdown.shutdown('b'),
+      shutdown.shutdown('c'),
+      shutdown.shutdown('d'),
+    ]);
+
+    assert.equal(callCount, 1);
+    assert.equal(shutdown.getStatus().isShuttingDown, true);
   });
 
-  it('executes shutdown hooks on signal', async () => {
+  it('handles repeated signal-style shutdown triggers deterministically', async () => {
     const logger = createTestLogger();
-    const gs = new GracefulShutdown(
-      { enabled: true, timeout: 100, forceTimeout: 50, signals: ['SIGINT'] },
-      logger
+    const shutdown = new GracefulShutdown(
+      {
+        enabled: true,
+        timeout: 250,
+        forceTimeout: 25,
+        signals: ['SIGTERM'],
+      },
+      logger,
     );
 
-    let hookExecuted = false;
-    gs.addHook({
-      name: 'test-hook',
-      handler: async () => {
-        hookExecuted = true;
+    let cleanupCount = 0;
+    shutdown.addHook({
+      name: 'cleanup-on-signal',
+      priority: 10,
+      cleanup: async () => {
+        cleanupCount++;
+        await new Promise((resolve) => setTimeout(resolve, 20));
       },
     });
 
-    // Find the signal handler
-    const sigHandler = addedHandlers.find((h) => h.event === 'SIGINT');
-    if (sigHandler) {
-      // Simulate signal
-      await sigHandler.handler();
+    const signalHandler = registeredHandlers.find((entry) => entry.event === 'SIGTERM');
+    assert.ok(signalHandler, 'Expected SIGTERM handler to be registered');
+
+    const originalExit = process.exit;
+    const exitCodes: number[] = [];
+    process.exit = ((code?: number) => {
+      exitCodes.push(code ?? 0);
+      return undefined as never;
+    }) as typeof process.exit;
+
+    try {
+      signalHandler?.handler();
+      signalHandler?.handler();
+      signalHandler?.handler();
+
+      await new Promise((resolve) => setTimeout(resolve, 75));
+    } finally {
+      process.exit = originalExit;
     }
 
-    // Hook should have been executed (or at least attempted)
-    assert.ok(hookExecuted || gs.getStatus().isShuttingDown);
-  });
-
-  it('respects timeout configuration', () => {
-    const logger = createTestLogger();
-    const gs = new GracefulShutdown(
-      { enabled: true, timeout: 200, forceTimeout: 100, signals: ['SIGTERM'] },
-      logger
-    );
-
-    assert.strictEqual(gs.getStatus().hooksRegistered, 0);
-    
-    // Verify configuration is stored
-    const status = gs.getStatus();
-    assert.ok(typeof status.isShuttingDown === 'boolean');
-  });
-
-  it('handles multiple hooks in order', async () => {
-    const logger = createTestLogger();
-    const gs = new GracefulShutdown(
-      { enabled: true, timeout: 100, forceTimeout: 50, signals: [] },
-      logger
-    );
-
-    const executionOrder: number[] = [];
-
-    gs.addHook({
-      name: 'hook1',
-      handler: async () => {
-        executionOrder.push(1);
-      },
-    });
-
-    gs.addHook({
-      name: 'hook2',
-      handler: async () => {
-        executionOrder.push(2);
-      },
-    });
-
-    assert.strictEqual(gs.getStatus().hooksRegistered, 2);
-    
-    // Verify hooks are registered
-    assert.ok(executionOrder.length === 0 || executionOrder.length === 2);
-  });
-
-  it('handles hook errors gracefully', async () => {
-    const logger = createTestLogger();
-    const gs = new GracefulShutdown(
-      { enabled: true, timeout: 100, forceTimeout: 50, signals: [] },
-      logger
-    );
-
-    gs.addHook({
-      name: 'error-hook',
-      handler: async () => {
-        throw new Error('Hook error');
-      },
-    });
-
-    // Should not throw, but handle error gracefully
-    assert.doesNotThrow(() => {
-      const status = gs.getStatus();
-      assert.ok(typeof status === 'object');
-    });
+    assert.equal(cleanupCount, 1);
+    assert.deepEqual(exitCodes, [0]);
   });
 });
-

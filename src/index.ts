@@ -37,11 +37,15 @@ if (process.argv.includes('--setup')) {
     const logger = container.get<Logger>('logger');
     const server = new BestPracticeLegalMCPServer();
 
-    process.on('SIGTERM', async () => {
-      if (otelSdk) {
-        await otelSdk.shutdown();
-      }
-    });
+    if (otelSdk) {
+      server.getShutdownCoordinator().addHook({
+        name: 'otel-sdk',
+        priority: 100,
+        cleanup: async () => {
+          await otelSdk.shutdown();
+        },
+      });
+    }
 
     try {
       await server.start();

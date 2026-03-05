@@ -104,6 +104,9 @@ export interface ServerConfig {
     enableSessions: boolean;
     enableResumability: boolean;
     enableDnsRebindingProtection: boolean;
+    maxConcurrentRequests?: number;
+    maxConcurrentSessionInitializations?: number;
+    maxActiveSessions?: number;
     allowedOrigins?: string[];
     allowedHosts?: string[];
   };
@@ -112,6 +115,18 @@ export interface ServerConfig {
     issuerUrl?: string;
     clientId?: string;
     clientSecret?: string;
+  };
+  asyncExecution?: {
+    enabled: boolean;
+    queueConcurrency: number;
+    queueBatchSize: number;
+    defaultMaxAttempts: number;
+    defaultRetryDelayMs: number;
+    defaultTtlSeconds: number;
+    maxStoredJobs: number;
+    maxQueueDepth: number;
+    queueLatencyGuardrailMs: number;
+    completionLatencyGuardrailMs: number;
   };
 }
 
@@ -328,6 +343,25 @@ export interface Metrics {
       requests_failed: number;
       cache_hits: number;
       cache_misses: number;
+    }
+  >;
+  runtime_latency_ms?: Record<
+    string,
+    {
+      count: number;
+      avg_ms: number;
+      max_ms: number;
+      last_ms: number;
+    }
+  >;
+  cost_guardrails?: Record<
+    string,
+    {
+      threshold: number;
+      breaches: number;
+      last_value: number;
+      max_value: number;
+      last_exceeded_at?: string;
     }
   >;
 }

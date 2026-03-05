@@ -209,6 +209,57 @@ describe('Configuration Management (TypeScript)', () => {
     });
   });
 
+  describe('Auth Policy Matrix', () => {
+    it('should fail fast when OAuth and OIDC are both enabled', async () => {
+      process.env.OAUTH_ENABLED = 'true';
+      process.env.OIDC_ISSUER = 'https://issuer.example.com';
+
+      const { getConfig } = await importConfigFresh();
+
+      assert.throws(
+        () => getConfig(),
+        /OAuth and OIDC auth cannot both be enabled at startup/
+      );
+    });
+
+    it('should expose canonical auth precedence without leaking secrets', async () => {
+      process.env.MCP_AUTH_TOKEN = 'static-secret-token';
+      process.env.OIDC_ISSUER = 'https://issuer.example.com';
+      process.env.SUPABASE_URL = 'https://example.supabase.co';
+      process.env.SUPABASE_SECRET_KEY = 'supabase-service-secret';
+
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        authPolicy?: { effectivePrimary?: string; precedence?: string[] };
+      };
+
+      assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, 'supabase');
+      assert.deepStrictEqual(diagnostics.authPolicy?.precedence, [
+        'oauth',
+        'serviceToken',
+        'supabase',
+        'oidc',
+        'staticToken',
+      ]);
+
+      const serialized = JSON.stringify(diagnostics);
+      assert.strictEqual(serialized.includes('static-secret-token'), false);
+      assert.strictEqual(serialized.includes('supabase-service-secret'), false);
+    });
+
+    it('should fail fast when MCP_AUTH_PRIMARY references an unconfigured auth mode', async () => {
+      process.env.MCP_AUTH_TOKEN = 'static-only-token';
+      process.env.MCP_AUTH_PRIMARY = 'oidc';
+
+      const { getConfig } = await importConfigFresh();
+
+      assert.throws(
+        () => getConfig(),
+        /MCP_AUTH_PRIMARY was set for an auth mode that is not configured/
+      );
+    });
+  });
+
   describe('Circuit Breaker Configuration', () => {
     it('should parse circuit breaker settings', async () => {
       process.env.CIRCUIT_BREAKER_ENABLED = 'true';
@@ -252,4 +303,3 @@ describe('Configuration Management (TypeScript)', () => {
     });
   });
 });
-

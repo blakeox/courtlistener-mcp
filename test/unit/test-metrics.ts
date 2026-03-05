@@ -205,6 +205,29 @@ describe('Metrics Collector (TypeScript)', () => {
     });
   });
 
+  describe('Runtime Latency and Cost Guardrails', () => {
+    it('captures runtime latency metrics for hot paths', () => {
+      metrics.recordLatencyMetric('queue_latency_ms', 12);
+      metrics.recordLatencyMetric('queue_latency_ms', 24);
+      metrics.recordLatencyMetric('async_completion_latency_ms', 40);
+
+      const metricsData = metrics.getMetrics();
+      assert.strictEqual(metricsData.runtime_latency_ms?.queue_latency_ms?.count, 2);
+      assert.strictEqual(metricsData.runtime_latency_ms?.queue_latency_ms?.avg_ms, 18);
+      assert.strictEqual(metricsData.runtime_latency_ms?.async_completion_latency_ms?.max_ms, 40);
+    });
+
+    it('tracks cost guardrail breaches when thresholds are exceeded', () => {
+      metrics.recordCostGuardrail('async.queue_depth', 10, 8);
+      metrics.recordCostGuardrail('async.queue_depth', 6, 8);
+
+      const metricsData = metrics.getMetrics();
+      assert.strictEqual(metricsData.cost_guardrails?.['async.queue_depth']?.breaches, 1);
+      assert.strictEqual(metricsData.cost_guardrails?.['async.queue_depth']?.threshold, 8);
+      assert.strictEqual(metricsData.cost_guardrails?.['async.queue_depth']?.max_value, 10);
+    });
+  });
+
   describe('Metrics Reset', () => {
     it('should reset all metrics to initial state', () => {
       // Record some data

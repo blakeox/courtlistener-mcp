@@ -405,10 +405,17 @@ describe('BestPracticeLegalMCPServer', () => {
     const tools = server.buildToolDefinitions();
 
     assert.ok(Array.isArray(tools));
-    assert.strictEqual(tools.length, 1);
-    assert.strictEqual(tools[0].name, 'stub_tool');
-    assert.strictEqual(tools[0].inputSchema.type, 'object');
+    assert.ok(tools.length >= 1);
+    const stubTool = tools.find((tool) => tool.name === 'stub_tool');
+    assert.ok(stubTool);
+    assert.strictEqual(stubTool.inputSchema.type, 'object');
 
     await server.stop();
+  });
+
+  it('handles shutdown storms without double-stop failures', async () => {
+    const server = new BestPracticeLegalMCPServer();
+
+    await Promise.all([server.stop(), server.stop(), server.stop(), server.stop()]);
   });
 });

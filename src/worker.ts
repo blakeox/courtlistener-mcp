@@ -57,13 +57,24 @@ import {
   type WorkerDelegatedRouteDeps,
 } from './server/worker-route-composition.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
+import {
+  finalizeSessionLifecycleResponse as finalizeBoundarySessionLifecycleResponse,
+  validateSessionLifecycleRequest as validateBoundarySessionLifecycleRequest,
+} from './server/mcp-transport-runtime-facade.js';
 import { buildMcpCorsHeaders } from './server/transport-boundary-headers.js';
+import {
+  buildMcpReplayFingerprint,
+  deriveAdaptiveBoundaryRateLimit,
+  getMcpBoundaryGuardConfig,
+  getRequestContentLength,
+} from './server/mcp-boundary-abuse-guard.js';
 import {
   extractBearerToken,
   isAllowedOrigin,
   parseAllowedOrigins,
   parseBoolean,
 } from './server/worker-security.js';
+import { isSensitiveKeyName, redactSecretsInText } from './infrastructure/secret-redaction.js';
 import {
   authenticateUserWithAnonKey,
   authenticateUserWithPassword,
@@ -86,6 +97,11 @@ import {
 } from './server/supabase-management.js';
 import { SPA_BUILD_ID, SPA_CSS, SPA_JS } from './web/spa-assets.js';
 import { renderSpaShellHtml } from './web/spa-shell.js';
+import {
+  getWorkerMcpSessionPlacementHint,
+  resolveWorkerMcpSessionTopologyV2,
+  type WorkerMcpSessionTopologyV2,
+} from './server/worker-mcp-session-topology.js';
 
 // ---------------------------------------------------------------------------
 // Cloudflare Worker environment bindings
@@ -100,6 +116,8 @@ interface Env {
   MCP_AUTH_PRIMARY?: string;
   /** Set to true only during migration windows to allow static fallback with primary auth */
   MCP_ALLOW_STATIC_FALLBACK?: string;
+  /** Optional override for internal service-token header used by edge auth */
+  MCP_SERVICE_TOKEN_HEADER?: string;
   /** Optional comma-separated CORS allow-list (e.g. https://app.example.com,https://chat.example.com) */
   MCP_ALLOWED_ORIGINS?: string;
   /** Set to "true" to require MCP-Protocol-Version on MCP POST requests */
@@ -134,6 +152,20 @@ interface Env {
   MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS?: string;
   /** Temporary block duration in seconds once threshold hit (default 600) */
   MCP_AUTH_FAILURE_RATE_LIMIT_BLOCK_SECONDS?: string;
+  /** Toggle MCP boundary abuse guards (default true) */
+  MCP_BOUNDARY_GUARDS_ENABLED?: string;
+  /** Base MCP boundary request cap per client window (default 90) */
+  MCP_BOUNDARY_RATE_LIMIT_MAX?: string;
+  /** MCP boundary request window seconds (default 60) */
+  MCP_BOUNDARY_RATE_LIMIT_WINDOW_SECONDS?: string;
+  /** MCP boundary block duration seconds (default 120) */
+  MCP_BOUNDARY_RATE_LIMIT_BLOCK_SECONDS?: string;
+  /** Payload bytes threshold to apply stricter adaptive limits (default 65536) */
+  MCP_BOUNDARY_HEAVY_PAYLOAD_BYTES?: string;
+  /** Hard payload byte limit at MCP boundary (default 262144) */
+  MCP_BOUNDARY_MAX_PAYLOAD_BYTES?: string;
+  /** Replay fingerprint retention window seconds (default 120) */
+  MCP_BOUNDARY_REPLAY_WINDOW_SECONDS?: string;
   /** Toggle for signup and keys UI API rate limits (default true) */
   MCP_UI_RATE_LIMIT_ENABLED?: string;
   /** Signup requests allowed per window (default 8) */
@@ -160,6 +192,14 @@ interface Env {
   MCP_UI_INSECURE_COOKIES?: string;
   /** Enable server-side UI session revocation checks via Durable Objects (default true) */
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
+  /** Worker MCP session topology shard count (default 16) */
+  MCP_SESSION_SHARD_COUNT?: string;
+  /** Worker MCP session idle TTL in seconds before eviction (default 1800) */
+  MCP_SESSION_IDLE_TTL_SECONDS?: string;
+  /** Worker MCP session absolute TTL in seconds before eviction (default 86400) */
+  MCP_SESSION_ABSOLUTE_TTL_SECONDS?: string;
+  /** Worker MCP session eviction sweep sample size per request (default 64) */
+  MCP_SESSION_EVICTION_SWEEP_LIMIT?: string;
   /** Durable Object binding (auto-wired by wrangler.jsonc) */
   MCP_OBJECT: DurableObjectNamespace;
   /** Durable Object binding for auth failure rate limiting */
@@ -180,6 +220,10 @@ interface Env {
 // The APIs are compatible at runtime; casts bridge the type-level gap.
 
 export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
+  static override options = {
+    hibernate: true,
+  };
+
   server = new McpServer(
     { name: 'courtlistener-mcp', version: '0.1.0' },
     { capabilities: SERVER_CAPABILITIES },
@@ -337,6 +381,35 @@ interface SessionTokenResponseBody {
   token: string | null;
 }
 
+type McpSessionLifecycleAction = 'mcp_session_register' | 'mcp_session_touch' | 'mcp_session_close';
+
+interface McpSessionLifecycleRequestBody {
+  action: McpSessionLifecycleAction;
+  nowMs: number;
+  sessionId: string;
+  idleTtlMs: number;
+  absoluteTtlMs: number;
+  evictionSweepLimit: number;
+  shardHint?: string;
+}
+
+type McpSessionEvictionReason = 'active' | 'missing' | 'idle_evicted' | 'absolute_evicted' | 'closed';
+
+interface McpSessionLifecycleResponseBody {
+  active: boolean;
+  reason: McpSessionEvictionReason;
+  sessionId: string;
+  shard: string;
+}
+
+interface McpSessionLifecycleState {
+  sessionId: string;
+  createdAtMs: number;
+  lastSeenAtMs: number;
+  idleExpiresAtMs: number;
+  absoluteExpiresAtMs: number;
+}
+
 interface LifetimeQuotaRequestBody {
   action: 'quota_increment_check';
   maxAllowed: number;
@@ -367,6 +440,7 @@ const workerRouteLatency = new Map<string, LatencyStats>();
 const WORKER_ROUTE_LATENCY_MAX_ROUTES = 64;
 const WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE = 'OTHER';
 const allowedOriginsCache = new Map<string, string[]>();
+const sessionTopologyCache = new Map<string, WorkerMcpSessionTopologyV2>();
 const durableObjectLatency: Record<DurableObjectLatencyDimension, LatencyStats> = {
   auth_limiter: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
   session_revocation: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
@@ -438,6 +512,20 @@ function getCachedAllowedOrigins(rawAllowedOrigins: string | undefined): string[
   const parsed = parseAllowedOrigins(rawAllowedOrigins);
   allowedOriginsCache.set(cacheKey, parsed);
   return parsed;
+}
+
+function getCachedSessionTopology(env: Env): WorkerMcpSessionTopologyV2 {
+  const cacheKey = [
+    env.MCP_SESSION_SHARD_COUNT ?? '',
+    env.MCP_SESSION_IDLE_TTL_SECONDS ?? '',
+    env.MCP_SESSION_ABSOLUTE_TTL_SECONDS ?? '',
+    env.MCP_SESSION_EVICTION_SWEEP_LIMIT ?? '',
+  ].join('|');
+  const cached = sessionTopologyCache.get(cacheKey);
+  if (cached) return cached;
+  const topology = resolveWorkerMcpSessionTopologyV2(env);
+  sessionTopologyCache.set(cacheKey, topology);
+  return topology;
 }
 
 function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
@@ -989,7 +1077,8 @@ async function callMcpJsonRpc(
   // Resolve the best available token for internal MCP calls:
   // 1. MCP_AUTH_TOKEN (static secret) is the most reliable for internal use
   // 2. Fall back to the user-provided token if no static token is configured
-  const effectiveToken = env.MCP_AUTH_TOKEN?.trim() || token;
+  const serviceToken = env.MCP_AUTH_TOKEN?.trim() || null;
+  const effectiveToken = serviceToken || token;
 
   const headers = new Headers({
     authorization: `Bearer ${effectiveToken}`,
@@ -999,6 +1088,10 @@ async function callMcpJsonRpc(
   });
   if (sessionId) {
     headers.set('mcp-session-id', sessionId);
+  }
+  if (serviceToken && serviceToken === effectiveToken) {
+    const serviceHeader = env.MCP_SERVICE_TOKEN_HEADER?.trim() || 'x-mcp-service-token';
+    headers.set(serviceHeader, serviceToken);
   }
 
   const mcpRequest = new Request('https://mcp.internal/mcp', {
@@ -1019,7 +1112,7 @@ async function callMcpJsonRpc(
   });
   if (authResult.authError) {
     const text = await authResult.authError.text();
-    throw new Error(text || 'MCP auth failed');
+    throw new Error(redactSecretsInText(text || 'MCP auth failed'));
   }
 
   const response = await runWithPrincipalContext(authResult.principal, () =>
@@ -1027,13 +1120,13 @@ async function callMcpJsonRpc(
   );
   const raw = await response.text();
   if (!response.ok) {
-    throw new Error(raw.slice(0, 1000) || 'MCP request failed');
+    throw new Error(redactSecretsInText(raw.slice(0, 1000) || 'MCP request failed'));
   }
 
   const payload = extractMcpResponseBody(raw);
   const rpcBody = payload as McpJsonRpcResponse<unknown>;
   if (rpcBody.error?.message) {
-    throw new Error(`MCP error ${rpcBody.error.code}: ${rpcBody.error.message}`);
+    throw new Error(redactSecretsInText(`MCP error ${rpcBody.error.code}: ${rpcBody.error.message}`));
   }
 
   return {
@@ -1068,13 +1161,31 @@ function jsonError(
   );
 }
 
+function redactWorkerDiagnosticValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactSecretsInText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactWorkerDiagnosticValue(entry));
+  }
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        isSensitiveKeyName(key) ? '[REDACTED]' : redactWorkerDiagnosticValue(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
 function logWorkerWarning(event: string, error: unknown, meta?: Record<string, unknown>): void {
   console.warn(
     JSON.stringify({
       level: 'warn',
-      event,
-      error: error instanceof Error ? error.message : String(error),
-      ...(meta ?? {}),
+      event: redactSecretsInText(event),
+      error: redactSecretsInText(error instanceof Error ? error.message : String(error)),
+      ...(meta ? (redactWorkerDiagnosticValue(meta) as Record<string, unknown>) : {}),
     }),
   );
 }
@@ -1693,6 +1804,95 @@ export class AuthFailureLimiterDO {
     await this.state.storage.delete('auth_failure_state');
   }
 
+  private getMcpSessionStorageKey(sessionId: string): string {
+    return `mcp_session:${sessionId}`;
+  }
+
+  private async loadMcpSessionState(sessionId: string): Promise<McpSessionLifecycleState | null> {
+    const stored = await this.state.storage.get<McpSessionLifecycleState>(
+      this.getMcpSessionStorageKey(sessionId),
+    );
+    if (!stored || stored.sessionId !== sessionId) {
+      return null;
+    }
+    return stored;
+  }
+
+  private resolveMcpSessionState(
+    entry: McpSessionLifecycleState | null,
+    nowMs: number,
+  ): { active: boolean; reason: McpSessionEvictionReason } {
+    if (!entry) {
+      return { active: false, reason: 'missing' };
+    }
+    if (entry.absoluteExpiresAtMs <= nowMs) {
+      return { active: false, reason: 'absolute_evicted' };
+    }
+    if (entry.idleExpiresAtMs <= nowMs) {
+      return { active: false, reason: 'idle_evicted' };
+    }
+    return { active: true, reason: 'active' };
+  }
+
+  private async evictExpiredMcpSessions(nowMs: number, sweepLimit: number): Promise<void> {
+    const entries = await this.state.storage.list<McpSessionLifecycleState>({
+      prefix: 'mcp_session:',
+      limit: Math.max(1, sweepLimit),
+    });
+    const deleteKeys: string[] = [];
+    for (const [key, value] of entries.entries()) {
+      const sessionState = value as McpSessionLifecycleState;
+      if (
+        !sessionState ||
+        typeof sessionState.absoluteExpiresAtMs !== 'number' ||
+        typeof sessionState.idleExpiresAtMs !== 'number'
+      ) {
+        deleteKeys.push(key);
+        continue;
+      }
+      if (sessionState.absoluteExpiresAtMs <= nowMs || sessionState.idleExpiresAtMs <= nowMs) {
+        deleteKeys.push(key);
+      }
+    }
+    if (deleteKeys.length > 0) {
+      await Promise.all(deleteKeys.map((key) => this.state.storage.delete(key)));
+    }
+  }
+
+  private async scheduleMcpSessionAlarm(nextAtMs: number): Promise<void> {
+    const scheduledAt = (await this.state.storage.get<number>('mcp_session_alarm_at_ms')) ?? 0;
+    if (scheduledAt > 0 && scheduledAt <= nextAtMs) {
+      return;
+    }
+    await this.state.storage.put('mcp_session_alarm_at_ms', nextAtMs);
+    await this.state.storage.setAlarm(nextAtMs);
+  }
+
+  private async refreshMcpSessionAlarm(): Promise<void> {
+    const entries = await this.state.storage.list<McpSessionLifecycleState>({
+      prefix: 'mcp_session:',
+      limit: 256,
+    });
+    let nextAtMs = Number.POSITIVE_INFINITY;
+    for (const value of entries.values()) {
+      const state = value as McpSessionLifecycleState;
+      if (!state) continue;
+      const candidate = Math.min(state.idleExpiresAtMs, state.absoluteExpiresAtMs);
+      if (candidate < nextAtMs) {
+        nextAtMs = candidate;
+      }
+    }
+
+    if (!Number.isFinite(nextAtMs)) {
+      await this.state.storage.delete('mcp_session_alarm_at_ms');
+      await this.state.storage.deleteAlarm();
+      return;
+    }
+
+    await this.state.storage.put('mcp_session_alarm_at_ms', nextAtMs);
+    await this.state.storage.setAlarm(nextAtMs);
+  }
+
   async fetch(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
       return Response.json({ error: 'method_not_allowed' }, { status: 405 });
@@ -1703,9 +1903,79 @@ export class AuthFailureLimiterDO {
       | SessionRevocationRequestBody
       | SessionTokenRequestBody
       | LifetimeQuotaRequestBody
+      | McpSessionLifecycleRequestBody
     >(request);
     if (!body) {
       return Response.json({ error: 'invalid_request' }, { status: 400 });
+    }
+
+    if (
+      body.action === 'mcp_session_register' ||
+      body.action === 'mcp_session_touch' ||
+      body.action === 'mcp_session_close'
+    ) {
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+      const idleTtlMs = Math.max(1_000, Number.isFinite(body.idleTtlMs) ? body.idleTtlMs : 30 * 60 * 1000);
+      const absoluteTtlMs = Math.max(
+        idleTtlMs,
+        Number.isFinite(body.absoluteTtlMs) ? body.absoluteTtlMs : 24 * 60 * 60 * 1000,
+      );
+      const sweepLimit = Math.max(
+        1,
+        Number.isFinite(body.evictionSweepLimit) ? Math.floor(body.evictionSweepLimit) : 64,
+      );
+
+      if (!sessionId) {
+        return Response.json({ error: 'invalid_session_id' }, { status: 400 });
+      }
+
+      await this.evictExpiredMcpSessions(nowMs, sweepLimit);
+      const storageKey = this.getMcpSessionStorageKey(sessionId);
+      const existing = await this.loadMcpSessionState(sessionId);
+
+      if (body.action === 'mcp_session_close') {
+        await this.state.storage.delete(storageKey);
+        await this.refreshMcpSessionAlarm();
+        return Response.json({
+          active: false,
+          reason: 'closed',
+          sessionId,
+          shard: this.state.id.toString(),
+        } satisfies McpSessionLifecycleResponseBody);
+      }
+
+      const resolved = this.resolveMcpSessionState(existing, nowMs);
+      if (!resolved.active && body.action === 'mcp_session_touch') {
+        await this.state.storage.delete(storageKey);
+        await this.refreshMcpSessionAlarm();
+        return Response.json({
+          active: false,
+          reason: resolved.reason,
+          sessionId,
+          shard: this.state.id.toString(),
+        } satisfies McpSessionLifecycleResponseBody);
+      }
+
+      const createdAtMs = existing?.createdAtMs ?? nowMs;
+      const nextState: McpSessionLifecycleState = {
+        sessionId,
+        createdAtMs,
+        lastSeenAtMs: nowMs,
+        idleExpiresAtMs: nowMs + idleTtlMs,
+        absoluteExpiresAtMs: createdAtMs + absoluteTtlMs,
+      };
+      await this.state.storage.put(storageKey, nextState);
+      await this.scheduleMcpSessionAlarm(
+        Math.min(nextState.idleExpiresAtMs, nextState.absoluteExpiresAtMs),
+      );
+
+      return Response.json({
+        active: true,
+        reason: 'active',
+        sessionId,
+        shard: this.state.id.toString(),
+      } satisfies McpSessionLifecycleResponseBody);
     }
 
     if (body.action === 'session_check' || body.action === 'session_revoke') {
@@ -1851,6 +2121,86 @@ export class AuthFailureLimiterDO {
       state: current,
     } satisfies AuthFailureLimiterResponseBody);
   }
+
+  async alarm(): Promise<void> {
+    const nowMs = Date.now();
+    await this.evictExpiredMcpSessions(nowMs, 256);
+    await this.refreshMcpSessionAlarm();
+  }
+}
+
+function getMcpSessionLifecycleStub(
+  env: Env,
+  sessionId: string,
+  topology: WorkerMcpSessionTopologyV2,
+): DurableObjectStub {
+  const placement = getWorkerMcpSessionPlacementHint(sessionId, topology);
+  const objectId = env.AUTH_FAILURE_LIMITER.idFromName(placement.shardName);
+  return env.AUTH_FAILURE_LIMITER.get(objectId);
+}
+
+async function callMcpSessionLifecycle(
+  env: Env,
+  sessionId: string,
+  action: McpSessionLifecycleAction,
+  nowMs: number,
+): Promise<McpSessionLifecycleResponseBody | null> {
+  const topology = getCachedSessionTopology(env);
+  const placement = getWorkerMcpSessionPlacementHint(sessionId, topology);
+  const stub = getMcpSessionLifecycleStub(env, sessionId, topology);
+  const response = await stub.fetch('https://auth-failure-limiter/internal', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-mcp-session-shard': String(placement.shard),
+      'x-mcp-placement-signal': placement.placementSignal,
+    },
+    body: JSON.stringify({
+      action,
+      sessionId,
+      nowMs,
+      idleTtlMs: topology.idleTtlMs,
+      absoluteTtlMs: topology.absoluteTtlMs,
+      evictionSweepLimit: topology.evictionSweepLimit,
+      shardHint: placement.placementSignal,
+    } satisfies McpSessionLifecycleRequestBody),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return (await response.json()) as McpSessionLifecycleResponseBody;
+}
+
+async function validateSessionRequest(request: Request, env: Env, nowMs: number): Promise<Response | null> {
+  return validateBoundarySessionLifecycleRequest(
+    request,
+    env,
+    nowMs,
+    async (sessionId) => {
+      const result = await callMcpSessionLifecycle(env, sessionId, 'mcp_session_touch', nowMs);
+      if (!result) {
+        return null;
+      }
+      return result.active;
+    },
+    { methods: ['POST', 'DELETE'] },
+  );
+}
+
+async function finalizeSessionResponse(
+  request: Request,
+  response: Response,
+  env: Env,
+  nowMs: number,
+): Promise<void> {
+  await finalizeBoundarySessionLifecycleResponse(request, response, env, nowMs, {
+    registerSession: async (sessionId) => {
+      await callMcpSessionLifecycle(env, sessionId, 'mcp_session_register', nowMs);
+    },
+    closeSession: async (sessionId) => {
+      await callMcpSessionLifecycle(env, sessionId, 'mcp_session_close', nowMs);
+    },
+  });
 }
 
 function getAuthFailureRateLimitConfig(env: Env): {
@@ -1961,6 +2311,73 @@ async function clearAuthFailures(clientId: string, env: Env, nowMs: number): Pro
   const cfg = getAuthFailureRateLimitConfig(env);
   if (!cfg.enabled) return;
   await callAuthLimiter(env, clientId, 'clear', nowMs);
+}
+
+function hashBoundaryReplayFingerprint(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+async function evaluateMcpBoundaryRequest(
+  request: Request,
+  env: Env,
+  clientId: string,
+  nowMs: number,
+): Promise<Response | null> {
+  const cfg = getMcpBoundaryGuardConfig(env);
+  if (!cfg.enabled) {
+    return null;
+  }
+
+  const contentLength = getRequestContentLength(request);
+  if (contentLength !== null && contentLength > cfg.maxPayloadBytes) {
+    return jsonError('MCP payload too large.', 413, 'payload_too_large', {
+      max_payload_bytes: cfg.maxPayloadBytes,
+    });
+  }
+
+  const adaptiveMaxAttempts = deriveAdaptiveBoundaryRateLimit(request, cfg, contentLength);
+  const boundaryRateLimit = await callAuthLimiter(env, `mcp-boundary:${clientId}`, 'record', nowMs, {
+    maxAttempts: adaptiveMaxAttempts,
+    windowMs: cfg.windowMs,
+    blockMs: cfg.blockMs,
+  });
+  if (boundaryRateLimit?.blocked) {
+    const retryAfterSeconds = boundaryRateLimit.retryAfterSeconds;
+    return jsonError(
+      'MCP boundary rate limit exceeded.',
+      429,
+      'mcp_rate_limited',
+      { retry_after_seconds: retryAfterSeconds },
+      { 'Retry-After': String(retryAfterSeconds) },
+    );
+  }
+
+  const replayFingerprint = await buildMcpReplayFingerprint(request, contentLength, cfg.heavyPayloadBytes);
+  if (!replayFingerprint) {
+    return null;
+  }
+
+  const replayState = await callAuthLimiter(
+    env,
+    `mcp-replay:${clientId}:${hashBoundaryReplayFingerprint(replayFingerprint)}`,
+    'record',
+    nowMs,
+    {
+      maxAttempts: 2,
+      windowMs: cfg.replayWindowMs,
+      blockMs: cfg.replayWindowMs,
+    },
+  );
+  if (replayState?.blocked) {
+    return jsonError('Replay request detected at MCP boundary.', 409, 'mcp_replay_detected');
+  }
+
+  return null;
 }
 
 type UiRateLimitType = 'signup' | 'keys';
@@ -2112,6 +2529,7 @@ function rejectDisallowedUiOrigin(
 const workerDelegatedRouteDeps = {
   jsonError,
   jsonResponse,
+  fetchFn: fetch,
   rejectDisallowedUiOrigin,
   getSupabaseSignupConfig,
   getUiSessionSecret,
@@ -2185,15 +2603,20 @@ const workerDelegatedRouteDeps = {
   spaBuildId: SPA_BUILD_ID,
   spaAssetResponse,
   renderSpaShellHtml,
-  supportedProtocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
-  mcpStreamableHandler,
-  mcpSseCompatibilityHandler,
-  withCors,
-  buildCorsHeaders,
-  getClientIdentifier,
-  getAuthRateLimitedResponse,
-  recordAuthFailure,
-  clearAuthFailures,
+  mcpBoundaryPolicy: {
+    supportedProtocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
+    mcpStreamableHandler,
+    mcpSseCompatibilityHandler,
+    withCors,
+    buildCorsHeaders,
+    getClientIdentifier,
+    getAuthRateLimitedResponse,
+    recordAuthFailure,
+    clearAuthFailures,
+    evaluateMcpBoundaryRequest,
+    validateSessionRequest,
+    finalizeSessionResponse,
+  },
 } satisfies WorkerDelegatedRouteDeps<Env>;
 
 export default {
@@ -2218,12 +2641,20 @@ export default {
 
       // Health check
       if (pathname === '/health') {
+        const sessionTopology = getCachedSessionTopology(env);
         return jsonResponse({
           status: 'ok',
           service: 'courtlistener-mcp',
           transport: 'cloudflare-agents-streamable-http',
           metrics: {
             latency_ms: getWorkerLatencySnapshot(),
+          },
+          session_topology: {
+            version: sessionTopology.version,
+            shard_count: sessionTopology.shardCount,
+            idle_ttl_ms: sessionTopology.idleTtlMs,
+            absolute_ttl_ms: sessionTopology.absoluteTtlMs,
+            eviction_sweep_limit: sessionTopology.evictionSweepLimit,
           },
         });
       }

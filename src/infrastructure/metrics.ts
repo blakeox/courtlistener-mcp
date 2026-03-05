@@ -14,6 +14,21 @@ type OperationMetrics = {
   cache_misses: number;
 };
 
+type RuntimeLatencyMetric = {
+  count: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+};
+
+type CostGuardrailMetric = {
+  threshold: number;
+  breaches: number;
+  lastValue: number;
+  maxValue: number;
+  lastExceededAt?: string;
+};
+
 export class MetricsCollector {
   private metrics: Metrics;
   private startTime: number;
@@ -22,6 +37,8 @@ export class MetricsCollector {
   private readonly maxResponseTimesSamples = 100;
   private readonly maxOperationBreakdownEntries = 100;
   private readonly overflowOperationBucket = 'other';
+  private readonly runtimeLatency = new Map<string, RuntimeLatencyMetric>();
+  private readonly costGuardrails = new Map<string, CostGuardrailMetric>();
   private readonly operationMetrics: Record<string, OperationMetrics> = {};
   private operationBreakdownSize = 0;
 
@@ -106,6 +123,42 @@ export class MetricsCollector {
     this.getOrCreateOperationMetrics(operation).cache_misses++;
   }
 
+  recordLatencyMetric(metric: string, durationMs: number): void {
+    if (!metric.trim()) return;
+    const normalizedDuration = Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 0;
+    const current = this.runtimeLatency.get(metric) ?? {
+      count: 0,
+      totalMs: 0,
+      maxMs: 0,
+      lastMs: 0,
+    };
+    current.count += 1;
+    current.totalMs += normalizedDuration;
+    current.maxMs = Math.max(current.maxMs, normalizedDuration);
+    current.lastMs = normalizedDuration;
+    this.runtimeLatency.set(metric, current);
+  }
+
+  recordCostGuardrail(metric: string, value: number, threshold: number): void {
+    if (!metric.trim()) return;
+    const normalizedValue = Number.isFinite(value) ? value : 0;
+    const normalizedThreshold = Number.isFinite(threshold) && threshold > 0 ? threshold : 1;
+    const current = this.costGuardrails.get(metric) ?? {
+      threshold: normalizedThreshold,
+      breaches: 0,
+      lastValue: 0,
+      maxValue: 0,
+    };
+    current.threshold = normalizedThreshold;
+    current.lastValue = normalizedValue;
+    current.maxValue = Math.max(current.maxValue, normalizedValue);
+    if (normalizedValue > normalizedThreshold) {
+      current.breaches += 1;
+      current.lastExceededAt = new Date().toISOString();
+    }
+    this.costGuardrails.set(metric, current);
+  }
+
   /**
    * Update response time average
    */
@@ -126,10 +179,36 @@ export class MetricsCollector {
    * Get current metrics
    */
   getMetrics(): Metrics {
+    const runtimeLatency = Object.fromEntries(
+      [...this.runtimeLatency.entries()].map(([metric, values]) => [
+        metric,
+        {
+          count: values.count,
+          avg_ms: values.count > 0 ? Number((values.totalMs / values.count).toFixed(2)) : 0,
+          max_ms: Number(values.maxMs.toFixed(2)),
+          last_ms: Number(values.lastMs.toFixed(2)),
+        },
+      ]),
+    );
+    const costGuardrails = Object.fromEntries(
+      [...this.costGuardrails.entries()].map(([metric, values]) => [
+        metric,
+        {
+          threshold: values.threshold,
+          breaches: values.breaches,
+          last_value: Number(values.lastValue.toFixed(2)),
+          max_value: Number(values.maxValue.toFixed(2)),
+          ...(values.lastExceededAt && { last_exceeded_at: values.lastExceededAt }),
+        },
+      ]),
+    );
+
     return {
       ...this.metrics,
       uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000),
       operation_breakdown: { ...this.operationMetrics },
+      ...(Object.keys(runtimeLatency).length > 0 && { runtime_latency_ms: runtimeLatency }),
+      ...(Object.keys(costGuardrails).length > 0 && { cost_guardrails: costGuardrails }),
     };
   }
 
@@ -272,6 +351,8 @@ export class MetricsCollector {
     Object.keys(this.operationMetrics).forEach((key) => {
       delete this.operationMetrics[key];
     });
+    this.runtimeLatency.clear();
+    this.costGuardrails.clear();
     this.operationBreakdownSize = 0;
     this.startTime = Date.now();
 

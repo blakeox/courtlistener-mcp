@@ -54,6 +54,9 @@ jobs:
           echo "🧪 Running full test suite for release validation..."
           pnpm test
 
+      - name: Hosted OAuth release gate
+        run: pnpm run ci:auth-release-gate
+
       - name: Extended MCP Inspector validation
         run: |
           echo "🔍 Running extended MCP Inspector validation..."

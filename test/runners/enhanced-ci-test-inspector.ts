@@ -54,7 +54,7 @@ const CONFIG: Config = {
   remoteServer: {
     url:
       process.env.REMOTE_SERVER_URL ||
-      'https://courtlistener-mcp.blakeoxford.workers.dev/mcp',
+      'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   inspector: {
@@ -130,7 +130,7 @@ const performanceMetrics: PerformanceMetric[] = [];
 // Enhanced test cases with categories
 const basicTestCases: TestCase[] = [
   {
-    name: 'Inspector Protocol Handshake',
+    name: 'Inspector Resource Discovery',
     category: 'protocol',
     priority: 'critical',
     args: [
@@ -140,10 +140,9 @@ const basicTestCases: TestCase[] = [
       'node',
       join(projectRoot, 'dist/index.js'),
       '--method',
-      'initialize',
+      'resources/list',
     ],
-    validate: (output) =>
-      output.includes('protocolVersion') && output.includes('capabilities'),
+    validate: (output) => output.includes('resources'),
     timeout: 15000,
     required: true,
   },

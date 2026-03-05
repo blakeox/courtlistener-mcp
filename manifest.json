@@ -11,766 +11,1951 @@
           "name": "search_opinions",
           "description": "Search for legal opinions with various filters and parameters",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "query": {
+                "type": "string"
+              },
+              "q": {
+                "type": "string"
+              },
+              "court": {
+                "type": "string"
+              },
+              "judge": {
+                "type": "string"
+              },
+              "dateAfter": {
+                "type": "string"
+              },
+              "dateBefore": {
+                "type": "string"
+              },
+              "date_filed_after": {
+                "type": "string"
+              },
+              "date_filed_before": {
+                "type": "string"
+              },
+              "orderBy": {
+                "type": "string"
+              },
+              "order_by": {
+                "type": "string"
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Search Opinions"
+          },
+          "title": "Search Opinions",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Search Opinions",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "search_cases",
           "description": "Search for legal cases and opinions using CourtListener's comprehensive database with advanced filtering capabilities",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "query": {
+                "type": "string"
               },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
-                  },
-                  "count": {
-                    "type": "number"
-                  }
-                }
+              "q": {
+                "type": "string"
               },
-              "metadata": {
-                "type": "object"
+              "court": {
+                "type": "string"
               },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "current_page": {
-                    "type": "number"
-                  },
-                  "total_pages": {
-                    "type": "number"
-                  },
-                  "total_results": {
-                    "type": "number"
-                  },
-                  "has_next": {
-                    "type": "boolean"
-                  },
-                  "has_previous": {
-                    "type": "boolean"
-                  }
-                }
+              "judge": {
+                "type": "string"
+              },
+              "case_name": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              },
+              "date_filed_after": {
+                "type": "string"
+              },
+              "date_filed_before": {
+                "type": "string"
+              },
+              "precedential_status": {
+                "type": "string"
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
               }
-            },
-            "required": [
-              "success",
-              "data"
-            ]
+            }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Search Cases"
+          },
+          "title": "Search Cases",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Search Cases",
+              "category": "search",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "advanced_search",
           "description": "Execute advanced legal research queries with multi-parameter filtering",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "type": {
+                "default": "o",
+                "type": "string",
+                "enum": [
+                  "o",
+                  "r",
+                  "p",
+                  "oa"
+                ]
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1
+              },
+              "court": {
+                "type": "string"
+              },
+              "judge": {
+                "type": "string"
+              },
+              "case_name": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              },
+              "docket_number": {
+                "type": "string"
+              },
+              "date_filed_after": {
+                "type": "string"
+              },
+              "date_filed_before": {
+                "type": "string"
+              },
+              "precedential_status": {
+                "type": "string"
+              },
+              "cited_lt": {
+                "type": "number"
+              },
+              "cited_gt": {
+                "type": "number"
+              },
+              "status": {
+                "type": "string"
+              },
+              "nature_of_suit": {
+                "type": "string"
+              },
+              "order_by": {
+                "type": "string"
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "page_size": {
+                "default": 20,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Advanced Search"
+          },
+          "title": "Advanced Search",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Advanced Search",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_case_details",
           "description": "Get comprehensive details about a specific case including full metadata, citations, and related information",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "cluster_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              "data": {
-                "type": "object"
-              },
-              "metadata": {
-                "type": "object"
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               }
-            },
-            "required": [
-              "success",
-              "data"
-            ]
+            }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Case Details"
+          },
+          "title": "Get Case Details",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Case Details",
+              "category": "details",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_related_cases",
           "description": "Find cases related to a specific case",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "opinion_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "cluster_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "limit": {
+                "default": 10,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Related Cases"
+          },
+          "title": "Get Related Cases",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Related Cases",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "analyze_case_authorities",
           "description": "Analyze the legal authorities cited in a case",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "include_citations": {
+                "default": true,
+                "type": "boolean"
+              },
+              "depth": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 3
+              }
+            },
+            "required": [
+              "case_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Analyze Case Authorities"
+          },
+          "title": "Analyze Case Authorities",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Analyze Case Authorities",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_opinion_text",
           "description": "Retrieve the full text content of a specific legal opinion, including HTML and plain text formats",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "opinion_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              "data": {
-                "type": "object"
-              },
-              "metadata": {
-                "type": "object"
+              "format": {
+                "default": "text",
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html",
+                  "pdf"
+                ]
               }
             },
             "required": [
-              "success",
-              "data"
+              "opinion_id"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Opinion Text"
+          },
+          "title": "Get Opinion Text",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Opinion Text",
+              "category": "details",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "analyze_legal_argument",
           "description": "Analyze a legal argument by finding supporting and opposing cases, with AI-powered relevance assessment. ⚡ Moderate API cost.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "argument": {
+                "type": "string",
+                "minLength": 1
               },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
-                  },
-                  "count": {
-                    "type": "number"
-                  }
-                }
+              "search_query": {
+                "type": "string",
+                "minLength": 1
               },
-              "metadata": {
-                "type": "object"
+              "jurisdiction": {
+                "type": "string"
+              },
+              "date_range_start": {
+                "type": "string"
+              },
+              "date_range_end": {
+                "type": "string"
               }
             },
             "required": [
-              "success",
-              "data"
+              "argument",
+              "search_query"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Analyze Legal Argument"
+          },
+          "title": "Analyze Legal Argument",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Analyze Legal Argument",
+              "category": "analysis",
+              "complexity": "advanced",
+              "async": true,
+              "costHint": "high",
+              "rateLimitWeight": 3
+            }
           }
         },
         {
           "name": "get_citation_network",
           "description": "Analyze citation networks and precedent relationships to understand case law evolution and influence",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "opinion_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
               },
-              "data": {
-                "type": "object"
+              "depth": {
+                "default": 2,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 3
               },
-              "metadata": {
-                "type": "object"
+              "direction": {
+                "default": "both",
+                "type": "string",
+                "enum": [
+                  "cited_by",
+                  "cites",
+                  "both"
+                ]
+              },
+              "limit": {
+                "default": 50,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
               }
             },
             "required": [
-              "success",
-              "data"
+              "opinion_id"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Citation Network"
+          },
+          "title": "Get Citation Network",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Citation Network",
+              "category": "analysis",
+              "complexity": "advanced",
+              "async": true,
+              "costHint": "medium",
+              "rateLimitWeight": 2
+            }
           }
         },
         {
           "name": "lookup_citation",
           "description": "Look up cases by legal citation",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "citation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "normalize": {
+                "default": true,
+                "type": "boolean"
+              },
+              "include_alternatives": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "citation"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Lookup Citation"
+          },
+          "title": "Lookup Citation",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Lookup Citation",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "list_courts",
           "description": "List all available courts with their metadata, jurisdiction information, and operational status",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "jurisdiction": {
+                "type": "string"
               },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
-                  },
-                  "count": {
-                    "type": "number"
-                  }
-                }
+              "court_type": {
+                "type": "string",
+                "enum": [
+                  "federal",
+                  "state",
+                  "appellate",
+                  "district",
+                  "supreme"
+                ]
               },
-              "metadata": {
-                "type": "object"
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "description": "Pagination cursor from previous response (alternative to page/page_size)",
+                "type": "string"
+              },
+              "limit": {
+                "description": "Number of results to return (used with cursor)",
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
               }
-            },
-            "required": [
-              "success",
-              "data"
-            ]
+            }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "List Courts"
+          },
+          "title": "List Courts",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "List Courts",
+              "category": "reference",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_judges",
           "description": "Get information about judges",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "court": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "description": "Pagination cursor from previous response (alternative to page/page_size)",
+                "type": "string"
+              },
+              "limit": {
+                "description": "Number of results to return (used with cursor)",
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Judges"
+          },
+          "title": "Get Judges",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Judges",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_judge",
           "description": "Get detailed information about a specific judge",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "judge_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "judge_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Judge"
+          },
+          "title": "Get Judge",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Judge",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_dockets",
           "description": "Get docket information with filtering options",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "court": {
+                "type": "string"
+              },
+              "case_name": {
+                "type": "string"
+              },
+              "docket_number": {
+                "type": "string"
+              },
+              "date_filed": {
+                "type": "string"
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Dockets"
+          },
+          "title": "Get Dockets",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Dockets",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_docket",
           "description": "Get detailed information about a specific docket",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "docket_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "include_entries": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Docket"
+          },
+          "title": "Get Docket",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Docket",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_docket_entries",
           "description": "Get individual court filings and orders for a specific docket, providing case timeline and procedural history",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
-              },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
+              "docket": {
+                "anyOf": [
+                  {
+                    "type": "string"
                   },
-                  "count": {
+                  {
                     "type": "number"
                   }
-                }
+                ]
               },
-              "metadata": {
-                "type": "object"
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "current_page": {
+              "entry_number": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
                     "type": "number"
-                  },
-                  "total_pages": {
-                    "type": "number"
-                  },
-                  "total_results": {
-                    "type": "number"
-                  },
-                  "has_next": {
-                    "type": "boolean"
-                  },
-                  "has_previous": {
-                    "type": "boolean"
                   }
-                }
+                ]
+              },
+              "date_filed_after": {
+                "type": "string"
+              },
+              "date_filed_before": {
+                "type": "string"
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
               }
             },
             "required": [
-              "success",
-              "data"
+              "docket"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Docket Entries"
+          },
+          "title": "Get Docket Entries",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Docket Entries",
+              "category": "details",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_recap_documents",
           "description": "Get RECAP documents for a docket",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "docket_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "document_type": {
+                "type": "string"
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Recap Documents"
+          },
+          "title": "Get Recap Documents",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Recap Documents",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_recap_document",
           "description": "Get a specific RECAP document",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "include_content": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "document_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Recap Document"
+          },
+          "title": "Get Recap Document",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Recap Document",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_financial_disclosures",
           "description": "Get financial disclosures for judges",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "judge_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "year": {
+                "type": "number",
+                "minimum": 1990,
+                "maximum": 2026
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Financial Disclosures"
+          },
+          "title": "Get Financial Disclosures",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Financial Disclosures",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_financial_disclosure",
           "description": "Get details of a specific financial disclosure",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "disclosure_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "disclosure_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Financial Disclosure"
+          },
+          "title": "Get Financial Disclosure",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Financial Disclosure",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_parties_and_attorneys",
           "description": "Get parties and attorneys information for a case",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "docket_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "include_attorneys": {
+                "default": true,
+                "type": "boolean"
+              },
+              "include_parties": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Parties And Attorneys"
+          },
+          "title": "Get Parties And Attorneys",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Parties And Attorneys",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "manage_alerts",
           "description": "Manage legal alerts and notifications",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "action": {
+                "type": "string",
+                "enum": [
+                  "create",
+                  "list",
+                  "update",
+                  "delete"
+                ]
+              },
+              "alert_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "query": {
+                "type": "string"
+              },
+              "frequency": {
+                "type": "string",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ]
+              },
+              "alert_type": {
+                "type": "string",
+                "enum": [
+                  "case",
+                  "opinion",
+                  "docket"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Manage Alerts"
+          },
+          "title": "Manage Alerts",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Manage Alerts",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_oral_arguments",
           "description": "Get oral arguments with filtering options",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "court": {
+                "type": "string"
+              },
+              "case_name": {
+                "type": "string"
+              },
+              "date_argued": {
+                "type": "string"
+              },
+              "docket_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "page": {
+                "default": 1,
+                "type": "number",
+                "minimum": 1
+              },
+              "page_size": {
+                "default": 20,
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Oral Arguments"
+          },
+          "title": "Get Oral Arguments",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Oral Arguments",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_oral_argument",
           "description": "Get detailed information about a specific oral argument",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "oral_argument_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "include_transcript": {
+                "default": false,
+                "type": "boolean"
+              },
+              "include_audio_url": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "oral_argument_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Oral Argument"
+          },
+          "title": "Get Oral Argument",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Oral Argument",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_visualization_data",
           "description": "Generate visualization-ready legal analytics datasets",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "data_type": {
+                "type": "string",
+                "enum": [
+                  "court_distribution",
+                  "case_timeline",
+                  "citation_network",
+                  "judge_statistics"
+                ]
+              },
+              "opinion_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "depth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "start_date": {
+                "type": "string"
+              },
+              "end_date": {
+                "type": "string"
+              },
+              "court_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "data_type"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Visualization Data"
+          },
+          "title": "Get Visualization Data",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Visualization Data",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_bulk_data",
           "description": "Provide guidance and samples for CourtListener bulk data access",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "data_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sample_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              }
+            },
+            "required": [
+              "data_type"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Bulk Data"
+          },
+          "title": "Get Bulk Data",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Bulk Data",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_bankruptcy_data",
           "description": "Retrieve bankruptcy-related docket data with contextual insights",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
+              "court": {
+                "type": "string"
+              },
+              "case_name": {
+                "type": "string"
+              },
+              "docket_number": {
+                "type": "string"
+              },
+              "date_filed_after": {
+                "type": "string"
+              },
+              "date_filed_before": {
+                "type": "string"
+              },
+              "page": {
+                "default": 1,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "page_size": {
+                "default": 20,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Bankruptcy Data"
+          },
+          "title": "Get Bankruptcy Data",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Bankruptcy Data",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_comprehensive_judge_profile",
           "description": "Get complete judicial profile including positions, education, political affiliations, ABA ratings, and financial disclosures. ⚡ Moderate API cost.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
-              },
-              "data": {
-                "type": "object"
-              },
-              "metadata": {
-                "type": "object"
+              "judge_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
               }
             },
             "required": [
-              "success",
-              "data"
+              "judge_id"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Comprehensive Judge Profile"
+          },
+          "title": "Get Comprehensive Judge Profile",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Comprehensive Judge Profile",
+              "category": "analysis",
+              "complexity": "advanced",
+              "async": true,
+              "costHint": "high",
+              "rateLimitWeight": 4
+            }
           }
         },
         {
           "name": "get_comprehensive_case_analysis",
           "description": "Get complete case analysis including docket entries, parties, attorneys, and tags for full case intelligence. ⚡ Moderate API cost.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
-              },
-              "data": {
-                "type": "object"
-              },
-              "metadata": {
-                "type": "object"
+              "cluster_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
               }
             },
             "required": [
-              "success",
-              "data"
+              "cluster_id"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Comprehensive Case Analysis"
+          },
+          "title": "Get Comprehensive Case Analysis",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Comprehensive Case Analysis",
+              "category": "analysis",
+              "complexity": "advanced",
+              "async": true,
+              "costHint": "high",
+              "rateLimitWeight": 4
+            }
           }
         },
         {
           "name": "get_financial_disclosure_details",
           "description": "Get detailed financial disclosure information including investments, debts, gifts, and income sources",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
+              "disclosure_type": {
+                "type": "string",
+                "enum": [
+                  "investments",
+                  "debts",
+                  "gifts",
+                  "agreements",
+                  "positions",
+                  "reimbursements",
+                  "spouse_incomes",
+                  "non_investment_incomes"
+                ]
               },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
+              "judge": {
+                "anyOf": [
+                  {
+                    "type": "string"
                   },
-                  "count": {
+                  {
                     "type": "number"
                   }
-                }
+                ]
               },
-              "metadata": {
-                "type": "object"
+              "year": {
+                "type": "integer",
+                "minimum": 1900,
+                "maximum": 2026
+              },
+              "page": {
+                "default": 1,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "page_size": {
+                "default": 20,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
               }
             },
             "required": [
-              "success",
-              "data"
-            ]
+              "disclosure_type"
+            ],
+            "additionalProperties": {}
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Financial Disclosure Details"
+          },
+          "title": "Get Financial Disclosure Details",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Financial Disclosure Details",
+              "category": "details",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "medium",
+              "rateLimitWeight": 2
+            }
           }
         },
         {
           "name": "validate_citations",
           "description": "Validate and parse citations from text to prevent AI hallucinations and ensure accurate legal references",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
-              },
-              "data": {
-                "type": "object",
-                "properties": {
-                  "results": {
-                    "type": "array"
-                  },
-                  "count": {
-                    "type": "number"
-                  }
-                }
-              },
-              "metadata": {
-                "type": "object"
+              "text": {
+                "type": "string",
+                "minLength": 1
               }
             },
             "required": [
-              "success",
-              "data"
+              "text"
             ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Validate Citations"
+          },
+          "title": "Validate Citations",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Validate Citations",
+              "category": "reference",
+              "complexity": "simple",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         },
         {
           "name": "get_enhanced_recap_data",
           "description": "Access advanced RECAP/PACER features including document fetching and email notifications",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
-          },
-          "outputSchema": {
-            "type": "object",
-            "properties": {
-              "success": {
-                "type": "boolean"
-              },
-              "data": {
-                "type": "object"
-              },
-              "metadata": {
-                "type": "object"
+              "action": {
+                "type": "string",
+                "enum": [
+                  "fetch",
+                  "query",
+                  "email"
+                ]
               }
             },
             "required": [
-              "success",
-              "data"
-            ]
+              "action"
+            ],
+            "additionalProperties": {}
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Get Enhanced Recap Data"
+          },
+          "title": "Get Enhanced Recap Data",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Get Enhanced Recap Data",
+              "category": "details",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "medium",
+              "rateLimitWeight": 2
+            }
           }
         },
         {
           "name": "smart_search",
           "description": "Intelligently search for cases using natural language. Uses an LLM to optimize search parameters.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "$schema": "http://json-schema.org/draft-07/schema#"
-            }
+              "query": {
+                "type": "string",
+                "description": "Natural language query describing what you are looking for"
+              },
+              "max_results": {
+                "default": 5,
+                "description": "Maximum number of results to return",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20
+              }
+            },
+            "required": [
+              "query"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
-            "openWorldHint": true
+            "openWorldHint": true,
+            "title": "Smart Search"
+          },
+          "title": "Smart Search",
+          "execution": {
+            "taskSupport": "optional"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Smart Search",
+              "category": "uncategorized",
+              "complexity": "intermediate",
+              "async": true,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
+          }
+        },
+        {
+          "name": "mcp_async_get_job",
+          "title": "Async Job Status",
+          "description": "Get async job status by job ID",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string",
+                "description": "Async job ID returned by async tool execution"
+              }
+            },
+            "required": [
+              "jobId"
+            ]
+          },
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Async Job Status",
+              "category": "async-control",
+              "complexity": "simple",
+              "async": false,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
+          }
+        },
+        {
+          "name": "mcp_async_get_job_result",
+          "title": "Async Job Result",
+          "description": "Get async job result payload by job ID",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string",
+                "description": "Async job ID returned by async tool execution"
+              }
+            },
+            "required": [
+              "jobId"
+            ]
+          },
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Async Job Result",
+              "category": "async-control",
+              "complexity": "simple",
+              "async": false,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
+          }
+        },
+        {
+          "name": "mcp_async_cancel_job",
+          "title": "Async Job Cancel",
+          "description": "Cancel async job execution by job ID",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string",
+                "description": "Async job ID returned by async tool execution"
+              }
+            },
+            "required": [
+              "jobId"
+            ]
+          },
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "_meta": {
+            "courtlistener/ux": {
+              "title": "Async Job Cancel",
+              "category": "async-control",
+              "complexity": "simple",
+              "async": false,
+              "costHint": "low",
+              "rateLimitWeight": 1
+            }
           }
         }
       ],
@@ -797,73 +1982,272 @@
           "uri": "courtlistener://opinion/123456",
           "name": "Example Opinion 123456",
           "description": "Example of a legal opinion resource",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Example Opinion 123456",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "opinion"
+              ],
+              "examples": [
+                "courtlistener://opinion/123456"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://opinion/{id}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://schema/opinion",
           "name": "Opinion Schema",
           "description": "Schema for opinion data structure",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Opinion Schema",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/opinion"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://schema/{type}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://schema/docket",
           "name": "Docket Schema",
           "description": "Schema for docket data structure",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Docket Schema",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/docket"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://schema/{type}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://schema/court",
           "name": "Court Schema",
           "description": "Schema for court data structure",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Court Schema",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/court"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://schema/{type}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://schema/judge",
           "name": "Judge Schema",
           "description": "Schema for judge data structure",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Judge Schema",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/judge"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://schema/{type}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://schema/search-params",
           "name": "Search-params Schema",
           "description": "Schema for search-params data structure",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Search-params Schema",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/search-params"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://schema/{type}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://case/123456",
           "name": "Example Case 123456",
           "description": "Example of a case/opinion cluster resource",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Example Case 123456",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "case"
+              ],
+              "examples": [
+                "courtlistener://case/123456"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://case/{id}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://docket/123456",
           "name": "Example Docket 123456",
           "description": "Example of a docket resource",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Example Docket 123456",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "docket"
+              ],
+              "examples": [
+                "courtlistener://docket/123456"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://docket/{id}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://court/scotus",
           "name": "Example Court (SCOTUS)",
           "description": "Example of a court resource",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Example Court (SCOTUS)",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "court"
+              ],
+              "examples": [
+                "courtlistener://court/scotus"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://court/{id}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://judge/123456",
           "name": "Example Judge 123456",
           "description": "Example of a judge resource",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Example Judge 123456",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "judge"
+              ],
+              "examples": [
+                "courtlistener://judge/123456"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://judge/{id}",
+                "dynamic": true
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://search/recent",
           "name": "Recent Opinions",
           "description": "Dynamic listing of opinions filed in the last 7 days",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "Recent Opinions",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "recent",
+                "opinions"
+              ],
+              "examples": [
+                "courtlistener://search/recent"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://search/recent",
+                "dynamic": false
+              }
+            }
+          }
         },
         {
           "uri": "courtlistener://api/status",
           "name": "API Status",
           "description": "Check API connectivity, cache stats, and rate limit status",
-          "mimeType": "application/json"
+          "mimeType": "application/json",
+          "title": "API Status",
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "resource",
+                "api",
+                "status"
+              ],
+              "examples": [
+                "courtlistener://api/status"
+              ],
+              "descriptors": {
+                "uriTemplate": "courtlistener://api/status",
+                "dynamic": false
+              }
+            }
+          }
         }
       ]
     },
@@ -871,6 +2255,7 @@
       "prompts": [
         {
           "name": "legal_assistant",
+          "title": "Legal Assistant",
           "description": "Sets up the context for a legal research assistant with specific focus areas",
           "arguments": [
             {
@@ -883,10 +2268,35 @@
               "description": "The jurisdiction to prioritize (e.g., \"US Supreme Court\", \"California\")",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "legal",
+                "assistant",
+                "focus_area",
+                "jurisdiction"
+              ],
+              "examples": [
+                {
+                  "description": "Run legal_assistant with starter arguments",
+                  "arguments": {
+                    "focus_area": "<focus_area>",
+                    "jurisdiction": "<jurisdiction>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": []
+              }
+            }
+          }
         },
         {
           "name": "summarize-statute",
+          "title": "Summarize Statute",
           "description": "Generate a concise summary of a statute or legal provision",
           "arguments": [
             {
@@ -899,10 +2309,37 @@
               "description": "The jurisdiction (e.g., federal, state)",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "summarize",
+                "statute",
+                "statute_text",
+                "jurisdiction"
+              ],
+              "examples": [
+                {
+                  "description": "Run summarize-statute with starter arguments",
+                  "arguments": {
+                    "statute_text": "<statute_text>",
+                    "jurisdiction": "<jurisdiction>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "statute_text"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "compare-precedents",
+          "title": "Compare Precedents",
           "description": "Compare and contrast multiple legal precedents",
           "arguments": [
             {
@@ -915,10 +2352,37 @@
               "description": "Specific legal issue to focus the comparison on",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "compare",
+                "precedents",
+                "case_citations",
+                "focus_issue"
+              ],
+              "examples": [
+                {
+                  "description": "Run compare-precedents with starter arguments",
+                  "arguments": {
+                    "case_citations": "<case_citations>",
+                    "focus_issue": "<focus_issue>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "case_citations"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "analyze-case",
+          "title": "Analyze Case",
           "description": "Perform comprehensive analysis of a legal case",
           "arguments": [
             {
@@ -931,10 +2395,37 @@
               "description": "Type of analysis: holding, reasoning, impact, or full",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "analyze",
+                "case",
+                "case_citation",
+                "analysis_type"
+              ],
+              "examples": [
+                {
+                  "description": "Run analyze-case with starter arguments",
+                  "arguments": {
+                    "case_citation": "<case_citation>",
+                    "analysis_type": "<analysis_type>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "case_citation"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "draft-brief-section",
+          "title": "Draft Brief Section",
           "description": "Help draft a section of a legal brief",
           "arguments": [
             {
@@ -952,10 +2443,41 @@
               "description": "Supporting case citations",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "draft",
+                "brief",
+                "section",
+                "section_type",
+                "key_points",
+                "supporting_cases"
+              ],
+              "examples": [
+                {
+                  "description": "Run draft-brief-section with starter arguments",
+                  "arguments": {
+                    "section_type": "<section_type>",
+                    "key_points": "<key_points>",
+                    "supporting_cases": "<supporting_cases>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 3,
+                "requiredArguments": [
+                  "section_type",
+                  "key_points"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "identify-issues",
+          "title": "Identify Issues",
           "description": "Identify legal issues in a factual scenario",
           "arguments": [
             {
@@ -968,10 +2490,37 @@
               "description": "Applicable jurisdiction",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "identify",
+                "issues",
+                "fact_pattern",
+                "jurisdiction"
+              ],
+              "examples": [
+                {
+                  "description": "Run identify-issues with starter arguments",
+                  "arguments": {
+                    "fact_pattern": "<fact_pattern>",
+                    "jurisdiction": "<jurisdiction>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "fact_pattern"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "legal_research_workflow",
+          "title": "Legal Research Workflow",
           "description": "Step-by-step case research workflow guiding through searching, analyzing, and synthesizing findings",
           "arguments": [
             {
@@ -984,10 +2533,38 @@
               "description": "The jurisdiction to focus on (e.g., \"federal\", \"California\")",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "legal",
+                "research",
+                "workflow",
+                "topic",
+                "jurisdiction"
+              ],
+              "examples": [
+                {
+                  "description": "Run legal_research_workflow with starter arguments",
+                  "arguments": {
+                    "topic": "<topic>",
+                    "jurisdiction": "<jurisdiction>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "topic"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "citation_analysis",
+          "title": "Citation Analysis",
           "description": "Analyze the citation network for a case, including cited cases and citation patterns",
           "arguments": [
             {
@@ -995,10 +2572,35 @@
               "description": "The citation of the case to analyze (e.g., \"410 U.S. 113\")",
               "required": true
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "citation",
+                "analysis",
+                "case_citation"
+              ],
+              "examples": [
+                {
+                  "description": "Run citation_analysis with starter arguments",
+                  "arguments": {
+                    "case_citation": "<case_citation>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 1,
+                "requiredArguments": [
+                  "case_citation"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "jurisdiction_comparison",
+          "title": "Jurisdiction Comparison",
           "description": "Compare how different jurisdictions approach a legal issue",
           "arguments": [
             {
@@ -1011,10 +2613,38 @@
               "description": "Comma-separated list of jurisdictions to compare (e.g., \"California, New York, Texas\")",
               "required": true
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "jurisdiction",
+                "comparison",
+                "legal_issue",
+                "jurisdictions"
+              ],
+              "examples": [
+                {
+                  "description": "Run jurisdiction_comparison with starter arguments",
+                  "arguments": {
+                    "legal_issue": "<legal_issue>",
+                    "jurisdictions": "<jurisdictions>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "legal_issue",
+                  "jurisdictions"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "case_brief",
+          "title": "Case Brief",
           "description": "Generate a structured case brief from a court opinion",
           "arguments": [
             {
@@ -1022,10 +2652,35 @@
               "description": "The opinion ID to brief (CourtListener opinion ID)",
               "required": true
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "case",
+                "brief",
+                "opinion_id"
+              ],
+              "examples": [
+                {
+                  "description": "Run case_brief with starter arguments",
+                  "arguments": {
+                    "opinion_id": "<opinion_id>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 1,
+                "requiredArguments": [
+                  "opinion_id"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "motion_drafting",
+          "title": "Motion Drafting",
           "description": "Draft a motion outline supported by case law research",
           "arguments": [
             {
@@ -1038,10 +2693,37 @@
               "description": "Optional comma-separated case citations to use as supporting authority",
               "required": false
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "motion",
+                "drafting",
+                "motion_type",
+                "supporting_cases"
+              ],
+              "examples": [
+                {
+                  "description": "Run motion_drafting with starter arguments",
+                  "arguments": {
+                    "motion_type": "<motion_type>",
+                    "supporting_cases": "<supporting_cases>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 2,
+                "requiredArguments": [
+                  "motion_type"
+                ]
+              }
+            }
+          }
         },
         {
           "name": "judicial_due_diligence",
+          "title": "Judicial Due Diligence",
           "description": "Review a judge's financial disclosures, background, and ruling patterns",
           "arguments": [
             {
@@ -1049,7 +2731,32 @@
               "description": "The name of the judge to research",
               "required": true
             }
-          ]
+          ],
+          "_meta": {
+            "courtlistener/discoverability": {
+              "tags": [
+                "prompt",
+                "judicial",
+                "due",
+                "diligence",
+                "judge_name"
+              ],
+              "examples": [
+                {
+                  "description": "Run judicial_due_diligence with starter arguments",
+                  "arguments": {
+                    "judge_name": "<judge_name>"
+                  }
+                }
+              ],
+              "descriptors": {
+                "argumentCount": 1,
+                "requiredArguments": [
+                  "judge_name"
+                ]
+              }
+            }
+          }
         }
       ]
     }

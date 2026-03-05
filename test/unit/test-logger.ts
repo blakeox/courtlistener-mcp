@@ -111,6 +111,44 @@ describe('Logger (TypeScript)', () => {
     });
   });
 
+  describe('Secret Redaction', () => {
+    it('should redact sensitive metadata fields', () => {
+      const secret = 'super-secret-token';
+      logger.info('Sensitive metadata test', {
+        token: secret,
+        authorization: `Bearer ${secret}`,
+        regularField: 'safe-value',
+      });
+
+      const lastLog = logOutput[logOutput.length - 1];
+      const entry = JSON.parse(String(lastLog.args[0])) as {
+        metadata?: Record<string, unknown>;
+      };
+
+      assert.strictEqual(entry.metadata?.token, '[REDACTED]');
+      assert.strictEqual(entry.metadata?.authorization, '[REDACTED]');
+      assert.strictEqual(entry.metadata?.regularField, 'safe-value');
+      assert.strictEqual(String(lastLog.args[0]).includes(secret), false);
+    });
+
+    it('should redact bearer secrets from logged errors', () => {
+      const secret = 'error-secret-token';
+      const error = new Error(`Bearer ${secret}`);
+      error.stack = `Error: Bearer ${secret}\n at test`;
+
+      logger.error('Secret error test', error);
+
+      const lastLog = logOutput[logOutput.length - 1];
+      const entry = JSON.parse(String(lastLog.args[0])) as {
+        error?: { message?: string; stack?: string };
+      };
+
+      assert.strictEqual(entry.error?.message, 'Bearer [REDACTED]');
+      assert.ok(entry.error?.stack?.includes('Bearer [REDACTED]'));
+      assert.strictEqual(String(lastLog.args[0]).includes(secret), false);
+    });
+  });
+
   describe('Log Levels', () => {
     it('should respect debug level configuration', () => {
       const debugLogger = new LoggerClass(
@@ -370,4 +408,3 @@ describe('Logger (TypeScript)', () => {
     });
   });
 });
-

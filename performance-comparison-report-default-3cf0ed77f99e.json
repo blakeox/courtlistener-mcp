@@ -1,0 +1,112 @@
+{
+  "timestamp": "2026-03-04T18:01:40.508Z",
+  "artifactLabels": {
+    "commitSha": "3cf0ed77f99e",
+    "runtimeMode": "default"
+  },
+  "baselineFile": "performance-data/load-profile-baseline.json",
+  "currentFile": "performance-data/load-profile-current.json",
+  "comparison": {
+    "improved": [
+      {
+        "metric": "throughput",
+        "baseline": 4500,
+        "current": 4800,
+        "difference": 300,
+        "percentChange": 6.7
+      }
+    ],
+    "degraded": [],
+    "unchanged": [],
+    "summary": {
+      "throughput": {
+        "metric": "throughput",
+        "baseline": 4500,
+        "current": 4800,
+        "difference": 300,
+        "percentChange": 6.7
+      }
+    }
+  },
+  "endpointClassComparison": {
+    "baseline": {
+      "mcp": {
+        "p95": 1.5,
+        "throughput": 3200,
+        "errorRate": 100
+      },
+      "api": {
+        "p95": 1,
+        "throughput": 6000,
+        "errorRate": 100
+      },
+      "auth": {
+        "p95": 1,
+        "throughput": 8000,
+        "errorRate": 100
+      }
+    },
+    "current": {
+      "mcp": {
+        "p95": 1.5,
+        "throughput": 4200,
+        "errorRate": 100
+      },
+      "api": {
+        "p95": 1,
+        "throughput": 6000,
+        "errorRate": 100
+      },
+      "auth": {
+        "p95": 1,
+        "throughput": 6000,
+        "errorRate": 100
+      }
+    },
+    "thresholds": {
+      "mcp": {
+        "p95": {
+          "warnPct": 12,
+          "failPct": 25
+        },
+        "throughput": {
+          "warnPct": 10,
+          "failPct": 20
+        },
+        "errorRate": {
+          "warnAbs": 0.5,
+          "failAbs": 1
+        }
+      },
+      "api": {
+        "p95": {
+          "warnPct": 15,
+          "failPct": 30
+        },
+        "throughput": {
+          "warnPct": 12,
+          "failPct": 25
+        },
+        "errorRate": {
+          "warnAbs": 1,
+          "failAbs": 2
+        }
+      },
+      "auth": {
+        "p95": {
+          "warnPct": 20,
+          "failPct": 35
+        },
+        "throughput": {
+          "warnPct": 15,
+          "failPct": 30
+        },
+        "errorRate": {
+          "warnAbs": 1.5,
+          "failAbs": 3
+        }
+      }
+    }
+  },
+  "success": true
+}

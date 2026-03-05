@@ -10,4 +10,5 @@ export * from './logger.js';
 export * from './metrics.js';
 export * from './container.js';
 export * from './api-client-factory.js';
+export * from './protocol-governance.js';
 export * from './storage/index.js';
