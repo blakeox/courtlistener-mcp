@@ -1,19 +1,13 @@
 import React from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Shell, AuthRequired } from './components/Shell';
+import { Shell } from './components/Shell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-import { SignupPage } from './pages/SignupPage';
-import { LoginPage } from './pages/LoginPage';
-import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { OnboardingPage } from './pages/OnboardingPage';
-import { KeysPage } from './pages/KeysPage';
 import { PlaygroundPage } from './pages/PlaygroundPage';
 import { AccountPage } from './pages/AccountPage';
 import { useAuth } from './lib/auth';
-import { listKeys } from './lib/api';
-import { keysQueryKey } from './lib/query-keys';
 import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
 import { verifyMcpRuntimeReadiness } from './lib/mcp-runtime-readiness';
@@ -42,21 +36,13 @@ function AppContent(): React.JSX.Element {
   const { token } = useToken();
   const location = useLocation();
 
-  const keysQuery = useQuery({
-    queryKey: keysQueryKey,
-    queryFn: () => listKeys(),
-    enabled: Boolean(session?.authenticated),
-  });
-
-  const hasAccount = Boolean(session?.user?.id) || Boolean(localStorage.getItem('clmcp_signup_started_at'));
   const hasVerifiedAndLoggedIn = Boolean(session?.authenticated);
-  const hasKey = (keysQuery.data?.keys.length ?? 0) > 0;
   const hasToken = Boolean(token.trim());
   const expectedProtocolVersion = '2025-06-18';
   const mcpReadinessQuery = useQuery({
     queryKey: ['mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
-    enabled: hasVerifiedAndLoggedIn && hasKey && hasToken,
+    enabled: hasToken,
     retry: false,
   });
   const hasProtocolMismatch = Boolean(
@@ -67,26 +53,24 @@ function AppContent(): React.JSX.Element {
   const isPath = (paths: string[]): boolean => paths.includes(location.pathname);
 
   const steps = [
-    { label: 'Session setup', complete: hasAccount, active: isPath(['/app/signup']), to: '/app/signup' },
     {
-      label: 'Session auth',
+      label: 'Operator session',
       complete: hasVerifiedAndLoggedIn,
-      active: isPath(['/app/login', '/app/reset-password']),
-      to: '/app/login',
+      active: isPath(['/app/account']),
+      to: '/app/account',
     },
     {
-      label: 'MCP key ready',
-      complete: hasKey,
-      active: isPath(['/app/keys']),
-      to: '/app/keys',
-      disabled: !hasVerifiedAndLoggedIn,
+      label: 'Local MCP credential loaded',
+      complete: hasToken,
+      active: isPath(['/app/control-center']),
+      to: '/app/control-center',
     },
     {
-      label: 'MCP protocol ready',
+      label: 'Runtime ready',
       complete: hasMcpSuccess,
       active: isPath(['/app/playground', '/app/control-center', '/app']),
       to: '/app/playground',
-      disabled: !hasKey || !hasToken,
+      disabled: !hasToken,
     },
   ];
 
@@ -97,35 +81,14 @@ function AppContent(): React.JSX.Element {
           <Routes>
             <Route path="/app" element={<Navigate to="/app/control-center" replace />} />
             <Route path="/app/control-center" element={<OnboardingPage />} />
-            <Route path="/app/signup" element={<SignupPage />} />
-            <Route path="/app/login" element={<LoginPage />} />
-            <Route path="/app/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/app/signup" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/login" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/reset-password" element={<Navigate to="/app/control-center" replace />} />
             <Route path="/app/onboarding" element={<Navigate to="/app/control-center" replace />} />
-            <Route
-              path="/app/keys"
-              element={
-                <AuthRequired>
-                  <KeysPage />
-                </AuthRequired>
-              }
-            />
-            <Route
-              path="/app/playground"
-              element={
-                <AuthRequired>
-                  <PlaygroundPage />
-                </AuthRequired>
-              }
-            />
-            <Route
-              path="/app/account"
-              element={
-                <AuthRequired>
-                  <AccountPage />
-                </AuthRequired>
-              }
-            />
-            <Route path="*" element={<SmartRedirect hasAccount={hasAccount} hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasKey={hasKey} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />} />
+            <Route path="/app/keys" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/playground" element={<PlaygroundPage />} />
+            <Route path="/app/account" element={<AccountPage />} />
+            <Route path="*" element={<SmartRedirect hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasToken={hasToken} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />} />
           </Routes>
         </React.Suspense>
       </ErrorBoundary>
@@ -133,12 +96,11 @@ function AppContent(): React.JSX.Element {
   );
 }
 
-function SmartRedirect(props: { hasAccount: boolean; hasVerifiedAndLoggedIn: boolean; hasKey: boolean; hasMcpSuccess: boolean; hasProtocolMismatch: boolean }): React.JSX.Element {
-  let target = '/app/signup';
+function SmartRedirect(props: { hasVerifiedAndLoggedIn: boolean; hasToken: boolean; hasMcpSuccess: boolean; hasProtocolMismatch: boolean }): React.JSX.Element {
+  let target = '/app/control-center';
   if (props.hasMcpSuccess) target = '/app/control-center';
   else if (props.hasProtocolMismatch) target = '/app/control-center';
-  else if (props.hasKey) target = '/app/playground';
-  else if (props.hasVerifiedAndLoggedIn) target = '/app/keys';
-  else if (props.hasAccount) target = '/app/login';
+  else if (props.hasToken) target = '/app/playground';
+  else if (props.hasVerifiedAndLoggedIn) target = '/app/account';
   return <Navigate to={target} replace />;
 }

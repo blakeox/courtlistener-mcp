@@ -195,9 +195,6 @@ describe('HTTP Transport Server auth parity', () => {
     'OIDC_AUDIENCE',
     'OIDC_JWKS_URL',
     'OIDC_REQUIRED_SCOPE',
-    'SUPABASE_URL',
-    'SUPABASE_SECRET_KEY',
-    'SUPABASE_API_KEYS_TABLE',
   ];
   const previousEnv = new Map<string, string | undefined>();
 

@@ -8,7 +8,7 @@ It exposes legal research tools over MCP (`stdio` and HTTP), with deployment-rea
 - MCP server built on `@modelcontextprotocol/sdk`
 - 33 legal research tools backed by CourtListener API v4
 - Local runtime (`stdio`) and remote runtime (HTTP/Cloudflare Worker)
-- Optional auth layers: static bearer token, Supabase API-key auth, OIDC JWT
+- OAuth-protected MCP transport via Cloudflare Workers OAuth Provider
 - Built-in health checks and metrics endpoints for operations
 - Prebuilt MCP client config examples in [`configs/`](./configs)
 
@@ -197,36 +197,38 @@ Endpoints after deploy:
 
 ## Authentication Modes
 
+### Cloudflare OAuth (default)
+
+Cloudflare OAuth is now the primary and only supported hosted auth path for MCP routes.
+
+- OAuth endpoints:
+  - `GET/POST /authorize`
+  - `POST /token`
+  - `POST /register`
+- Discovery endpoints:
+  - `GET /.well-known/oauth-authorization-server`
+  - `GET /.well-known/oauth-protected-resource`
+- `/authorize` resolves identity from:
+  - Signed UI session (`clmcp_ui`) when present
+  - Cloudflare Access identity headers (`cf-access-authenticated-user-id` or `cf-access-authenticated-user-email`)
+  - `MCP_OAUTH_DEV_USER_ID` only when `MCP_ALLOW_DEV_FALLBACK=true` (development fallback only)
+  - If unresolved and `MCP_AUTH_UI_ORIGIN` is set, `/authorize` redirects to `${MCP_AUTH_UI_ORIGIN}/auth/start?return_to=<authorize_url>`
+- Browser-session bootstrap:
+  - `POST /api/session/bootstrap` with a valid short-lived Clerk/OIDC bearer token minted by the external auth UI
+  - Sets secure `clmcp_ui` cookie used by `/authorize`
+  - Route-level rate limit controls:
+    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
+    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
+    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS`
+- Usage dashboard endpoint:
+  - `GET /api/usage` returns per-user counters (`totalRequests`, `dailyRequests`, `byRoute`, `lastSeenAt`)
+
 ### Static bearer token
 
 Set `MCP_AUTH_TOKEN` secret. Clients send:
 
 ```text
 Authorization: Bearer <token>
-```
-
-### Supabase API-key auth
-
-Set:
-
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY`
-- `SUPABASE_API_KEYS_TABLE` (optional)
-- `MCP_UI_PUBLIC_ORIGIN` (optional)
-- `MCP_UI_INSECURE_COOKIES` (optional, local HTTP only)
-
-Schema files:
-
-- [`docs/supabase/mcp-auth-schema.sql`](./docs/supabase/mcp-auth-schema.sql)
-- [`docs/supabase/mcp-audit-logs.sql`](./docs/supabase/mcp-audit-logs.sql)
-
-Key management CLI:
-
-```bash
-pnpm run mcp:key:create -- --user-id <auth_user_uuid> --label "prod-key" --expires-days 90
-pnpm run mcp:key:list -- --active-only true --limit 100
-pnpm run mcp:key:revoke -- --key-id <mcp_key_uuid>
 ```
 
 ### OIDC JWT auth
@@ -238,25 +240,18 @@ Set:
 - `OIDC_JWKS_URL` (optional)
 - `OIDC_REQUIRED_SCOPE` (optional)
 
-### Supabase OAuth Server consent UI
+Use this for direct bearer-token validation paths and for hosted auth bootstrap verification inside the worker when using Clerk as the external auth UI. The worker expects a direct Clerk/OIDC JWT bearer token posted to `/api/session/bootstrap`.
 
-If Supabase OAuth Server is enabled for your project, configure:
+### Removed Legacy UI/Auth Endpoints
 
-- **Site URL**: your deployed app origin (for example `https://courtlistenermcp.blakeoxford.com`)
-- **Authorization Path**: `/oauth/consent`
+The following legacy UI endpoints are disabled in the hard cutover and return `410`:
 
-This repository now implements `GET/POST /oauth/consent` in the Cloudflare Worker:
-
-- renders a first-party consent page for third-party OAuth apps
-- supports approve/deny actions
-- redirects back to the OAuth client via Supabase authorization redirects
-
-Hosted OAuth entry points are also exposed on the Worker:
-
-- `GET/POST /authorize` (forwards authorization requests to Supabase Auth)
-- `POST /token` (forwards token exchange requests to Supabase Auth)
-- `GET /.well-known/oauth-authorization-server` (OAuth metadata for discovery)
-- `GET /.well-known/oauth-protected-resource` (OAuth protected resource metadata)
+- `/api/login*`
+- `/api/logout*`
+- `/api/signup*`
+- `/api/password*`
+- `/api/keys*`
+- `/oauth/consent`
 
 Canonical hosted OAuth contract values (paths, grants, response types, scopes, PKCE methods, priority clients) live in `src/auth/oauth-contract.ts`.
 

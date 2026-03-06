@@ -167,7 +167,7 @@ function baseShell(
     <main>
       <section class="hero">
         <h1>CourtListener MCP Access Portal</h1>
-        <p>Issue and manage Supabase-backed API keys for the MCP endpoint. Keep your bearer token private and rotate keys regularly.</p>
+        <p>Use Cloudflare OAuth to issue and manage MCP bearer access for the endpoint. Keep your bearer token private and rotate credentials regularly.</p>
         <nav class="nav">
           ${nav
             .map(

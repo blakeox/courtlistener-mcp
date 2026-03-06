@@ -432,13 +432,12 @@ export function getStartupDiagnostics() {
         errors: [redactSecretsInText(error instanceof Error ? error.message : String(error))],
         warnings: [] as string[],
         authPolicy: {
-          precedence: ['oauth', 'serviceToken', 'supabase', 'oidc', 'staticToken'],
+          precedence: ['oauth', 'serviceToken', 'oidc', 'staticToken'],
           configured: {
             oauth: process.env.OAUTH_ENABLED === 'true',
             apiKeyAuth: process.env.AUTH_ENABLED === 'true',
             serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
             oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
-            supabase: Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SECRET_KEY?.trim()),
             staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           },
           requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,
@@ -453,13 +452,12 @@ export function getStartupDiagnostics() {
         gatewayTokenConfigured: Boolean(process.env.MCP_AUTH_TOKEN),
       },
       authPolicy: {
-        precedence: ['oauth', 'serviceToken', 'supabase', 'oidc', 'staticToken'],
+        precedence: ['oauth', 'serviceToken', 'oidc', 'staticToken'],
         configured: {
           oauth: process.env.OAUTH_ENABLED === 'true',
           apiKeyAuth: process.env.AUTH_ENABLED === 'true',
           serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
-          supabase: Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SECRET_KEY?.trim()),
           staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
         },
         requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,

@@ -21,7 +21,7 @@
 | MCP protocol header validation | Optional strict validation via `MCP_REQUIRE_PROTOCOL_VERSION` | Header passed through transport; no dedicated strict gate | Intentional difference (SDK transport-managed locally) |
 | Session lifecycle invalid-session contract | **Now aligned** via shared invalid-session JSON-RPC payload helper and Worker session lifecycle boundary checks | Shared helper reused by local Streamable HTTP transport invalid session branch | Improved cross-runtime session parity |
 | Worker session ownership topology | **Now explicit (v2)** deterministic shard mapping `hash(sessionId) % shardCount` with DO-backed idle/absolute TTL eviction | N/A (local Node runtime uses in-process session map with capacity limits) | Runtime-specific, but contract-compatible session errors |
-| Auth mode selection | Static / OIDC / Supabase via worker-security selection logic | OAuth router + bearer verification (when enabled) | Different mechanisms by runtime design |
+| Auth mode selection | Static / OIDC via worker-security selection logic | OAuth router + bearer verification (when enabled) | Different mechanisms by runtime design |
 | UI auth/session flows | Full session cookie, CSRF, consent UI, rate limits in worker | Not present in local HTTP transport | Expected divergence (worker-hosted UI path) |
 | Config source | Worker env bindings bridged into `process.env` | Direct `process.env` | Equivalent config path after bootstrap |
 | Startup validation | Route-level config checks, some runtime guards | `getConfig()` + server setup checks | Additional fail-fast hardening can be expanded |

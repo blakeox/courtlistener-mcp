@@ -762,7 +762,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       return null;
     }
     if (!token.trim()) {
-      operatorStatus.setError('Set a bearer token first.');
+      operatorStatus.setError('Load a local MCP credential first.');
       return null;
     }
     const nextId = rpcId;
@@ -867,7 +867,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       return;
     }
     if (!token.trim()) {
-      operatorStatus.setError('Set a bearer token first.');
+      operatorStatus.setError('Load a local MCP credential first.');
       return;
     }
     operatorStatus.setInfo(`Retrying ${replay.toolName} as a new async job...`);
@@ -928,7 +928,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
   async function connect(): Promise<void> {
     if (!token.trim()) {
-      connectStatus.setError('Set a bearer token first (API Keys page).');
+      connectStatus.setError('Load a local MCP credential first (Operator Session page).');
       return;
     }
     setConnecting(true);
@@ -2029,19 +2029,19 @@ function PlaygroundContent(): React.JSX.Element {
         <Card title="Recovery status" subtitle="Recovery UX carries recent auth/playground errors across pages for guided follow-up.">
           <StatusBanner message={carriedStatus.message} type={carriedStatus.type} />
           <div className="row">
-            <Link to="/app/login" className="btn secondary">Review auth recovery</Link>
-            <Link to="/app/keys" className="text-link">Check API key status</Link>
+            <Link to="/app/account" className="btn secondary">Review session status</Link>
+            <Link to="/app/control-center" className="text-link">Open control center</Link>
           </div>
         </Card>
       ) : null}
 
       {tokenMissing && (
-        <StatusBanner role="alert" message="No bearer token set. Go to API Keys to create and save a token first." type="error" />
+        <StatusBanner role="alert" message="No local MCP credential set. Open Operator Session to load one for direct probes." type="error" />
       )}
 
       <Card title="Quick workflow" subtitle="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging.">
         <div className="row">
-          <Link to="/app/keys" className="btn secondary">1) Set token</Link>
+          <Link to="/app/account" className="btn secondary">1) Set token</Link>
           <Button variant="secondary" onClick={() => setActiveTab('ai')}>2) AI Chat</Button>
           <Button variant="secondary" onClick={() => setActiveTab('compare')}>3) Compare</Button>
           <Button variant="secondary" onClick={() => setActiveTab('raw')}>4) Raw Console</Button>

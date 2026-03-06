@@ -11,16 +11,16 @@
    - `pnpm run cloudflare:check`
 4. Confirm required secrets:
    - `COURTLISTENER_API_KEY`
-   - At least one auth mode (`MCP_AUTH_TOKEN` or `OIDC_ISSUER` or Supabase server auth pair)
+   - At least one auth mode (`MCP_AUTH_TOKEN` or `OIDC_ISSUER`)
 5. Confirm runtime parity inputs:
    - `MCP_ALLOWED_ORIGINS` aligned with expected browser clients
-   - session secret source available (`MCP_UI_SESSION_SECRET` or `SUPABASE_PUBLISHABLE_KEY`)
+   - session secret configured (`MCP_UI_SESSION_SECRET`)
 
 ## Post-deploy verification
 1. `GET /health` returns success.
 2. MCP initialize succeeds on `/mcp`.
 3. CORS check from expected origin succeeds.
-4. Authentication path expected for current mode (static/OIDC/Supabase).
+4. Authentication path expected for current mode (static/OIDC).
 
 ## Canary promotion criteria (protocol/runtime)
 1. Keep first rollout to a canary slice and observe for at least 10 minutes.

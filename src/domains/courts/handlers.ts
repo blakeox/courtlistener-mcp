@@ -51,6 +51,26 @@ const getJudgeSchema = z.object({
   judge_id: z.union([z.string(), z.number()]).transform(String),
 });
 
+function buildJudgeQueryParams(input: z.infer<typeof getJudgesSchema>): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+
+  if (input.court) params.court = input.court;
+  if (input.active !== undefined) params.active = input.active;
+
+  const normalizedName = input.name?.trim();
+  if (normalizedName) {
+    const parts = normalizedName.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) {
+      params.name_last = parts[0];
+    } else {
+      params.name_first = parts.slice(0, -1).join(' ');
+      params.name_last = parts[parts.length - 1];
+    }
+  }
+
+  return params;
+}
+
 /**
  * Handler for listing courts
  */
@@ -112,8 +132,13 @@ export class GetJudgesHandler extends TypedToolHandler<typeof getJudgesSchema> {
     const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
     const page = input.cursor ? Math.floor(offset / resolvedLimit) + 1 : input.page;
     const pageSize = input.cursor ? resolvedLimit : input.page_size;
+    const queryParams = buildJudgeQueryParams(input);
 
-    const response = await this.apiClient.getJudges({ ...input, page, page_size: pageSize });
+    const response = await this.apiClient.getJudges({
+      ...queryParams,
+      page,
+      page_size: pageSize,
+    });
 
     return this.success({
       summary: `Retrieved ${response.results?.length || 0} judges`,

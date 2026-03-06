@@ -9,13 +9,12 @@ describe('edge-auth-decision-engine', () => {
       requestedPrimary: null,
       allowStaticFallback: false,
       serviceTokenConfigured: false,
-      supabaseConfigured: true,
       oidcConfigured: true,
       staticTokenConfigured: true,
     });
 
-    assert.equal(decision.effectivePrimary, 'supabase');
-    assert.deepEqual(decision.attempts, ['supabase']);
+    assert.equal(decision.effectivePrimary, 'oidc');
+    assert.deepEqual(decision.attempts, ['oidc']);
   });
 
   it('normalizes oauth alias to oidc', () => {
@@ -23,7 +22,6 @@ describe('edge-auth-decision-engine', () => {
       requestedPrimary: 'oauth',
       allowStaticFallback: false,
       serviceTokenConfigured: false,
-      supabaseConfigured: false,
       oidcConfigured: true,
       staticTokenConfigured: true,
     });
@@ -34,27 +32,25 @@ describe('edge-auth-decision-engine', () => {
 
   it('always keeps service token evaluation ahead of primary auth', () => {
     const decision = buildEdgeAuthDecisionEngine({
-      requestedPrimary: 'supabase',
+      requestedPrimary: 'static',
       allowStaticFallback: false,
       serviceTokenConfigured: true,
-      supabaseConfigured: true,
       oidcConfigured: false,
       staticTokenConfigured: true,
     });
 
-    assert.deepEqual(decision.attempts, ['serviceToken', 'supabase']);
+    assert.deepEqual(decision.attempts, ['serviceToken', 'static']);
   });
 
   it('adds static auth as explicit fallback only when enabled', () => {
     const decision = buildEdgeAuthDecisionEngine({
-      requestedPrimary: 'supabase',
+      requestedPrimary: 'oidc',
       allowStaticFallback: true,
       serviceTokenConfigured: false,
-      supabaseConfigured: true,
-      oidcConfigured: false,
+      oidcConfigured: true,
       staticTokenConfigured: true,
     });
 
-    assert.deepEqual(decision.attempts, ['supabase', 'static']);
+    assert.deepEqual(decision.attempts, ['oidc', 'static']);
   });
 });

@@ -11,6 +11,7 @@ export function buildMcpCorsHeaders(origin: string | null, allowedOrigins: strin
     'Access-Control-Allow-Methods': MCP_CORS_ALLOWED_METHODS,
     'Access-Control-Allow-Headers': MCP_CORS_ALLOWED_HEADERS,
     'Access-Control-Expose-Headers': MCP_CORS_EXPOSE_HEADERS,
+    'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',
   });
 

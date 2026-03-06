@@ -113,7 +113,7 @@ export function KeysPage(): React.JSX.Element {
   return (
     <div className="stack">
       <div className="two-col">
-        <Card title="Bearer token" subtitle="Your token is managed globally. Promote a new key when you are ready.">
+        <Card title="Local MCP credential" subtitle="This browser-scoped credential is optional and only used for direct operator probes.">
           <dl className="dl-grid">
             <dt>Token status</dt>
             <dd>{token ? '✓ Set' : '✗ Not set'}</dd>
@@ -275,7 +275,7 @@ export function KeysPage(): React.JSX.Element {
         }}
       >
         <p>
-          Your new key was created successfully. Promote it to become the active bearer token for this browser session.
+          Your new key was created successfully. Promote it to become the active local MCP credential for this browser session.
         </p>
         <div className="row">
           <Button

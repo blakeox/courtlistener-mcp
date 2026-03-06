@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
+import { decodeProtectedHeader, importJWK, JWTPayload, jwtVerify, type JWK } from 'jose';
 
 type Fetcher = typeof fetch;
 
@@ -20,7 +20,26 @@ export interface OAuthConfig {
  */
 export interface OAuthDeps {
   jwtVerify?: typeof jwtVerify;
-  createRemoteJWKSet?: typeof createRemoteJWKSet;
+  importJWK?: typeof importJWK;
+}
+
+interface JsonWebKeySetLike {
+  keys: Array<Record<string, unknown>>;
+}
+
+async function fetchJwks(
+  jwksUri: string,
+  fetcher: Fetcher = fetch,
+): Promise<JsonWebKeySetLike> {
+  const res = await fetcher(jwksUri, { headers: { accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`JWKS fetch failed (${res.status}) for ${jwksUri}`);
+  }
+  const json = (await res.json()) as Partial<JsonWebKeySetLike>;
+  if (!json || !Array.isArray(json.keys) || json.keys.length === 0) {
+    throw new Error('JWKS response missing keys');
+  }
+  return { keys: json.keys };
 }
 
 async function getJwksUri(
@@ -57,11 +76,21 @@ export async function verifyAccessToken(
   if (!cfg.issuer) throw new Error('OIDC issuer not configured');
 
   const jwksUri = await getJwksUri(cfg.issuer, cfg.jwksUrl, fetcher);
-  const _createRemoteJWKSet = deps?.createRemoteJWKSet ?? createRemoteJWKSet;
   const _jwtVerify = deps?.jwtVerify ?? jwtVerify;
-  const JWKS = _createRemoteJWKSet(new URL(jwksUri));
+  const _importJWK = deps?.importJWK ?? importJWK;
+  const jwks = await fetchJwks(jwksUri, fetcher);
+  const protectedHeader = decodeProtectedHeader(token);
+  const matchingKey = jwks.keys.find((key) => {
+    if (typeof protectedHeader.kid === 'string' && key.kid !== protectedHeader.kid) return false;
+    if (typeof protectedHeader.alg === 'string' && typeof key.alg === 'string' && key.alg !== protectedHeader.alg) return false;
+    return true;
+  });
+  if (!matchingKey) {
+    throw new Error('no applicable key found in the JSON Web Key Set');
+  }
+  const verificationKey = await _importJWK(matchingKey as JWK, typeof protectedHeader.alg === 'string' ? protectedHeader.alg : undefined);
 
-  const { payload } = await _jwtVerify(token, JWKS, {
+  const { payload } = await _jwtVerify(token, verificationKey, {
     issuer: cfg.issuer,
     ...(cfg.audience !== undefined && { audience: cfg.audience }),
   });

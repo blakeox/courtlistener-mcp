@@ -5,6 +5,7 @@ export const HOSTED_MCP_OAUTH_CONTRACT = {
     protectedResourceMetadata: '/.well-known/oauth-protected-resource',
     authorize: '/authorize',
     token: '/token',
+    register: '/register',
   },
   responseTypesSupported: ['code'],
   grantTypesSupported: ['authorization_code', 'refresh_token'],
@@ -17,11 +18,12 @@ export const HOSTED_MCP_OAUTH_DEFAULT_SCOPE =
   HOSTED_MCP_OAUTH_CONTRACT.scopesSupported.join(' ');
 
 export function buildHostedMcpAuthorizationServerMetadata(origin: string) {
-  const issuer = new URL(origin).href;
+  const issuer = origin;
   return {
     issuer,
     authorization_endpoint: `${origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.authorize}`,
     token_endpoint: `${origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`,
+    registration_endpoint: `${origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.register}`,
     response_types_supported: [...HOSTED_MCP_OAUTH_CONTRACT.responseTypesSupported],
     grant_types_supported: [...HOSTED_MCP_OAUTH_CONTRACT.grantTypesSupported],
     token_endpoint_auth_methods_supported: [
@@ -33,10 +35,21 @@ export function buildHostedMcpAuthorizationServerMetadata(origin: string) {
 }
 
 export function buildHostedMcpProtectedResourceMetadata(origin: string) {
-  const resource = new URL(origin).href;
+  const resource = new URL('/mcp', origin).href;
   return {
     resource,
-    authorization_servers: [resource],
+    authorization_servers: [origin],
+    scopes_supported: [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported],
+  };
+}
+
+export function buildHostedMcpProtectedResourceMetadataForPath(origin: string, resourcePath: string) {
+  const authorizationServer = origin;
+  const normalizedPath = resourcePath.startsWith('/') ? resourcePath : `/${resourcePath}`;
+  const resource = new URL(normalizedPath, origin).href;
+  return {
+    resource,
+    authorization_servers: [authorizationServer],
     scopes_supported: [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported],
   };
 }

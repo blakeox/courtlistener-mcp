@@ -2,8 +2,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { composeWorkerDelegatedRouteHandlers } from '../../src/server/worker-route-composition.js';
-import { runWorkerRouteHandlers } from '../../src/server/worker-route-orchestration.js';
+import {
+  composeWorkerDelegatedRouteHandlers,
+  runWorkerRouteHandlers,
+} from '../../src/server/worker-route-composition.js';
 
 describe('composeWorkerDelegatedRouteHandlers', () => {
   it('preserves delegated route priority order', async () => {
@@ -11,16 +13,8 @@ describe('composeWorkerDelegatedRouteHandlers', () => {
 
     const response = await runWorkerRouteHandlers(
       composeWorkerDelegatedRouteHandlers({
-        oauthConsent: async () => {
-          callOrder.push('oauthConsent');
-          return null;
-        },
-        auth: async () => {
-          callOrder.push('auth');
-          return null;
-        },
-        uiKeys: async () => {
-          callOrder.push('uiKeys');
+        oauth: async () => {
+          callOrder.push('oauth');
           return null;
         },
         aiUi: async () => {
@@ -38,7 +32,7 @@ describe('composeWorkerDelegatedRouteHandlers', () => {
       }),
     );
 
-    assert.deepEqual(callOrder, ['oauthConsent', 'auth', 'uiKeys', 'aiUi', 'uiShell', 'mcpGateway']);
+    assert.deepEqual(callOrder, ['oauth', 'aiUi', 'uiShell', 'mcpGateway']);
     assert.ok(response);
     assert.equal(response.status, 200);
   });
@@ -48,17 +42,9 @@ describe('composeWorkerDelegatedRouteHandlers', () => {
 
     const response = await runWorkerRouteHandlers(
       composeWorkerDelegatedRouteHandlers({
-        oauthConsent: async () => {
-          callOrder.push('oauthConsent');
-          return null;
-        },
-        auth: async () => {
-          callOrder.push('auth');
+        oauth: async () => {
+          callOrder.push('oauth');
           return new Response('auth', { status: 200 });
-        },
-        uiKeys: async () => {
-          callOrder.push('uiKeys');
-          return null;
         },
         aiUi: async () => {
           callOrder.push('aiUi');
@@ -75,7 +61,7 @@ describe('composeWorkerDelegatedRouteHandlers', () => {
       }),
     );
 
-    assert.deepEqual(callOrder, ['oauthConsent', 'auth']);
+    assert.deepEqual(callOrder, ['oauth']);
     assert.ok(response);
     assert.equal(await response.text(), 'auth');
   });

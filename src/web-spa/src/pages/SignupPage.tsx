@@ -169,7 +169,7 @@ export function SignupPage(): React.JSX.Element {
         ) : (
           <ol className="ordered">
             <li>Create account</li>
-            <li>Verify email with Supabase link</li>
+            <li>Verify email using your configured identity provider</li>
             <li>Login and create your first key</li>
             <li>Run quick MCP smoke test</li>
           </ol>

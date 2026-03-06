@@ -53,10 +53,10 @@ export function readLoginHashToken(): string {
   return accessToken;
 }
 
-/** Pre-render redirect: if current URL has a recovery hash, redirect to /app/reset-password. */
+/** Pre-render redirect: if current URL has a recovery hash, redirect to /app/control-center. */
 export function redirectRecoveryHashToResetPage(): void {
   if (!isRecoveryHash()) return;
-  if (window.location.pathname === '/app/reset-password') return;
+  if (window.location.pathname === '/app/control-center') return;
   const hashParams = parseHashParams();
   const searchParams = parseSearchParams();
   const recoverySearch = new URLSearchParams();
@@ -75,6 +75,6 @@ export function redirectRecoveryHashToResetPage(): void {
 
   const search = recoverySearch.toString();
   const hash = recoveryHash.toString();
-  const target = `/app/reset-password${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
+  const target = `/app/control-center${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
   window.location.replace(target);
 }

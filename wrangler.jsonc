@@ -3,10 +3,24 @@
   "compatibility_date": "2025-07-25",
   "main": "src/worker.ts",
   "workers_dev": false,
+  "vars": {
+    "MCP_OAUTH_BACKEND": "cloudflare",
+    "MCP_AUTH_UI_ORIGIN": "https://auth.courtlistenermcp.blakeoxford.com",
+    "MCP_ALLOW_DEV_FALLBACK": "false",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300"
+  },
   "ai": {
     "binding": "AI"
   },
-  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "56b997590e3344c98bf6875ae8b522c0"
+    }
+  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [
       {

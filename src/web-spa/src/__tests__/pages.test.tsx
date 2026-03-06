@@ -9,6 +9,14 @@ import { ToastProvider } from '../components/Toast';
 // Mock the API module to avoid real fetches
 vi.mock('../lib/api', () => ({
   getSession: vi.fn().mockResolvedValue({ authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' }),
+  getUsage: vi.fn().mockResolvedValue({
+    userId: 'u1',
+    totalRequests: 0,
+    dailyRequests: 0,
+    currentDay: '2026-03-05',
+    lastSeenAt: null,
+    byRoute: {},
+  }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   login: vi.fn().mockResolvedValue({ message: 'ok' }),
   loginByAccessToken: vi.fn().mockResolvedValue({ message: 'ok' }),
@@ -185,7 +193,7 @@ describe('OnboardingPage', () => {
     });
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('status', { name: /checking session posture/i })).toBeInTheDocument();
+    expect(screen.getByText(/checking server session/i)).toBeInTheDocument();
   });
 
   it('shows protocol explorer surfaces from live readiness metadata', async () => {
@@ -249,10 +257,10 @@ describe('OnboardingPage', () => {
     render(<OnboardingPage />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('search_cases')).toBeInTheDocument();
-      expect(screen.getByText('courtlistener://status')).toBeInTheDocument();
-      expect(screen.getByText('summarize_case')).toBeInTheDocument();
-      expect(screen.getByText(/1\/1 tools enforce required arguments/i)).toBeInTheDocument();
+      expect(screen.getByText(/catalog counts/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 tools · 1 resources · 1 prompts/i)).toBeInTheDocument();
+      expect(screen.getByText(/tool categories/i)).toBeInTheDocument();
+      expect(screen.getByText(/^search$/i)).toBeInTheDocument();
     });
   });
 
@@ -271,9 +279,9 @@ describe('OnboardingPage', () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Session recovery')).toBeInTheDocument();
+    expect(screen.getByText(/not authenticated \(token-only mode still supported\)/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /clear stored token/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /log in again/i })).toHaveAttribute('href', '/app/login');
+    expect(screen.getByRole('link', { name: /open account page/i })).toHaveAttribute('href', '/app/account');
   });
 
   it('shows protocol mismatch recovery guidance', async () => {
@@ -302,9 +310,8 @@ describe('OnboardingPage', () => {
     render(<OnboardingPage />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText(/next step: resolve protocol mismatch/i)).toBeInTheDocument();
       expect(screen.getAllByText(/protocol mismatch detected/i).length).toBeGreaterThan(0);
-      expect(screen.getByRole('button', { name: /re-check protocol/i })).toBeInTheDocument();
+      expect(screen.getByText(/blocked by protocol mismatch/i)).toBeInTheDocument();
     });
   });
 });
@@ -447,10 +454,10 @@ describe('KeysPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders "Bearer token" heading', async () => {
+  it('renders "Local MCP credential" heading', async () => {
     const { KeysPage } = await import('../pages/KeysPage');
     render(<KeysPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Bearer token')).toBeInTheDocument();
+    expect(screen.getByText('Local MCP credential')).toBeInTheDocument();
   });
 
   it('shows create key button', async () => {
@@ -597,7 +604,7 @@ describe('PlaygroundPage', () => {
   it('shows token missing warning when no token set', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/no bearer token set/i)).toBeInTheDocument();
+    expect(screen.getByText(/no local mcp credential set/i)).toBeInTheDocument();
   });
 
   it('shows carried operational recovery status across pages', async () => {
@@ -606,7 +613,7 @@ describe('PlaygroundPage', () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
     expect(screen.getByText(/auth flow was rate limited/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /review auth recovery/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /review session status/i })).toBeInTheDocument();
   });
 
   it('renders AI Chat input area with textarea and send button', async () => {

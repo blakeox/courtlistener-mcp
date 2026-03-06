@@ -5,8 +5,6 @@ import { describe, it } from 'node:test';
 import { HOSTED_MCP_OAUTH_CONTRACT, HOSTED_MCP_OAUTH_DEFAULT_SCOPE } from '../../src/auth/oauth-contract.js';
 import {
   buildHostedMcpDefaultClientAttributes,
-  buildSupabaseHostedOAuthAuthorizeUrl,
-  buildSupabaseHostedOAuthTokenUrl,
   getHostedMcpScopesSupported,
   resolveHostedMcpRequestedScopes,
 } from '../../src/auth/oauth-service.js';
@@ -32,17 +30,5 @@ describe('oauth service helpers', () => {
     assert.equal(buildHostedMcpDefaultClientAttributes('secret').token_endpoint_auth_method, 'client_secret_post');
     assert.equal(buildHostedMcpDefaultClientAttributes(undefined).token_endpoint_auth_method, 'none');
     assert.equal(buildHostedMcpDefaultClientAttributes('secret').scope, HOSTED_MCP_OAUTH_DEFAULT_SCOPE);
-  });
-
-  it('builds Supabase OAuth upstream authorize/token URLs with copied query params', () => {
-    const query = new URLSearchParams('client_id=client-1&state=abc');
-    const authorizeUrl = buildSupabaseHostedOAuthAuthorizeUrl(
-      'https://project.example.supabase.co/',
-      query,
-    );
-    const tokenUrl = buildSupabaseHostedOAuthTokenUrl('https://project.example.supabase.co/', query);
-
-    assert.equal(authorizeUrl.toString(), 'https://project.example.supabase.co/auth/v1/authorize?client_id=client-1&state=abc');
-    assert.equal(tokenUrl.toString(), 'https://project.example.supabase.co/auth/v1/token?client_id=client-1&state=abc');
   });
 });

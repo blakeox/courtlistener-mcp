@@ -66,3 +66,12 @@ export interface TelemetryEvent {
   at: string;
   meta?: Record<string, string | number | boolean | null>;
 }
+
+export interface UsageSnapshotResponse {
+  userId: string;
+  totalRequests: number;
+  dailyRequests: number;
+  currentDay: string;
+  lastSeenAt: string | null;
+  byRoute: Record<string, number>;
+}

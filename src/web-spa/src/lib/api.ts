@@ -7,6 +7,7 @@ import type {
   LoginResponse,
   PasswordResetResponse,
   SignupResponse,
+  UsageSnapshotResponse,
 } from './types';
 
 const sessionSchema = z.object({
@@ -55,6 +56,15 @@ const aiChatSchema = z.object({
   session_id: z.string(),
   ai_response: z.string(),
   mcp_result: z.unknown(),
+});
+
+const usageSnapshotSchema = z.object({
+  userId: z.string(),
+  totalRequests: z.number(),
+  dailyRequests: z.number(),
+  currentDay: z.string(),
+  lastSeenAt: z.string().nullable(),
+  byRoute: z.record(z.string(), z.number()),
 });
 
 function readCookie(name: string): string {
@@ -131,6 +141,11 @@ function withAuth(headers: HeadersInit, token?: string): HeadersInit {
 export async function getSession(): Promise<AuthSessionResponse> {
   const payload = await request<unknown>('/api/session');
   return sessionSchema.parse(payload);
+}
+
+export async function getUsage(): Promise<UsageSnapshotResponse> {
+  const payload = await request<unknown>('/api/usage');
+  return usageSnapshotSchema.parse(payload);
 }
 
 export async function signup(payload: {

@@ -39,7 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
     },
     logout: async () => {
-      await logout();
+      try {
+        await logout();
+      } catch {
+        // Cloudflare hard-cut mode may not expose a server-side logout route.
+      }
       clearToken();
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
     },

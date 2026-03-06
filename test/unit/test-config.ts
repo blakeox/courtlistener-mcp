@@ -225,26 +225,22 @@ describe('Configuration Management (TypeScript)', () => {
     it('should expose canonical auth precedence without leaking secrets', async () => {
       process.env.MCP_AUTH_TOKEN = 'static-secret-token';
       process.env.OIDC_ISSUER = 'https://issuer.example.com';
-      process.env.SUPABASE_URL = 'https://example.supabase.co';
-      process.env.SUPABASE_SECRET_KEY = 'supabase-service-secret';
 
       const { getStartupDiagnostics } = await importConfigFresh();
       const diagnostics = getStartupDiagnostics() as {
         authPolicy?: { effectivePrimary?: string; precedence?: string[] };
       };
 
-      assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, 'supabase');
+      assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, 'oidc');
       assert.deepStrictEqual(diagnostics.authPolicy?.precedence, [
         'oauth',
         'serviceToken',
-        'supabase',
         'oidc',
         'staticToken',
       ]);
 
       const serialized = JSON.stringify(diagnostics);
       assert.strictEqual(serialized.includes('static-secret-token'), false);
-      assert.strictEqual(serialized.includes('supabase-service-secret'), false);
     });
 
     it('should fail fast when MCP_AUTH_PRIMARY references an unconfigured auth mode', async () => {

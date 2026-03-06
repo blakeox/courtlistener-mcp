@@ -1,6 +1,5 @@
 import type { OAuthConfig } from '../security/oidc.js';
 import { verifyAccessToken } from '../security/oidc.js';
-import { getSupabaseConfig, validateSupabaseApiKey } from './supabase-auth.js';
 import type { PrincipalContext } from '../infrastructure/principal-context.js';
 import {
   negotiateCapabilityProfile,
@@ -24,9 +23,6 @@ export interface WorkerSecurityEnv {
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
   OIDC_REQUIRED_SCOPE?: string;
-  SUPABASE_URL?: string;
-  SUPABASE_SECRET_KEY?: string;
-  SUPABASE_API_KEYS_TABLE?: string;
 }
 
 export interface WorkerSecurityDeps {
@@ -34,13 +30,9 @@ export interface WorkerSecurityDeps {
     token: string,
     cfg: OAuthConfig,
   ) => Promise<{ payload: Record<string, unknown> }>;
-  verifySupabaseApiKeyFn?: (
-    token: string,
-    env: WorkerSecurityEnv,
-  ) => Promise<boolean | { valid: boolean; userId?: string }>;
 }
 
-export type AuthMethod = 'supabase' | 'oidc' | 'static';
+export type AuthMethod = 'oidc' | 'static';
 export type McpRequestPrincipal = PrincipalContext;
 
 export interface McpAuthorizationResult {
@@ -85,8 +77,43 @@ function getOidcConfig(env: WorkerSecurityEnv): OAuthConfig | null {
   };
 }
 
-function jsonError(status: number, message: string, code: string): Response {
-  return Response.json({ error: code, message }, { status });
+function escapeHeaderValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function buildMcpOAuthProtectedResourceMetadataUrl(request: Request): string {
+  const origin = new URL(request.url).origin;
+  return `${origin}/.well-known/oauth-protected-resource/mcp`;
+}
+
+function buildWwwAuthenticateHeader(
+  request: Request,
+  message: string,
+  code: string,
+  status: number,
+): string {
+  const parts = [
+    'Bearer realm="mcp"',
+    `error="${escapeHeaderValue(code)}"`,
+    `error_description="${escapeHeaderValue(message)}"`,
+    `resource_metadata="${escapeHeaderValue(buildMcpOAuthProtectedResourceMetadataUrl(request))}"`,
+  ];
+  if (status === 403 && code === 'insufficient_scope') {
+    parts.push('scope="legal:read legal:search legal:analyze"');
+  }
+  return parts.join(', ');
+}
+
+function jsonError(status: number, message: string, code: string, request?: Request): Response {
+  const headers = new Headers();
+  if (request && (status === 401 || status === 403)) {
+    headers.set('WWW-Authenticate', buildWwwAuthenticateHeader(request, message, code, status));
+    headers.append(
+      'Link',
+      `<${buildMcpOAuthProtectedResourceMetadataUrl(request)}>; rel="oauth-protected-resource"`,
+    );
+  }
+  return Response.json({ error: code, message }, { status, headers });
 }
 
 export type ProtocolNegotiationDecisionReason =
@@ -137,11 +164,10 @@ function extractUserIdFromClaims(payload: Record<string, unknown>): string | und
  * Authorize MCP requests using either:
  * 0) Internal service-token header validation (x-mcp-service-token by default)
  * 1) OIDC/Cloudflare Access JWT verification (if OIDC_* configured)
- * 2) Supabase-backed API key validation (if SUPABASE_* configured)
- * 3) Static bearer token (MCP_AUTH_TOKEN)
+ * 2) Static bearer token (MCP_AUTH_TOKEN)
  *
  * If multiple mechanisms are configured, the primary backend is selected by:
- * MCP_AUTH_PRIMARY (default: supabase when configured), with static fallback
+ * MCP_AUTH_PRIMARY (default: oidc when configured), with static fallback
  * only when MCP_ALLOW_STATIC_FALLBACK is true.
  */
 export async function authorizeMcpRequestWithPrincipal(
@@ -155,27 +181,17 @@ export async function authorizeMcpRequestWithPrincipal(
   const cfAccessJwt = request.headers.get('CF-Access-Jwt-Assertion')?.trim() || null;
   const staticToken = env.MCP_AUTH_TOKEN?.trim();
   const oidcConfig = getOidcConfig(env);
-  const supabaseConfig = getSupabaseConfig(env);
   const staticTokenConfigured = Boolean(staticToken);
-  const supabaseConfigured = Boolean(supabaseConfig);
   const allowStaticFallback = parseBoolean(env.MCP_ALLOW_STATIC_FALLBACK);
   const decisionEngine = buildEdgeAuthDecisionEngine({
     requestedPrimary: env.MCP_AUTH_PRIMARY,
     allowStaticFallback,
     serviceTokenConfigured: staticTokenConfigured,
-    supabaseConfigured,
     oidcConfigured: Boolean(oidcConfig),
     staticTokenConfigured,
   });
 
   const verifyFn = deps.verifyAccessTokenFn ?? verifyAccessToken;
-  const verifySupabaseFn =
-    deps.verifySupabaseApiKeyFn ??
-    (async (token: string): Promise<{ valid: boolean; userId?: string }> => {
-      if (!supabaseConfig) return { valid: false };
-      const result = await validateSupabaseApiKey(token, supabaseConfig);
-      return result;
-    });
 
   if (decisionEngine.attempts.length === 0) {
     return { authError: null };
@@ -183,14 +199,13 @@ export async function authorizeMcpRequestWithPrincipal(
 
   const shouldTryServiceToken = decisionEngine.attempts.includes('serviceToken');
   const shouldTryOidc = decisionEngine.attempts.includes('oidc');
-  const shouldTrySupabase = decisionEngine.attempts.includes('supabase');
   const shouldTryStatic = decisionEngine.attempts.includes('static');
 
   if (staticToken && shouldTryServiceToken && serviceTokenCandidate) {
     if (serviceTokenCandidate === staticToken) {
       return { authError: null, principal: { authMethod: 'static' } };
     }
-    return { authError: jsonError(401, 'Invalid service token', 'invalid_token') };
+    return { authError: jsonError(401, 'Invalid service token', 'invalid_token', request) };
   }
 
   if (oidcConfig && shouldTryOidc) {
@@ -230,55 +245,25 @@ export async function authorizeMcpRequestWithPrincipal(
     }
 
     if (hasJwtCandidate) {
-      if (!shouldTrySupabase && !shouldTryStatic && !shouldTryServiceToken) {
+      if (!shouldTryStatic && !shouldTryServiceToken) {
         const message =
           lastError instanceof Error ? lastError.message : 'token_verification_failed';
         if (message === 'insufficient_scope') {
           return {
-            authError: jsonError(403, 'Token missing required scope', 'insufficient_scope'),
+            authError: jsonError(403, 'Token missing required scope', 'insufficient_scope', request),
           };
         }
-        return { authError: jsonError(401, 'Invalid OIDC access token', 'invalid_token') };
+        return { authError: jsonError(401, 'Invalid OIDC access token', 'invalid_token', request) };
       }
-    } else if (!shouldTrySupabase && !shouldTryStatic && !shouldTryServiceToken) {
+    } else if (!shouldTryStatic && !shouldTryServiceToken) {
       return {
         authError: jsonError(
           401,
           'Missing access token (Authorization: Bearer or CF-Access-Jwt-Assertion)',
           'missing_token',
+          request,
         ),
       };
-    }
-  }
-
-  if (supabaseConfig && shouldTrySupabase) {
-    if (!bearerToken) {
-      if (!shouldTryStatic && !shouldTryServiceToken) {
-        return { authError: jsonError(401, 'Missing bearer token', 'missing_token') };
-      }
-    } else {
-      try {
-        const supabaseResult = await verifySupabaseFn(bearerToken, env);
-        const normalizedResult =
-          typeof supabaseResult === 'boolean' ? { valid: supabaseResult } : supabaseResult;
-        if (normalizedResult.valid) {
-          return {
-            authError: null,
-            principal: {
-              authMethod: 'supabase',
-              ...(normalizedResult.userId ? { userId: normalizedResult.userId } : {}),
-            },
-          };
-        }
-      } catch {
-        if (!shouldTryStatic && !shouldTryServiceToken) {
-          return { authError: jsonError(401, 'Invalid Supabase API key', 'invalid_token') };
-        }
-      }
-
-      if (!shouldTryStatic && !shouldTryServiceToken) {
-        return { authError: jsonError(401, 'Invalid Supabase API key', 'invalid_token') };
-      }
     }
   }
 
@@ -287,11 +272,11 @@ export async function authorizeMcpRequestWithPrincipal(
       return { authError: null, principal: { authMethod: 'static' } };
     }
     if (decisionEngine.effectivePrimary === 'static' || allowStaticFallback) {
-      return { authError: jsonError(401, 'Invalid static bearer token', 'invalid_token') };
+      return { authError: jsonError(401, 'Invalid static bearer token', 'invalid_token', request) };
     }
   }
 
-  return { authError: jsonError(401, 'Unauthorized', 'unauthorized') };
+  return { authError: jsonError(401, 'Unauthorized', 'unauthorized', request) };
 }
 
 export async function authorizeMcpRequest(

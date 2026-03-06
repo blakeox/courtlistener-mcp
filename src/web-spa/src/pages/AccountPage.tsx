@@ -1,20 +1,26 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
-import { toErrorMessage } from '../lib/api';
+import { getUsage, toErrorMessage } from '../lib/api';
 import { useToken } from '../lib/token-context';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { Badge, Button, Card, StatusBanner } from '../components/ui';
+import { Badge, Button, Card, StatusBanner, formatDate } from '../components/ui';
 
 export function AccountPage(): React.JSX.Element {
-  useDocumentTitle('Account');
+  useDocumentTitle('Operator Session');
   const { session, loading, sessionReady, sessionError, refresh, logout } = useAuth();
   const { token, persisted, clear } = useToken();
   const { toast } = useToast();
   const hasServerSession = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
+  const usageQuery = useQuery({
+    queryKey: ['usage-snapshot', hasServerSession],
+    queryFn: getUsage,
+    enabled: hasServerSession,
+    retry: false,
+  });
   const protocolQuery = useQuery({
     queryKey: ['account-mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -33,9 +39,9 @@ export function AccountPage(): React.JSX.Element {
   const diagnostics: string[] = [];
   if (!loading && sessionReady && !sessionError) {
     if (hasToken && !hasServerSession) {
-      diagnostics.push('Local bearer token is set, but the server session is signed out. Log in again to sync account state.');
+      diagnostics.push('A local MCP credential is loaded, but the operator browser session is signed out. This credential is only for direct runtime probes.');
     } else if (!hasToken && hasServerSession) {
-      diagnostics.push('Server session is active, but no bearer token is saved locally. Add one in API Keys before MCP calls.');
+      diagnostics.push('Operator session is active. No local MCP credential is loaded, which is fine unless you need direct browser-side runtime probes.');
     }
   }
   if (protocolQuery.data?.diagnostics?.length) {
@@ -45,10 +51,14 @@ export function AccountPage(): React.JSX.Element {
     !persisted && hasToken ? 'Token is session-scoped and will clear when this browser session ends.' : '',
     protocolQuery.data?.sessionId ? `Protocol session active: ${protocolQuery.data.sessionId}` : '',
   ].filter(Boolean);
+  const routeBreakdown = React.useMemo(
+    () => Object.entries(usageQuery.data?.byRoute ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 5),
+    [usageQuery.data?.byRoute],
+  );
 
   return (
     <div className="stack">
-      <Card title="Account" subtitle="Session and local token storage details.">
+      <Card title="Operator Session" subtitle="Diagnostic view of server session state, optional local credential storage, and protocol posture.">
         <dl className="dl-grid">
           <dt>Session check</dt>
           <dd>{loading || !sessionReady ? '… Checking /api/session' : sessionError ? '⚠ Failed' : '✓ Ready'}</dd>
@@ -121,7 +131,7 @@ export function AccountPage(): React.JSX.Element {
               toast('Token cleared', 'info');
             }}
           >
-            Clear stored token
+            Clear local credential
           </Button>
           <Button
             variant="danger"
@@ -136,6 +146,43 @@ export function AccountPage(): React.JSX.Element {
             Logout
           </Button>
         </div>
+      </Card>
+
+      <Card title="Usage mirror" subtitle="Operator-facing mirror of per-user usage for OAuth-routed MCP requests. Public users should rely on the auth UI dashboard.">
+        {!hasServerSession ? (
+          <p className="muted">Sign in to view usage metrics.</p>
+        ) : usageQuery.isLoading ? (
+          <p className="muted">Loading usage metrics...</p>
+        ) : usageQuery.isError ? (
+          <StatusBanner role="alert" message={toErrorMessage(usageQuery.error)} type="error" />
+        ) : (
+          <>
+            <dl className="dl-grid">
+              <dt>User ID</dt>
+              <dd className="mono">{usageQuery.data?.userId || 'n/a'}</dd>
+              <dt>Total requests</dt>
+              <dd>{usageQuery.data?.totalRequests ?? 0}</dd>
+              <dt>Today</dt>
+              <dd>{usageQuery.data?.dailyRequests ?? 0}</dd>
+              <dt>Current day</dt>
+              <dd>{usageQuery.data?.currentDay || 'n/a'}</dd>
+              <dt>Last seen</dt>
+              <dd>{usageQuery.data?.lastSeenAt ? formatDate(usageQuery.data.lastSeenAt) : 'n/a'}</dd>
+            </dl>
+            <div className="stack">
+              <strong>Top routes</strong>
+              {routeBreakdown.length === 0 ? (
+                <p className="muted">No routed usage yet.</p>
+              ) : (
+                <ul className="ordered">
+                  {routeBreakdown.map(([route, count]) => (
+                    <li key={route}><span className="mono">{route}</span> — {count}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );

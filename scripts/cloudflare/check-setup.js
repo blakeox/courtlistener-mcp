@@ -54,13 +54,6 @@ function parseWranglerConfig() {
   return JSON.parse(cleaned);
 }
 
-function hasSupabaseAuth(secretNames) {
-  return (
-    secretNames.includes('SUPABASE_URL') &&
-    secretNames.includes('SUPABASE_SECRET_KEY')
-  );
-}
-
 function deriveBaseUrl(config) {
   if (Array.isArray(config.routes) && config.routes.length > 0) {
     const route = config.routes.find((r) => typeof r?.pattern === 'string');
@@ -195,6 +188,25 @@ async function main() {
     } else {
       ok('Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
     }
+
+    const configuredVars = config.vars && typeof config.vars === 'object' ? config.vars : {};
+    const authUiOrigin = typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
+      ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
+      : '';
+    const allowDevFallback = typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
+      ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
+      : '';
+    if (!authUiOrigin) {
+      warn('MCP_AUTH_UI_ORIGIN is not configured in wrangler vars. /authorize cannot redirect users to external login UI.');
+    } else {
+      ok(`Auth UI origin configured: ${authUiOrigin}`);
+    }
+    if (!allowDevFallback || allowDevFallback === 'false' || allowDevFallback === '0') {
+      ok('MCP_ALLOW_DEV_FALLBACK is disabled.');
+    } else {
+      fail('MCP_ALLOW_DEV_FALLBACK is enabled. Disable this in production.');
+      hasCriticalError = true;
+    }
   }
 
   const secretList = run('wrangler', ['secret', 'list']);
@@ -222,48 +234,45 @@ async function main() {
 
   const hasStaticAuth = secretNames.includes('MCP_AUTH_TOKEN');
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
-  const hasSupabase = hasSupabaseAuth(secretNames);
+  const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
   const staticFallbackEnabled = secretNames.includes('MCP_ALLOW_STATIC_FALLBACK');
-  const hasSupabasePublishable = secretNames.includes('SUPABASE_PUBLISHABLE_KEY');
   const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
+  const authUiOriginConfigured =
+    Boolean(config?.vars && typeof config.vars.MCP_AUTH_UI_ORIGIN === 'string' && config.vars.MCP_AUTH_UI_ORIGIN.trim());
 
-  const hasSupabaseUrl = secretNames.includes('SUPABASE_URL');
-  const hasSupabaseServerKey = secretNames.includes('SUPABASE_SECRET_KEY');
-  if (hasSupabaseUrl !== hasSupabaseServerKey) {
-    warn(
-      'Supabase auth is partially configured. Set both `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.',
-    );
+  if (!hasUiSessionSecret) {
+    const message = 'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
+    if (authUiOriginConfigured) {
+      fail(message);
+      hasCriticalError = true;
+    } else {
+      warn(message);
+    }
   }
 
-  if (hasSupabasePublishable && !hasSupabaseUrl) {
-    warn(
-      'SUPABASE_PUBLISHABLE_KEY is set but SUPABASE_URL is missing. Public auth and UI flows may fail.',
-    );
+  if (authUiOriginConfigured && !hasOidcAuth) {
+    warn('OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification will be unavailable.');
+  } else if (hasOidcAuth) {
+    ok('OIDC_ISSUER is configured.');
   }
 
-  if ((hasSupabase || hasSupabasePublishable) && !hasUiSessionSecret && !hasSupabasePublishable) {
-    warn(
-      'UI session secret source is missing. Set MCP_UI_SESSION_SECRET (or SUPABASE_PUBLISHABLE_KEY for derived secret).',
-    );
+  if (authUiOriginConfigured && !hasOidcAudience) {
+    warn('OIDC_AUDIENCE is not set. Strongly recommended for Clerk token-template validation.');
+  } else if (hasOidcAudience) {
+    ok('OIDC_AUDIENCE is configured.');
   }
 
-  if (!hasStaticAuth && !hasOidcAuth && !hasSupabase) {
+  if (!hasStaticAuth && !hasOidcAuth) {
     warn(
-      'No auth secret found (`MCP_AUTH_TOKEN`, `OIDC_ISSUER`, or `SUPABASE_URL` + `SUPABASE_SECRET_KEY`). Endpoint will be open unless protected elsewhere.',
+      'No auth secret found (`MCP_AUTH_TOKEN` or `OIDC_ISSUER`). Endpoint will be open unless protected elsewhere.',
     );
   } else {
     ok('At least one auth mechanism is configured.');
   }
 
-  if (hasStaticAuth && (hasOidcAuth || hasSupabase) && !staticFallbackEnabled) {
+  if (hasStaticAuth && hasOidcAuth && !staticFallbackEnabled) {
     ok(
       'Static token exists, but static fallback remains disabled unless MCP_ALLOW_STATIC_FALLBACK is explicitly set.',
-    );
-  }
-
-  if (hasStaticAuth && hasSupabase && staticFallbackEnabled) {
-    warn(
-      'Supabase is configured but static fallback is enabled. For production, remove MCP_ALLOW_STATIC_FALLBACK and MCP_AUTH_TOKEN after migration.',
     );
   }
 
@@ -299,16 +308,13 @@ async function main() {
 
   console.log('\nSuggested commands:');
   console.log('  wrangler secret put COURTLISTENER_API_KEY');
+  console.log('  wrangler secret put MCP_UI_SESSION_SECRET');
+  console.log('  wrangler secret put OIDC_ISSUER');
+  console.log('  wrangler secret put OIDC_AUDIENCE');
   console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional static auth');
-  console.log('  wrangler secret put MCP_AUTH_PRIMARY # optional: supabase|oidc|static');
+  console.log('  wrangler secret put MCP_AUTH_PRIMARY # optional: oidc|static');
   console.log('  wrangler secret put MCP_ALLOW_STATIC_FALLBACK # migration-only');
-  console.log('  wrangler secret put OIDC_ISSUER      # optional JWT auth');
-  console.log('  wrangler secret put SUPABASE_URL     # optional Supabase API key auth');
-  console.log('  wrangler secret put SUPABASE_SECRET_KEY');
-  if (hasSupabase) {
-    console.log('  Apply docs/supabase/mcp-auth-schema.sql in Supabase SQL editor');
-    console.log('  After first sign-in: select public.bootstrap_first_admin();');
-  }
+  console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
   console.log('  pnpm run cloudflare:deploy');
 
   if (hasCriticalError) {

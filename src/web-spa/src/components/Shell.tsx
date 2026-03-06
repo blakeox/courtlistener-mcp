@@ -23,19 +23,18 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
   const { toast } = useToast();
   const navGroups: Array<{ label: string; items: Array<{ label: string; to: string; requiresAuth?: boolean }> }> = [
     {
-      label: 'MCP Overview',
-      items: [{ label: 'Control Center', to: '/app/control-center' }],
+      label: 'Operations',
+      items: [{ label: 'Operator Console', to: '/app/control-center' }],
     },
     {
-      label: 'MCP Operations',
+      label: 'Runtime',
       items: [
-        { label: 'MCP Keys', to: '/app/keys', requiresAuth: true },
-        { label: 'MCP Playground', to: '/app/playground', requiresAuth: true },
+        { label: 'MCP Playground', to: '/app/playground' },
       ],
     },
     {
-      label: 'Session',
-      items: [{ label: 'Session & Account', to: '/app/account', requiresAuth: true }],
+      label: 'Diagnostics',
+      items: [{ label: 'Operator Session', to: '/app/account' }],
     },
   ];
 
@@ -43,8 +42,8 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
     enabled: authed,
     onExpired: () => {
       clear();
-      toast('Session expired — please log in again.', 'error');
-      navigate('/app/login');
+      toast('Session expired — review account status.', 'error');
+      navigate('/app/account');
     },
   });
 
@@ -66,17 +65,17 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       )}
       {!loading && !authed && hasLocalToken ? (
         <div className="status info" role="status" aria-live="polite">
-          <strong>Session recovery:</strong> A local bearer token is stored, but this browser session is signed out.
+          <strong>Session recovery:</strong> A local MCP credential is stored, but this browser session is signed out.
           <div className="row status-actions">
-            <Link to="/app/login" className="btn secondary">Log in again</Link>
+            <Link to="/app/account" className="btn secondary">Review session status</Link>
             <Button
               variant="secondary"
               onClick={() => {
                 clear();
-                toast('Stored token cleared', 'info');
+                toast('Stored local credential cleared', 'info');
               }}
             >
-              Clear stored token
+              Clear local credential
             </Button>
           </div>
         </div>
@@ -84,29 +83,19 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       <header className="topbar">
         <Link to="/app/control-center" className="brand">
           CourtListener MCP
-          <small>Access Portal</small>
+          <small>Operator Console</small>
         </Link>
         <nav className="top-actions" aria-label="Global navigation">
           <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${scheme === 'light' ? 'dark' : 'light'} mode`}>
             {scheme === 'light' ? '🌙' : '☀️'}
           </button>
-          {!loading && !authed ? (
-            <>
-              <NavLink to="/app/signup" className="pill">
-                Create Account
-              </NavLink>
-              <NavLink to="/app/login" className="pill primary">
-                Login
-              </NavLink>
-            </>
-          ) : null}
           {!loading && authed ? (
             <>
               <NavLink to="/app/account" className="pill primary">
-                Account
+                Operator Session
               </NavLink>
               <span className={`token-badge ${hasLocalToken ? 'set' : 'unset'}`}>
-                {hasLocalToken ? '🔑 Token set' : '🔑 No token'}
+                {hasLocalToken ? '🔑 Local credential set' : '🔑 No local credential'}
               </span>
               <button
                 type="button"
@@ -119,7 +108,7 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
                     // Graceful degradation — clear local state regardless
                   }
                   clear();
-                  navigate('/app/login');
+                  navigate('/app/control-center');
                 }}
               >
                 Log out
@@ -141,7 +130,7 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
           ☰ Menu
         </button>
         <aside id="primary-navigation" className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <h1>MCP Control Center</h1>
+          <h1>Operator Console</h1>
           <Stepper steps={props.steps} />
           <div className="menu">
             {navGroups.map((group) => (
@@ -164,22 +153,11 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
                 })}
               </div>
             ))}
-            {!authed && (
-              <div className="menu-group">
-                <p className="menu-group-label">Session access</p>
-                <NavLink to="/app/signup" className={({ isActive }) => (isActive ? 'active' : '')}>
-                  Create Account
-                </NavLink>
-                <NavLink to="/app/login" className={({ isActive }) => (isActive ? 'active' : '')}>
-                  Login
-                </NavLink>
-              </div>
-            )}
           </div>
           {authed ? (
             <div className="sidebar-shortcuts">
               <Link to="/app/playground" className="btn secondary">Open MCP Playground</Link>
-              <Link to="/app/keys" className="btn">Manage MCP Keys</Link>
+              <Link to="/app/account" className="btn">Open Operator Session</Link>
             </div>
           ) : null}
         </aside>
@@ -187,7 +165,7 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       </div>
 
       <footer>
-        MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
+        Operator console for MCP diagnostics. Public sign-in and usage live in the separate auth UI. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
       </footer>
     </div>
   );
@@ -199,7 +177,7 @@ export function AuthRequired(props: React.PropsWithChildren): React.JSX.Element 
 
   React.useEffect(() => {
     if (!loading && !session?.authenticated) {
-      navigate('/app/login', { replace: true });
+      navigate('/app/control-center', { replace: true });
     }
   }, [loading, navigate, session?.authenticated]);
 

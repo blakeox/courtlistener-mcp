@@ -116,13 +116,6 @@ function getWorkerSecurityEnv(): WorkerSecurityEnv {
   if (process.env.OIDC_REQUIRED_SCOPE !== undefined) {
     env.OIDC_REQUIRED_SCOPE = process.env.OIDC_REQUIRED_SCOPE;
   }
-  if (process.env.SUPABASE_URL !== undefined) env.SUPABASE_URL = process.env.SUPABASE_URL;
-  if (process.env.SUPABASE_SECRET_KEY !== undefined) {
-    env.SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  }
-  if (process.env.SUPABASE_API_KEYS_TABLE !== undefined) {
-    env.SUPABASE_API_KEYS_TABLE = process.env.SUPABASE_API_KEYS_TABLE;
-  }
   return env;
 }
 

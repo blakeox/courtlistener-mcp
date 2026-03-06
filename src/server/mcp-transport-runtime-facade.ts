@@ -2,6 +2,7 @@ import { runWithPrincipalContext } from '../infrastructure/principal-context.js'
 import { authorizeMcpGatewayRequest } from './mcp-gateway-auth.js';
 import { createInvalidSessionLifecycleResponse } from './mcp-session-lifecycle-contract.js';
 import type {
+  McpRequestPrincipal,
   ProtocolHeaderNegotiationDiagnostics,
   WorkerSecurityEnv,
 } from './worker-security.js';
@@ -57,6 +58,42 @@ export function applyProtocolNegotiationHeaders(
   const headers = new Headers(response.headers);
   setProtocolNegotiationHeaders(headers, diagnostics);
   return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function normalizePostMcpResponse(response: Response, requestMethod: string): Promise<Response> {
+  if (requestMethod !== 'POST') {
+    return response;
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() || '';
+  if (!contentType.includes('text/event-stream')) {
+    return response;
+  }
+
+  const bodyText = await response.text();
+  const dataLines = bodyText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .filter(Boolean);
+
+  if (dataLines.length === 0) {
+    return new Response(bodyText, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set('content-type', 'application/json');
+  headers.delete('content-length');
+  return new Response(dataLines.join('\n'), {
     status: response.status,
     statusText: response.statusText,
     headers,
@@ -134,6 +171,7 @@ export interface HandleMcpTransportBoundaryParams<
   getAuthRateLimitedResponse: (clientId: string, env: Env, nowMs: number) => Promise<Response | null>;
   recordAuthFailure: (clientId: string, env: Env, nowMs: number) => Promise<void>;
   clearAuthFailures: (clientId: string, env: Env, nowMs: number) => Promise<void>;
+  skipGatewayAuth?: boolean;
   evaluateMcpBoundaryRequest?: (
     request: Request,
     env: Env,
@@ -145,6 +183,12 @@ export interface HandleMcpTransportBoundaryParams<
     request: Request,
     response: Response,
     env: Env,
+    nowMs: number,
+  ) => Promise<void>;
+  onAuthorizedRequest?: (
+    request: Request,
+    env: Env,
+    principal: McpRequestPrincipal | undefined,
     nowMs: number,
   ) => Promise<void>;
 }
@@ -170,9 +214,11 @@ export async function handleMcpTransportBoundary<
     getAuthRateLimitedResponse,
     recordAuthFailure,
     clearAuthFailures,
+    skipGatewayAuth,
     evaluateMcpBoundaryRequest,
     validateSessionRequest,
     finalizeSessionResponse,
+    onAuthorizedRequest,
   } = params;
 
   if (!mcpPath) {
@@ -201,9 +247,22 @@ export async function handleMcpTransportBoundary<
     }
   }
 
+  const authEnv = skipGatewayAuth
+    ? ({
+        ...env,
+        MCP_AUTH_TOKEN: undefined,
+        MCP_AUTH_PRIMARY: undefined,
+        MCP_ALLOW_STATIC_FALLBACK: undefined,
+        OIDC_ISSUER: undefined,
+        OIDC_AUDIENCE: undefined,
+        OIDC_JWKS_URL: undefined,
+        OIDC_REQUIRED_SCOPE: undefined,
+      } satisfies Env)
+    : env;
+
   const authResult = await authorizeMcpGatewayRequest({
     request,
-    env,
+    env: authEnv,
     supportedProtocolVersions,
   });
   const authError = authResult.authError;
@@ -220,6 +279,9 @@ export async function handleMcpTransportBoundary<
 
   await clearAuthFailures(clientId, env, nowMs);
   const principal = authResult.principal;
+  if (onAuthorizedRequest) {
+    await onAuthorizedRequest(request, env, principal, nowMs);
+  }
 
   if (pathname === '/sse') {
     const accept = request.headers.get('Accept') ?? '';
@@ -247,11 +309,12 @@ export async function handleMcpTransportBoundary<
     const response = await runWithPrincipalContext(principal, () =>
       mcpStreamableHandler.fetch(request, env, ctx),
     );
+    const normalizedResponse = await normalizePostMcpResponse(response, requestMethod);
     if (finalizeSessionResponse) {
-      await finalizeSessionResponse(request, response, env, nowMs);
+      await finalizeSessionResponse(request, normalizedResponse, env, nowMs);
     }
     return withCors(
-      applyProtocolNegotiationHeaders(response, authResult.protocolNegotiation),
+      applyProtocolNegotiationHeaders(normalizedResponse, authResult.protocolNegotiation),
       origin,
       allowedOrigins,
     );

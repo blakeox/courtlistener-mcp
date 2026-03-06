@@ -42,7 +42,7 @@ const searchOpinionsSchema = z
     judge: parsed.judge,
     date_filed_after: parsed.date_filed_after ?? parsed.dateAfter,
     date_filed_before: parsed.date_filed_before ?? parsed.dateBefore,
-    order_by: parsed.order_by ?? parsed.orderBy ?? 'relevance',
+    order_by: parsed.order_by ?? parsed.orderBy,
     ...resolvePageFromCursor(parsed),
   }));
 
@@ -169,9 +169,9 @@ export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinion
     const searchParams: Record<string, unknown> = {
       page: input.page,
       page_size: input.page_size,
-      order_by: input.order_by,
     };
 
+    if (input.order_by) searchParams.order_by = input.order_by;
     if (input.query) searchParams.q = input.query;
     if (input.court) searchParams.court = input.court;
     if (input.judge) searchParams.judge = input.judge;

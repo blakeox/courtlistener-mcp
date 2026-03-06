@@ -80,6 +80,17 @@ describe('worker-security auth', () => {
     assert.equal(ok, null);
   });
 
+  it('includes OAuth discovery challenge headers on 401 auth failures', async () => {
+    const res = await authorizeMcpRequest(req(), { MCP_AUTH_TOKEN: 'secret' });
+    assert.ok(res);
+    assert.equal(res.status, 401);
+    const challenge = res.headers.get('www-authenticate') ?? '';
+    assert.match(challenge, /Bearer realm="mcp"/);
+    assert.match(challenge, /resource_metadata="https:\/\/example\.workers\.dev\/\.well-known\/oauth-protected-resource\/mcp"/);
+    const link = res.headers.get('link') ?? '';
+    assert.match(link, /rel="oauth-protected-resource"/);
+  });
+
   it('accepts valid OIDC bearer token', async () => {
     const res = await authorizeMcpRequest(
       req({ Authorization: 'Bearer jwt-token' }),
@@ -149,6 +160,9 @@ describe('worker-security auth', () => {
     );
     assert.ok(res);
     assert.equal(res.status, 403);
+    const challenge = res.headers.get('www-authenticate') ?? '';
+    assert.match(challenge, /error="insufficient_scope"/);
+    assert.match(challenge, /scope="legal:read legal:search legal:analyze"/);
   });
 
   it('falls back to static token when OIDC token verification fails', async () => {
@@ -168,97 +182,41 @@ describe('worker-security auth', () => {
     assert.equal(res, null);
   });
 
-  it('accepts valid Supabase API key when configured', async () => {
+  it('uses static token when OIDC is not configured', async () => {
     const res = await authorizeMcpRequest(
-      req({ Authorization: 'Bearer sb-valid-key' }),
+      req({ Authorization: 'Bearer static-fallback' }),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
-      },
-      {
-        verifySupabaseApiKeyFn: async (token) => token === 'sb-valid-key',
+        MCP_AUTH_TOKEN: 'static-fallback',
       },
     );
     assert.equal(res, null);
   });
 
-  it('returns Supabase principal userId when available', async () => {
+  it('returns OIDC principal userId when static fallback succeeds', async () => {
     const result = await authorizeMcpRequestWithPrincipal(
-      req({ Authorization: 'Bearer sb-valid-key' }),
-      {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
-      },
-      {
-        verifySupabaseApiKeyFn: async (token) => ({
-          valid: token === 'sb-valid-key',
-          userId: 'sb-user-1',
-        }),
-      },
-    );
-    assert.equal(result.authError, null);
-    assert.equal(result.principal?.authMethod, 'supabase');
-    assert.equal(result.principal?.userId, 'sb-user-1');
-  });
-
-  it('rejects invalid Supabase API key when static fallback is not configured', async () => {
-    const res = await authorizeMcpRequest(
-      req({ Authorization: 'Bearer sb-invalid-key' }),
-      {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
-      },
-      {
-        verifySupabaseApiKeyFn: async () => false,
-      },
-    );
-    assert.ok(res);
-    assert.equal(res.status, 401);
-  });
-
-  it('falls back to static token when Supabase rejects key', async () => {
-    const res = await authorizeMcpRequest(
       req({ Authorization: 'Bearer static-fallback' }),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
+        OIDC_ISSUER: 'https://issuer.example.com',
         MCP_AUTH_TOKEN: 'static-fallback',
         MCP_ALLOW_STATIC_FALLBACK: 'true',
       },
       {
-        verifySupabaseApiKeyFn: async () => false,
+        verifyAccessTokenFn: async () => {
+          throw new Error('jwt_invalid');
+        },
       },
     );
-    assert.equal(res, null);
-  });
-
-  it('prefers supabase auth and blocks static fallback by default', async () => {
-    const res = await authorizeMcpRequest(
-      req({ Authorization: 'Bearer static-fallback' }),
-      {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
-        MCP_AUTH_TOKEN: 'static-fallback',
-      },
-      {
-        verifySupabaseApiKeyFn: async () => false,
-      },
-    );
-    assert.ok(res);
-    assert.equal(res.status, 401);
+    assert.equal(result.authError, null);
+    assert.equal(result.principal?.authMethod, 'static');
   });
 
   it('supports explicit static primary auth when configured', async () => {
     const res = await authorizeMcpRequest(
       req({ Authorization: 'Bearer static-primary' }),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
+        OIDC_ISSUER: 'https://issuer.example.com',
         MCP_AUTH_TOKEN: 'static-primary',
         MCP_AUTH_PRIMARY: 'static',
-      },
-      {
-        verifySupabaseApiKeyFn: async () => false,
       },
     );
     assert.equal(res, null);
@@ -278,19 +236,20 @@ describe('worker-security auth', () => {
     assert.equal(res, null);
   });
 
-  it('prioritizes internal service-token header over supabase primary', async () => {
+  it('prioritizes internal service-token header over OIDC primary', async () => {
     const result = await authorizeMcpRequestWithPrincipal(
       req({
-        Authorization: 'Bearer not-a-valid-supabase-key',
+        Authorization: 'Bearer not-a-valid-jwt',
         'x-mcp-service-token': 'edge-service-secret',
       }),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
+        OIDC_ISSUER: 'https://issuer.example.com',
         MCP_AUTH_TOKEN: 'edge-service-secret',
       },
       {
-        verifySupabaseApiKeyFn: async () => false,
+        verifyAccessTokenFn: async () => {
+          throw new Error('jwt_invalid');
+        },
       },
     );
     assert.equal(result.authError, null);
@@ -300,31 +259,23 @@ describe('worker-security auth', () => {
   it('fails closed when a service-token header is present but invalid', async () => {
     const result = await authorizeMcpRequestWithPrincipal(
       req({
-        Authorization: 'Bearer sb-valid-key',
+        Authorization: 'Bearer jwt-token',
         'x-mcp-service-token': 'wrong-service-secret',
       }),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
+        OIDC_ISSUER: 'https://issuer.example.com',
         MCP_AUTH_TOKEN: 'edge-service-secret',
-      },
-      {
-        verifySupabaseApiKeyFn: async () => true,
       },
     );
     assert.ok(result.authError);
     assert.equal(result.authError?.status, 401);
   });
 
-  it('requires Authorization bearer token for Supabase auth', async () => {
+  it('requires Authorization bearer token for OIDC auth', async () => {
     const res = await authorizeMcpRequest(
       req({}),
       {
-        SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SECRET_KEY: 'service-role-key',
-      },
-      {
-        verifySupabaseApiKeyFn: async () => true,
+        OIDC_ISSUER: 'https://issuer.example.com',
       },
     );
     assert.ok(res);

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface PrincipalContext {
-  authMethod: 'supabase' | 'oidc' | 'static';
+  authMethod: 'oidc' | 'static';
   userId?: string;
 }
 

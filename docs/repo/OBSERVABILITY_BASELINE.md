@@ -5,7 +5,7 @@
 - Error rate split by category:
   - `auth`
   - `origin/cors`
-  - `upstream` (CourtListener/Supabase/OIDC)
+  - `upstream` (CourtListener/OIDC)
   - `validation`
 - Latency percentiles (`p50`, `p95`, `p99`) for `/mcp` and `/health`.
 - Session/auth lifecycle events (login success/failure, token validation failures).
@@ -23,12 +23,12 @@ Use these fields consistently where possible across Worker and local runtimes:
 - `durationMs`
 - `errorCode` (when applicable)
 - `origin` (when applicable)
-- `authMode` (static/oidc/supabase where applicable)
+- `authMode` (static/oidc where applicable)
 
 ## Incident-first troubleshooting flow
 1. Confirm `/health` status.
 2. Verify MCP initialize handshake on `/mcp`.
-3. Check auth mode-specific failures (missing token, issuer mismatch, Supabase key validation).
+3. Check auth mode-specific failures (missing token, issuer mismatch).
 4. Check CORS/origin rejection events.
 5. Check upstream dependency failure rate and timeout spikes.
 
@@ -37,7 +37,7 @@ Use these fields consistently where possible across Worker and local runtimes:
 - `status=error` with `invariants.errors`: treat as deploy-blocking configuration drift.
 - `authPolicy.precedence`:
   - Unexpected order or missing mode indicates auth selection drift.
-  - Verify `MCP_AUTH_PRIMARY`, `MCP_ALLOW_STATIC_FALLBACK`, and Supabase/OIDC variables align with intended policy.
+  - Verify `MCP_AUTH_PRIMARY`, `MCP_ALLOW_STATIC_FALLBACK`, and OIDC/static variables align with intended policy.
 
 ## Common incident remediation runbook
 1. **Protocol negotiation failures (`invalid_protocol_version`)**
