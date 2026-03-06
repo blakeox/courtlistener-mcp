@@ -10,7 +10,10 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
     const response = await handleWorkerMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
-        headers: { Authorization: 'Bearer token', 'MCP-Protocol-Version': '2025-03-26' },
+        headers: {
+          'x-mcp-service-token': 'token',
+          'MCP-Protocol-Version': '2025-03-26',
+        },
       }),
       env: { MCP_AUTH_TOKEN: 'token' },
       ctx: {} as ExecutionContext,

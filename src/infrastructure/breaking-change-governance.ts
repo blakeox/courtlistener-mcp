@@ -55,13 +55,13 @@ export const BREAKING_CHANGE_GATES: readonly BreakingChangeGateDefinition[] = Ob
   },
   {
     id: 'bp10-edge-auth-precedence',
-    description: 'Service-token-first edge auth precedence with explicit static fallback control',
+    description: 'OAuth-first edge auth with explicit service-token header exceptions only',
     envFlag: 'MCP_BREAKING_BP10_EDGE_AUTH_PRECEDENCE',
     introducedBy: 'BP10',
     minProtocolVersion: '2025-03-26',
     defaultEnabled: true,
     migrationNotes: Object.freeze([
-      'Set MCP_AUTH_PRIMARY and MCP_ALLOW_STATIC_FALLBACK explicitly for deterministic auth behavior.',
+      'Client MCP access now requires OAuth/OIDC tokens; MCP_AUTH_TOKEN is reserved for explicit x-mcp-service-token usage only.',
       'Audit x-mcp-service-token usage and ensure invalid service tokens fail closed.',
     ]),
   },

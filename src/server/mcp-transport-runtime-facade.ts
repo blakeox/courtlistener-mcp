@@ -251,8 +251,6 @@ export async function handleMcpTransportBoundary<
     ? ({
         ...env,
         MCP_AUTH_TOKEN: undefined,
-        MCP_AUTH_PRIMARY: undefined,
-        MCP_ALLOW_STATIC_FALLBACK: undefined,
         OIDC_ISSUER: undefined,
         OIDC_AUDIENCE: undefined,
         OIDC_JWKS_URL: undefined,

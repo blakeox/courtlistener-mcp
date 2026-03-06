@@ -236,22 +236,33 @@ describe('Configuration Management (TypeScript)', () => {
         'oauth',
         'serviceToken',
         'oidc',
-        'staticToken',
       ]);
 
       const serialized = JSON.stringify(diagnostics);
       assert.strictEqual(serialized.includes('static-secret-token'), false);
     });
 
-    it('should fail fast when MCP_AUTH_PRIMARY references an unconfigured auth mode', async () => {
+    it('should ignore deprecated static fallback env vars without failing startup', async () => {
       process.env.MCP_AUTH_TOKEN = 'static-only-token';
       process.env.MCP_AUTH_PRIMARY = 'oidc';
+      process.env.MCP_ALLOW_STATIC_FALLBACK = 'true';
 
-      const { getConfig } = await importConfigFresh();
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        authPolicy?: { effectivePrimary?: string | null };
+        invariants?: { warnings?: string[] };
+      };
 
-      assert.throws(
-        () => getConfig(),
-        /MCP_AUTH_PRIMARY was set for an auth mode that is not configured/
+      assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, null);
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_AUTH_PRIMARY is deprecated and ignored')
+        )
+      );
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored')
+        )
       );
     });
   });

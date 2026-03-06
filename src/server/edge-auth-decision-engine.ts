@@ -1,25 +1,20 @@
-export type EdgePrimaryAuthMethod = 'oidc' | 'static';
+export type EdgePrimaryAuthMethod = 'oidc';
 export type EdgeAuthAttempt = 'serviceToken' | EdgePrimaryAuthMethod;
 
-const PRIMARY_AUTH_PRECEDENCE: readonly EdgePrimaryAuthMethod[] = ['oidc', 'static'] as const;
+const PRIMARY_AUTH_PRECEDENCE: readonly EdgePrimaryAuthMethod[] = ['oidc'] as const;
 const EDGE_AUTH_PRECEDENCE: readonly EdgeAuthAttempt[] = ['serviceToken', ...PRIMARY_AUTH_PRECEDENCE] as const;
 
 function normalizePrimaryAuthMethod(value: string | null | undefined): EdgePrimaryAuthMethod | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === 'oidc' || normalized === 'oauth') return 'oidc';
-  if (normalized === 'static' || normalized === 'static-token' || normalized === 'service-token') {
-    return 'static';
-  }
   return null;
 }
 
 export interface BuildEdgeAuthDecisionEngineInput {
   requestedPrimary: string | null | undefined;
-  allowStaticFallback: boolean;
   serviceTokenConfigured: boolean;
   oidcConfigured: boolean;
-  staticTokenConfigured: boolean;
 }
 
 export interface EdgeAuthDecisionEngine {
@@ -32,9 +27,7 @@ export interface EdgeAuthDecisionEngine {
 export function buildEdgeAuthDecisionEngine(
   input: BuildEdgeAuthDecisionEngineInput,
 ): EdgeAuthDecisionEngine {
-  const configuredPrimary = PRIMARY_AUTH_PRECEDENCE.filter((method) =>
-    method === 'oidc' ? input.oidcConfigured : input.staticTokenConfigured,
-  );
+  const configuredPrimary = PRIMARY_AUTH_PRECEDENCE.filter(() => input.oidcConfigured);
   const requestedPrimary = normalizePrimaryAuthMethod(input.requestedPrimary);
   const effectivePrimary =
     requestedPrimary && configuredPrimary.includes(requestedPrimary)
@@ -47,9 +40,6 @@ export function buildEdgeAuthDecisionEngine(
   }
   if (effectivePrimary && !attempts.includes(effectivePrimary)) {
     attempts.push(effectivePrimary);
-  }
-  if (input.allowStaticFallback && input.staticTokenConfigured && !attempts.includes('static')) {
-    attempts.push('static');
   }
 
   return {

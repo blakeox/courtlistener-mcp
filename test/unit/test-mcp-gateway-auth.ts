@@ -57,7 +57,7 @@ describe('authorizeMcpGatewayRequest', () => {
           deps: {
             authorizeMcpRequestWithPrincipalFn: async () => ({
               authError: null,
-              principal: { authMethod: 'static' },
+              principal: { authMethod: 'service' },
             }),
           },
         });
@@ -81,7 +81,7 @@ describe('authorizeMcpGatewayRequest', () => {
       deps: {
         authorizeMcpRequestWithPrincipalFn: async () => ({
           authError: null,
-          principal: { authMethod: 'static' },
+          principal: { authMethod: 'service' },
         }),
       },
     });
@@ -100,12 +100,12 @@ describe('authorizeMcpGatewayRequest', () => {
       deps: {
         authorizeMcpRequestWithPrincipalFn: async () => ({
           authError: null,
-          principal: { authMethod: 'static' },
+          principal: { authMethod: 'service' },
         }),
       },
     });
 
     assert.equal(result.authError, null);
-    assert.deepEqual(result.principal, { authMethod: 'static' });
+    assert.deepEqual(result.principal, { authMethod: 'service' });
   });
 });

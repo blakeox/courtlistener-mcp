@@ -164,7 +164,7 @@ async function runInvalidSessionCase(sessionId: string, description: string): Pr
     headers: {
       'content-type': 'application/json',
       'mcp-session-id': sessionId,
-      authorization: 'Bearer secret',
+      'x-mcp-service-token': 'secret',
       'mcp-protocol-version': '2025-03-26',
     },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
       new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
-          authorization: 'Bearer wrong',
+          'x-mcp-service-token': 'wrong',
           'mcp-protocol-version': '2025-03-26',
         },
       }),
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
       new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
-          authorization: 'Bearer secret',
+          'x-mcp-service-token': 'secret',
           'mcp-protocol-version': '2099-01-01',
         },
       }),

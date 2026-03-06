@@ -188,8 +188,6 @@ describe('HTTP Transport Server auth parity', () => {
   let close: () => Promise<void>;
   const authEnvKeys = [
     'MCP_AUTH_TOKEN',
-    'MCP_AUTH_PRIMARY',
-    'MCP_ALLOW_STATIC_FALLBACK',
     'MCP_REQUIRE_PROTOCOL_VERSION',
     'OIDC_ISSUER',
     'OIDC_AUDIENCE',
@@ -231,7 +229,7 @@ describe('HTTP Transport Server auth parity', () => {
     }
   });
 
-  it('enforces static bearer token with consistent auth error shape', async () => {
+  it('does not accept MCP_AUTH_TOKEN as public bearer auth', async () => {
     await runAuthFailureContract(
       [
         { name: 'missing token', expectedStatus: 401, expectedError: 'invalid_token' },
@@ -277,7 +275,7 @@ describe('HTTP Transport Server auth parity', () => {
       async (fixture) => {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          Authorization: 'Bearer http-static-token',
+          'x-mcp-service-token': 'http-static-token',
           Accept: 'application/json, text/event-stream',
         };
         if (fixture.headerValue) {

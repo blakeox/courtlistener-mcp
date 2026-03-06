@@ -4,8 +4,6 @@ import type { WorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.j
 export interface Env {
   COURTLISTENER_API_KEY?: string;
   MCP_AUTH_TOKEN?: string;
-  MCP_AUTH_PRIMARY?: string;
-  MCP_ALLOW_STATIC_FALLBACK?: string;
   MCP_SERVICE_TOKEN_HEADER?: string;
   MCP_ALLOWED_ORIGINS?: string;
   MCP_REQUIRE_PROTOCOL_VERSION?: string;
