@@ -432,17 +432,14 @@ export function getStartupDiagnostics() {
         errors: [redactSecretsInText(error instanceof Error ? error.message : String(error))],
         warnings: [] as string[],
         authPolicy: {
-          precedence: ['oauth', 'serviceToken', 'oidc', 'staticToken'],
+          precedence: ['oauth', 'serviceToken', 'oidc'],
           configured: {
             oauth: process.env.OAUTH_ENABLED === 'true',
             apiKeyAuth: process.env.AUTH_ENABLED === 'true',
             serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
             oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
-            staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           },
-          requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,
           effectivePrimary: null,
-          staticFallbackEnabled: process.env.MCP_ALLOW_STATIC_FALLBACK === 'true',
           incompatibleRulesTriggered: [],
         },
       },
@@ -452,17 +449,14 @@ export function getStartupDiagnostics() {
         gatewayTokenConfigured: Boolean(process.env.MCP_AUTH_TOKEN),
       },
       authPolicy: {
-        precedence: ['oauth', 'serviceToken', 'oidc', 'staticToken'],
+        precedence: ['oauth', 'serviceToken', 'oidc'],
         configured: {
           oauth: process.env.OAUTH_ENABLED === 'true',
           apiKeyAuth: process.env.AUTH_ENABLED === 'true',
           serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
-          staticToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
         },
-        requestedPrimary: process.env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null,
         effectivePrimary: null,
-        staticFallbackEnabled: process.env.MCP_ALLOW_STATIC_FALLBACK === 'true',
         incompatibleRulesTriggered: [],
       },
       session: {

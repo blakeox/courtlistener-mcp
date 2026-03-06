@@ -7,10 +7,8 @@ describe('edge-auth-decision-engine', () => {
   it('uses precedence when no explicit primary is requested', () => {
     const decision = buildEdgeAuthDecisionEngine({
       requestedPrimary: null,
-      allowStaticFallback: false,
       serviceTokenConfigured: false,
       oidcConfigured: true,
-      staticTokenConfigured: true,
     });
 
     assert.equal(decision.effectivePrimary, 'oidc');
@@ -20,10 +18,8 @@ describe('edge-auth-decision-engine', () => {
   it('normalizes oauth alias to oidc', () => {
     const decision = buildEdgeAuthDecisionEngine({
       requestedPrimary: 'oauth',
-      allowStaticFallback: false,
       serviceTokenConfigured: false,
       oidcConfigured: true,
-      staticTokenConfigured: true,
     });
 
     assert.equal(decision.requestedPrimary, 'oidc');
@@ -32,25 +28,22 @@ describe('edge-auth-decision-engine', () => {
 
   it('always keeps service token evaluation ahead of primary auth', () => {
     const decision = buildEdgeAuthDecisionEngine({
-      requestedPrimary: 'static',
-      allowStaticFallback: false,
+      requestedPrimary: 'oidc',
       serviceTokenConfigured: true,
-      oidcConfigured: false,
-      staticTokenConfigured: true,
+      oidcConfigured: true,
     });
 
-    assert.deepEqual(decision.attempts, ['serviceToken', 'static']);
+    assert.deepEqual(decision.attempts, ['serviceToken', 'oidc']);
   });
 
-  it('adds static auth as explicit fallback only when enabled', () => {
+  it('keeps service-token-only auth when OIDC is absent', () => {
     const decision = buildEdgeAuthDecisionEngine({
-      requestedPrimary: 'oidc',
-      allowStaticFallback: true,
-      serviceTokenConfigured: false,
-      oidcConfigured: true,
-      staticTokenConfigured: true,
+      requestedPrimary: null,
+      serviceTokenConfigured: true,
+      oidcConfigured: false,
     });
 
-    assert.deepEqual(decision.attempts, ['oidc', 'static']);
+    assert.equal(decision.effectivePrimary, null);
+    assert.deepEqual(decision.attempts, ['serviceToken']);
   });
 });

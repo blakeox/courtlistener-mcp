@@ -11,15 +11,13 @@
  *
  * Secrets (set via `wrangler secret put`):
  *   COURTLISTENER_API_KEY  — CourtListener API token (required)
- *   MCP_AUTH_TOKEN          — Optional bearer token to restrict access
+ *   MCP_AUTH_TOKEN          — Optional service token for x-mcp-service-token only
  *   OIDC_ISSUER             — Optional OIDC issuer URL for JWT validation
  *   OIDC_AUDIENCE           — Optional OIDC audience
  *   OIDC_JWKS_URL           — Optional explicit JWKS URL
  *   OIDC_REQUIRED_SCOPE     — Optional required scope
  *   MCP_OAUTH_DEV_USER_ID   — Optional controlled dev fallback identity for /authorize
  *   MCP_UI_PUBLIC_ORIGIN    — Optional canonical UI origin used for email confirmation redirects
- *   MCP_AUTH_PRIMARY        — Optional primary auth backend for legacy non-OAuth routes
- *   MCP_ALLOW_STATIC_FALLBACK — Optional migration flag; default false when stronger auth exists
  */
 
 import { McpAgent } from 'agents/mcp';

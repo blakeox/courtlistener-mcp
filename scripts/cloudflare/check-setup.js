@@ -235,7 +235,6 @@ async function main() {
   const hasStaticAuth = secretNames.includes('MCP_AUTH_TOKEN');
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
   const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
-  const staticFallbackEnabled = secretNames.includes('MCP_ALLOW_STATIC_FALLBACK');
   const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
   const authUiOriginConfigured =
     Boolean(config?.vars && typeof config.vars.MCP_AUTH_UI_ORIGIN === 'string' && config.vars.MCP_AUTH_UI_ORIGIN.trim());
@@ -270,10 +269,8 @@ async function main() {
     ok('At least one auth mechanism is configured.');
   }
 
-  if (hasStaticAuth && hasOidcAuth && !staticFallbackEnabled) {
-    ok(
-      'Static token exists, but static fallback remains disabled unless MCP_ALLOW_STATIC_FALLBACK is explicitly set.',
-    );
+  if (hasStaticAuth) {
+    ok('MCP_AUTH_TOKEN is configured for the explicit x-mcp-service-token path.');
   }
 
   if (config) {
@@ -311,9 +308,7 @@ async function main() {
   console.log('  wrangler secret put MCP_UI_SESSION_SECRET');
   console.log('  wrangler secret put OIDC_ISSUER');
   console.log('  wrangler secret put OIDC_AUDIENCE');
-  console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional static auth');
-  console.log('  wrangler secret put MCP_AUTH_PRIMARY # optional: oidc|static');
-  console.log('  wrangler secret put MCP_ALLOW_STATIC_FALLBACK # migration-only');
+  console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
   console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
   console.log('  pnpm run cloudflare:deploy');
 
