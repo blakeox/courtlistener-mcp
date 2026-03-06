@@ -111,7 +111,7 @@ jobs:
 
       - name: 📈 Upload Coverage to Codecov
         if: github.event_name != 'schedule'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage/coverage-final.json
           flags: unittests
