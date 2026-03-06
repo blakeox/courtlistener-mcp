@@ -14,8 +14,6 @@ import { buildEdgeAuthDecisionEngine } from './edge-auth-decision-engine.js';
 
 export interface WorkerSecurityEnv {
   MCP_AUTH_TOKEN?: string;
-  MCP_AUTH_PRIMARY?: string;
-  MCP_ALLOW_STATIC_FALLBACK?: string;
   MCP_SERVICE_TOKEN_HEADER?: string;
   MCP_REQUIRE_PROTOCOL_VERSION?: string;
   MCP_ALLOWED_ORIGINS?: string;
@@ -32,7 +30,7 @@ export interface WorkerSecurityDeps {
   ) => Promise<{ payload: Record<string, unknown> }>;
 }
 
-export type AuthMethod = 'oidc' | 'static';
+export type AuthMethod = 'oidc' | 'service';
 export type McpRequestPrincipal = PrincipalContext;
 
 export interface McpAuthorizationResult {
@@ -164,11 +162,10 @@ function extractUserIdFromClaims(payload: Record<string, unknown>): string | und
  * Authorize MCP requests using either:
  * 0) Internal service-token header validation (x-mcp-service-token by default)
  * 1) OIDC/Cloudflare Access JWT verification (if OIDC_* configured)
- * 2) Static bearer token (MCP_AUTH_TOKEN)
  *
- * If multiple mechanisms are configured, the primary backend is selected by:
- * MCP_AUTH_PRIMARY (default: oidc when configured), with static fallback
- * only when MCP_ALLOW_STATIC_FALLBACK is true.
+ * Public MCP access is OAuth/OIDC only. MCP_AUTH_TOKEN is reserved for the
+ * explicit service-token header path and is never accepted as a public bearer
+ * token in the Authorization header.
  */
 export async function authorizeMcpRequestWithPrincipal(
   request: Request,
@@ -179,16 +176,12 @@ export async function authorizeMcpRequestWithPrincipal(
   const serviceTokenHeader = env.MCP_SERVICE_TOKEN_HEADER?.trim() || 'x-mcp-service-token';
   const serviceTokenCandidate = request.headers.get(serviceTokenHeader)?.trim() || null;
   const cfAccessJwt = request.headers.get('CF-Access-Jwt-Assertion')?.trim() || null;
-  const staticToken = env.MCP_AUTH_TOKEN?.trim();
+  const serviceToken = env.MCP_AUTH_TOKEN?.trim();
   const oidcConfig = getOidcConfig(env);
-  const staticTokenConfigured = Boolean(staticToken);
-  const allowStaticFallback = parseBoolean(env.MCP_ALLOW_STATIC_FALLBACK);
   const decisionEngine = buildEdgeAuthDecisionEngine({
-    requestedPrimary: env.MCP_AUTH_PRIMARY,
-    allowStaticFallback,
-    serviceTokenConfigured: staticTokenConfigured,
+    requestedPrimary: 'oidc',
+    serviceTokenConfigured: Boolean(serviceToken),
     oidcConfigured: Boolean(oidcConfig),
-    staticTokenConfigured,
   });
 
   const verifyFn = deps.verifyAccessTokenFn ?? verifyAccessToken;
@@ -199,11 +192,10 @@ export async function authorizeMcpRequestWithPrincipal(
 
   const shouldTryServiceToken = decisionEngine.attempts.includes('serviceToken');
   const shouldTryOidc = decisionEngine.attempts.includes('oidc');
-  const shouldTryStatic = decisionEngine.attempts.includes('static');
 
-  if (staticToken && shouldTryServiceToken && serviceTokenCandidate) {
-    if (serviceTokenCandidate === staticToken) {
-      return { authError: null, principal: { authMethod: 'static' } };
+  if (serviceToken && shouldTryServiceToken && serviceTokenCandidate) {
+    if (serviceTokenCandidate === serviceToken) {
+      return { authError: null, principal: { authMethod: 'service' } };
     }
     return { authError: jsonError(401, 'Invalid service token', 'invalid_token', request) };
   }
@@ -245,7 +237,7 @@ export async function authorizeMcpRequestWithPrincipal(
     }
 
     if (hasJwtCandidate) {
-      if (!shouldTryStatic && !shouldTryServiceToken) {
+      if (!shouldTryServiceToken) {
         const message =
           lastError instanceof Error ? lastError.message : 'token_verification_failed';
         if (message === 'insufficient_scope') {
@@ -255,7 +247,7 @@ export async function authorizeMcpRequestWithPrincipal(
         }
         return { authError: jsonError(401, 'Invalid OIDC access token', 'invalid_token', request) };
       }
-    } else if (!shouldTryStatic && !shouldTryServiceToken) {
+    } else if (!shouldTryServiceToken) {
       return {
         authError: jsonError(
           401,
@@ -267,13 +259,8 @@ export async function authorizeMcpRequestWithPrincipal(
     }
   }
 
-  if (staticToken && shouldTryStatic) {
-    if (bearerToken === staticToken) {
-      return { authError: null, principal: { authMethod: 'static' } };
-    }
-    if (decisionEngine.effectivePrimary === 'static' || allowStaticFallback) {
-      return { authError: jsonError(401, 'Invalid static bearer token', 'invalid_token', request) };
-    }
+  if (shouldTryServiceToken) {
+    return { authError: jsonError(401, 'Invalid service token', 'invalid_token', request) };
   }
 
   return { authError: jsonError(401, 'Unauthorized', 'unauthorized', request) };

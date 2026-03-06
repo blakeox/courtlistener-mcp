@@ -1,8 +1,8 @@
 import type { ServerConfig } from '../types.js';
 import { redactSecretsInText } from './secret-redaction.js';
 
-type WorkerAuthMethod = 'oidc' | 'staticToken';
-type AuthFeature = 'oauth' | 'oidc' | 'serviceToken' | 'staticToken' | 'apiKeyAuth';
+type WorkerAuthMethod = 'oidc';
+type AuthFeature = 'oauth' | 'oidc' | 'serviceToken' | 'apiKeyAuth';
 
 interface AuthCompatibilityRule {
   id: string;
@@ -11,18 +11,13 @@ interface AuthCompatibilityRule {
 }
 
 export const AUTH_POLICY_MATRIX = {
-  precedence: ['oauth', 'serviceToken', 'oidc', 'staticToken'] as const,
-  workerPrecedence: ['oidc', 'staticToken'] as const,
+  precedence: ['oauth', 'serviceToken', 'oidc'] as const,
+  workerPrecedence: ['oidc'] as const,
   incompatibleCombinations: [
     {
       id: 'oauth-api-key-auth',
       requiresAll: ['oauth', 'apiKeyAuth'],
       message: 'OAuth and API-key auth cannot both be enabled at startup',
-    },
-    {
-      id: 'oauth-static-token',
-      requiresAll: ['oauth', 'staticToken'],
-      message: 'OAuth and static bearer token auth cannot both be enabled at startup',
     },
     {
       id: 'oauth-oidc',
@@ -39,11 +34,8 @@ export interface AuthPolicyDiagnostics {
     apiKeyAuth: boolean;
     serviceToken: boolean;
     oidc: boolean;
-    staticToken: boolean;
   };
-  requestedPrimary: string | null;
   effectivePrimary: WorkerAuthMethod | null;
-  staticFallbackEnabled: boolean;
   incompatibleRulesTriggered: string[];
 }
 
@@ -60,10 +52,7 @@ function parseBoolean(value: string | undefined): boolean {
 }
 
 function getConfiguredWorkerMethods(configured: AuthPolicyDiagnostics['configured']): WorkerAuthMethod[] {
-  return AUTH_POLICY_MATRIX.workerPrecedence.filter(
-    (method): method is WorkerAuthMethod =>
-      method === 'oidc' ? configured.oidc : configured.staticToken,
-  );
+  return configured.oidc ? ['oidc'] : [];
 }
 
 export function evaluateAuthPolicyMatrix(
@@ -73,15 +62,12 @@ export function evaluateAuthPolicyMatrix(
   const oauth = config.oauth?.enabled ?? false;
   const apiKeyAuth = config.security.authEnabled;
   const oidc = Boolean(env.OIDC_ISSUER?.trim());
-  const staticToken = Boolean(env.MCP_AUTH_TOKEN?.trim());
-  const requestedPrimary = env.MCP_AUTH_PRIMARY?.trim().toLowerCase() || null;
-  const staticFallbackEnabled = parseBoolean(env.MCP_ALLOW_STATIC_FALLBACK);
+  const serviceToken = Boolean(env.MCP_AUTH_TOKEN?.trim());
   const configured = {
     oauth,
     apiKeyAuth,
-    serviceToken: staticToken,
+    serviceToken,
     oidc,
-    staticToken,
   };
 
   const errors: string[] = [];
@@ -95,40 +81,28 @@ export function evaluateAuthPolicyMatrix(
     if (rule) errors.push(rule.message);
   }
 
-  if (staticToken && apiKeyAuth) {
+  if (serviceToken && apiKeyAuth) {
     warnings.push('Both gateway token auth and API-key auth are configured; verify intended precedence');
   }
 
+  if (serviceToken) {
+    warnings.push(
+      'MCP_AUTH_TOKEN is configured; ensure it is used only via the explicit service-token header path, not client Authorization bearer auth',
+    );
+  }
+
   const configuredWorkerMethods = getConfiguredWorkerMethods(configured);
-  const allowedPrimaryValues = new Set<WorkerAuthMethod>(AUTH_POLICY_MATRIX.workerPrecedence);
-  const requestedPrimaryMethod = requestedPrimary === 'static' ? 'staticToken' : requestedPrimary;
-
-  if (requestedPrimary && !allowedPrimaryValues.has(requestedPrimaryMethod as WorkerAuthMethod)) {
-    errors.push('MCP_AUTH_PRIMARY must be one of: oidc, static');
+  if (env.MCP_AUTH_PRIMARY?.trim()) {
+    warnings.push('MCP_AUTH_PRIMARY is deprecated and ignored; edge auth now requires OAuth/OIDC for client access');
   }
 
-  if (
-    requestedPrimaryMethod &&
-    allowedPrimaryValues.has(requestedPrimaryMethod as WorkerAuthMethod) &&
-    !configuredWorkerMethods.includes(requestedPrimaryMethod as WorkerAuthMethod)
-  ) {
-    errors.push('MCP_AUTH_PRIMARY was set for an auth mode that is not configured');
+  if (parseBoolean(env.MCP_ALLOW_STATIC_FALLBACK)) {
+    warnings.push(
+      'MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored; static bearer-token fallback is disabled',
+    );
   }
 
-  if (staticFallbackEnabled && !staticToken) {
-    errors.push('MCP_ALLOW_STATIC_FALLBACK requires MCP_AUTH_TOKEN to be configured');
-  }
-
-  if (staticFallbackEnabled && !configured.oidc) {
-    warnings.push('MCP_ALLOW_STATIC_FALLBACK is enabled but no OIDC primary auth is configured');
-  }
-
-  const effectivePrimary =
-    requestedPrimaryMethod &&
-    allowedPrimaryValues.has(requestedPrimaryMethod as WorkerAuthMethod) &&
-    configuredWorkerMethods.includes(requestedPrimaryMethod as WorkerAuthMethod)
-      ? (requestedPrimaryMethod as WorkerAuthMethod)
-      : (configuredWorkerMethods[0] ?? null);
+  const effectivePrimary = configuredWorkerMethods[0] ?? null;
 
   return {
     errors: errors.map((message) => redactSecretsInText(message)),
@@ -136,9 +110,7 @@ export function evaluateAuthPolicyMatrix(
     diagnostics: {
       precedence: [...AUTH_POLICY_MATRIX.precedence],
       configured,
-      requestedPrimary,
       effectivePrimary,
-      staticFallbackEnabled,
       incompatibleRulesTriggered,
     },
   };

@@ -61,7 +61,7 @@ describe('worker-security auth', () => {
     assert.equal(res, null);
   });
 
-  it('enforces static bearer token with consistent auth error shape', async () => {
+  it('does not accept MCP_AUTH_TOKEN as a public bearer token', async () => {
     await runAuthFailureContract(
       [
         { name: 'missing token', expectedStatus: 401, expectedError: 'invalid_token' },
@@ -73,11 +73,6 @@ describe('worker-security auth', () => {
           { MCP_AUTH_TOKEN: 'secret' },
         ),
     );
-
-    const ok = await authorizeMcpRequest(req({ Authorization: 'Bearer secret' }), {
-      MCP_AUTH_TOKEN: 'secret',
-    });
-    assert.equal(ok, null);
   });
 
   it('includes OAuth discovery challenge headers on 401 auth failures', async () => {
@@ -165,13 +160,12 @@ describe('worker-security auth', () => {
     assert.match(challenge, /scope="legal:read legal:search legal:analyze"/);
   });
 
-  it('falls back to static token when OIDC token verification fails', async () => {
+  it('does not fall back to MCP_AUTH_TOKEN bearer auth when OIDC verification fails', async () => {
     const res = await authorizeMcpRequest(
       req({ Authorization: 'Bearer fallback-secret' }),
       {
         OIDC_ISSUER: 'https://issuer.example.com',
         MCP_AUTH_TOKEN: 'fallback-secret',
-        MCP_ALLOW_STATIC_FALLBACK: 'true',
       },
       {
         verifyAccessTokenFn: async () => {
@@ -179,55 +173,15 @@ describe('worker-security auth', () => {
         },
       },
     );
-    assert.equal(res, null);
+    assert.ok(res);
+    assert.equal(res.status, 401);
   });
 
-  it('uses static token when OIDC is not configured', async () => {
-    const res = await authorizeMcpRequest(
-      req({ Authorization: 'Bearer static-fallback' }),
-      {
-        MCP_AUTH_TOKEN: 'static-fallback',
-      },
-    );
-    assert.equal(res, null);
-  });
-
-  it('returns OIDC principal userId when static fallback succeeds', async () => {
-    const result = await authorizeMcpRequestWithPrincipal(
-      req({ Authorization: 'Bearer static-fallback' }),
-      {
-        OIDC_ISSUER: 'https://issuer.example.com',
-        MCP_AUTH_TOKEN: 'static-fallback',
-        MCP_ALLOW_STATIC_FALLBACK: 'true',
-      },
-      {
-        verifyAccessTokenFn: async () => {
-          throw new Error('jwt_invalid');
-        },
-      },
-    );
-    assert.equal(result.authError, null);
-    assert.equal(result.principal?.authMethod, 'static');
-  });
-
-  it('supports explicit static primary auth when configured', async () => {
-    const res = await authorizeMcpRequest(
-      req({ Authorization: 'Bearer static-primary' }),
-      {
-        OIDC_ISSUER: 'https://issuer.example.com',
-        MCP_AUTH_TOKEN: 'static-primary',
-        MCP_AUTH_PRIMARY: 'static',
-      },
-    );
-    assert.equal(res, null);
-  });
-
-  it('supports oauth primary alias for OIDC verification', async () => {
+  it('supports oauth primary alias for OIDC verification compatibility', async () => {
     const res = await authorizeMcpRequest(
       req({ Authorization: 'Bearer oauth-token' }),
       {
         OIDC_ISSUER: 'https://issuer.example.com',
-        MCP_AUTH_PRIMARY: 'oauth',
       },
       {
         verifyAccessTokenFn: async () => ({ payload: { sub: 'user-oauth' } }),
@@ -253,7 +207,7 @@ describe('worker-security auth', () => {
       },
     );
     assert.equal(result.authError, null);
-    assert.equal(result.principal?.authMethod, 'static');
+    assert.equal(result.principal?.authMethod, 'service');
   });
 
   it('fails closed when a service-token header is present but invalid', async () => {
@@ -269,6 +223,19 @@ describe('worker-security auth', () => {
     );
     assert.ok(result.authError);
     assert.equal(result.authError?.status, 401);
+  });
+
+  it('accepts valid service-token header when OIDC is not configured', async () => {
+    const result = await authorizeMcpRequestWithPrincipal(
+      req({
+        'x-mcp-service-token': 'edge-service-secret',
+      }),
+      {
+        MCP_AUTH_TOKEN: 'edge-service-secret',
+      },
+    );
+    assert.equal(result.authError, null);
+    assert.equal(result.principal?.authMethod, 'service');
   });
 
   it('requires Authorization bearer token for OIDC auth', async () => {

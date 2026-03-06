@@ -103,10 +103,6 @@ function getDefaultConfig(): HttpTransportConfig {
 function getWorkerSecurityEnv(): WorkerSecurityEnv {
   const env: WorkerSecurityEnv = {};
   if (process.env.MCP_AUTH_TOKEN !== undefined) env.MCP_AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
-  if (process.env.MCP_AUTH_PRIMARY !== undefined) env.MCP_AUTH_PRIMARY = process.env.MCP_AUTH_PRIMARY;
-  if (process.env.MCP_ALLOW_STATIC_FALLBACK !== undefined) {
-    env.MCP_ALLOW_STATIC_FALLBACK = process.env.MCP_ALLOW_STATIC_FALLBACK;
-  }
   if (process.env.MCP_REQUIRE_PROTOCOL_VERSION !== undefined) {
     env.MCP_REQUIRE_PROTOCOL_VERSION = process.env.MCP_REQUIRE_PROTOCOL_VERSION;
   }
