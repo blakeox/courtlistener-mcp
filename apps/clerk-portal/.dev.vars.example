@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local Cloudflare preview secrets.
+CLERK_SECRET_KEY=sk_test_your_secret_key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key

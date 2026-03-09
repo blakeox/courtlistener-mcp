@@ -17,14 +17,18 @@
 :root {
   --bg: #f5f0e8;
   --bg-soft: #faf7f2;
+  --bg-elevated: #fffdf9;
   --ink: #11253f;
   --ink-muted: #4a6078;
+  --muted: var(--ink-muted);
   --brand: #0a7f5a;
   --brand-deep: #086245;
   --line: #d9c8b1;
   --card: #fffdf9;
+  --panel: var(--card);
   --danger: #b83232;
   --ok: #1f7a4d;
+  --success: var(--ok);
   --shadow: 0 14px 30px rgba(17, 37, 63, 0.14);
   --space-1: 4px;
   --space-2: 8px;
@@ -1276,6 +1280,17 @@ footer a {
 }
 .skip-link:focus {
   left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .stepper a {

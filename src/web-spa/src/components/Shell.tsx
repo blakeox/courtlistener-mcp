@@ -165,7 +165,7 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       </div>
 
       <footer>
-        Operator console for MCP diagnostics. Public sign-in and usage live in the separate auth UI. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
+        Operator console for MCP diagnostics. Public sign-in flows through the separate Clerk handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
       </footer>
     </div>
   );
