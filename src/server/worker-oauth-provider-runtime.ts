@@ -129,10 +129,15 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
   deps: OAuthProviderRuntimeDeps<TEnv>,
 ) {
   const base = deps.baseOrigin ?? 'https://courtlistenermcp.blakeoxford.com';
+  // Use RELATIVE paths for OAuth endpoints — the OAuthProvider library
+  // resolves them against the request origin.  Happy-fox (working ChatGPT
+  // reference) uses this same pattern.  Absolute URLs caused the library's
+  // matchEndpoint() to compare hostnames, which can fail when the request
+  // arrives on an unexpected origin.
   const options = {
-    authorizeEndpoint: `${base}/authorize`,
-    tokenEndpoint: `${base}/token`,
-    clientRegistrationEndpoint: `${base}/register`,
+    authorizeEndpoint: '/authorize',
+    tokenEndpoint: '/token',
+    clientRegistrationEndpoint: '/register',
     resourceMetadata: {
       resource: base,
       authorization_servers: [base],

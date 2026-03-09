@@ -1,6 +1,6 @@
 {
   "name": "courtlistener-mcp",
-  "compatibility_date": "2025-07-25",
+  "compatibility_date": "2026-03-02",
   "main": "src/worker.ts",
   "workers_dev": false,
   "vars": {
