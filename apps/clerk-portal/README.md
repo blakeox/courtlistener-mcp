@@ -18,12 +18,14 @@ Copy `.env.example` to `.env.local` and fill in the values:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_MCP_ORIGIN`
+- `NEXT_PUBLIC_MCP_ADDITIONAL_ORIGINS`
 - `NEXT_PUBLIC_CLERK_TOKEN_TEMPLATE`
 
 Recommended defaults already included:
 
 - `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/auth/start`
 - `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/auth/start`
+- `NEXT_PUBLIC_MCP_ADDITIONAL_ORIGINS=https://courtlistener-mcp.blakeoxford.workers.dev`
 
 ## Run locally
 
@@ -87,6 +89,7 @@ For production, change `MCP_AUTH_UI_ORIGIN` to the deployed origin of this app.
 - `/auth/start` is the single focused handoff screen.
 - The worker redirects to `/auth/start?return_to=...` when an OAuth `/authorize` request needs user identity.
 - The portal decides between `oauth-complete` and `bootstrap` by inspecting `return_to`; there is no separate `mode` query parameter anymore.
+- Direct OAuth completion posts back to the exact trusted worker origin that initiated `/authorize`, so workers.dev and custom-domain flows stay on the same authorization server.
 
 ## Key files
 

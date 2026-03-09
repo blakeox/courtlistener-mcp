@@ -22,16 +22,24 @@ describe('auth-start utils', () => {
     });
   });
 
-  it('canonicalizes workers.dev authorize targets onto the configured MCP origin', async () => {
-    const { resolveAuthStartReturnTarget, isDirectOauthReturnTarget } = await loadAuthStartUtils();
+  it('preserves trusted workers.dev authorize targets for direct OAuth completion', async () => {
+    const {
+      resolveAuthStartReturnTarget,
+      isDirectOauthReturnTarget,
+      resolveDirectOauthWorkerOrigin,
+    } = await loadAuthStartUtils();
     const resolved = resolveAuthStartReturnTarget(
       'https://courtlistener-mcp.blakeoxford.workers.dev/authorize?response_type=code&state=abc',
     );
     assert.deepEqual(resolved, {
-      value: 'https://courtlistenermcp.blakeoxford.com/authorize?response_type=code&state=abc',
+      value: 'https://courtlistener-mcp.blakeoxford.workers.dev/authorize?response_type=code&state=abc',
       isExplicit: true,
     });
     assert.equal(isDirectOauthReturnTarget(resolved.value), true);
+    assert.equal(
+      resolveDirectOauthWorkerOrigin(resolved.value),
+      'https://courtlistener-mcp.blakeoxford.workers.dev',
+    );
   });
 
   it('drops invalid absolute return targets while preserving explicit intent', async () => {

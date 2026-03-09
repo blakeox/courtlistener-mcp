@@ -20,6 +20,7 @@
   },
   "vars": {
     "NEXT_PUBLIC_MCP_ORIGIN": "https://courtlistenermcp.blakeoxford.com",
+    "NEXT_PUBLIC_MCP_ADDITIONAL_ORIGINS": "https://courtlistener-mcp.blakeoxford.workers.dev",
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYXV0aC5jb3VydGxpc3RlbmVybWNwLmJsYWtlb3hmb3JkLmNvbSQ",
     "NEXT_PUBLIC_CLERK_DOMAIN": "clerk.auth.courtlistenermcp.blakeoxford.com",
     "NEXT_PUBLIC_CLERK_TOKEN_TEMPLATE": "mcp",

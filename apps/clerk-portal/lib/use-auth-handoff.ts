@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { CLERK_TOKEN_TEMPLATE, MCP_ORIGIN } from './config';
-import { isDirectOauthReturnTarget } from './auth-start';
+import { resolveDirectOauthWorkerOrigin } from './auth-start';
 
 type HandoffErrorResponse = {
   error?: string;
@@ -38,7 +38,8 @@ export function useAuthHandoff({ returnTo, isLoaded, isSignedIn, getToken }: Use
         );
       }
 
-      const isDirectOauthFlow = isDirectOauthReturnTarget(returnTo);
+      const directOauthWorkerOrigin = resolveDirectOauthWorkerOrigin(returnTo);
+      const isDirectOauthFlow = directOauthWorkerOrigin !== null;
       setStatus(
         isDirectOauthFlow
           ? 'Completing OAuth authorization with the worker...'
@@ -59,7 +60,8 @@ export function useAuthHandoff({ returnTo, isLoaded, isSignedIn, getToken }: Use
         requestInit.body = JSON.stringify({ return_to: returnTo });
       }
 
-      const response = await fetch(`${MCP_ORIGIN}${endpoint}`, requestInit);
+      const workerOrigin = directOauthWorkerOrigin || MCP_ORIGIN;
+      const response = await fetch(`${workerOrigin}${endpoint}`, requestInit);
 
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as HandoffErrorResponse;
