@@ -4,7 +4,7 @@ import { UserButton, useAuth, useClerk } from '@clerk/nextjs';
 import { Suspense, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-import { resolveAuthStartReturnTarget } from '../../../lib/auth-start';
+import { isDirectOauthReturnTarget, resolveAuthStartReturnTarget } from '../../../lib/auth-start';
 import { CLERK_TOKEN_TEMPLATE, MCP_ORIGIN } from '../../../lib/config';
 import { useAuthHandoff } from '../../../lib/use-auth-handoff';
 
@@ -44,6 +44,7 @@ function AuthStartContent() {
   const returnTarget = useMemo(() => resolveAuthStartReturnTarget(params.get('return_to')), [params]);
   const returnTo = returnTarget.value;
   const hasReturnTo = returnTarget.isExplicit;
+  const isDirectOauthFlow = isDirectOauthReturnTarget(returnTo);
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
   const clerk = useClerk();
   const { status, error, isSubmitting, completeAuthHandoff } = useAuthHandoff({
@@ -142,11 +143,11 @@ function AuthStartContent() {
             </li>
             <li>
               <strong>Worker handoff mode</strong>
-              <span>{hasReturnTo ? 'Direct OAuth completion from the worker authorize flow.' : 'Browser-session bootstrap back into the worker UI.'}</span>
+              <span>{isDirectOauthFlow ? 'Direct OAuth completion from the worker authorize flow.' : 'Browser-session bootstrap back into the worker UI.'}</span>
             </li>
             <li>
               <strong>Next action</strong>
-              <span>{isSignedIn ? (hasReturnTo ? 'The portal will finish the redirect automatically.' : 'Use Continue to complete the worker session.') : 'Authenticate with Clerk to continue.'}</span>
+              <span>{isSignedIn ? (isDirectOauthFlow ? 'The portal will finish the OAuth redirect automatically.' : 'Use Continue to complete the worker session.') : 'Authenticate with Clerk to continue.'}</span>
             </li>
           </ul>
           <p className="footnote">

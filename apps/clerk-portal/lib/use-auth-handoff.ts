@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { CLERK_TOKEN_TEMPLATE, MCP_ORIGIN } from './config';
+import { isDirectOauthReturnTarget } from './auth-start';
 
 type HandoffErrorResponse = {
   error?: string;
@@ -15,15 +16,6 @@ interface UseAuthHandoffOptions {
   isLoaded: boolean;
   isSignedIn: boolean;
   getToken: (options: { template: string }) => Promise<string | null>;
-}
-
-function isWorkerAuthorizeReturnTarget(returnTo: string): boolean {
-  try {
-    const url = new URL(returnTo);
-    return url.origin === MCP_ORIGIN && url.pathname === '/authorize';
-  } catch {
-    return false;
-  }
 }
 
 export function useAuthHandoff({ returnTo, isLoaded, isSignedIn, getToken }: UseAuthHandoffOptions) {
@@ -46,7 +38,7 @@ export function useAuthHandoff({ returnTo, isLoaded, isSignedIn, getToken }: Use
         );
       }
 
-      const isDirectOauthFlow = isWorkerAuthorizeReturnTarget(returnTo);
+      const isDirectOauthFlow = isDirectOauthReturnTarget(returnTo);
       setStatus(
         isDirectOauthFlow
           ? 'Completing OAuth authorization with the worker...'
