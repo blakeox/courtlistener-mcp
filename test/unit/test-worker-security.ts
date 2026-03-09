@@ -80,8 +80,7 @@ describe('worker-security auth', () => {
     assert.ok(res);
     assert.equal(res.status, 401);
     const challenge = res.headers.get('www-authenticate') ?? '';
-    assert.match(challenge, /Bearer realm="mcp"/);
-    assert.match(challenge, /resource_metadata="https:\/\/example\.workers\.dev\/\.well-known\/oauth-protected-resource\/mcp"/);
+    assert.match(challenge, /^Bearer resource_metadata="https:\/\/example\.workers\.dev\/\.well-known\/oauth-protected-resource"$/);
     const link = res.headers.get('link') ?? '';
     assert.match(link, /rel="oauth-protected-resource"/);
   });

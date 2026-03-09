@@ -140,7 +140,7 @@ describe('worker UI session runtime', () => {
     assert.ok(state?.headers.get('Set-Cookie'));
   });
 
-  it('resolves browser-session user id only from the signed worker cookie', async () => {
+  it('resolves UI session user id only from the signed worker cookie', async () => {
     const runtime = createRuntime();
     const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
     const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
@@ -151,7 +151,7 @@ describe('worker UI session runtime', () => {
       },
     });
 
-    const result = await runtime.resolveBrowserSessionUserId(request, env);
+    const result = await runtime.resolveUiSessionUserId(request, env);
 
     assert.equal(result, 'user-42');
   });
@@ -200,7 +200,7 @@ describe('worker UI session runtime', () => {
     );
 
     assert.equal(result.userId, null);
-    assert.match(String(result.error), /Malformed Clerk\/OIDC bearer token/i);
+    assert.match(String(result.error), /Malformed OIDC bearer token/i);
   });
 
   it('returns a bootstrap rate-limit response with retry headers', async () => {

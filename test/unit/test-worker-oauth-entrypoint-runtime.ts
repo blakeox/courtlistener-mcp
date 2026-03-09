@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 
 import {
   handleWorkerOAuthEntrypoint,
+  shouldBypassOAuthProvider,
   shouldInspectOAuthRoute,
 } from '../../src/server/worker-oauth-entrypoint-runtime.js';
 
@@ -12,10 +13,28 @@ describe('worker OAuth entrypoint runtime', () => {
   it('identifies the OAuth routes that should emit diagnostics', () => {
     assert.equal(shouldInspectOAuthRoute('/token'), true);
     assert.equal(shouldInspectOAuthRoute('/.well-known/oauth-authorization-server'), true);
+    assert.equal(shouldInspectOAuthRoute('/mcp/.well-known/oauth-authorization-server'), true);
+    assert.equal(shouldInspectOAuthRoute('/.well-known/oauth-authorization-server/mcp'), true);
+    assert.equal(shouldInspectOAuthRoute('/.well-known/openid-configuration'), true);
+    assert.equal(shouldInspectOAuthRoute('/mcp/.well-known/openid-configuration'), true);
+    assert.equal(shouldInspectOAuthRoute('/.well-known/openid-configuration/mcp'), true);
     assert.equal(shouldInspectOAuthRoute('/.well-known/oauth-protected-resource'), true);
     assert.equal(shouldInspectOAuthRoute('/.well-known/oauth-protected-resource/mcp'), true);
     assert.equal(shouldInspectOAuthRoute('/authorize'), false);
     assert.equal(shouldInspectOAuthRoute('/mcp'), false);
+  });
+
+  it('bypasses the provider for the /mcp auth metadata alias', () => {
+    assert.equal(shouldBypassOAuthProvider('/.well-known/oauth-authorization-server'), true);
+    assert.equal(shouldBypassOAuthProvider('/mcp/.well-known/oauth-authorization-server'), true);
+    assert.equal(shouldBypassOAuthProvider('/mcp/.well-known/openid-configuration'), true);
+    assert.equal(shouldBypassOAuthProvider('/.well-known/oauth-authorization-server/mcp'), true);
+    assert.equal(shouldBypassOAuthProvider('/.well-known/openid-configuration'), true);
+    assert.equal(shouldBypassOAuthProvider('/.well-known/openid-configuration/mcp'), true);
+    assert.equal(shouldBypassOAuthProvider('/.well-known/oauth-protected-resource'), true);
+    assert.equal(shouldBypassOAuthProvider('/.well-known/oauth-protected-resource/mcp'), true);
+    assert.equal(shouldBypassOAuthProvider('/mcp/.well-known/oauth-protected-resource'), true);
+    assert.equal(shouldBypassOAuthProvider('/mcp'), false);
   });
 
   it('passes through non-diagnostic routes without summarizing', async () => {

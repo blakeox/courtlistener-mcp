@@ -28,6 +28,7 @@ import {
   type CallToolRequest,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 import { generateId } from './common/utils.js';
 import { bootstrapServices } from './infrastructure/bootstrap.js';
@@ -69,7 +70,10 @@ import {
   type WorkerMcpAiRuntime,
 } from './server/worker-mcp-ai-runtime.js';
 import { createWorkerLegacyFetchHandler } from './server/worker-request-runtime.js';
-import { handleWorkerOAuthEntrypoint } from './server/worker-oauth-entrypoint-runtime.js';
+import {
+  handleWorkerOAuthEntrypoint,
+  shouldBypassOAuthProvider,
+} from './server/worker-oauth-entrypoint-runtime.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
 import { handleWorkerOAuthAuthorizeRoute } from './server/worker-oauth-authorize.js';
 import { handleWorkerDynamicClientRegistration } from './server/worker-oauth-registration.js';
@@ -232,12 +236,6 @@ function isMcpPath(pathname: string): boolean {
   return pathname === '/mcp' || pathname === '/sse';
 }
 
-function isCloudflareOAuthBackendEnabled(env: Env): boolean {
-  // Hard-cut migration posture: Cloudflare OAuth provider is now the only supported runtime.
-  void env;
-  return true;
-}
-
 function isRemovedLegacyUiRoute(pathname: string): boolean {
   return (
     pathname === '/oauth/consent' ||
@@ -295,6 +293,7 @@ function rejectDisallowedUiOrigin(
 const workerDelegatedRouteDeps = {
   jsonError,
   jsonResponse,
+  withCors,
   rejectDisallowedUiOrigin,
   requireCsrfToken: workerUiSessionRuntime.requireCsrfToken,
   parseJsonBody,
@@ -340,13 +339,17 @@ const workerDelegatedRouteDeps = {
   },
 } satisfies WorkerDelegatedRouteDeps<Env>;
 
+let getOAuthHelpersRef: (env: Env) => OAuthHelpers = () => {
+  throw new Error('OAuth helpers are not initialized.');
+};
+
 const workerCoreRouteDeps = {
   isAllowedOrigin,
   buildCorsHeaders,
   withCors,
   jsonError,
   jsonResponse,
-  isCloudflareOAuthBackendEnabled,
+  getOAuthHelpers: (env: Env) => getOAuthHelpersRef(env),
   isRemovedLegacyUiRoute,
   workerUiSessionRuntime,
   getCachedSessionTopology: workerObservabilityRuntime.getCachedSessionTopology,
@@ -396,43 +399,48 @@ const cloudflareOAuthProviderRuntime = createCloudflareOAuthProviderRuntime<Env>
 
 const cloudflareOAuthProvider = cloudflareOAuthProviderRuntime.provider;
 const getOAuthHelpers = cloudflareOAuthProviderRuntime.getOAuthHelpers;
+getOAuthHelpersRef = getOAuthHelpers;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (isCloudflareOAuthBackendEnabled(env)) {
-      if (
-        url.pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.register ||
-        url.pathname.startsWith(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`)
-      ) {
-        return handleWorkerDynamicClientRegistration(request, env, {
-          getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
-          getRegistrationAllowedOrigins: (runtimeEnv) =>
-            getRegistrationAllowedOrigins(runtimeEnv, {
-              getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
-            }),
-          isAllowedOrigin,
-          extractBearerToken,
-          buildCorsHeaders,
-          withRegistrationCors: (response, corsRequest, runtimeEnv) =>
-            withRegistrationCors(response, corsRequest, runtimeEnv, {
-              getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
-              buildCorsHeaders,
-              getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
-            }),
-          jsonRegistrationError,
-          getOAuthHelpers,
-          createRegistrationAccessToken,
-          verifyRegistrationAccessToken,
-        });
-      }
-      return handleWorkerOAuthEntrypoint(request, env, ctx, {
-        cloudflareOAuthProvider,
-        summarizeOAuthRequest,
-        summarizeOAuthResponse,
-        emitOAuthDiagnostic,
+    // Capture the request origin so the OAuthProvider's onError callback
+    // builds resource_metadata URLs relative to the domain the client used
+    // (workers.dev vs custom domain).
+    cloudflareOAuthProviderRuntime.setCurrentRequestOrigin(url.origin);
+
+    if (shouldBypassOAuthProvider(url.pathname)) {
+      return handleLegacyWorkerFetch(request, env, ctx);
+    }
+    // Let the OAuthProvider handle base /register (RFC 7591 DCR) natively.
+    // Only intercept /register/{clientId} for client management (RFC 7592).
+    if (url.pathname.startsWith(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`)) {
+      return handleWorkerDynamicClientRegistration(request, env, {
+        getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
+        getRegistrationAllowedOrigins: (runtimeEnv) =>
+          getRegistrationAllowedOrigins(runtimeEnv, {
+            getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
+          }),
+        isAllowedOrigin,
+        extractBearerToken,
+        buildCorsHeaders,
+        withRegistrationCors: (response, corsRequest, runtimeEnv) =>
+          withRegistrationCors(response, corsRequest, runtimeEnv, {
+            getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
+            buildCorsHeaders,
+            getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
+          }),
+        jsonRegistrationError,
+        getOAuthHelpers,
+        createRegistrationAccessToken,
+        verifyRegistrationAccessToken,
       });
     }
-    return handleLegacyWorkerFetch(request, env, ctx);
+    return handleWorkerOAuthEntrypoint(request, env, ctx, {
+      cloudflareOAuthProvider,
+      summarizeOAuthRequest,
+      summarizeOAuthResponse,
+      emitOAuthDiagnostic,
+    });
   },
 };

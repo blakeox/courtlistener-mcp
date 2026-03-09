@@ -21,11 +21,16 @@ function jsonError(message: string, status: number, errorCode: string): Response
   return jsonResponse({ error: message, error_code: errorCode }, status);
 }
 
+function withCors(response: Response): Response {
+  return response;
+}
+
 describe('worker OAuth smoke', () => {
   it('serves discovery metadata and leaves provider endpoints unhandled', async () => {
     const deps: WorkerOAuthRouteDeps<TestEnv> = {
       jsonError,
       jsonResponse,
+      withCors,
     };
 
     const discoveryRequest = new Request(
@@ -33,7 +38,7 @@ describe('worker OAuth smoke', () => {
       { method: 'GET' },
     );
     const discoveryResponse = await handleWorkerOAuthRoutes(
-      { request: discoveryRequest, url: new URL(discoveryRequest.url), env: {} },
+      { request: discoveryRequest, url: new URL(discoveryRequest.url), origin: null, allowedOrigins: [], env: {} },
       deps,
     );
     assert.ok(discoveryResponse);
@@ -45,7 +50,7 @@ describe('worker OAuth smoke', () => {
       body: 'grant_type=authorization_code&code=x&code_verifier=y',
     });
     const tokenResponse = await handleWorkerOAuthRoutes(
-      { request: tokenRequest, url: new URL(tokenRequest.url), env: {} },
+      { request: tokenRequest, url: new URL(tokenRequest.url), origin: null, allowedOrigins: [], env: {} },
       deps,
     );
     assert.equal(tokenResponse, null);

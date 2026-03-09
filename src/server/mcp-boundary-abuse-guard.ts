@@ -1,3 +1,6 @@
+import { parsePositiveInt } from '../common/validation.js';
+import { parseBoolean } from './worker-security.js';
+
 export interface McpBoundaryGuardEnv {
   MCP_BOUNDARY_GUARDS_ENABLED?: string;
   MCP_BOUNDARY_RATE_LIMIT_MAX?: string;
@@ -24,19 +27,6 @@ const DEFAULT_BOUNDARY_RATE_LIMIT_BLOCK_SECONDS = 120;
 const DEFAULT_BOUNDARY_HEAVY_PAYLOAD_BYTES = 64 * 1024;
 const DEFAULT_BOUNDARY_MAX_PAYLOAD_BYTES = 256 * 1024;
 const DEFAULT_BOUNDARY_REPLAY_WINDOW_SECONDS = 120;
-
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) return fallback;
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

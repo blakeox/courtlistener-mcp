@@ -1,6 +1,7 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
-import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
+import { buildHostedOAuthCompletionDetails } from '../auth/oauth-authorization-completion.js';
+import { resolveGrantedScopes } from '../auth/oauth-scope-resolver.js';
 import {
   emitOAuthDiagnostic,
   summarizeOAuthRequest,
@@ -87,22 +88,17 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
     });
     return response;
   }
-  const supportedScopes = new Set<string>(HOSTED_MCP_OAUTH_CONTRACT.scopesSupported);
-  const requestedScopes = authRequest.scope.filter((scope) => supportedScopes.has(scope));
-  const grantedScopes =
-    requestedScopes.length > 0 ? requestedScopes : [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported];
+  const grantedScopes = resolveGrantedScopes(authRequest);
 
   let completion;
   try {
+    const completionDetails = buildHostedOAuthCompletionDetails('cloudflare_oauth', sessionUserId);
     completion = await env.OAUTH_PROVIDER.completeAuthorization({
       request: authRequest,
       userId: sessionUserId,
-      metadata: { source: 'cloudflare_oauth', approved_at: new Date().toISOString() },
+      metadata: completionDetails.metadata,
       scope: grantedScopes,
-      props: {
-        userId: sessionUserId,
-        authMethod: 'cloudflare_oauth',
-      },
+      props: completionDetails.props,
     });
   } catch (error) {
     const response = deps.jsonError(

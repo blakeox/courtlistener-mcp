@@ -39,8 +39,8 @@ export interface McpAuthorizationResult {
   protocolNegotiation?: ProtocolHeaderNegotiationDiagnostics;
 }
 
-export function parseBoolean(value: string | undefined): boolean {
-  if (!value) return false;
+export function parseBoolean(value: string | undefined, fallback = false): boolean {
+  if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
@@ -81,7 +81,7 @@ function escapeHeaderValue(value: string): string {
 
 function buildMcpOAuthProtectedResourceMetadataUrl(request: Request): string {
   const origin = new URL(request.url).origin;
-  return `${origin}/.well-known/oauth-protected-resource/mcp`;
+  return `${origin}/.well-known/oauth-protected-resource`;
 }
 
 function buildWwwAuthenticateHeader(
@@ -90,13 +90,10 @@ function buildWwwAuthenticateHeader(
   code: string,
   status: number,
 ): string {
-  const parts = [
-    'Bearer realm="mcp"',
-    `error="${escapeHeaderValue(code)}"`,
-    `error_description="${escapeHeaderValue(message)}"`,
-    `resource_metadata="${escapeHeaderValue(buildMcpOAuthProtectedResourceMetadataUrl(request))}"`,
-  ];
+  const parts = [`Bearer resource_metadata="${escapeHeaderValue(buildMcpOAuthProtectedResourceMetadataUrl(request))}"`];
   if (status === 403 && code === 'insufficient_scope') {
+    parts.push(`error="${escapeHeaderValue(code)}"`);
+    parts.push(`error_description="${escapeHeaderValue(message)}"`);
     parts.push('scope="legal:read legal:search legal:analyze"');
   }
   return parts.join(', ');

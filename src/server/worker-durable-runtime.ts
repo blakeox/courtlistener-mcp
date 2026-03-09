@@ -36,6 +36,7 @@ import {
   getMcpBoundaryGuardConfig,
   getRequestContentLength,
 } from './mcp-boundary-abuse-guard.js';
+import { parsePositiveInt } from '../common/validation.js';
 import { parseBoolean } from './worker-security.js';
 
 interface WorkerDurableRuntimeEnv {
@@ -109,13 +110,6 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     nowMs: number,
   ) => Promise<Response | null>;
   applyAiChatLifetimeQuota: (env: TEnv, userId: string) => Promise<Response | null>;
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
 }
 
 async function parseJsonBody<T>(request: Request): Promise<T | null> {

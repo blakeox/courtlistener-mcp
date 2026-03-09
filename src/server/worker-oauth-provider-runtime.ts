@@ -2,6 +2,11 @@ import { OAuthProvider, getOAuthApi, type OAuthHelpers } from '@cloudflare/worke
 
 import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
 import { verifyAccessToken, type OAuthConfig } from '../security/oidc.js';
+import { mergeHostedAiClientOrigins } from './oauth-client-origins.js';
+
+// Captured per-request so onError can build resource_metadata URLs relative
+// to the origin the client actually connected to (workers.dev vs custom domain).
+let _currentRequestOrigin = '';
 
 interface OAuthRuntimeEnv {
   MCP_ALLOWED_ORIGINS?: string;
@@ -17,6 +22,10 @@ interface OAuthRuntimeEnv {
 }
 
 interface OAuthProviderRuntimeDeps<TEnv extends OAuthRuntimeEnv> {
+  /** Base origin used as a static default for OAuthProvider config URLs.
+   *  Per-request dynamic origin is handled by setCurrentRequestOrigin +
+   *  custom discovery handlers. Defaults to 'https://courtlistenermcp.blakeoxford.com'. */
+  baseOrigin?: string;
   handleAuthorizeRoute: (request: Request, env: TEnv & { OAUTH_PROVIDER: OAuthHelpers }) => Promise<Response>;
   handleLegacyWorkerFetch: (
     request: Request,
@@ -45,15 +54,7 @@ export function getRegistrationAllowedOrigins<TEnv extends OAuthRuntimeEnv>(
   deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'getCachedAllowedOrigins'>,
 ): string[] {
   const configured = deps.getCachedAllowedOrigins(env.MCP_ALLOWED_ORIGINS, env.MCP_AUTH_UI_ORIGIN);
-  if (configured.includes('*')) return configured;
-
-  const allowed = [...configured];
-  for (const origin of ['https://chatgpt.com', 'https://chat.openai.com']) {
-    if (!allowed.includes(origin)) {
-      allowed.push(origin);
-    }
-  }
-  return allowed;
+  return mergeHostedAiClientOrigins(configured);
 }
 
 export function withRegistrationCors<TEnv extends OAuthRuntimeEnv>(
@@ -127,13 +128,14 @@ export async function verifyRegistrationAccessToken<TEnv extends OAuthRuntimeEnv
 export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEnv>(
   deps: OAuthProviderRuntimeDeps<TEnv>,
 ) {
+  const base = deps.baseOrigin ?? 'https://courtlistenermcp.blakeoxford.com';
   const options = {
-    authorizeEndpoint: 'https://courtlistenermcp.blakeoxford.com/authorize',
-    tokenEndpoint: 'https://courtlistenermcp.blakeoxford.com/token',
-    clientRegistrationEndpoint: 'https://courtlistenermcp.blakeoxford.com/register',
+    authorizeEndpoint: `${base}/authorize`,
+    tokenEndpoint: `${base}/token`,
+    clientRegistrationEndpoint: `${base}/register`,
     resourceMetadata: {
-      resource: 'https://courtlistenermcp.blakeoxford.com/mcp',
-      authorization_servers: ['https://courtlistenermcp.blakeoxford.com'],
+      resource: base,
+      authorization_servers: [base],
       scopes_supported: [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported],
       bearer_methods_supported: ['header'],
       resource_name: 'CourtListener MCP',
@@ -154,6 +156,9 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
         const headers = new Headers(request.headers);
         if (oauthUserId) headers.set('x-oauth-user-id', oauthUserId);
         if (oauthAuthMethod) headers.set('x-oauth-auth-method', oauthAuthMethod);
+        // Remove the Cloudflare OAuth bearer token — the provider already
+        // validated it.  Forwarding it would confuse downstream auth layers.
+        headers.delete('Authorization');
         const enrichedRequest = new Request(request, { headers });
         return deps.handleLegacyWorkerFetch(enrichedRequest, env, ctx, { skipGatewayAuth: true });
       },
@@ -170,7 +175,9 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
     scopesSupported: [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported],
     allowImplicitFlow: false,
     allowPlainPKCE: false,
-    clientIdMetadataDocumentEnabled: true,
+    // Disabled: ChatGPT interprets client_id_metadata_document_supported=true
+    // as "use CIMD instead of DCR" and skips RFC 7591 registration.
+    clientIdMetadataDocumentEnabled: false,
     onError: ({ code, description, status, headers }: {
       code: string;
       description: string;
@@ -182,27 +189,17 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
         status === 401 || (status === 403 && code === 'insufficient_scope');
 
       if (isAuthChallenge) {
+        const origin = _currentRequestOrigin || base;
         const mcpResourceMetadataUrl =
-          'https://courtlistenermcp.blakeoxford.com/.well-known/oauth-protected-resource/mcp';
-        const challengeParts = [
-          'Bearer realm="mcp"',
-          `resource_metadata="${mcpResourceMetadataUrl}"`,
-          `error="${code}"`,
-        ];
-        if (description) {
-          challengeParts.push(
-            `error_description="${description.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
-          );
-        }
-        if (status === 403 && code === 'insufficient_scope') {
-          challengeParts.push('scope="legal:read legal:search legal:analyze"');
-        }
-        normalizedHeaders.set('WWW-Authenticate', challengeParts.join(', '));
+          `${origin}/.well-known/oauth-protected-resource`;
+        normalizedHeaders.set('WWW-Authenticate', `Bearer resource_metadata="${mcpResourceMetadataUrl}"`);
         normalizedHeaders.append(
           'Link',
           `<${mcpResourceMetadataUrl}>; rel="oauth-protected-resource"`,
         );
       }
+      normalizedHeaders.set('content-type', 'application/json');
+      normalizedHeaders.set('cache-control', 'no-store');
 
       return new Response(
         JSON.stringify({
@@ -258,5 +255,9 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
     options,
     provider,
     getOAuthHelpers,
+    /** Call before provider.fetch() so onError can derive origin-relative URLs. */
+    setCurrentRequestOrigin(origin: string) {
+      _currentRequestOrigin = origin;
+    },
   };
 }

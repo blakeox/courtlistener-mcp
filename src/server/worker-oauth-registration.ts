@@ -184,39 +184,6 @@ async function mapRegistrationResponse<TEnv extends RegistrationEnv>(
   return response;
 }
 
-function buildRegistrationDiscoveryResponse<TEnv extends RegistrationEnv>(
-  request: Request,
-  env: TEnv,
-  deps: Pick<RegistrationDeps<TEnv>, 'withRegistrationCors'>,
-): Response {
-  const url = new URL(request.url);
-  const body = {
-    registration_endpoint: url.toString(),
-    registration_supported: true,
-    token_endpoint_auth_methods_supported: [
-      'client_secret_basic',
-      'client_secret_post',
-      'none',
-    ],
-    grant_types_supported: [...HOSTED_MCP_OAUTH_CONTRACT.grantTypesSupported],
-    response_types_supported: [...HOSTED_MCP_OAUTH_CONTRACT.responseTypesSupported],
-    code_challenge_methods_supported: ['S256'],
-  };
-
-  return deps.withRegistrationCors(
-    new Response(request.method === 'HEAD' ? null : JSON.stringify(body), {
-      status: 200,
-      headers: {
-        'content-type': 'application/json',
-        'cache-control': 'no-store',
-        allow: 'GET, HEAD, POST, OPTIONS',
-      },
-    }),
-    request,
-    env,
-  );
-}
-
 async function handleClientRegistrationManagement<TEnv extends RegistrationEnv>(
   request: Request,
   env: TEnv,
@@ -460,8 +427,27 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
   }
 
   if (request.method === 'GET' || request.method === 'HEAD') {
-    const response = buildRegistrationDiscoveryResponse(request, env, deps);
-    emitOAuthDiagnostic(env, 'oauth.register.discovery', {
+    // ChatGPT probes GET /register to confirm RFC 7591 DCR support before
+    // sending POST.  Return a 200 with minimal endpoint metadata so the
+    // client recognises the endpoint as active.
+    const body = request.method === 'GET'
+      ? JSON.stringify({
+          registration_endpoint: `${new URL(request.url).origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.register}`,
+          registration_endpoint_auth_methods_supported: ['none'],
+        })
+      : null;
+    const response = deps.withRegistrationCors(
+      new Response(body, {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        },
+      }),
+      request,
+      env,
+    );
+    emitOAuthDiagnostic(env, 'oauth.register.probe', {
       ...requestSummary,
       ...(await summarizeOAuthResponse(response)),
     });
@@ -514,19 +500,22 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
     applyClientMetadata(clientCreatePayload, validated.metadata);
 
     const clientInfo = await deps.getOAuthHelpers(env).createClient(clientCreatePayload);
+    const responseBody = await mapRegistrationResponse(url.origin, clientInfo, env, deps, {
+      includeClientSecret: true,
+    });
+    const responseHeaders: Record<string, string> = {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+    };
+    if (typeof responseBody.registration_client_uri === 'string' && responseBody.registration_client_uri.length > 0) {
+      responseHeaders.Location = responseBody.registration_client_uri;
+    }
     const response = deps.withRegistrationCors(
       new Response(
-        JSON.stringify(
-          await mapRegistrationResponse(url.origin, clientInfo, env, deps, {
-            includeClientSecret: true,
-          }),
-        ),
+        JSON.stringify(responseBody),
         {
           status: 201,
-          headers: {
-            'content-type': 'application/json',
-            'cache-control': 'no-store',
-          },
+          headers: responseHeaders,
         },
       ),
       request,

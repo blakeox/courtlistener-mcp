@@ -6,7 +6,6 @@ import { describe, it } from 'node:test';
 import { handleWorkerCoreRoutes } from '../../src/server/worker-core-routes.js';
 
 interface TestEnv {
-  oauthEnabled?: boolean;
   MCP_UI_SESSION_SECRET?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
@@ -49,7 +48,7 @@ function buildContext(pathname: string, requestMethod = 'GET') {
     url: new URL(request.url),
     origin: null,
     allowedOrigins: ['https://chatgpt.com'],
-    env: { oauthEnabled: true },
+    env: {},
     pathname,
     requestMethod,
     mcpPath: pathname === '/mcp',
@@ -76,10 +75,21 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
     },
     jsonError,
     jsonResponse,
-    isCloudflareOAuthBackendEnabled: (env: TestEnv) => env.oauthEnabled === true,
+    getOAuthHelpers: () => ({
+      parseAuthRequest: async () => ({
+        clientId: 'client-1',
+        redirectUri: 'https://chatgpt.com/callback',
+        responseType: 'code',
+        state: 'state-1',
+        scope: ['legal:read'],
+        codeChallenge: 'challenge',
+        codeChallengeMethod: 'S256',
+      }),
+      completeAuthorization: async () => ({ redirectTo: 'https://chatgpt.com/callback?code=abc&state=state-1' }),
+    }),
     isRemovedLegacyUiRoute: (pathname: string) => pathname === '/api/login',
     workerUiSessionRuntime: {
-      resolveBrowserSessionUserId: async () => 'user-1',
+      resolveUiSessionUserId: async () => 'user-1',
       resolveCloudflareOAuthUserId: async () => 'user-1',
       getSessionBootstrapRateLimitedResponse: async () => null,
       getUiSessionSecret: () => 'session-secret',
@@ -136,7 +146,7 @@ describe('handleWorkerCoreRoutes', () => {
       buildContext('/api/session'),
       buildDeps({
         workerUiSessionRuntime: {
-          resolveBrowserSessionUserId: async () => null,
+          resolveUiSessionUserId: async () => null,
           resolveCloudflareOAuthUserId: async () => 'user-1',
           getSessionBootstrapRateLimitedResponse: async () => null,
           getUiSessionSecret: () => 'session-secret',
@@ -175,7 +185,6 @@ describe('handleWorkerCoreRoutes', () => {
       origin: 'https://auth.courtlistenermcp.blakeoxford.com',
       allowedOrigins: ['https://auth.courtlistenermcp.blakeoxford.com'],
       env: {
-        oauthEnabled: true,
         MCP_UI_SESSION_SECRET: 'session-secret',
         OIDC_ISSUER: 'https://clerk.example',
         OIDC_AUDIENCE: 'mcp',
@@ -189,7 +198,7 @@ describe('handleWorkerCoreRoutes', () => {
       context,
       buildDeps({
         workerUiSessionRuntime: {
-          resolveBrowserSessionUserId: async () => 'user-1',
+          resolveUiSessionUserId: async () => 'user-1',
           resolveCloudflareOAuthUserId: async () => 'user-1',
           getSessionBootstrapRateLimitedResponse: async () => null,
           getUiSessionSecret: () => 'session-secret',
@@ -224,4 +233,69 @@ describe('handleWorkerCoreRoutes', () => {
     const response = await handleWorkerCoreRoutes(buildContext('/not-handled'), buildDeps());
     assert.equal(response, null);
   });
+
+  it('completes OAuth directly from a Clerk/OIDC bearer token without relying on bootstrap cookies', async () => {
+    const request = new Request('https://worker.example/api/session/oauth-complete', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer header.payload.signature',
+        origin: 'https://auth.courtlistenermcp.blakeoxford.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        return_to:
+          'https://worker.example/authorize?client_id=client-1&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fcallback&response_type=code&state=state-1&scope=legal%3Aread&code_challenge=challenge&code_challenge_method=S256',
+      }),
+    });
+    const context = {
+      request,
+      url: new URL(request.url),
+      origin: 'https://auth.courtlistenermcp.blakeoxford.com',
+      allowedOrigins: ['https://auth.courtlistenermcp.blakeoxford.com'],
+      env: {
+        MCP_UI_SESSION_SECRET: 'session-secret',
+        OIDC_ISSUER: 'https://clerk.example',
+        OIDC_AUDIENCE: 'mcp',
+      },
+      pathname: '/api/session/oauth-complete',
+      requestMethod: 'POST',
+      mcpPath: false,
+    };
+
+    const response = await handleWorkerCoreRoutes(
+      context,
+      buildDeps({
+        workerUiSessionRuntime: {
+          resolveUiSessionUserId: async () => null,
+          resolveCloudflareOAuthUserId: async () => null,
+          getSessionBootstrapRateLimitedResponse: async () => null,
+          getUiSessionSecret: () => 'session-secret',
+          verifyBootstrapUserIdFromAuthorization: async (incomingRequest) => ({
+            userId:
+              incomingRequest.headers.get('authorization') === 'Bearer header.payload.signature'
+                ? 'clerk-user-123'
+                : null,
+            error: null,
+          }),
+          createUiSessionToken: async () => 'signed-session',
+          parseUiSessionToken: () => ({ sub: 'clerk-user-123', exp: 9999999999, jti: 'jti-1' }),
+          buildUiSessionBootstrapHeaders: () => new Headers({ 'set-cookie': 'clmcp_ui=signed-session' }),
+          createUiSessionState: async () => ({
+            sessionToken: 'signed-session',
+            expiresInSeconds: 12 * 60 * 60,
+            headers: new Headers({ 'set-cookie': 'clmcp_ui=signed-session' }),
+          }),
+        },
+      }),
+    );
+
+    assert.ok(response);
+    assert.equal(response?.status, 200);
+    assert.equal(response?.headers.get('access-control-allow-origin'), 'https://auth.courtlistenermcp.blakeoxford.com');
+    const payload = (await response?.json()) as Record<string, unknown>;
+    assert.equal(payload.ok, true);
+    assert.equal(payload.userId, 'clerk-user-123');
+    assert.equal(payload.redirectTo, 'https://chatgpt.com/callback?code=abc&state=state-1');
+  });
+
 });

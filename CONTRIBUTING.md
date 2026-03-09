@@ -31,6 +31,9 @@ npm run build
 npm test
 ```
 
+Git hooks are installed into `.githooks/` and executed by Lefthook via `lefthook.yml`.
+This repo intentionally avoids a `.husky/` hook path so the active hook manager is unambiguous.
+
 ---
 
 ## 🏗️ Architecture Overview

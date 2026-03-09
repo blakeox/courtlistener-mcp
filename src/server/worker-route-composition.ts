@@ -88,7 +88,7 @@ export async function handleDelegatedWorkerRoutes<TEnv extends WorkerDelegatedRo
 
   return runWorkerRouteHandlers(
     composeWorkerDelegatedRouteHandlers({
-      oauth: async () => handleWorkerOAuthRoutes({ request, url, env }, deps),
+      oauth: async () => handleWorkerOAuthRoutes({ request, url, origin, allowedOrigins, env }, deps),
       aiUi: async () =>
         handleWorkerAiUiRoutes({
           context: { request, url, origin, allowedOrigins, env, ctx },

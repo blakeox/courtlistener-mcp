@@ -1,3 +1,4 @@
+import { parsePositiveInt } from '../common/validation.js';
 import { extractBearerToken, parseBoolean } from './worker-security.js';
 import { verifyAccessToken, type OAuthConfig } from '../security/oidc.js';
 
@@ -66,7 +67,7 @@ export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> 
   getUiSessionSecret(env: TEnv): string | null;
   createUiSessionToken(userId: string, secret: string, ttlSeconds?: number): Promise<string>;
   parseUiSessionToken(token: string): UiSessionPayload | null;
-  resolveBrowserSessionUserId(request: Request, env: TEnv): Promise<string | null>;
+  resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null>;
   isSecureCookieRequest(request: Request, env: TEnv): boolean;
   buildUiSessionBootstrapHeaders(request: Request, env: TEnv, sessionToken: string): Headers;
   createUiSessionState(
@@ -141,11 +142,6 @@ function constantTimeEqual(a: string, b: string): boolean {
   }
 
   return diff === 0;
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt((value || '').trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function getUiSessionSecret<TEnv extends WorkerUiSessionRuntimeEnv>(env: TEnv): string | null {
@@ -262,9 +258,16 @@ async function verifyOidcUserIdFromAuthorization<TEnv extends WorkerUiSessionRun
   request: Request,
   env: TEnv,
 ): Promise<{ userId: string | null; error: string | null }> {
-  const bearerToken = extractBearerToken(request.headers.get('authorization'));
+  return verifyOidcUserId(extractBearerToken(request.headers.get('authorization')), env, 'Missing bearer token.');
+}
+
+async function verifyOidcUserId<TEnv extends WorkerUiSessionRuntimeEnv>(
+  bearerToken: string | null,
+  env: TEnv,
+  missingTokenError: string,
+): Promise<{ userId: string | null; error: string | null }> {
   if (!bearerToken) {
-    return { userId: null, error: 'Missing bearer token.' };
+    return { userId: null, error: missingTokenError };
   }
   const oidcConfig = getWorkerOidcConfig(env);
   if (!oidcConfig) {
@@ -289,23 +292,7 @@ async function verifyOidcUserIdFromToken<TEnv extends WorkerUiSessionRuntimeEnv>
   bearerToken: string,
   env: TEnv,
 ): Promise<{ userId: string | null; error: string | null }> {
-  const oidcConfig = getWorkerOidcConfig(env);
-  if (!oidcConfig) {
-    return { userId: null, error: 'OIDC issuer is not configured.' };
-  }
-  try {
-    const verified = await verifyAccessToken(bearerToken, oidcConfig);
-    const subject = verified.payload.sub;
-    if (typeof subject === 'string' && subject.trim().length > 0) {
-      return { userId: subject.trim(), error: null };
-    }
-    return { userId: null, error: 'Verified token missing subject claim.' };
-  } catch (error) {
-    return {
-      userId: null,
-      error: error instanceof Error ? error.message : 'OIDC verification failed.',
-    };
-  }
+  return verifyOidcUserId(bearerToken, env, 'Missing bearer token.');
 }
 
 async function deriveCloudflareIdentityUserId(request: Request): Promise<string | null> {
@@ -354,7 +341,7 @@ async function verifyBootstrapBearerToken<TEnv extends WorkerUiSessionRuntimeEnv
   }
 
   if (bearerToken.split('.').length !== 3) {
-    return { userId: null, error: 'Malformed Clerk/OIDC bearer token.' };
+    return { userId: null, error: 'Malformed OIDC bearer token.' };
   }
 
   const verifyOidc = deps.verifyOidcUserIdFromToken ?? verifyOidcUserIdFromToken;
@@ -377,7 +364,7 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       return parseUiSessionToken(token);
     },
 
-    async resolveBrowserSessionUserId(request: Request, env: TEnv): Promise<string | null> {
+    async resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null> {
       const sessionSecret = getUiSessionSecret(env);
       if (!sessionSecret) {
         return null;
@@ -454,21 +441,26 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
     },
 
     async resolveCloudflareOAuthUserId(request: Request, env: TEnv): Promise<string | null> {
-      const verifiedOidc = await verifyOidcUserIdFromAuthorization(request, env);
-      if (verifiedOidc.userId) return verifiedOidc.userId;
-
       const sessionSecret = getUiSessionSecret(env);
-      if (sessionSecret) {
-        const sessionUserId = await getUiSessionUserId(request, sessionSecret, env, deps);
-        if (sessionUserId) return sessionUserId;
-      }
-
-      const cfIdentityUserId = await deriveCloudflareIdentityUserId(request);
-      if (cfIdentityUserId) return cfIdentityUserId;
-
       const devUserId = env.MCP_OAUTH_DEV_USER_ID?.trim();
       const allowDevFallback = parseBoolean(env.MCP_ALLOW_DEV_FALLBACK);
-      if (devUserId && allowDevFallback) return devUserId;
+
+      // Verification precedence matters here because the OAuth authorize endpoint accepts
+      // both explicit bearer credentials and browser/session-based identities.
+      const identityResolvers: Array<() => Promise<string | null>> = [
+        async () => {
+          const verifiedOidc = await verifyOidcUserIdFromAuthorization(request, env);
+          return verifiedOidc.userId;
+        },
+        async () => (sessionSecret ? getUiSessionUserId(request, sessionSecret, env, deps) : null),
+        async () => deriveCloudflareIdentityUserId(request),
+        async () => (devUserId && allowDevFallback ? devUserId : null),
+      ];
+
+      for (const resolveIdentity of identityResolvers) {
+        const userId = await resolveIdentity();
+        if (userId) return userId;
+      }
 
       return null;
     },

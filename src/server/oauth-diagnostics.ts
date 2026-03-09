@@ -34,7 +34,18 @@ function routeKindFromPath(pathname: string): OAuthRouteKind {
   if (pathname === '/authorize') return 'authorize';
   if (pathname === '/token') return 'token';
   if (pathname === '/register') return 'register';
-  if (pathname === '/.well-known/oauth-authorization-server') {
+  if (
+    pathname === '/.well-known/oauth-authorization-server' ||
+    pathname === '/mcp/.well-known/oauth-authorization-server' ||
+    pathname === '/.well-known/oauth-authorization-server/mcp'
+  ) {
+    return 'authorization-server-metadata';
+  }
+  if (
+    pathname === '/.well-known/openid-configuration' ||
+    pathname === '/mcp/.well-known/openid-configuration' ||
+    pathname === '/.well-known/openid-configuration/mcp'
+  ) {
     return 'authorization-server-metadata';
   }
   if (

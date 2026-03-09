@@ -27,11 +27,34 @@ interface JsonWebKeySetLike {
   keys: Array<Record<string, unknown>>;
 }
 
+function findMatchingJwk(
+  jwks: JsonWebKeySetLike,
+  protectedHeader: ReturnType<typeof decodeProtectedHeader>,
+): Record<string, unknown> | undefined {
+  return jwks.keys.find((key) => {
+    if (typeof protectedHeader.kid === 'string' && key.kid !== protectedHeader.kid) return false;
+    if (
+      typeof protectedHeader.alg === 'string'
+      && typeof key.alg === 'string'
+      && key.alg !== protectedHeader.alg
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
 async function fetchJwks(
   jwksUri: string,
   fetcher: Fetcher = fetch,
+  forceRefresh = false,
 ): Promise<JsonWebKeySetLike> {
-  const res = await fetcher(jwksUri, { headers: { accept: 'application/json' } });
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (forceRefresh) {
+    headers['cache-control'] = 'no-cache';
+    headers.pragma = 'no-cache';
+  }
+  const res = await fetcher(jwksUri, { headers });
   if (!res.ok) {
     throw new Error(`JWKS fetch failed (${res.status}) for ${jwksUri}`);
   }
@@ -78,13 +101,12 @@ export async function verifyAccessToken(
   const jwksUri = await getJwksUri(cfg.issuer, cfg.jwksUrl, fetcher);
   const _jwtVerify = deps?.jwtVerify ?? jwtVerify;
   const _importJWK = deps?.importJWK ?? importJWK;
-  const jwks = await fetchJwks(jwksUri, fetcher);
   const protectedHeader = decodeProtectedHeader(token);
-  const matchingKey = jwks.keys.find((key) => {
-    if (typeof protectedHeader.kid === 'string' && key.kid !== protectedHeader.kid) return false;
-    if (typeof protectedHeader.alg === 'string' && typeof key.alg === 'string' && key.alg !== protectedHeader.alg) return false;
-    return true;
-  });
+  const jwks = await fetchJwks(jwksUri, fetcher);
+  let matchingKey = findMatchingJwk(jwks, protectedHeader);
+  if (!matchingKey && typeof protectedHeader.kid === 'string' && protectedHeader.kid.length > 0) {
+    matchingKey = findMatchingJwk(await fetchJwks(jwksUri, fetcher, true), protectedHeader);
+  }
   if (!matchingKey) {
     throw new Error('no applicable key found in the JSON Web Key Set');
   }

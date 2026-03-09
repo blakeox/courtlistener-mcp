@@ -1,3 +1,5 @@
+import { parsePositiveInt } from '../common/validation.js';
+
 export interface WorkerMcpSessionTopologyEnv {
   MCP_SESSION_SHARD_COUNT?: string;
   MCP_SESSION_IDLE_TTL_SECONDS?: string;
@@ -23,13 +25,6 @@ const DEFAULT_SESSION_SHARD_COUNT = 16;
 const DEFAULT_SESSION_IDLE_TTL_SECONDS = 30 * 60;
 const DEFAULT_SESSION_ABSOLUTE_TTL_SECONDS = 24 * 60 * 60;
 const DEFAULT_SESSION_EVICTION_SWEEP_LIMIT = 64;
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
 
 function hashSessionId(sessionId: string): number {
   let hash = 2166136261;

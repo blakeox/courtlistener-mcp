@@ -213,9 +213,9 @@ Cloudflare OAuth is now the primary and only supported hosted auth path for MCP 
   - Cloudflare Access identity headers (`cf-access-authenticated-user-id` or `cf-access-authenticated-user-email`)
   - `MCP_OAUTH_DEV_USER_ID` only when `MCP_ALLOW_DEV_FALLBACK=true` (development fallback only)
   - If unresolved and `MCP_AUTH_UI_ORIGIN` is set, `/authorize` redirects to `${MCP_AUTH_UI_ORIGIN}/auth/start?return_to=<authorize_url>`
-- Browser-session bootstrap:
-  - `POST /api/session/bootstrap` with a valid short-lived Clerk/OIDC bearer token minted by the external auth UI
-  - Sets secure `clmcp_ui` cookie used by `/authorize`
+- External auth UI handoff:
+  - OAuth handoffs from the Clerk portal call `POST /api/session/oauth-complete` with a valid short-lived Clerk/OIDC bearer token plus the original `return_to`
+  - Non-OAuth browser bootstrap flows call `POST /api/session/bootstrap`, which sets the secure `clmcp_ui` cookie used by `/authorize`
   - Route-level rate limit controls:
     - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
     - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
@@ -240,7 +240,7 @@ Set:
 - `OIDC_JWKS_URL` (optional)
 - `OIDC_REQUIRED_SCOPE` (optional)
 
-Use this for direct bearer-token validation paths and for hosted auth bootstrap verification inside the worker when using Clerk as the external auth UI. The worker expects a direct Clerk/OIDC JWT bearer token posted to `/api/session/bootstrap`.
+Use this for direct bearer-token validation paths and for the Clerk portal handoff inside the worker. The worker accepts a direct Clerk/OIDC JWT bearer token posted to `/api/session/oauth-complete` for OAuth completion and to `/api/session/bootstrap` for browser-session bootstrap.
 
 ### Removed Legacy UI/Auth Endpoints
 

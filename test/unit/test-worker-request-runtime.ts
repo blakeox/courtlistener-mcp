@@ -8,7 +8,6 @@ import { createWorkerLegacyFetchHandler } from '../../src/server/worker-request-
 interface TestEnv {
   MCP_ALLOWED_ORIGINS?: string;
   MCP_AUTH_UI_ORIGIN?: string;
-  oauthEnabled?: boolean;
 }
 
 function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs: number }>) {
@@ -61,7 +60,6 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
             ...(extraHeaders ? Object.fromEntries(new Headers(extraHeaders).entries()) : {}),
           },
         }),
-      isCloudflareOAuthBackendEnabled: (env) => env.oauthEnabled === true,
       isRemovedLegacyUiRoute: (pathname) => pathname === '/api/login',
       workerUiSessionRuntime: {
         resolveCloudflareOAuthUserId: async () => 'user-1',
@@ -145,7 +143,7 @@ describe('createWorkerLegacyFetchHandler', () => {
 
     const response = await handler(
       new Request('https://worker.example/health'),
-      { oauthEnabled: true },
+      {},
       {} as ExecutionContext,
     );
     const payload = (await response.json()) as Record<string, unknown>;
@@ -161,7 +159,7 @@ describe('createWorkerLegacyFetchHandler', () => {
 
     const response = await handler(
       new Request('https://worker.example/not-found'),
-      { oauthEnabled: true },
+      {},
       {} as ExecutionContext,
       { skipGatewayAuth: true },
     );

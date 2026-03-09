@@ -16,7 +16,7 @@
     "courtlistener-mcp": "dist/index.js"
   },
   "scripts": {
-    "hooks:install": "lefthook install --force",
+    "hooks:install": "node scripts/dev/install-git-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "build": "npm run clean && npm run generate:web:spa && tsc && npm run generate:manifest",
     "generate:web:spa": "node scripts/web/build-spa-assets.mjs",
@@ -70,6 +70,7 @@
     "mcp:remote": "node scripts/dev/mcp-remote.js",
     "mcp:test:remote": "node scripts/dev/test-remote-mcp.js",
     "test:e2e:ai-chat-presets": "node scripts/testing/e2e-ai-chat-presets.mjs",
+    "test:e2e:oauth-remote": "node scripts/testing/e2e-remote-oauth-handshake.mjs",
     "dev": "tsc --watch --preserveWatchOutput",
     "lint": "eslint . --ext .ts",
     "lint:critical": "eslint src/worker.ts src/index.ts src/types.ts --ext .ts",
@@ -105,7 +106,7 @@
     "coverage:check": "c8 --config .c8rc.json --check-coverage --branches=50 --functions=50 --lines=50 --statements=50 npm run test:unit",
     "test:analysis": "npx tsx test/analysis/analyze-untested-code.ts",
     "prepublishOnly": "npm run build && npm run typecheck",
-    "prepare": "lefthook install --force"
+    "prepare": "node scripts/dev/install-git-hooks.mjs"
   },
   "keywords": [
     "mcp",

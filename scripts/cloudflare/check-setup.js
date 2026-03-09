@@ -65,6 +65,27 @@ function deriveBaseUrl(config) {
   return null;
 }
 
+function validateAuthUiOrigin(rawValue) {
+  if (!rawValue) {
+    return { ok: false, reason: 'missing' };
+  }
+  try {
+    const parsed = new URL(rawValue);
+    const hasExtraPath = parsed.pathname && parsed.pathname !== '/';
+    const hasExtraQuery = Boolean(parsed.search);
+    const hasExtraHash = Boolean(parsed.hash);
+    return {
+      ok: true,
+      normalized: parsed.origin,
+      hasExtraPath,
+      hasExtraQuery,
+      hasExtraHash,
+    };
+  } catch {
+    return { ok: false, reason: 'invalid' };
+  }
+}
+
 async function checkEndpoint(baseUrl, path) {
   try {
     const res = await fetch(`${baseUrl}${path}`);
@@ -199,7 +220,18 @@ async function main() {
     if (!authUiOrigin) {
       warn('MCP_AUTH_UI_ORIGIN is not configured in wrangler vars. /authorize cannot redirect users to external login UI.');
     } else {
-      ok(`Auth UI origin configured: ${authUiOrigin}`);
+      const authUiOriginCheck = validateAuthUiOrigin(authUiOrigin);
+      if (!authUiOriginCheck.ok) {
+        fail(`MCP_AUTH_UI_ORIGIN is not a valid absolute URL: ${authUiOrigin}`);
+        hasCriticalError = true;
+      } else {
+        ok(`Auth UI origin configured: ${authUiOriginCheck.normalized}`);
+        if (authUiOriginCheck.hasExtraPath || authUiOriginCheck.hasExtraQuery || authUiOriginCheck.hasExtraHash) {
+          warn(
+            'MCP_AUTH_UI_ORIGIN should be the auth app origin only (for example https://auth.example.com), not an /mcp path or URL with query/hash components.',
+          );
+        }
+      }
     }
     if (!allowDevFallback || allowDevFallback === 'false' || allowDevFallback === '0') {
       ok('MCP_ALLOW_DEV_FALLBACK is disabled.');
