@@ -90,6 +90,118 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
     assert.equal(response.status, 200);
     assert.equal(streamableCalled, true);
   });
+
+  it('returns a session lifecycle error when finalizing a session mutation fails', async () => {
+    const response = await handleWorkerMcpTransportBoundary({
+      request: new Request('https://example.com/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'x-mcp-service-token': 'token',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize', id: 1, params: {} }),
+      }),
+      env: { MCP_AUTH_TOKEN: 'token' },
+      ctx: {} as ExecutionContext,
+      pathname: '/mcp',
+      requestMethod: 'POST',
+      origin: null,
+      allowedOrigins: [],
+      mcpPath: true,
+      supportedProtocolVersions: new Set(['2025-03-26']),
+      mcpStreamableHandler: {
+        fetch: async () =>
+          new Response(JSON.stringify({ jsonrpc: '2.0', result: {} }), {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+              'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
+            },
+          }),
+      },
+      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
+      withCors: (res) => res,
+      buildCorsHeaders: () => new Headers(),
+      getClientIdentifier: () => 'client-1',
+      getAuthRateLimitedResponse: async () => null,
+      recordAuthFailure: async () => {},
+      clearAuthFailures: async () => {},
+      finalizeSessionResponse: async () =>
+        Response.json(
+          {
+            jsonrpc: '2.0',
+            error: {
+              code: -32001,
+              message: 'Session lifecycle service unavailable',
+            },
+          },
+          { status: 503 },
+        ),
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message: 'Session lifecycle service unavailable',
+      },
+    });
+  });
+
+  it('returns a session lifecycle error when closing a session mutation fails', async () => {
+    const response = await handleWorkerMcpTransportBoundary({
+      request: new Request('https://example.com/mcp', {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json, text/event-stream',
+          'x-mcp-service-token': 'token',
+          'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
+        },
+      }),
+      env: { MCP_AUTH_TOKEN: 'token' },
+      ctx: {} as ExecutionContext,
+      pathname: '/mcp',
+      requestMethod: 'DELETE',
+      origin: null,
+      allowedOrigins: [],
+      mcpPath: true,
+      supportedProtocolVersions: new Set(['2025-03-26']),
+      mcpStreamableHandler: {
+        fetch: async () => new Response(null, { status: 204 }),
+      },
+      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
+      withCors: (res) => res,
+      buildCorsHeaders: () => new Headers(),
+      getClientIdentifier: () => 'client-1',
+      getAuthRateLimitedResponse: async () => null,
+      recordAuthFailure: async () => {},
+      clearAuthFailures: async () => {},
+      finalizeSessionResponse: async () =>
+        Response.json(
+          {
+            jsonrpc: '2.0',
+            error: {
+              code: -32001,
+              message: 'Session lifecycle service unavailable',
+            },
+          },
+          { status: 503 },
+        ),
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message: 'Session lifecycle service unavailable',
+      },
+    });
+  });
 });
 
 describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-validated)', () => {
@@ -196,6 +308,10 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
 
     assert.ok(response);
     assert.equal(response.status, 200);
-    assert.equal(mcpHandlerCalled, true, 'MCP handler should be reached despite missing protocol version');
+    assert.equal(
+      mcpHandlerCalled,
+      true,
+      'MCP handler should be reached despite missing protocol version',
+    );
   });
 });

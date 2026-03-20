@@ -7,15 +7,15 @@ import { Logger as _Logger } from './logger.js';
 
 // Base error context interface
 export interface ErrorContext {
-  requestId?: string;
-  userId?: string;
-  endpoint?: string;
-  method?: string;
+  requestId?: string | undefined;
+  userId?: string | undefined;
+  endpoint?: string | undefined;
+  method?: string | undefined;
   timestamp: string;
-  stackTrace?: string;
-  additionalData?: Record<string, unknown>;
-  correlationId?: string;
-  sessionId?: string;
+  stackTrace?: string | undefined;
+  additionalData?: Record<string, unknown> | undefined;
+  correlationId?: string | undefined;
+  sessionId?: string | undefined;
 }
 
 // Error severity levels
@@ -140,7 +140,7 @@ export class ValidationError extends BaseError {
     this.validationErrors = validationErrors;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       validationErrors: this.validationErrors,
@@ -161,7 +161,7 @@ export class AuthenticationError extends BaseError {
  * Authorization errors
  */
 export class AuthorizationError extends BaseError {
-  public readonly requiredPermissions?: string[];
+  public readonly requiredPermissions: string[] | undefined;
 
   constructor(
     message = 'Insufficient permissions',
@@ -172,7 +172,7 @@ export class AuthorizationError extends BaseError {
     this.requiredPermissions = requiredPermissions;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       requiredPermissions: this.requiredPermissions,
@@ -184,8 +184,8 @@ export class AuthorizationError extends BaseError {
  * Resource not found errors
  */
 export class NotFoundError extends BaseError {
-  public readonly resourceType?: string;
-  public readonly resourceId?: string;
+  public readonly resourceType: string | undefined;
+  public readonly resourceId: string | undefined;
 
   constructor(
     message = 'Resource not found',
@@ -198,7 +198,7 @@ export class NotFoundError extends BaseError {
     this.resourceId = resourceId;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       resourceType: this.resourceType,
@@ -235,7 +235,7 @@ export class RateLimitError extends BaseError {
     this.retryAfter = retryAfter;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       limit: this.limit,
@@ -250,8 +250,8 @@ export class RateLimitError extends BaseError {
  */
 export class ExternalAPIError extends BaseError {
   public readonly apiName: string;
-  public readonly apiStatusCode?: number;
-  public readonly apiResponse?: unknown;
+  public readonly apiStatusCode: number | undefined;
+  public readonly apiResponse: unknown;
 
   constructor(
     apiName: string,
@@ -278,7 +278,7 @@ export class ExternalAPIError extends BaseError {
     this.apiResponse = apiResponse;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       apiName: this.apiName,
@@ -292,14 +292,14 @@ export class ExternalAPIError extends BaseError {
  * Business logic errors
  */
 export class BusinessLogicError extends BaseError {
-  public readonly businessCode?: string;
+  public readonly businessCode: string | undefined;
 
   constructor(message: string, businessCode?: string, context: Partial<ErrorContext> = {}) {
     super(message, ErrorCategory.BUSINESS_LOGIC, ErrorSeverity.MEDIUM, 422, context, true, false);
     this.businessCode = businessCode;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       businessCode: this.businessCode,
@@ -332,14 +332,14 @@ export class InternalServerError extends BaseError {
  * Configuration errors
  */
 export class ConfigurationError extends BaseError {
-  public readonly configKey?: string;
+  public readonly configKey: string | undefined;
 
   constructor(message: string, configKey?: string, context: Partial<ErrorContext> = {}) {
     super(message, ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL, 500, context, false, false);
     this.configKey = configKey;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       configKey: this.configKey,
@@ -373,7 +373,7 @@ export class DependencyError extends BaseError {
     this.dependencyType = dependencyType;
   }
 
-  public toJSON() {
+  public override toJSON() {
     return {
       ...super.toJSON(),
       dependencyName: this.dependencyName,

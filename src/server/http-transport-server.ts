@@ -155,7 +155,10 @@ class HttpMcpSessionManager {
 
   attach(sessionId: string, context: HttpSessionContext): void {
     this.sessions.set(sessionId, context);
-    this.logger.info('MCP HTTP session initialized', { sessionId, activeSessions: this.sessions.size });
+    this.logger.info('MCP HTTP session initialized', {
+      sessionId,
+      activeSessions: this.sessions.size,
+    });
   }
 
   get(sessionId: string): HttpSessionContext | undefined {
@@ -224,7 +227,10 @@ export async function startHttpTransport(
   config: Partial<HttpTransportConfig> = {},
 ): Promise<{ app: express.Application; close: () => Promise<void> }> {
   const cfg = { ...getDefaultConfig(), ...config };
-  const maxConcurrentRequests = Math.max(1, cfg.maxConcurrentRequests ?? DEFAULT_MAX_CONCURRENT_REQUESTS);
+  const maxConcurrentRequests = Math.max(
+    1,
+    cfg.maxConcurrentRequests ?? DEFAULT_MAX_CONCURRENT_REQUESTS,
+  );
   const maxConcurrentSessionInitializations = Math.max(
     1,
     cfg.maxConcurrentSessionInitializations ?? DEFAULT_MAX_CONCURRENT_SESSION_INITIALIZATIONS,
@@ -336,7 +342,8 @@ export async function startHttpTransport(
         const availability = stats.total > 0 ? stats.success / stats.total : 1;
         const allowedFailures = stats.total * (1 - MCP_OPERATION_SLO_TARGET);
         const errorBudgetRemaining = Math.max(0, allowedFailures - failures);
-        const failureBudgetBurnRate = allowedFailures > 0 ? failures / allowedFailures : failures > 0 ? null : 0;
+        const failureBudgetBurnRate =
+          allowedFailures > 0 ? failures / allowedFailures : failures > 0 ? null : 0;
 
         return [
           operation,
@@ -503,7 +510,8 @@ export async function startHttpTransport(
         webRequest,
         sessionManager,
         Date.now(),
-        async (incomingSessionId, _request, manager) => Boolean(manager.get(incomingSessionId)),
+        async (incomingSessionId, _request, manager) =>
+          manager.get(incomingSessionId) ? 'active' : 'invalid',
         { methods: ['GET', 'POST', 'DELETE'] },
       );
       if (invalidSession) {
@@ -549,7 +557,9 @@ export async function startHttpTransport(
         let initializedSessionId: string | undefined;
         const transport = new StreamableHTTPServerTransport({
           ...(cfg.enableSessions && { sessionIdGenerator: () => randomUUID() }),
-          ...(cfg.enableJsonResponse !== undefined && { enableJsonResponse: cfg.enableJsonResponse }),
+          ...(cfg.enableJsonResponse !== undefined && {
+            enableJsonResponse: cfg.enableJsonResponse,
+          }),
           ...(eventStore !== undefined && { eventStore }),
           ...(cfg.enableDnsRebindingProtection !== undefined && {
             enableDnsRebindingProtection: cfg.enableDnsRebindingProtection,
@@ -574,7 +584,9 @@ export async function startHttpTransport(
 
         try {
           await sessionServer.connect(transport as Transport);
-          await runWithPrincipalContext(principal, () => transport.handleRequest(req, res, req.body));
+          await runWithPrincipalContext(principal, () =>
+            transport.handleRequest(req, res, req.body),
+          );
           markOperationSuccess();
         } catch (error) {
           await Promise.allSettled([transport.close(), sessionServer.close()]);

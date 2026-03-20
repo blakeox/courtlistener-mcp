@@ -37,19 +37,34 @@ function jsonError(
   );
 }
 
-function createRuntime(overrides: {
-  isUiSessionRevoked?: boolean;
-  bootstrapRateLimited?: boolean;
-  verifyOidcUserIdFromToken?: (token: string, env: TestEnv) => Promise<{ userId: string | null; error: string | null }>;
-} = {}) {
+function createRuntime(
+  overrides: {
+    isUiSessionRevoked?: boolean;
+    revocationUnavailable?: boolean;
+    bootstrapRateLimited?: boolean;
+    bootstrapLimiterUnavailable?: boolean;
+    verifyOidcUserIdFromToken?: (
+      token: string,
+      env: TestEnv,
+    ) => Promise<{ userId: string | null; error: string | null }>;
+  } = {},
+) {
   return createWorkerUiSessionRuntime<TestEnv>({
     jsonError,
     getClientIdentifier: () => 'client-1',
-    isUiSessionRevoked: async () => overrides.isUiSessionRevoked ?? false,
+    isUiSessionRevoked: async () =>
+      overrides.revocationUnavailable
+        ? { kind: 'unavailable' }
+        : { kind: 'ok', value: overrides.isUiSessionRevoked ?? false },
     recordSessionBootstrapRateLimit: async () =>
-      overrides.bootstrapRateLimited
-        ? { blocked: true, retryAfterSeconds: 123 }
-        : { blocked: false, retryAfterSeconds: 0 },
+      overrides.bootstrapLimiterUnavailable
+        ? { kind: 'unavailable' }
+        : {
+            kind: 'ok',
+            value: overrides.bootstrapRateLimited
+              ? { blocked: true, retryAfterSeconds: 123 }
+              : { blocked: false, retryAfterSeconds: 0 },
+          },
     ...(overrides.verifyOidcUserIdFromToken
       ? { verifyOidcUserIdFromToken: overrides.verifyOidcUserIdFromToken }
       : {}),
@@ -88,6 +103,26 @@ describe('worker UI session runtime', () => {
 
     assert.ok(result instanceof Response);
     assert.equal(result.status, 401);
+  });
+
+  it('fails closed when session revocation cannot be validated', async () => {
+    const runtime = createRuntime({ revocationUnavailable: true });
+    const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
+    const request = new Request('https://worker.example/api/ai-chat', {
+      headers: {
+        cookie: `clmcp_ui=${token}`,
+      },
+    });
+
+    const result = await runtime.authenticateUiApiRequest(request, env);
+
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 503);
+    assert.deepEqual(await result.json(), {
+      error: 'Unable to validate session revocation.',
+      error_code: 'session_revocation_unavailable',
+    });
   });
 
   it('creates and validates CSRF cookies and headers', () => {
@@ -213,5 +248,20 @@ describe('worker UI session runtime', () => {
     assert.ok(response instanceof Response);
     assert.equal(response.status, 429);
     assert.equal(response.headers.get('Retry-After'), '123');
+  });
+
+  it('fails closed when bootstrap rate limiting is unavailable', async () => {
+    const runtime = createRuntime({ bootstrapLimiterUnavailable: true });
+    const env: TestEnv = {};
+    const request = new Request('https://worker.example/api/session/bootstrap');
+
+    const response = await runtime.getSessionBootstrapRateLimitedResponse(request, env, Date.now());
+
+    assert.ok(response instanceof Response);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: 'Unable to validate session bootstrap rate limit.',
+      error_code: 'session_bootstrap_rate_limit_unavailable',
+    });
   });
 });
