@@ -102,3 +102,6 @@ wrangler.toml.backup
 # Backup files
 *.backup
 *.bak
+
+# Accidental Finder-style duplicate copies
+* 2.*
