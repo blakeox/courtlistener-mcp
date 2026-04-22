@@ -1,9 +1,6 @@
 name: Enhanced MCP Inspector Integration
 
 on:
-  schedule:
-    # Run comprehensive Inspector validation weekly
-    - cron: '0 6 * * 1'
   workflow_dispatch:
     inputs:
       test_type:
@@ -113,7 +110,7 @@ jobs:
   visual-regression:
     name: Inspector Visual Regression Testing
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.test_type == 'comprehensive'
+    if: github.event.inputs.test_type == 'comprehensive'
     env:
       VISUAL_BASELINE_URL: ''
 
