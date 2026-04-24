@@ -53,24 +53,25 @@ jobs:
       - name: 🧪 Run Infrastructure Tests (Week 1)
         run: |
           echo "🏗️ Testing Infrastructure Components..."
-          node test/unit/test-cache.js
-          node test/unit/test-config.js
-          node test/unit/test-logger.js
-          node test/unit/test-metrics.js
-          node test/unit/test-circuit-breaker.js
+          npx tsx --test \
+            test/unit/test-cache.ts \
+            test/unit/test-config.ts \
+            test/unit/test-logger.ts \
+            test/unit/test-metrics.ts \
+            test/unit/test-circuit-breaker.ts
           echo "✅ Infrastructure tests completed"
 
       - name: 🌐 Run API Integration Tests (Week 2)
         run: |
           echo "🌐 Testing API Integration..."
-          node test/unit/test-courtlistener.js
+          npx tsx --test test/unit/test-courtlistener.ts
           echo "✅ API integration tests completed"
 
       - name: 🏢 Run Server Integration Tests (Week 3)
         run: |
           echo "🏢 Testing Server Integration..."
-          node test/integration/test-server-integration.js
-          node test/unit/test-enterprise-server.js
+          npx tsx test/integration/test-server-integration.ts
+          npx tsx --test test/unit/test-enterprise-server.ts
           echo "✅ Server integration tests completed"
 
   # Comprehensive Testing with Coverage
@@ -100,15 +101,15 @@ jobs:
       - name: 🧪 Run Comprehensive Test Suite
         run: |
           echo "🚀 Running comprehensive test suite..."
-          node test/comprehensive-test-runner.js
+          pnpm run test:unit
+          pnpm run test:integration
+          pnpm run test:spa:auth
           echo "✅ Comprehensive testing completed"
 
       - name: 📊 Generate Coverage Report
         run: |
           echo "📊 Generating coverage report..."
-          npx c8 --reporter=html --reporter=json-summary --reporter=text \
-            --exclude='test/**' --exclude='dist/**' --exclude='scripts/**' \
-            node test/comprehensive-test-runner.js || true
+          pnpm run coverage || true
           echo "✅ Coverage report generated"
 
       - name: 📈 Upload Coverage to Codecov
@@ -211,11 +212,7 @@ jobs:
       - name: ⚡ Run Performance Tests
         run: |
           echo "⚡ Running performance tests..."
-          if [ -f test/test-performance.js ]; then
-            node test/test-performance.js || echo "⚠️ Performance tests completed with warnings"
-          else
-            echo "ℹ️ No performance tests found"
-          fi
+          pnpm run test:performance
 
       - name: 🔍 Performance Analysis
         run: |
