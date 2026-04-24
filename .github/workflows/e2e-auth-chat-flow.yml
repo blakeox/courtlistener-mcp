@@ -1,8 +1,8 @@
 name: E2E Hosted OAuth Handshake
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '17 9 * * *'
   workflow_dispatch:
 
 permissions:
