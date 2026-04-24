@@ -16,7 +16,6 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const reviewers = ['blakeox'];
             const pr = context.payload.pull_request;
             if (!pr) {
               core.info('No pull_request payload found.');
@@ -26,6 +25,11 @@ jobs:
             const isDraft = pr.draft || /\b(wip|draft)\b/i.test(title);
             if (isDraft) {
               core.info('PR is draft/WIP. Skipping requesting reviewers.');
+              return;
+            }
+            const reviewers = ['blakeox'].filter((reviewer) => reviewer !== pr.user?.login);
+            if (reviewers.length === 0) {
+              core.info('All configured reviewers are the PR author. Skipping review request.');
               return;
             }
             await github.rest.pulls.requestReviewers({

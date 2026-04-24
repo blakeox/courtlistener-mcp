@@ -71,4 +71,19 @@ describe('GitHub workflow hardening', () => {
     assert.match(lefthook, /run: pnpm run test:unit/);
     assert.match(lefthook, /run: pnpm run test:spa:auth/);
   });
+
+  it('skips auto-assign reviewer requests when the only reviewer is the PR author', () => {
+    const workflow = read('../../.github/workflows/auto-assign.yml');
+
+    assert.match(workflow, /filter\(\(reviewer\) => reviewer !== pr\.user\?\.login\)/);
+    assert.match(workflow, /All configured reviewers are the PR author/);
+  });
+
+  it('uses the v5 labeler configuration shape', () => {
+    const config = read('../../.github/labeler.yml');
+
+    assert.match(config, /changed-files:/);
+    assert.match(config, /any-glob-to-any-file:/);
+    assert.doesNotMatch(config, /^area\/docs:\n\s+- 'docs\/\*\*'/m);
+  });
 });
