@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { DIContainer } from '../../src/infrastructure/container.js';
 
 // Import server components
-const { LegalMCPServer } = await import('../../dist/index.js');
-const { bootstrapServices } = await import('../../dist/infrastructure/bootstrap.js');
-const { container } = await import('../../dist/infrastructure/container.js');
+const { LegalMCPServer } = await import('../../src/index.ts');
+const { bootstrapServices } = await import('../../src/infrastructure/bootstrap.ts');
+const { container } = await import('../../src/infrastructure/container.ts');
 
 process.env.GRACEFUL_SHUTDOWN_ENABLED = 'false';
 
@@ -91,7 +91,7 @@ class MCPMessageFactory {
   static createCallToolMessage(
     toolName: string,
     args: Record<string, unknown> = {},
-    id: number = 3
+    id: number = 3,
   ): MCPCallToolMessage {
     return {
       jsonrpc: '2.0',
@@ -106,7 +106,7 @@ class MCPMessageFactory {
 
   static createNotificationMessage(
     method: string,
-    params: Record<string, unknown> = {}
+    params: Record<string, unknown> = {},
   ): { jsonrpc: '2.0'; method: string; params: Record<string, unknown> } {
     return {
       jsonrpc: '2.0',
@@ -221,9 +221,8 @@ describe('Enterprise MCP Server Testing (TypeScript)', () => {
       assert.ok(mcpServer);
       const constructorName = mcpServer.constructor.name;
       assert.ok(
-        constructorName === 'LegalMCPServer' ||
-          constructorName === 'BestPracticeLegalMCPServer',
-        `Unexpected server constructor: ${constructorName}`
+        constructorName === 'LegalMCPServer' || constructorName === 'BestPracticeLegalMCPServer',
+        `Unexpected server constructor: ${constructorName}`,
       );
     });
 
@@ -262,9 +261,7 @@ describe('Enterprise MCP Server Testing (TypeScript)', () => {
     });
 
     it('should handle notification messages', () => {
-      const notification = MCPMessageFactory.createNotificationMessage(
-        'notifications/initialized'
-      );
+      const notification = MCPMessageFactory.createNotificationMessage('notifications/initialized');
 
       // Notifications should not have an ID
       assert.strictEqual(notification.jsonrpc, '2.0');
@@ -307,4 +304,3 @@ describe('Enterprise MCP Server Testing (TypeScript)', () => {
     });
   });
 });
-
