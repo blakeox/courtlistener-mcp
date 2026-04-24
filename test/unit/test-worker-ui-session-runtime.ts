@@ -4,12 +4,16 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createWorkerUiSessionRuntime } from '../../src/server/worker-ui-session-runtime.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 interface TestEnv {
   MCP_UI_SESSION_SECRET?: string;
-  MCP_AUTH_UI_ORIGIN?: string;
   MCP_ALLOW_DEV_FALLBACK?: string;
   MCP_OAUTH_DEV_USER_ID?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
@@ -47,6 +51,10 @@ function createRuntime(
       token: string,
       env: TestEnv,
     ) => Promise<{ userId: string | null; error: string | null }>;
+    verifyOidcUserIdFromAuthorization?: (
+      request: Request,
+      env: TestEnv,
+    ) => Promise<{ userId: string | null; error: string | null }>;
   } = {},
 ) {
   return createWorkerUiSessionRuntime<TestEnv>({
@@ -67,6 +75,9 @@ function createRuntime(
           },
     ...(overrides.verifyOidcUserIdFromToken
       ? { verifyOidcUserIdFromToken: overrides.verifyOidcUserIdFromToken }
+      : {}),
+    ...(overrides.verifyOidcUserIdFromAuthorization
+      ? { verifyOidcUserIdFromAuthorization: overrides.verifyOidcUserIdFromAuthorization }
       : {}),
   });
 }
@@ -158,6 +169,74 @@ describe('worker UI session runtime', () => {
     assert.equal(invalid.status, 403);
   });
 
+  it('rejects a tampered UI session signature as invalid', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
+    const [payload, signature] = token.split('.');
+    const tamperedToken = `${payload}.${signature}tampered`;
+    const request = new Request('https://worker.example/api/session', {
+      headers: {
+        cookie: `clmcp_ui=${tamperedToken}`,
+      },
+    });
+
+    const result = await runtime.resolveUiSession(request, env);
+
+    assert.deepEqual(result, { kind: 'invalid' });
+  });
+
+  it('rejects an expired UI session token', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!, -1);
+    const request = new Request('https://worker.example/api/session', {
+      headers: {
+        cookie: `clmcp_ui=${token}`,
+      },
+    });
+
+    const result = await runtime.resolveUiSession(request, env);
+
+    assert.deepEqual(result, { kind: 'invalid' });
+  });
+
+  it('returns 403 when the CSRF header is missing', async () => {
+    const runtime = createRuntime();
+    const request = new Request('https://worker.example/api/ai-chat', {
+      headers: {
+        cookie: 'clmcp_csrf=csrf-token',
+      },
+    });
+
+    const result = runtime.requireCsrfToken(request);
+
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 403);
+    assert.deepEqual(await result.json(), {
+      error: 'CSRF token validation failed.',
+      error_code: 'csrf_validation_failed',
+    });
+  });
+
+  it('returns 403 when the CSRF cookie is missing', async () => {
+    const runtime = createRuntime();
+    const request = new Request('https://worker.example/api/ai-chat', {
+      headers: {
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+
+    const result = runtime.requireCsrfToken(request);
+
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 403);
+    assert.deepEqual(await result.json(), {
+      error: 'CSRF token validation failed.',
+      error_code: 'csrf_validation_failed',
+    });
+  });
+
   it('creates a reusable UI session state for bootstrap flows', async () => {
     const runtime = createRuntime();
     const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
@@ -191,15 +270,124 @@ describe('worker UI session runtime', () => {
     assert.equal(result, 'user-42');
   });
 
-  it('accepts Clerk/OIDC-style JWT bootstrap tokens via OIDC verification', async () => {
+  it('surfaces revocation unavailability from UI session resolution', async () => {
+    const runtime = createRuntime({ revocationUnavailable: true });
+    const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
+    const request = new Request('https://worker.example/api/session', {
+      headers: {
+        cookie: `clmcp_ui=${token}`,
+      },
+    });
+
+    const result = await runtime.resolveUiSession(request, env);
+
+    assert.deepEqual(result, { kind: 'revocation_unavailable' });
+  });
+
+  it('preserves bearer precedence before session revocation checks for OAuth identity resolution', async () => {
+    const runtime = createRuntime({
+      revocationUnavailable: true,
+      verifyOidcUserIdFromAuthorization: async (request) => ({
+        userId:
+          request.headers.get('authorization') === 'Bearer header.payload.signature'
+            ? 'oidc-user-1'
+            : null,
+        error:
+          request.headers.get('authorization') === 'Bearer header.payload.signature'
+            ? null
+            : 'invalid oidc token',
+      }),
+    });
     const env: TestEnv = {
-      MCP_AUTH_UI_ORIGIN: 'https://auth.example',
-      OIDC_ISSUER: 'https://clerk.example',
+      MCP_UI_SESSION_SECRET: 'session-secret',
+      OIDC_ISSUER: 'https://issuer.example',
+      OIDC_AUDIENCE: 'mcp',
+    };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
+    const request = new Request('https://worker.example/authorize', {
+      headers: {
+        authorization: 'Bearer header.payload.signature',
+        cookie: `clmcp_ui=${token}`,
+      },
+    });
+
+    const result = await runtime.resolveCloudflareOAuthIdentity(request, env);
+
+    assert.deepEqual(result, {
+      kind: 'authenticated',
+      userId: 'oidc-user-1',
+      authSource: 'oidc_bearer',
+    });
+  });
+
+  it('surfaces session revocation unavailability during OAuth identity resolution', async () => {
+    const runtime = createRuntime({ revocationUnavailable: true });
+    const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
+    const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
+    const request = new Request('https://worker.example/authorize', {
+      headers: {
+        cookie: `clmcp_ui=${token}`,
+      },
+    });
+
+    const result = await runtime.resolveCloudflareOAuthIdentity(request, env);
+
+    assert.deepEqual(result, { kind: 'session_revocation_unavailable' });
+  });
+
+  it('ignores Cloudflare Access identity headers unless explicit trust is enabled', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = {};
+    const request = new Request('https://worker.example/authorize', {
+      headers: {
+        'cf-access-authenticated-user-email': 'user@example.com',
+      },
+    });
+
+    const result = await runtime.resolveCloudflareOAuthIdentity(request, env);
+
+    assert.deepEqual(result, { kind: 'missing' });
+  });
+
+  it('accepts Cloudflare Access identity headers when explicit trust is enabled', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = { MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS: 'true' };
+    const request = new Request('https://worker.example/authorize', {
+      headers: {
+        'cf-access-authenticated-user-email': 'user@example.com',
+      },
+    });
+
+    const result = await runtime.resolveCloudflareOAuthIdentity(request, env);
+
+    assert.equal(result.kind, 'authenticated');
+    assert.equal(result.authSource, 'cloudflare_access');
+    assert.match(result.userId, /^cf_/);
+  });
+
+  it('does not accept Cloudflare Access identity headers when only JWT assertion trust is enabled', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = { MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION: 'true' };
+    const request = new Request('https://worker.example/authorize', {
+      headers: {
+        'cf-access-authenticated-user-email': 'user@example.com',
+      },
+    });
+
+    const result = await runtime.resolveCloudflareOAuthIdentity(request, env);
+
+    assert.deepEqual(result, { kind: 'missing' });
+  });
+
+  it('accepts OIDC JWT bootstrap tokens via OIDC verification', async () => {
+    const env: TestEnv = {
+      OIDC_ISSUER: 'https://issuer.example',
       OIDC_AUDIENCE: 'mcp',
     };
     const runtime = createRuntime({
       verifyOidcUserIdFromToken: async (token) => ({
-        userId: token === 'header.payload.signature' ? 'clerk_user_123' : null,
+        userId: token === 'header.payload.signature' ? 'oidc_user_123' : null,
         error: token === 'header.payload.signature' ? null : 'invalid oidc token',
       }),
     });
@@ -211,13 +399,13 @@ describe('worker UI session runtime', () => {
       env,
     );
 
-    assert.equal(result.userId, 'clerk_user_123');
+    assert.equal(result.userId, 'oidc_user_123');
     assert.equal(result.error, null);
   });
 
   it('rejects malformed non-JWT bootstrap bearer tokens', async () => {
     const env: TestEnv = {
-      OIDC_ISSUER: 'https://clerk.example',
+      OIDC_ISSUER: 'https://issuer.example',
       OIDC_AUDIENCE: 'mcp',
     };
     const runtime = createRuntime({
@@ -236,6 +424,28 @@ describe('worker UI session runtime', () => {
 
     assert.equal(result.userId, null);
     assert.match(String(result.error), /Malformed OIDC bearer token/i);
+  });
+
+  it('fails closed when OIDC audience is missing for bootstrap bearer validation', async () => {
+    const env: TestEnv = {
+      OIDC_ISSUER: 'https://issuer.example',
+    };
+    const runtime = createRuntime({
+      verifyOidcUserIdFromToken: async () => ({
+        userId: 'should-not-be-returned',
+        error: null,
+      }),
+    });
+
+    const result = await runtime.verifyBootstrapUserIdFromAuthorization(
+      new Request('https://worker.example/api/session/bootstrap', {
+        headers: { authorization: 'Bearer header.payload.signature' },
+      }),
+      env,
+    );
+
+    assert.equal(result.userId, null);
+    assert.match(String(result.error), /OIDC audience is not configured/i);
   });
 
   it('returns a bootstrap rate-limit response with retry headers', async () => {
@@ -263,5 +473,18 @@ describe('worker UI session runtime', () => {
       error: 'Unable to validate session bootstrap rate limit.',
       error_code: 'session_bootstrap_rate_limit_unavailable',
     });
+  });
+
+  it('builds logout headers that expire UI session and csrf cookies', () => {
+    const runtime = createRuntime();
+    const headers = runtime.buildUiSessionLogoutHeaders(
+      new Request('https://worker.example/api/logout'),
+      {},
+    );
+    const setCookie = headers.get('set-cookie');
+
+    assert.match(String(setCookie), /clmcp_ui=;/);
+    assert.match(String(setCookie), /clmcp_ui_present=;/);
+    assert.match(String(setCookie), /clmcp_csrf=;/);
   });
 });

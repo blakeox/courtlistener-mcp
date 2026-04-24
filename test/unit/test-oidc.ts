@@ -73,12 +73,8 @@ describe('OIDC verification (TypeScript)', () => {
     const { fetcher } = makeFetchSequence([{ status: 404, json: {} }]);
     await assert.rejects(
       () =>
-        verifyAccessToken(
-          't',
-          { issuer: 'https://issuer-discovery-error' } as OIDCConfig,
-          fetcher
-        ),
-      /OIDC discovery failed \(404\) for issuer https:\/\/issuer-discovery-error/
+        verifyAccessToken('t', { issuer: 'https://issuer-discovery-error' } as OIDCConfig, fetcher),
+      /OIDC discovery failed \(404\) for issuer https:\/\/issuer-discovery-error/,
     );
   });
 
@@ -86,19 +82,18 @@ describe('OIDC verification (TypeScript)', () => {
     const { fetcher } = makeFetchSequence([{ status: 200, json: {} }]);
     await assert.rejects(
       () =>
-        verifyAccessToken(
-          't',
-          { issuer: 'https://issuer-missing-jwks' } as OIDCConfig,
-          fetcher
-        ),
-      /OIDC discovery missing jwks_uri/
+        verifyAccessToken('t', { issuer: 'https://issuer-missing-jwks' } as OIDCConfig, fetcher),
+      /OIDC discovery missing jwks_uri/,
     );
   });
 
   it('rejects when required scope is not present', async () => {
     const { fetcher } = makeFetchSequence([
       { status: 200, json: { jwks_uri: 'https://issuer-scope-miss/jwks' } },
-      { status: 200, json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] } },
+      {
+        status: 200,
+        json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] },
+      },
     ]);
     const deps: OIDCDeps = {
       importJWK: async () => ({}),
@@ -115,16 +110,19 @@ describe('OIDC verification (TypeScript)', () => {
           makeToken(),
           { issuer: 'https://issuer-scope-miss', requiredScope: 'admin' } as OIDCConfig,
           fetcher,
-          deps2
+          deps2,
         ),
-      /insufficient_scope/
+      /insufficient_scope/,
     );
   });
 
   it('accepts when required scope is present via scp array', async () => {
     const { fetcher } = makeFetchSequence([
       { status: 200, json: { jwks_uri: 'https://issuer-scope-ok/jwks' } },
-      { status: 200, json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] } },
+      {
+        status: 200,
+        json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] },
+      },
     ]);
     const deps: OIDCDeps = {
       importJWK: async () => ({}),
@@ -139,16 +137,31 @@ describe('OIDC verification (TypeScript)', () => {
       makeToken(),
       { issuer: 'https://issuer-scope-ok', requiredScope: 'admin' } as OIDCConfig,
       fetcher,
-      deps2
+      deps2,
     );
     assert.equal(res.payload.sub, 'abc');
+    assert.equal(res.metadata.discoveryCacheStatus, 'miss');
+    assert.match(String(res.metadata.verificationDurationMs), /^\d+$/);
+    assert.match(String(res.metadata.jwksFetchDurationMs), /^\d+$/);
   });
 
   it('refreshes JWKS once when the token kid is initially missing', async () => {
     const { fetcher, calls } = makeFetchSequence([
-      { status: 200, json: { jwks_uri: 'https://issuer-refresh/jwks' }, matchUrl: 'https://issuer-refresh/.well-known/openid-configuration' },
-      { status: 200, json: { keys: [{ kid: 'old-kid', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] }, matchUrl: 'https://issuer-refresh/jwks' },
-      { status: 200, json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'def' }] }, matchUrl: 'https://issuer-refresh/jwks' },
+      {
+        status: 200,
+        json: { jwks_uri: 'https://issuer-refresh/jwks' },
+        matchUrl: 'https://issuer-refresh/.well-known/openid-configuration',
+      },
+      {
+        status: 200,
+        json: { keys: [{ kid: 'old-kid', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'abc' }] },
+        matchUrl: 'https://issuer-refresh/jwks',
+      },
+      {
+        status: 200,
+        json: { keys: [{ kid: 'kid-1', alg: 'RS256', kty: 'RSA', e: 'AQAB', n: 'def' }] },
+        matchUrl: 'https://issuer-refresh/jwks',
+      },
     ]);
     let importCalls = 0;
 
@@ -167,6 +180,8 @@ describe('OIDC verification (TypeScript)', () => {
 
     assert.equal(res.payload.sub, 'refreshed-user');
     assert.equal(importCalls, 1);
+    assert.equal(res.metadata.discoveryCacheStatus, 'miss');
+    assert.match(String(res.metadata.jwksFetchDurationMs), /^\d+$/);
     assert.deepEqual(calls, [
       'https://issuer-refresh/.well-known/openid-configuration',
       'https://issuer-refresh/jwks',

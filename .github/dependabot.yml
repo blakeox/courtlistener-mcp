@@ -1,12 +1,12 @@
 version: 2
 updates:
   # Keep npm dependencies up to date
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      time: "09:00"
-      timezone: "America/Los_Angeles"
+      interval: 'weekly'
+      time: '09:00'
+      timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 5
     labels:
       - dependencies
@@ -20,15 +20,15 @@ updates:
         applies-to: version-updates
         dependency-type: development
         patterns:
-          - "*"
+          - '*'
 
   # Keep GitHub Actions up to date
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      time: "09:30"
-      timezone: "America/Los_Angeles"
+      interval: 'weekly'
+      time: '09:30'
+      timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 3
     labels:
       - dependencies

@@ -7,8 +7,8 @@
 
 import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-// Import compiled server
-const { LegalMCPServer } = await import('../../dist/index.js');
+// Import live server source so test:integration does not depend on stale build output.
+const { LegalMCPServer } = await import('../../src/index.ts');
 
 interface TestResult {
   name: string;

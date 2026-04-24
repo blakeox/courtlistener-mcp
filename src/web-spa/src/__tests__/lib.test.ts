@@ -1,29 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { validatePassword } from '../lib/validation';
-import {
-  isRecoveryHash,
-  getRecoveryToken,
-  getRecoveryTokenHash,
-  readLoginHashToken,
-} from '../lib/hash-utils';
-
-// ---------------------------------------------------------------------------
-// Helper: create a spec-compliant in-memory Storage mock.
-// Node.js v25 exposes a native localStorage global that shadows jsdom's,
-// so we need to stub both localStorage and sessionStorage before importing
-// the storage module.
-// ---------------------------------------------------------------------------
-function createStorageMock(): Storage {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => (key in store ? store[key] : null),
-    setItem: (key: string, value: string) => { store[key] = String(value); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
-    get length() { return Object.keys(store).length; },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  };
-}
+import { isRecoveryHash, getRecoveryToken, getRecoveryTokenHash } from '../lib/hash-utils';
+import { createStorageMock } from './test-utils';
 
 describe('validatePassword', () => {
   it('rejects short passwords', () => {
@@ -138,7 +116,11 @@ describe('hash-utils', () => {
   const originalHash = window.location.hash;
 
   afterEach(() => {
-    window.history.replaceState({}, document.title, `${originalPathname}${originalSearch}${originalHash}`);
+    window.history.replaceState(
+      {},
+      document.title,
+      `${originalPathname}${originalSearch}${originalHash}`,
+    );
   });
 
   it('isRecoveryHash returns false with empty hash', () => {
@@ -161,23 +143,21 @@ describe('hash-utils', () => {
     expect(getRecoveryToken()).toBe('');
   });
 
-  it('readLoginHashToken extracts login tokens', () => {
-    window.location.hash = '#access_token=logintok&token_type=bearer';
-    expect(readLoginHashToken()).toBe('logintok');
-  });
-
-  it('readLoginHashToken ignores recovery hashes', () => {
-    window.location.hash = '#type=recovery&access_token=tok';
-    expect(readLoginHashToken()).toBe('');
-  });
-
   it('isRecoveryHash returns true with recovery token_hash query', () => {
-    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=abc');
+    window.history.replaceState(
+      {},
+      document.title,
+      '/app/reset-password?type=recovery&token_hash=abc',
+    );
     expect(isRecoveryHash()).toBe(true);
   });
 
   it('getRecoveryTokenHash extracts token_hash from query', () => {
-    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=myhash');
+    window.history.replaceState(
+      {},
+      document.title,
+      '/app/reset-password?type=recovery&token_hash=myhash',
+    );
     expect(getRecoveryTokenHash()).toBe('myhash');
   });
 });

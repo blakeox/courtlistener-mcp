@@ -4,30 +4,6 @@ export interface AuthSessionResponse {
   turnstile_site_key?: string;
 }
 
-export interface SignupResponse {
-  message?: string;
-  error?: string;
-  error_code?: string;
-}
-
-export interface LoginResponse {
-  message?: string;
-  user?: {
-    id: string;
-    email: string | null;
-  };
-  error?: string;
-  error_code?: string;
-}
-
-export interface PasswordResetResponse {
-  message?: string;
-  error?: string;
-  error_code?: string;
-  autoLogin?: boolean;
-  user?: { id: string; email: string | null };
-}
-
 export interface ApiKeyRecord {
   id: string;
   label: string;

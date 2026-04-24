@@ -1,19 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import React from 'react';
-
-// Token context tests need storage mocking
-function createStorageMock(): Storage {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => (key in store ? store[key] : null),
-    setItem: (key: string, value: string) => { store[key] = String(value); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
-    get length() { return Object.keys(store).length; },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  };
-}
+import { createStorageMock } from './test-utils';
 
 describe('PlaygroundProvider', () => {
   it('provides initial empty state', async () => {

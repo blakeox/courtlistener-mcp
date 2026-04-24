@@ -1,5 +1,9 @@
 import { parsePositiveInt } from '../common/validation.js';
-import { extractBearerToken, parseBoolean } from './worker-security.js';
+import {
+  extractBearerToken,
+  parseBoolean,
+  trustCloudflareAccessIdentityHeaders,
+} from './worker-security.js';
 import { verifyAccessToken, type OAuthConfig } from '../security/oidc.js';
 
 export interface UiApiAuthResult {
@@ -32,13 +36,22 @@ type UiSessionResolution =
   | { kind: 'invalid' }
   | { kind: 'revocation_unavailable' };
 
+type OAuthIdentityResolution =
+  | {
+      kind: 'authenticated';
+      userId: string;
+      authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access' | 'dev_fallback';
+    }
+  | { kind: 'missing' }
+  | { kind: 'session_revocation_unavailable' };
+
 export interface WorkerUiSessionRuntimeEnv {
   MCP_UI_SESSION_SECRET?: string;
   MCP_UI_INSECURE_COOKIES?: string;
-  MCP_AUTH_UI_ORIGIN?: string;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
   MCP_OAUTH_DEV_USER_ID?: string;
   MCP_ALLOW_DEV_FALLBACK?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
@@ -71,15 +84,21 @@ interface WorkerUiSessionRuntimeDeps<TEnv extends WorkerUiSessionRuntimeEnv> {
     token: string,
     env: TEnv,
   ) => Promise<{ userId: string | null; error: string | null }>;
+  verifyOidcUserIdFromAuthorization?: (
+    request: Request,
+    env: TEnv,
+  ) => Promise<{ userId: string | null; error: string | null }>;
 }
 
 export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> {
   getUiSessionSecret(env: TEnv): string | null;
   createUiSessionToken(userId: string, secret: string, ttlSeconds?: number): Promise<string>;
   parseUiSessionToken(token: string): UiSessionPayload | null;
+  resolveUiSession(request: Request, env: TEnv): Promise<UiSessionResolution>;
   resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null>;
   isSecureCookieRequest(request: Request, env: TEnv): boolean;
   buildUiSessionBootstrapHeaders(request: Request, env: TEnv, sessionToken: string): Headers;
+  buildUiSessionLogoutHeaders(request: Request, env: TEnv): Headers;
   createUiSessionState(
     request: Request,
     env: TEnv,
@@ -93,6 +112,7 @@ export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> 
     request: Request,
     env: TEnv,
   ): Promise<{ userId: string | null; error: string | null }>;
+  resolveCloudflareOAuthIdentity(request: Request, env: TEnv): Promise<OAuthIdentityResolution>;
   resolveCloudflareOAuthUserId(request: Request, env: TEnv): Promise<string | null>;
   getSessionBootstrapRateLimitedResponse(
     request: Request,
@@ -222,13 +242,15 @@ function isSecureCookieRequest<TEnv extends WorkerUiSessionRuntimeEnv>(
 }
 
 function buildUiSessionCookie(token: string, secure: boolean): string {
-  const sameSite = secure ? 'None' : 'Lax';
-  return `${UI_SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly;${secure ? ' Secure;' : ''} SameSite=${sameSite}; Max-Age=43200`;
+  return `${UI_SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly;${secure ? ' Secure;' : ''} SameSite=Lax; Max-Age=43200`;
 }
 
 function buildUiSessionIndicatorCookie(secure: boolean): string {
-  const sameSite = secure ? 'None' : 'Lax';
-  return `${UI_SESSION_PRESENT_COOKIE_NAME}=1; Path=/;${secure ? ' Secure;' : ''} SameSite=${sameSite}; Max-Age=43200`;
+  return `${UI_SESSION_PRESENT_COOKIE_NAME}=1; Path=/;${secure ? ' Secure;' : ''} SameSite=Lax; Max-Age=43200`;
+}
+
+function buildExpiredCookie(name: string, secure: boolean): string {
+  return `${name}=; Path=/;${secure ? ' Secure;' : ''} SameSite=Lax; Max-Age=0`;
 }
 
 function getCsrfTokenFromCookie(request: Request): string | null {
@@ -324,7 +346,11 @@ async function verifyOidcUserIdFromToken<TEnv extends WorkerUiSessionRuntimeEnv>
   return verifyOidcUserId(bearerToken, env, 'Missing bearer token.');
 }
 
-async function deriveCloudflareIdentityUserId(request: Request): Promise<string | null> {
+async function deriveCloudflareIdentityUserId<TEnv extends WorkerUiSessionRuntimeEnv>(
+  request: Request,
+  env: TEnv,
+): Promise<string | null> {
+  if (!trustCloudflareAccessIdentityHeaders(env)) return null;
   const rawIdentity =
     request.headers.get('cf-access-authenticated-user-id')?.trim() ||
     request.headers.get('cf-access-authenticated-user-email')?.trim();
@@ -375,6 +401,10 @@ async function verifyBootstrapBearerToken<TEnv extends WorkerUiSessionRuntimeEnv
     return { userId: null, error: 'Malformed OIDC bearer token.' };
   }
 
+  if (!env.OIDC_AUDIENCE?.trim()) {
+    return { userId: null, error: 'OIDC audience is not configured.' };
+  }
+
   const verifyOidc = deps.verifyOidcUserIdFromToken ?? verifyOidcUserIdFromToken;
   return verifyOidc(bearerToken, env);
 }
@@ -399,12 +429,16 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       return parseUiSessionToken(token);
     },
 
-    async resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null> {
+    async resolveUiSession(request: Request, env: TEnv): Promise<UiSessionResolution> {
       const sessionSecret = getUiSessionSecret(env);
       if (!sessionSecret) {
-        return null;
+        return { kind: 'invalid' };
       }
-      const sessionState = await getUiSessionUserId(request, sessionSecret, env, deps);
+      return getUiSessionUserId(request, sessionSecret, env, deps);
+    },
+
+    async resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null> {
+      const sessionState = await this.resolveUiSession(request, env);
       return sessionState.kind === 'authenticated' ? sessionState.userId : null;
     },
 
@@ -417,6 +451,19 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       const headers = new Headers();
       headers.append('Set-Cookie', buildUiSessionCookie(sessionToken, secureCookies));
       headers.append('Set-Cookie', buildUiSessionIndicatorCookie(secureCookies));
+      headers.set('Cache-Control', 'no-store');
+      return headers;
+    },
+
+    buildUiSessionLogoutHeaders(request: Request, env: TEnv): Headers {
+      const secureCookies = isSecureCookieRequest(request, env);
+      const headers = new Headers();
+      headers.append('Set-Cookie', buildExpiredCookie(UI_SESSION_COOKIE_NAME, secureCookies));
+      headers.append(
+        'Set-Cookie',
+        buildExpiredCookie(UI_SESSION_PRESENT_COOKIE_NAME, secureCookies),
+      );
+      headers.append('Set-Cookie', buildExpiredCookie(CSRF_COOKIE_NAME, secureCookies));
       headers.set('Cache-Control', 'no-store');
       return headers;
     },
@@ -491,32 +538,74 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
     },
 
     async resolveCloudflareOAuthUserId(request: Request, env: TEnv): Promise<string | null> {
+      const identity = await this.resolveCloudflareOAuthIdentity(request, env);
+      return identity.kind === 'authenticated' ? identity.userId : null;
+    },
+
+    async resolveCloudflareOAuthIdentity(
+      request: Request,
+      env: TEnv,
+    ): Promise<OAuthIdentityResolution> {
       const sessionSecret = getUiSessionSecret(env);
       const devUserId = env.MCP_OAUTH_DEV_USER_ID?.trim();
       const allowDevFallback = parseBoolean(env.MCP_ALLOW_DEV_FALLBACK);
 
       // Verification precedence matters here because the OAuth authorize endpoint accepts
       // both explicit bearer credentials and browser/session-based identities.
-      const identityResolvers: Array<() => Promise<string | null>> = [
+      const identityResolvers: Array<() => Promise<OAuthIdentityResolution | null>> = [
         async () => {
-          const verifiedOidc = await verifyOidcUserIdFromAuthorization(request, env);
-          return verifiedOidc.userId;
+          const verifyOidcFromAuthorization =
+            deps.verifyOidcUserIdFromAuthorization ?? verifyOidcUserIdFromAuthorization;
+          const verifiedOidc = await verifyOidcFromAuthorization(request, env);
+          return verifiedOidc.userId
+            ? ({
+                kind: 'authenticated',
+                userId: verifiedOidc.userId,
+                authSource: 'oidc_bearer',
+              } satisfies OAuthIdentityResolution)
+            : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
         },
         async () => {
           if (!sessionSecret) return null;
           const sessionState = await getUiSessionUserId(request, sessionSecret, env, deps);
-          return sessionState.kind === 'authenticated' ? sessionState.userId : null;
+          if (sessionState.kind === 'revocation_unavailable') {
+            return { kind: 'session_revocation_unavailable' } satisfies OAuthIdentityResolution;
+          }
+          return sessionState.kind === 'authenticated'
+            ? ({
+                kind: 'authenticated',
+                userId: sessionState.userId,
+                authSource: 'ui_session',
+              } satisfies OAuthIdentityResolution)
+            : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
         },
-        async () => deriveCloudflareIdentityUserId(request),
-        async () => (devUserId && allowDevFallback ? devUserId : null),
+        async () => {
+          const userId = await deriveCloudflareIdentityUserId(request, env);
+          return userId
+            ? ({
+                kind: 'authenticated',
+                userId,
+                authSource: 'cloudflare_access',
+              } satisfies OAuthIdentityResolution)
+            : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
+        },
+        async () =>
+          devUserId && allowDevFallback
+            ? ({
+                kind: 'authenticated',
+                userId: devUserId,
+                authSource: 'dev_fallback',
+              } satisfies OAuthIdentityResolution)
+            : ({ kind: 'missing' } satisfies OAuthIdentityResolution),
       ];
 
       for (const resolveIdentity of identityResolvers) {
-        const userId = await resolveIdentity();
-        if (userId) return userId;
+        const identity = await resolveIdentity();
+        if (!identity || identity.kind === 'missing') continue;
+        return identity;
       }
 
-      return null;
+      return { kind: 'missing' };
     },
 
     async getSessionBootstrapRateLimitedResponse(

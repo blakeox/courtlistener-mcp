@@ -9,10 +9,9 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 
-const { GetOralArgumentsHandler, GetOralArgumentHandler } = await import(
-  '../../dist/domains/oral-arguments/handlers.js'
-);
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+const { GetOralArgumentsHandler, GetOralArgumentHandler } =
+  await import('../../src/domains/oral-arguments/handlers.ts');
+const { Logger } = await import('../../src/infrastructure/logger.ts');
 
 class SilentLogger extends Logger {
   constructor(component = 'OralArgumentsTest') {
@@ -81,7 +80,7 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
       assert.ok(
         payload.summary.includes('oral') ||
           payload.summary.includes('arguments') ||
-          payload.summary.includes('Retrieved')
+          payload.summary.includes('Retrieved'),
       );
       if (payload.oralArguments) {
         assert.ok(Array.isArray(payload.oralArguments));
@@ -103,7 +102,10 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       // withErrorHandling returns 'handler_name failed' as error
       assert.strictEqual(payload.error, 'get_oral_arguments failed');
       assert.strictEqual(payload.details?.message, 'Oral arguments unavailable');
@@ -149,7 +151,7 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
       assert.ok(
         payload.summary.includes('oral') ||
           payload.summary.includes('argument') ||
-          payload.summary.includes('Retrieved')
+          payload.summary.includes('Retrieved'),
       );
       if (payload.oralArgument) {
         assert.strictEqual(payload.oralArgument.court, 'Supreme Court');
@@ -182,4 +184,3 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
     }
   });
 });
-

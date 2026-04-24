@@ -12,10 +12,12 @@ import type { ToolContext } from '../../src/server/tool-handler.js';
 const {
   GetOpinionTextHandler,
   AnalyzeLegalArgumentHandler,
+  GetAuthoritiesHandler,
   GetCitationNetworkHandler,
+  GetOpinionCitationsHandler,
   LookupCitationHandler,
-} = await import('../../dist/domains/opinions/handlers.js');
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+} = await import('../../src/domains/opinions/handlers.js');
+const { Logger } = await import('../../src/infrastructure/logger.js');
 
 class SilentLogger extends Logger {
   constructor(component = 'OpinionsTest') {
@@ -79,7 +81,11 @@ describe('GetOpinionTextHandler (TypeScript)', () => {
         summary: string;
         opinion: { id: string };
       };
-      assert.ok(payload.summary.includes('html') || payload.summary.includes('text') || payload.summary.includes('opinion'));
+      assert.ok(
+        payload.summary.includes('html') ||
+          payload.summary.includes('text') ||
+          payload.summary.includes('opinion'),
+      );
       assert.strictEqual(payload.opinion.id, 'A-12');
     }
   });
@@ -167,7 +173,10 @@ describe('AnalyzeLegalArgumentHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       // withErrorHandling returns 'handler_name failed' as error, original message in details
       assert.strictEqual(payload.error, 'analyze_legal_argument failed');
       assert.strictEqual(payload.details?.message, 'Analysis timeout');
@@ -193,7 +202,7 @@ describe('GetCitationNetworkHandler (TypeScript)', () => {
     const api = {
       async getCitationNetwork(
         opinionId: string | number,
-        options: { depth: number; direction: string; limit: number }
+        options: { depth: number; direction: string; limit: number },
       ): Promise<{ nodes: number[]; edges: unknown[] }> {
         assert.strictEqual(Number(opinionId), 123);
         assert.deepStrictEqual(options, { depth: 3, direction: 'cited_by', limit: 10 });
@@ -216,7 +225,11 @@ describe('GetCitationNetworkHandler (TypeScript)', () => {
         summary: string;
         network: { nodes: number[] };
       };
-      assert.ok(payload.summary.includes('citation') || payload.summary.includes('network') || payload.summary.includes('Retrieved'));
+      assert.ok(
+        payload.summary.includes('citation') ||
+          payload.summary.includes('network') ||
+          payload.summary.includes('Retrieved'),
+      );
       assert.deepStrictEqual(payload.network.nodes, [1, 2, 3]);
     }
   });
@@ -264,14 +277,22 @@ describe('LookupCitationHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error.message, /Too small.*>=1 characters|String must contain at least 1 character/);
+      assert.match(
+        result.error.message,
+        /Too small.*>=1 characters|String must contain at least 1 character/,
+      );
     }
   });
 
   it('returns citation search results', async () => {
     const api = {
-      async searchCitations(citation: string): Promise<Array<{ id: number }>> {
-        assert.strictEqual(citation, '123 F.3d 456');
+      async lookupCitation(params: {
+        citation: string;
+        normalize?: boolean;
+        include_alternatives?: boolean;
+      }): Promise<Array<{ id: number }>> {
+        assert.strictEqual(params.citation, '123 F.3d 456');
+        assert.strictEqual(params.include_alternatives, true);
         return [{ id: 1 }];
       },
     };
@@ -293,7 +314,7 @@ describe('LookupCitationHandler (TypeScript)', () => {
 
   it('returns error payload when citation lookup fails', async () => {
     const api = {
-      async searchCitations(): Promise<never> {
+      async lookupCitation(): Promise<never> {
         throw new Error('Lookup failed');
       },
     };
@@ -316,3 +337,72 @@ describe('LookupCitationHandler (TypeScript)', () => {
   });
 });
 
+describe('GetOpinionCitationsHandler (TypeScript)', () => {
+  it('normalizes the opinion identifier', () => {
+    const handler = new GetOpinionCitationsHandler({});
+    const result = handler.validate({ opinion_id: 42 });
+
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data.opinion_id, '42');
+    }
+  });
+
+  it('returns citations payload', async () => {
+    const api = {
+      async getOpinionCitations(opinionId: number): Promise<{ cited: Array<{ id: number }> }> {
+        assert.strictEqual(opinionId, 42);
+        return { cited: [{ id: 7 }] };
+      },
+    };
+
+    const handler = new GetOpinionCitationsHandler(api);
+    const validated = handler.validate({ opinion_id: '42' });
+    assert.strictEqual(validated.success, true);
+
+    if (validated.success) {
+      const result = await handler.execute(validated.data, makeContext());
+      const payload = JSON.parse(result.content[0].text) as {
+        summary: string;
+        citations: { cited: Array<{ id: number }> };
+      };
+      assert.ok(payload.summary.includes('42'));
+      assert.deepStrictEqual(payload.citations, { cited: [{ id: 7 }] });
+    }
+  });
+});
+
+describe('GetAuthoritiesHandler (TypeScript)', () => {
+  it('normalizes the opinion identifier', () => {
+    const handler = new GetAuthoritiesHandler({});
+    const result = handler.validate({ opinion_id: 99 });
+
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data.opinion_id, '99');
+    }
+  });
+
+  it('returns authorities payload', async () => {
+    const api = {
+      async getAuthorities(opinionId: number): Promise<{ authorities: Array<{ id: number }> }> {
+        assert.strictEqual(opinionId, 99);
+        return { authorities: [{ id: 3 }] };
+      },
+    };
+
+    const handler = new GetAuthoritiesHandler(api);
+    const validated = handler.validate({ opinion_id: '99' });
+    assert.strictEqual(validated.success, true);
+
+    if (validated.success) {
+      const result = await handler.execute(validated.data, makeContext());
+      const payload = JSON.parse(result.content[0].text) as {
+        summary: string;
+        authorities: { authorities: Array<{ id: number }> };
+      };
+      assert.ok(payload.summary.includes('99'));
+      assert.deepStrictEqual(payload.authorities, { authorities: [{ id: 3 }] });
+    }
+  });
+});

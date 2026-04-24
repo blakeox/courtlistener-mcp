@@ -1,44 +1,87 @@
 # Deployment Safety Checklist (Worker + Local Parity)
 
 ## Pre-deploy checks (required)
+
 1. Install/build:
    - `pnpm install`
    - `pnpm run build` (when baseline TypeScript state allows)
 2. Protocol smoke tests:
    - `npm run test:mcp`
-   - `pnpm run test:runtime-parity:certify` (artifact: `test-output/runtime-parity/certification-report.json`)
+   - `pnpm run test:runtime-parity:certify` (artifact:
+     `test-output/runtime-parity/certification-report.json`)
+   - `pnpm run ci:auth-release-gate` for hosted auth regressions across handoff,
+     runtime trust boundaries, authorize flow, and server auth middleware
 3. Cloudflare readiness:
    - `pnpm run cloudflare:check`
 4. Confirm required secrets:
    - `COURTLISTENER_API_KEY`
    - At least one auth mode (`MCP_AUTH_TOKEN` or `OIDC_ISSUER`)
+   - `MCP_UI_SESSION_SECRET` for Worker-owned browser auth/session signing
+   - `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` so DCR management tokens do not reuse
+     UI session or API-key material
 5. Confirm runtime parity inputs:
    - `MCP_ALLOWED_ORIGINS` aligned with expected browser clients
    - session secret configured (`MCP_UI_SESSION_SECRET`)
+   - if hosted auth is enabled, verify `OIDC_ISSUER` plus one complete upstream
+     client pair (`MCP_AUTH_OIDC_CLIENT_*` preferred; `LOGTO_APP_*` only when
+     the generic pair is entirely absent)
+   - block deploy on partial hosted-auth env drift (for example only one of
+     `MCP_AUTH_OIDC_CLIENT_ID` / `MCP_AUTH_OIDC_CLIENT_SECRET`)
+   - set `MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS` explicitly instead of
+     relying on the 24h default
+   - if `MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION` or
+     `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS` is enabled, require
+     `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`
+   - remove deprecated `MCP_AUTH_UI_ORIGIN`; Worker-owned hosted auth is
+     same-origin only
 
 ## Post-deploy verification
+
 1. `GET /health` returns success.
 2. MCP initialize succeeds on `/mcp`.
 3. CORS check from expected origin succeeds.
 4. Authentication path expected for current mode (static/OIDC).
+5. Hosted browser auth probe and approval journey:
+   - `GET /auth/start?continue=1` redirects only when hosted auth is fully ready
+   - a real `/authorize` browser flow reaches `/auth/approve` before completing
+     OAuth
+6. Registration management token policy:
+   - dedicated `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` configured
+   - explicit `MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS` value recorded for the
+     deploy
 
 ## Canary promotion criteria (protocol/runtime)
+
 1. Keep first rollout to a canary slice and observe for at least 10 minutes.
 2. Promote only if all are true:
-   - MCP protocol contract checks remain green (`test:mcp`, protocol governance/unit contract checks).
-   - Auth/security matrix checks remain green (gateway + worker auth contract suites).
-   - Runtime parity certification stays green with zero diffs (`pnpm run ci:runtime-safety-gate`).
-   - Performance certification remains within gate budgets (`pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json`).
-   - Combined release-readiness gate remains green (`pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002`).
-   - Async workflow contracts remain green (`test/unit/test-async-tool-execution-service.ts`).
+   - MCP protocol contract checks remain green (`test:mcp`, protocol
+     governance/unit contract checks).
+   - Auth/security matrix checks remain green (gateway + worker auth handoff
+     suites).
+   - Hosted auth release gate remains green (`pnpm run ci:auth-release-gate`).
+   - Runtime parity certification stays green with zero diffs
+     (`pnpm run ci:runtime-safety-gate`).
+   - Performance certification remains within gate budgets
+     (`pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json`).
+   - Combined release-readiness gate remains green
+     (`pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002`).
+   - Async workflow contracts remain green
+     (`test/unit/test-async-tool-execution-service.ts`).
    - Startup diagnostics invariants stay `status=ok` on `/startup-diagnostics`.
-   - No sustained increase in `5xx`, `429`, or auth failures on `/mcp` and `/health`.
-3. Block promotion and trigger rollback if protocol negotiation failures, auth regression, or startup invariant errors appear.
+   - No sustained increase in `5xx`, `429`, or auth failures on `/mcp` and
+     `/health`.
+3. Block promotion and trigger rollback if protocol negotiation failures, auth
+   regression, or startup invariant errors appear.
+4. Treat any accidental reintroduction of `MCP_AUTH_UI_ORIGIN`, missing Access
+   acknowledgement, or missing dedicated registration-token secret as rollout
+   blockers for hosted auth.
 
 ## Fast rollback playbook
+
 1. Identify last known good deployment.
 2. Redeploy previous commit/tag:
-   - `wrangler deploy --env <env> --compatibility-date <date>` (using previous artifact/commit context)
+   - `wrangler deploy --env <env> --compatibility-date <date>` (using previous
+     artifact/commit context)
 3. Re-run:
    - `/health` check
    - MCP initialize smoke test

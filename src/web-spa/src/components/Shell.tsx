@@ -104,11 +104,11 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
                 onClick={async () => {
                   try {
                     await logout();
+                    clear();
+                    navigate('/app/control-center');
                   } catch {
-                    // Graceful degradation — clear local state regardless
+                    toast('Logout failed — session is still active.', 'error');
                   }
-                  clear();
-                  navigate('/app/control-center');
                 }}
               >
                 Log out
@@ -165,7 +165,7 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
       </div>
 
       <footer>
-        Operator console for MCP diagnostics. Public sign-in flows through the separate Clerk handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
+        Operator console for MCP diagnostics. Public sign-in flows through the separate auth portal handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
       </footer>
     </div>
   );

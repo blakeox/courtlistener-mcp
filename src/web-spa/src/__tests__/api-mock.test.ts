@@ -12,17 +12,8 @@ describe('api-mock', () => {
     expect(session.user).toBeNull();
   });
 
-  it('login sets authenticated state', async () => {
-    const mock = await import('../lib/api-mock');
-    await mock.login({ email: 'test@test.com', password: 'pass' });
-    const session = await mock.getSession();
-    expect(session.authenticated).toBe(true);
-    expect(session.user).not.toBeNull();
-  });
-
   it('logout clears authenticated state', async () => {
     const mock = await import('../lib/api-mock');
-    await mock.login({ email: 'test@test.com', password: 'pass' });
     await mock.logout();
     const session = await mock.getSession();
     expect(session.authenticated).toBe(false);
@@ -35,7 +26,7 @@ describe('api-mock', () => {
     expect(result.api_key?.token).toBeTruthy();
     const keys = await mock.listKeys();
     expect(keys.keys.length).toBeGreaterThanOrEqual(1);
-    expect(keys.keys.some(k => k.label === 'test-key')).toBe(true);
+    expect(keys.keys.some((k) => k.label === 'test-key')).toBe(true);
   });
 
   it('revokeKey marks key as inactive', async () => {
@@ -44,15 +35,18 @@ describe('api-mock', () => {
     const keyId = created.api_key!.id;
     await mock.revokeKey(keyId);
     const keys = await mock.listKeys();
-    const revoked = keys.keys.find(k => k.id === keyId);
+    const revoked = keys.keys.find((k) => k.id === keyId);
     expect(revoked?.is_active).toBe(false);
     expect(revoked?.revoked_at).toBeTruthy();
   });
 
-  it('signup returns mock message', async () => {
+  it('does not export removed browser-form auth helpers', async () => {
     const mock = await import('../lib/api-mock');
-    const result = await mock.signup({ email: 'a@b.com', password: 'pass' });
-    expect(result.message).toContain('Mock');
+    expect('login' in mock).toBe(false);
+    expect('loginByAccessToken' in mock).toBe(false);
+    expect('signup' in mock).toBe(false);
+    expect('requestPasswordReset' in mock).toBe(false);
+    expect('resetPassword' in mock).toBe(false);
   });
 
   it('mcpCall returns mock response', async () => {
@@ -82,7 +76,10 @@ describe('api-mock', () => {
     const result = await mock.aiChat({
       message: 'follow up',
       mcpToken: 'tok',
-      history: [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'response' }],
+      history: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'response' },
+      ],
     });
     expect(result.ai_response).toBeTruthy();
   });
@@ -104,7 +101,10 @@ describe('api-mock', () => {
     const mock = await import('../lib/api-mock');
     const result = await mock.aiPlain({
       message: 'follow up',
-      history: [{ role: 'user', content: 'prior' }, { role: 'assistant', content: 'prior resp' }],
+      history: [
+        { role: 'user', content: 'prior' },
+        { role: 'assistant', content: 'prior resp' },
+      ],
     });
     expect(result.ai_response).toBeTruthy();
   });

@@ -11,3 +11,5 @@ pre-push:
       run: pnpm run build
     unit-tests:
       run: pnpm run test:unit
+    spa-auth-tests:
+      run: pnpm run test:spa:auth

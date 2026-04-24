@@ -205,7 +205,7 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
 });
 
 describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-validated)', () => {
-  it('bypasses gateway auth and constructs principal from OAuth headers', async () => {
+  it('bypasses gateway auth and constructs principal from prevalidated context props', async () => {
     let mcpHandlerCalled = false;
     let gatewayAuthCalled = false;
 
@@ -215,8 +215,6 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
-          'x-oauth-user-id': 'user_abc123',
-          'x-oauth-auth-method': 'clerk',
         },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize', id: 1, params: {} }),
       }),
@@ -225,7 +223,9 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
         OIDC_ISSUER: 'https://issuer.example.com',
         MCP_REQUIRE_PROTOCOL_VERSION: 'true',
       },
-      ctx: {} as ExecutionContext,
+      ctx: {
+        props: { userId: 'user_abc123', authMethod: 'oidc' },
+      } as ExecutionContext,
       pathname: '/mcp',
       requestMethod: 'POST',
       origin: null,
@@ -275,7 +275,6 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
-          'x-oauth-user-id': 'user_abc123',
         },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize', id: 1, params: {} }),
       }),
@@ -283,7 +282,9 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
         MCP_REQUIRE_PROTOCOL_VERSION: 'true',
         OIDC_ISSUER: 'https://issuer.example.com',
       },
-      ctx: {} as ExecutionContext,
+      ctx: {
+        props: { userId: 'user_abc123', authMethod: 'oidc' },
+      } as ExecutionContext,
       pathname: '/mcp',
       requestMethod: 'POST',
       origin: null,
@@ -313,5 +314,55 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
       true,
       'MCP handler should be reached despite missing protocol version',
     );
+  });
+
+  it('fails closed when skipGatewayAuth lacks prevalidated context props', async () => {
+    let mcpHandlerCalled = false;
+
+    const response = await handleWorkerMcpTransportBoundary({
+      request: new Request('https://example.com/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'x-oauth-user-id': 'spoofed-user',
+          'x-oauth-auth-method': 'oidc',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize', id: 1, params: {} }),
+      }),
+      env: {
+        MCP_AUTH_TOKEN: 'should-not-be-checked',
+        OIDC_ISSUER: 'https://issuer.example.com',
+      },
+      ctx: {} as ExecutionContext,
+      pathname: '/mcp',
+      requestMethod: 'POST',
+      origin: null,
+      allowedOrigins: [],
+      mcpPath: true,
+      supportedProtocolVersions: new Set(['2025-03-26']),
+      skipGatewayAuth: true,
+      mcpStreamableHandler: {
+        fetch: async () => {
+          mcpHandlerCalled = true;
+          return new Response('ok', { status: 200 });
+        },
+      },
+      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
+      withCors: (res) => res,
+      buildCorsHeaders: () => new Headers(),
+      getClientIdentifier: () => 'client-1',
+      getAuthRateLimitedResponse: async () => null,
+      recordAuthFailure: async () => {},
+      clearAuthFailures: async () => {},
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 401);
+    assert.equal(mcpHandlerCalled, false);
+    assert.deepEqual(await response.json(), {
+      error: 'invalid_prevalidated_oauth_context',
+      message: 'Validated OAuth context is required for the internal provider fast path.',
+    });
   });
 });

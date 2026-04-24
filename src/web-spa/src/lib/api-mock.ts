@@ -7,9 +7,6 @@ import type {
   ApiKeyRecord,
   ApiKeysListResponse,
   AuthSessionResponse,
-  LoginResponse,
-  PasswordResetResponse,
-  SignupResponse,
 } from './types';
 
 let mockAuthenticated = false;
@@ -31,47 +28,9 @@ export async function getSession(): Promise<AuthSessionResponse> {
   };
 }
 
-export async function signup(_payload: {
-  email: string;
-  password: string;
-  fullName?: string;
-  turnstileToken?: string;
-}): Promise<SignupResponse> {
-  await delay();
-  return { message: 'Mock: Check your email for verification (simulated).' };
-}
-
-export async function login(_payload: { email: string; password: string }): Promise<LoginResponse> {
-  await delay();
-  mockAuthenticated = true;
-  return { message: 'Mock: Logged in successfully.' };
-}
-
-export async function loginByAccessToken(_accessToken: string): Promise<LoginResponse> {
-  await delay();
-  mockAuthenticated = true;
-  return { message: 'Mock: Token login successful.' };
-}
-
 export async function logout(): Promise<void> {
   await delay(100);
   mockAuthenticated = false;
-}
-
-export async function requestPasswordReset(
-  _payload: { email: string },
-): Promise<PasswordResetResponse> {
-  await delay();
-  return { message: 'Mock: Password reset email sent (simulated).' };
-}
-
-export async function resetPassword(_payload: {
-  accessToken?: string;
-  tokenHash?: string;
-  password: string;
-}): Promise<PasswordResetResponse> {
-  await delay();
-  return { message: 'Mock: Password updated successfully.' };
 }
 
 export async function listKeys(_token?: string): Promise<ApiKeysListResponse> {

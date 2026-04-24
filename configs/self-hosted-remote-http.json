@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "courtlistener-self-hosted": {
+      "url": "https://your-deployment.example.com/mcp",
+      "transport": "streamable-http"
+    }
+  }
+}

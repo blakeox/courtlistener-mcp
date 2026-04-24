@@ -11,9 +11,12 @@ import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 const REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim() || '';
 
 interface ServerConfig {
@@ -53,13 +56,12 @@ interface Config {
 // Configuration
 const CONFIG: Config = {
   localServer: {
-    command: 'node',
-    args: ['dist/index.js'],
+    command: localServerRuntime.command,
+    args: localServerRuntime.args,
     env: { NODE_ENV: 'test' },
   },
   remoteServer: {
-    url:
-      process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
+    url: process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   tests: [
@@ -136,7 +138,7 @@ interface MCPResponse {
 async function runTest(
   test: Test,
   serverConfig: ServerConfig | RemoteServerConfig,
-  isRemote = false
+  isRemote = false,
 ): Promise<TestResult> {
   return new Promise((resolve, reject) => {
     console.log(`\n🧪 Running test: ${test.name}`);
@@ -219,9 +221,7 @@ async function runTest(
       if (code !== 0) {
         console.log(`❌ Test failed with code ${code}`);
         console.log(`STDERR: ${stderr}`);
-        reject(
-          new Error(`Test "${test.name}" failed with exit code ${code}\nSTDERR: ${stderr}`)
-        );
+        reject(new Error(`Test "${test.name}" failed with exit code ${code}\nSTDERR: ${stderr}`));
         return;
       }
 
@@ -241,13 +241,10 @@ async function runTest(
           reject(new Error(`Test "${test.name}" validation failed: ${validation.error}`));
         }
       } catch (parseError) {
-        const errorMessage =
-          parseError instanceof Error ? parseError.message : String(parseError);
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
         console.log(`❌ Test "${test.name}" response parsing failed`);
         console.log(`Raw output: ${stdout}`);
-        reject(
-          new Error(`Test "${test.name}" response parsing failed: ${errorMessage}`)
-        );
+        reject(new Error(`Test "${test.name}" response parsing failed: ${errorMessage}`));
       }
     });
   });
@@ -262,10 +259,7 @@ function validateResponse(response: MCPResponse, expected: TestExpected): Valida
       return { success: false, error: 'Missing result field' };
     }
 
-    if (
-      expected.hasTools &&
-      (!response.result?.tools || !Array.isArray(response.result.tools))
-    ) {
+    if (expected.hasTools && (!response.result?.tools || !Array.isArray(response.result.tools))) {
       return { success: false, error: 'Missing or invalid tools array' };
     }
 

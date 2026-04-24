@@ -46,6 +46,9 @@ jobs:
       - name: Build for production
         run: pnpm run build
 
+      - name: Install Chromium for auth browser validation
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Install MCP Inspector
         run: pnpm add -g @modelcontextprotocol/inspector
 
@@ -55,6 +58,8 @@ jobs:
           pnpm test
 
       - name: Hosted OAuth release gate
+        env:
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: pnpm run ci:auth-release-gate
 
       - name: Extended MCP Inspector validation
@@ -62,7 +67,7 @@ jobs:
           echo "🔍 Running extended MCP Inspector validation..."
 
           # Run comprehensive Inspector CLI tests
-          node test/runners/ci-test-mcp-inspector.js --extended
+          pnpm run ci:test-inspector:extended
 
           # Test all available tools
           pnpm run test:mcp:tool list_courts
@@ -203,6 +208,71 @@ jobs:
             # Clean up
             docker stop legal-mcp-test || true
           fi
+
+  publish-npm:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    needs: [validate-release, docker-test]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run typecheck
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-docker:
+    name: Publish Docker image
+    runs-on: ubuntu-latest
+    needs: [validate-release, docker-test]
+    if: github.event_name == 'push'
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  github-release:
+    name: Create GitHub release
+    needs: [publish-npm, publish-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
 
   deployment-ready:
     name: Deployment Ready Check

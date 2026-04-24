@@ -192,4 +192,28 @@ export const enhancedToolDefinitions: EnhancedTool[] = [
       required: ['success', 'data'],
     },
   },
+  {
+    name: 'get_visualization_metadata',
+    description: 'Get visualization metadata and available chart descriptors',
+    category: 'analysis',
+    complexity: 'simple',
+    rateLimitWeight: 1,
+    examples: [
+      {
+        name: 'Visualization catalog',
+        description: 'List available visualization metadata for a category',
+        arguments: { category: 'courts', page: 1, page_size: 20 },
+      },
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string' },
+        court_id: { type: 'string' },
+        page: { type: 'number', minimum: 1 },
+        page_size: { type: 'number', minimum: 1, maximum: 100 },
+      },
+      additionalProperties: false,
+    },
+  },
 ];

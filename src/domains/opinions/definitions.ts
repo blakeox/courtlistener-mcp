@@ -167,4 +167,68 @@ export const opinionToolDefinitions: EnhancedTool[] = [
       required: ['success', 'data'],
     },
   },
+  {
+    name: 'lookup_citation',
+    description: 'Look up cases by legal citation',
+    category: 'reference',
+    complexity: 'simple',
+    rateLimitWeight: 1,
+    examples: [
+      {
+        name: 'Lookup reporter citation',
+        description: 'Find a known citation',
+        arguments: { citation: '410 U.S. 113' },
+      },
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        citation: { type: 'string', minLength: 1 },
+        normalize: { type: 'boolean' },
+        include_alternatives: { type: 'boolean' },
+      },
+      required: ['citation'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_opinion_citations',
+    description: 'Get the opinions and authorities cited by a specific opinion',
+    category: 'details',
+    complexity: 'simple',
+    rateLimitWeight: 1,
+    examples: [
+      {
+        name: 'Opinion citations',
+        description: 'List citations for one opinion',
+        arguments: { opinion_id: 108713 },
+      },
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: { opinion_id: { type: ['number', 'string'] } },
+      required: ['opinion_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_authorities',
+    description: 'Get the authorities referenced by a specific opinion',
+    category: 'details',
+    complexity: 'simple',
+    rateLimitWeight: 1,
+    examples: [
+      {
+        name: 'Opinion authorities',
+        description: 'List authorities for one opinion',
+        arguments: { opinion_id: 108713 },
+      },
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: { opinion_id: { type: ['number', 'string'] } },
+      required: ['opinion_id'],
+      additionalProperties: false,
+    },
+  },
 ];

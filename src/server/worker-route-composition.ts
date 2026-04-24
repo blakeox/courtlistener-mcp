@@ -1,18 +1,20 @@
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { WorkerSecurityEnv } from './worker-security.js';
-import {
-  handleWorkerOAuthRoutes,
-  type WorkerOAuthRouteDeps,
-} from './worker-oauth-routes.js';
+import { handleWorkerOAuthRoutes, type WorkerOAuthRouteDeps } from './worker-oauth-routes.js';
 import { handleWorkerAiUiRoutes, type HandleWorkerAiUiRoutesDeps } from './worker-ai-ui-routes.js';
 import {
   handleWorkerUiShellRoutes,
   type HandleWorkerUiShellRoutesDeps,
 } from './worker-ui-shell-routes.js';
+import type { WorkerUiSessionRuntime } from './worker-ui-session-runtime.js';
+import { handleWorkerAuthHandoffRoutes } from './worker-auth-handoff-routes.js';
+import type { HostedOAuthCompletionSource } from '../auth/oauth-authorization-completion.js';
 import {
   buildMcpGatewayRouteParams,
   handleMcpGatewayRoute,
   type McpGatewayBoundaryPolicyParams,
 } from './worker-mcp-gateway.js';
+import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-limit.js';
 export type WorkerRouteHandler = () => Promise<Response | null>;
 
 type WorkerDelegatedRouteEnv = WorkerSecurityEnv & {
@@ -24,7 +26,18 @@ type WorkerDelegatedRouteEnv = WorkerSecurityEnv & {
 
 type WorkerDelegatedSharedDeps<TEnv extends WorkerDelegatedRouteEnv> = WorkerOAuthRouteDeps<TEnv> &
   HandleWorkerAiUiRoutesDeps<TEnv, ExecutionContext> &
-  HandleWorkerUiShellRoutesDeps<TEnv>;
+  HandleWorkerUiShellRoutesDeps<TEnv> & {
+    buildHostedOAuthCompletionDetails: (
+      authMethod: HostedOAuthCompletionSource,
+      userId: string,
+    ) => { metadata: Record<string, unknown>; props: Record<string, unknown> };
+    resolveGrantedScopes: (authRequest: { scope: string[] }) => string[];
+    getOAuthHelpers: (env: TEnv) => OAuthHelpers;
+    workerUiSessionRuntime: WorkerUiSessionRuntime<TEnv>;
+    getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+    getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+    now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+  };
 
 interface McpHandler<TEnv extends WorkerDelegatedRouteEnv> {
   fetch(request: Request, env: TEnv, ctx: ExecutionContext): Promise<Response>;
@@ -42,8 +55,9 @@ export interface WorkerDelegatedRouteContext<TEnv extends WorkerDelegatedRouteEn
   mcpPath: boolean;
 }
 
-export interface WorkerDelegatedRouteDeps<TEnv extends WorkerDelegatedRouteEnv>
-  extends WorkerDelegatedSharedDeps<TEnv> {
+export interface WorkerDelegatedRouteDeps<
+  TEnv extends WorkerDelegatedRouteEnv,
+> extends WorkerDelegatedSharedDeps<TEnv> {
   mcpBoundaryPolicy: McpGatewayBoundaryPolicyParams<TEnv> & {
     mcpStreamableHandler: McpHandler<TEnv>;
     mcpSseCompatibilityHandler: McpHandler<TEnv>;
@@ -53,6 +67,7 @@ export interface WorkerDelegatedRouteDeps<TEnv extends WorkerDelegatedRouteEnv>
 export interface WorkerDelegatedRouteCompositionHandlers {
   oauth: WorkerRouteHandler;
   aiUi: WorkerRouteHandler;
+  authHandoff: WorkerRouteHandler;
   uiShell: WorkerRouteHandler;
   mcpGateway: WorkerRouteHandler;
 }
@@ -63,6 +78,7 @@ export function composeWorkerDelegatedRouteHandlers(
   return [
     handlers.oauth,
     handlers.aiUi,
+    handlers.authHandoff,
     handlers.uiShell,
     handlers.mcpGateway,
   ].filter((handler): handler is WorkerRouteHandler => typeof handler === 'function');
@@ -84,14 +100,23 @@ export async function handleDelegatedWorkerRoutes<TEnv extends WorkerDelegatedRo
   context: WorkerDelegatedRouteContext<TEnv>,
   deps: WorkerDelegatedRouteDeps<TEnv>,
 ): Promise<Response | null> {
-  const { request, url, origin, allowedOrigins, env, ctx, pathname, requestMethod, mcpPath } = context;
+  const { request, url, origin, allowedOrigins, env, ctx, pathname, requestMethod, mcpPath } =
+    context;
 
   return runWorkerRouteHandlers(
     composeWorkerDelegatedRouteHandlers({
-      oauth: async () => handleWorkerOAuthRoutes({ request, url, origin, allowedOrigins, env }, deps),
+      oauth: async () =>
+        handleWorkerOAuthRoutes({ request, url, origin, allowedOrigins, env }, deps),
       aiUi: async () =>
         handleWorkerAiUiRoutes({
           context: { request, url, origin, allowedOrigins, env, ctx },
+          deps,
+        }),
+      authHandoff: async () =>
+        handleWorkerAuthHandoffRoutes({
+          request,
+          url,
+          env,
           deps,
         }),
       uiShell: async () =>

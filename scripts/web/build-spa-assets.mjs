@@ -3,9 +3,11 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(import.meta.dirname, '../..');
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, '../..');
 const spaRoot = resolve(repoRoot, 'src/web-spa');
 const outDir = resolve(repoRoot, '.spa-dist');
 const manifestPath = resolve(outDir, '.vite/manifest.json');

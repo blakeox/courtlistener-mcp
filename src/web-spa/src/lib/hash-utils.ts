@@ -17,7 +17,11 @@ export function isRecoveryHash(): boolean {
   if (readRecoveryType() !== 'recovery') return false;
   const hashParams = parseHashParams();
   const searchParams = parseSearchParams();
-  const accessToken = (hashParams.get('access_token') || searchParams.get('access_token') || '').trim();
+  const accessToken = (
+    hashParams.get('access_token') ||
+    searchParams.get('access_token') ||
+    ''
+  ).trim();
   const tokenHash = (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
   return Boolean(accessToken || tokenHash);
 }
@@ -42,17 +46,6 @@ export function getRecoveryTokenHash(): string {
   return (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
 }
 
-export function readLoginHashToken(): string {
-  const params = parseHashParams();
-  const accessToken = (params.get('access_token') || '').trim();
-  const tokenType = (params.get('token_type') || '').trim().toLowerCase();
-  const flowType = (params.get('type') || '').trim().toLowerCase();
-  if (flowType === 'recovery') return '';
-  if (!accessToken) return '';
-  if (tokenType && tokenType !== 'bearer') return '';
-  return accessToken;
-}
-
 /** Pre-render redirect: if current URL has a recovery hash, redirect to /app/control-center. */
 export function redirectRecoveryHashToResetPage(): void {
   if (!isRecoveryHash()) return;
@@ -63,7 +56,11 @@ export function redirectRecoveryHashToResetPage(): void {
   const recoveryHash = new URLSearchParams();
 
   const tokenHash = (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
-  const accessToken = (hashParams.get('access_token') || searchParams.get('access_token') || '').trim();
+  const accessToken = (
+    hashParams.get('access_token') ||
+    searchParams.get('access_token') ||
+    ''
+  ).trim();
   const tokenType = (hashParams.get('token_type') || '').trim();
 
   if (tokenHash) recoverySearch.set('token_hash', tokenHash);

@@ -4,13 +4,10 @@ import type {
   ApiKeyCreateResponse,
   ApiKeysListResponse,
   AuthSessionResponse,
-  LoginResponse,
-  PasswordResetResponse,
-  SignupResponse,
   UsageSnapshotResponse,
 } from './types';
 
-const sessionSchema = z.object({
+export const sessionSchema = z.object({
   authenticated: z.boolean(),
   user: z
     .object({
@@ -58,7 +55,7 @@ const aiChatSchema = z.object({
   mcp_result: z.unknown(),
 });
 
-const usageSnapshotSchema = z.object({
+export const usageSnapshotSchema = z.object({
   userId: z.string(),
   totalRequests: z.number(),
   dailyRequests: z.number(),
@@ -148,57 +145,8 @@ export async function getUsage(): Promise<UsageSnapshotResponse> {
   return usageSnapshotSchema.parse(payload);
 }
 
-export async function signup(payload: {
-  email: string;
-  password: string;
-  fullName?: string;
-  turnstileToken?: string;
-}): Promise<SignupResponse> {
-  return request<SignupResponse>('/api/signup', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function login(payload: { email: string; password: string }): Promise<LoginResponse> {
-  return request<LoginResponse>('/api/login', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function loginByAccessToken(accessToken: string): Promise<LoginResponse> {
-  return request<LoginResponse>('/api/login/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ accessToken }),
-  });
-}
-
 export async function logout(): Promise<void> {
   await request('/api/logout', { method: 'POST' });
-}
-
-export async function requestPasswordReset(payload: { email: string }): Promise<PasswordResetResponse> {
-  return request<PasswordResetResponse>('/api/password/forgot', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function resetPassword(payload: {
-  accessToken?: string;
-  tokenHash?: string;
-  password: string;
-}): Promise<PasswordResetResponse> {
-  return request<PasswordResetResponse>('/api/password/reset', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
 }
 
 export async function listKeys(token?: string): Promise<ApiKeysListResponse> {
@@ -308,7 +256,10 @@ export async function mcpCall<T>(
     throw {
       status: 0,
       error: 'mcp_error',
-      message: typeof errBody.error?.message === 'string' ? errBody.error.message : 'MCP returned an error',
+      message:
+        typeof errBody.error?.message === 'string'
+          ? errBody.error.message
+          : 'MCP returned an error',
     } satisfies ApiError;
   }
 

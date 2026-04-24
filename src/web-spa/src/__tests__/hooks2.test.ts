@@ -1,18 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut';
-
-function createStorageMock(): Storage {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => (key in store ? store[key] : null),
-    setItem: (key: string, value: string) => { store[key] = String(value); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
-    get length() { return Object.keys(store).length; },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  };
-}
+import { createMatchMediaMock, createStorageMock } from './test-utils';
 
 // useColorScheme needs special handling due to matchMedia
 describe('useColorScheme', () => {
@@ -21,12 +10,10 @@ describe('useColorScheme', () => {
   beforeEach(() => {
     mockLocal = createStorageMock();
     vi.stubGlobal('localStorage', mockLocal);
-    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes('dark') ? false : true,
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })));
+    vi.stubGlobal(
+      'matchMedia',
+      createMatchMediaMock((query) => !query.includes('dark')),
+    );
     document.documentElement.removeAttribute('data-theme');
     vi.resetModules();
   });
@@ -143,9 +130,13 @@ describe('useRateLimitBackoff', () => {
     const { result } = renderHook(() => useRateLimitBackoff());
     act(() => result.current.trigger({ retry_after_seconds: 2, status: 429 }));
     expect(result.current.secondsLeft).toBe(2);
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(result.current.secondsLeft).toBe(1);
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(result.current.secondsLeft).toBe(0);
     expect(result.current.blocked).toBe(false);
   });
@@ -183,7 +174,9 @@ describe('useSessionHeartbeat', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(1000, { enabled: false, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(2000); });
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(mockGetSession).not.toHaveBeenCalled();
     expect(onExpired).not.toHaveBeenCalled();
     vi.doUnmock('../lib/api');
@@ -195,7 +188,9 @@ describe('useSessionHeartbeat', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(1000, { enabled: true, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(1000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(mockGetSession).toHaveBeenCalled();
     expect(onExpired).not.toHaveBeenCalled();
     vi.doUnmock('../lib/api');
@@ -207,7 +202,9 @@ describe('useSessionHeartbeat', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(1000, { enabled: true, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(1000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(onExpired).toHaveBeenCalledTimes(1);
     vi.doUnmock('../lib/api');
   });
@@ -218,7 +215,9 @@ describe('useSessionHeartbeat', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(1000, { enabled: true, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(1000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(mockGetSession).toHaveBeenCalled();
     expect(onExpired).not.toHaveBeenCalled();
     vi.doUnmock('../lib/api');
@@ -231,7 +230,9 @@ describe('useSessionHeartbeat', () => {
     const onExpired = vi.fn();
     const { unmount } = renderHook(() => useSessionHeartbeat(1000, { enabled: true, onExpired }));
     unmount();
-    await act(async () => { vi.advanceTimersByTime(3000); });
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
     // Only called once at most (for any tick before unmount)
     expect(mockGetSession.mock.calls.length).toBeLessThanOrEqual(1);
     vi.doUnmock('../lib/api');

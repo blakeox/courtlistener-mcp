@@ -1,5 +1,6 @@
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
 import { emitOAuthDiagnostic } from './oauth-diagnostics.js';
+import { getPrevalidatedOAuthIdentity } from './prevalidated-oauth-context.js';
 import { authorizeMcpGatewayRequest } from './mcp-gateway-auth.js';
 import { createInvalidSessionLifecycleResponse } from './mcp-session-lifecycle-contract.js';
 import type {
@@ -343,15 +344,24 @@ export async function handleMcpTransportBoundary<
   const nowMs = Date.now();
 
   if (skipGatewayAuth) {
-    // The Cloudflare OAuth provider already validated the bearer token and
-    // injected identity headers. Trust those headers and skip every
-    // secondary check (gateway auth, rate-limiter, protocol-version gate).
-    // This matches the Happy Fox pattern: single auth point.
-    const oauthUserId = request.headers.get('x-oauth-user-id')?.trim() || null;
-    const oauthAuthMethod = request.headers.get('x-oauth-auth-method')?.trim() || 'oauth';
-    principal = oauthUserId
-      ? { authMethod: oauthAuthMethod as McpRequestPrincipal['authMethod'], userId: oauthUserId }
-      : undefined;
+    // Only trust the explicit provider-owned ExecutionContext boundary for the
+    // prevalidated OAuth fast path. Never reconstruct principal state from
+    // user-controlled request headers here.
+    const prevalidatedIdentity = getPrevalidatedOAuthIdentity(ctx);
+    if (!prevalidatedIdentity) {
+      return withCors(
+        Response.json(
+          {
+            error: 'invalid_prevalidated_oauth_context',
+            message: 'Validated OAuth context is required for the internal provider fast path.',
+          },
+          { status: 401 },
+        ),
+        origin,
+        allowedOrigins,
+      );
+    }
+    principal = prevalidatedIdentity;
   } else {
     // Standard direct-access path: validate credentials via gateway auth
     // with rate-limiting and protocol-version enforcement.

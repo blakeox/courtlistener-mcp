@@ -5,10 +5,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 const SERVER_URL = process.env.SERVER_URL?.trim();
 const MCP_REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
@@ -80,7 +82,7 @@ function createStdioClient(): {
   send: (payload: { id: number; [key: string]: unknown }) => Promise<McpSuccessResponse>;
   close: () => void;
 } {
-  const server: ChildProcess = spawn('node', [join(projectRoot, 'dist/index.js')], {
+  const server: ChildProcess = spawn(localServerRuntime.command, localServerRuntime.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     cwd: projectRoot,
   });
@@ -176,7 +178,9 @@ function parseToolText(response: McpSuccessResponse): SearchPayload {
   const content = response.result?.content;
   assert.ok(Array.isArray(content) && content.length > 0, 'Expected non-empty MCP content array');
 
-  const textItem = content.find((item) => typeof item.text === 'string' && item.text.trim().startsWith('{'));
+  const textItem = content.find(
+    (item) => typeof item.text === 'string' && item.text.trim().startsWith('{'),
+  );
   assert.ok(textItem?.text, 'Expected JSON text content in tool response');
 
   return JSON.parse(textItem.text) as SearchPayload;
@@ -223,7 +227,10 @@ describe('MCP tariff rulings workflow', () => {
       const payload = parseToolText(response);
       assert.match(payload.summary ?? '', /Found \d+ opinions/i);
       assert.ok(Array.isArray(payload.results), 'Expected results array');
-      assert.ok((payload.results?.length ?? 0) > 0, 'Expected at least one tariff-related opinion result');
+      assert.ok(
+        (payload.results?.length ?? 0) > 0,
+        'Expected at least one tariff-related opinion result',
+      );
       assert.equal(payload.search_parameters?.query, 'tariff');
     } finally {
       client.close();

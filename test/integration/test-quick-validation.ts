@@ -7,9 +7,11 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 interface MCPRequest {
   jsonrpc: string;
@@ -43,7 +45,7 @@ async function testParameterFiltering(): Promise<void> {
   console.log('🧪 Testing parameter filtering for order_by...');
 
   // Start the MCP server
-  const server: ChildProcess = spawn('node', [join(projectRoot, 'dist/index.js')], {
+  const server: ChildProcess = spawn(localServerRuntime.command, localServerRuntime.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -57,35 +59,28 @@ async function testParameterFiltering(): Promise<void> {
   let toolsReceived = false;
 
   server.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n').filter((line) => line.trim());
+    const lines = data
+      .toString()
+      .split('\n')
+      .filter((line) => line.trim());
     for (const line of lines) {
       try {
         const response = JSON.parse(line) as MCPResponse;
         if (response.id === 1 && response.result) {
           toolsReceived = true;
           console.log('✅ Server is responding correctly');
-          console.log(
-            `✅ Found ${response.result.tools?.length || 0} tools available`
-          );
+          console.log(`✅ Found ${response.result.tools?.length || 0} tools available`);
 
           // Check that search_cases tool exists and has order_by parameter
-          const searchTool = response.result.tools?.find(
-            (t) => t.name === 'search_cases'
-          );
+          const searchTool = response.result.tools?.find((t) => t.name === 'search_cases');
           if (searchTool && searchTool.inputSchema?.properties?.order_by) {
-            console.log(
-              '✅ search_cases tool has order_by parameter (as expected)'
-            );
+            console.log('✅ search_cases tool has order_by parameter (as expected)');
           }
 
           // Check that advanced_search tool exists and has order_by parameter
-          const advancedTool = response.result.tools?.find(
-            (t) => t.name === 'advanced_search'
-          );
+          const advancedTool = response.result.tools?.find((t) => t.name === 'advanced_search');
           if (advancedTool && advancedTool.inputSchema?.properties?.order_by) {
-            console.log(
-              '✅ advanced_search tool has order_by parameter (as expected)'
-            );
+            console.log('✅ advanced_search tool has order_by parameter (as expected)');
           }
 
           // Now test that order_by is filtered out when calling the tool

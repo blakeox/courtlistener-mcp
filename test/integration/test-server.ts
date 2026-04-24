@@ -8,9 +8,12 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 interface MCPRequest {
   jsonrpc: string;
@@ -23,8 +26,7 @@ async function testMCPServer(): Promise<boolean> {
   console.log('Testing Legal MCP Server...');
 
   // Start the MCP server
-  const serverPath = join(__dirname, '../../dist/index.js');
-  const server: ChildProcess = spawn('node', [serverPath], {
+  const server: ChildProcess = spawn(localServerRuntime.command, localServerRuntime.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -74,4 +76,3 @@ testMCPServer()
     console.error('Test error:', error);
     process.exit(1);
   });
-

@@ -11,6 +11,100 @@ permissions:
   issues: write
 
 jobs:
+  detect-relevant-changes:
+    name: Detect Relevant PR Changes
+    runs-on: ubuntu-latest
+    outputs:
+      auth_related: ${{ steps.finalize.outputs.auth_related }}
+      worker_related: ${{ steps.finalize.outputs.worker_related }}
+      mcp_related: ${{ steps.finalize.outputs.mcp_related }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            auth_related:
+              - 'src/auth/**'
+              - 'src/server/worker-auth-*.ts'
+              - 'src/server/worker-oauth-*.ts'
+              - 'src/server/worker-ui-session-runtime.ts'
+              - 'src/server/worker-core-routes.ts'
+              - 'src/server/worker-security.ts'
+              - 'src/server/oauth-diagnostics.ts'
+              - 'src/security/**'
+              - 'src/web-spa/**'
+              - 'src/infrastructure/auth-policy-matrix.ts'
+              - 'src/infrastructure/config.ts'
+              - 'scripts/reports/auth-release-gate.js'
+              - 'scripts/testing/e2e-remote-oauth-handshake.mjs'
+              - 'scripts/testing/spa-auth-suites.mjs'
+              - 'scripts/testing/run-spa-auth-*.mjs'
+              - 'docs/repo/AUTH_START_INTEGRATION.md'
+              - 'playwright.config.ts'
+              - 'README.md'
+              - 'test/unit/test-worker-auth-handoff-routes.ts'
+              - 'test/unit/test-worker-oauth-authorize.ts'
+              - 'test/unit/test-worker-core-routes.ts'
+              - 'test/unit/test-worker-ui-session-runtime.ts'
+              - 'test/unit/test-worker-security.ts'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            worker_related:
+              - 'src/server/**'
+              - 'src/infrastructure/**'
+              - 'src/security/**'
+              - 'src/worker.ts'
+              - 'src/index.ts'
+              - 'scripts/reports/runtime-safety-gate.js'
+              - 'scripts/reports/release-readiness-gate.js'
+              - 'scripts/reports/auth-release-gate.js'
+              - 'scripts/testing/e2e-remote-oauth-handshake.mjs'
+              - 'test/unit/test-worker-*.ts'
+              - 'test/integration/test-http-transport.ts'
+              - 'test/integration/test-mcp-protocol.ts'
+              - 'test/tools/runtime-parity-certification.ts'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            mcp_related:
+              - 'src/**'
+              - 'scripts/dev/**'
+              - 'scripts/resolve-remote-endpoints.js'
+              - 'test/integration/test-mcp-protocol.ts'
+              - 'test/tools/runtime-parity-certification.ts'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+
+      - name: Default all filters to true outside PRs
+        if: github.event_name != 'pull_request'
+        id: defaults
+        run: |
+          echo "auth_related=true" >> "$GITHUB_OUTPUT"
+          echo "worker_related=true" >> "$GITHUB_OUTPUT"
+          echo "mcp_related=true" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize filter outputs
+        id: finalize
+        env:
+          AUTH_FILTER: ${{ steps.filter.outputs.auth_related }}
+          WORKER_FILTER: ${{ steps.filter.outputs.worker_related }}
+          MCP_FILTER: ${{ steps.filter.outputs.mcp_related }}
+          AUTH_DEFAULT: ${{ steps.defaults.outputs.auth_related }}
+          WORKER_DEFAULT: ${{ steps.defaults.outputs.worker_related }}
+          MCP_DEFAULT: ${{ steps.defaults.outputs.mcp_related }}
+        run: |
+          echo "auth_related=${AUTH_FILTER:-$AUTH_DEFAULT}" >> "$GITHUB_OUTPUT"
+          echo "worker_related=${WORKER_FILTER:-$WORKER_DEFAULT}" >> "$GITHUB_OUTPUT"
+          echo "mcp_related=${MCP_FILTER:-$MCP_DEFAULT}" >> "$GITHUB_OUTPUT"
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -61,6 +155,10 @@ jobs:
 
       - name: Run integration tests
         run: pnpm run test:integration
+
+      - name: Run SPA auth tests
+        if: ${{ matrix.node-version != 18 }}
+        run: pnpm run test:spa:auth
 
       - name: Enforce coverage thresholds
         run: pnpm run coverage:check
@@ -116,9 +214,52 @@ jobs:
       - name: Run runtime parity smoke tests
         run: pnpm run test:infra:parity
 
+  browser-auth:
+    name: Browser Auth CI
+    runs-on: ubuntu-latest
+    needs: detect-relevant-changes
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        needs.detect-relevant-changes.outputs.auth_related == 'true'
+      }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
+            pnpm install
+          else
+            pnpm install --frozen-lockfile
+          fi
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run SPA auth browser tests
+        run: pnpm run test:spa:e2e:auth
+
   hardening-release-gates:
     name: Hardening Release Gates (${{ matrix.gate }})
     runs-on: ubuntu-latest
+    needs: detect-relevant-changes
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        needs.detect-relevant-changes.outputs.auth_related == 'true' ||
+        needs.detect-relevant-changes.outputs.worker_related == 'true'
+      }}
     strategy:
       fail-fast: false
       matrix:
@@ -154,6 +295,10 @@ jobs:
       - name: Build project
         run: pnpm run build
 
+      - name: Install Chromium for SPA auth browser gates
+        if: matrix.gate == 'auth-release-gate'
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Resolve gate policy
         id: gate_policy
         run: |
@@ -172,6 +317,7 @@ jobs:
         env:
           PERF_GATE_POLICY_MODE: ${{ steps.gate_policy.outputs.policy_mode }}
           PERF_GATE_REQUIRE_FILES: ${{ steps.gate_policy.outputs.strict_mode }}
+          REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           case "${{ matrix.gate }}" in
             protocol-contract)
@@ -285,7 +431,12 @@ jobs:
   mcp-compliance:
     name: MCP Protocol Compliance
     runs-on: ubuntu-latest
-    needs: test
+    needs: [detect-relevant-changes, test]
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        needs.detect-relevant-changes.outputs.mcp_related == 'true'
+      }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

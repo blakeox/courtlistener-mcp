@@ -4,9 +4,7 @@
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { PaginatedApiResponse } from '../../common/pagination-utils.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { Judge } from '../../types.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 export * from './smart-search.js';
@@ -96,6 +94,13 @@ const enhancedRecapSchema = z
   })
   .passthrough();
 
+const visualizationMetadataSchema = z.object({
+  category: z.string().optional(),
+  court_id: z.string().optional(),
+  page: z.number().int().min(1).optional().default(1),
+  page_size: z.number().int().min(1).max(100).optional().default(20),
+});
+
 // Helper functions removed - now handled by @withDefaults decorator!
 
 export class GetVisualizationDataHandler extends TypedToolHandler<typeof visualizationSchema> {
@@ -113,75 +118,12 @@ export class GetVisualizationDataHandler extends TypedToolHandler<typeof visuali
     input: z.infer<typeof visualizationSchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    let result: unknown;
-
-    switch (input.data_type) {
-      case 'court_distribution': {
-        const courts = (await this.apiClient.listCourts({})) as PaginatedApiResponse<{
-          type: string;
-        }>;
-        const distribution = (courts.results || []).reduce(
-          (acc: Record<string, number>, court: { type: string }) => {
-            const type = court.type || 'Unknown';
-            acc[type] = (acc[type] || 0) + 1;
-            return acc;
-          },
-          {},
-        );
-        result = {
-          total_courts: courts.count ?? 0,
-          distribution,
-          raw_data: (courts.results || []).slice(0, 10), // Sample
-        };
-        break;
-      }
-      case 'case_timeline': {
-        // Mock implementation for demo
-        result = {
-          timeline: [
-            { year: 2020, cases: 150 },
-            { year: 2021, cases: 230 },
-            { year: 2022, cases: 180 },
-          ],
-        };
-        break;
-      }
-      case 'citation_network': {
-        if (!input.opinion_id) {
-          throw new Error('opinion_id is required for citation_network');
-        }
-        const network = await this.apiClient.getCitationNetwork(input.opinion_id, {
-          depth: input.depth || 1,
-        });
-        result = network;
-        break;
-      }
-      case 'judge_statistics': {
-        const judges = await this.apiClient.getJudges({});
-        result = {
-          total_judges: judges.count,
-          active_judges: judges.results.filter((j: Judge) => !j.date_termination).length,
-          appointed_by_president: judges.results.reduce(
-            (acc: Record<string, number>, judge: Judge) => {
-              const president = judge.appointer || 'Unknown';
-              acc[president] = (acc[president] || 0) + 1;
-              return acc;
-            },
-            {},
-          ),
-        };
-        break;
-      }
+    if (input.data_type === 'citation_network' && !input.opinion_id) {
+      throw new Error('opinion_id is required for citation_network');
     }
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
+    const result = (await this.apiClient.getVisualizationData(input)) as Record<string, unknown>;
+    return this.success(result);
   }
 }
 
@@ -200,21 +142,8 @@ export class GetBulkDataHandler extends TypedToolHandler<typeof bulkDataSchema> 
     input: z.infer<typeof bulkDataSchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    const result: Record<string, unknown> = {
-      data_type: input.data_type,
-      sample_size: input.sample_size || 10,
-      data: [], // Mock data
-      message: 'Bulk data retrieval is simulated for this demo',
-    };
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
+    const result = (await this.apiClient.getBulkData(input)) as Record<string, unknown>;
+    return this.success(result);
   }
 }
 
@@ -233,21 +162,8 @@ export class GetBankruptcyDataHandler extends TypedToolHandler<typeof bankruptcy
     input: z.infer<typeof bankruptcySchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    const result: Record<string, unknown> = {
-      court: input.court,
-      case_name: input.case_name,
-      docket_number: input.docket_number,
-      message: 'Bankruptcy data retrieval is simulated for this demo',
-    };
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
+    const result = (await this.apiClient.getBankruptcyData(input)) as Record<string, unknown>;
+    return this.success(result);
   }
 }
 
@@ -269,37 +185,11 @@ export class GetComprehensiveJudgeProfileHandler extends TypedToolHandler<
     input: z.infer<typeof comprehensiveJudgeSchema>,
     _context: ToolContext,
   ): Promise<CallToolResult> {
-    try {
-      const judge = await this.apiClient.getJudge(input.judge_id);
-
-      const result: Record<string, unknown> = {
-        profile: judge,
-        analytics: {
-          opinions_authored: 150, // Mock
-          citations_received: 1200, // Mock
-          avg_opinion_length: 4500, // Mock
-        },
-      };
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error fetching judge profile: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+    const result = (await this.apiClient.getComprehensiveJudgeProfile(input.judge_id)) as Record<
+      string,
+      unknown
+    >;
+    return this.success(result);
   }
 }
 
@@ -437,5 +327,30 @@ export class GetEnhancedRECAPDataHandler extends TypedToolHandler<typeof enhance
     }
 
     return this.success(result as Record<string, unknown>);
+  }
+}
+
+export class GetVisualizationMetadataHandler extends TypedToolHandler<
+  typeof visualizationMetadataSchema
+> {
+  readonly name = 'get_visualization_metadata';
+  readonly description = 'Get visualization metadata and available chart descriptors';
+  readonly category = 'analytics';
+  protected readonly schema = visualizationMetadataSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 1800 } })
+  async execute(
+    input: z.infer<typeof visualizationMetadataSchema>,
+    _context: ToolContext,
+  ): Promise<CallToolResult> {
+    const result = (await this.apiClient.getVisualizationMetadata(input)) as Record<
+      string,
+      unknown
+    >;
+    return this.success(result);
   }
 }

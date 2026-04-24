@@ -125,9 +125,7 @@ describe('Configuration Management (TypeScript)', () => {
       assert.doesNotThrow(() => {
         const config = getConfig();
         // Should fallback to default if invalid
-        assert.ok(
-          ['error', 'warn', 'info', 'debug'].includes(config.logging.level)
-        );
+        assert.ok(['error', 'warn', 'info', 'debug'].includes(config.logging.level));
       });
     });
 
@@ -143,7 +141,7 @@ describe('Configuration Management (TypeScript)', () => {
         assert.ok(config.cache.ttl > 0);
         assert.ok(
           config.metrics.port === undefined ||
-            (config.metrics.port >= 1024 && config.metrics.port <= 65535)
+            (config.metrics.port >= 1024 && config.metrics.port <= 65535),
         );
       });
 
@@ -162,7 +160,7 @@ describe('Configuration Management (TypeScript)', () => {
         const config = getConfig();
         assert.ok(
           typeof config.courtListener.baseUrl === 'string' &&
-            config.courtListener.baseUrl.length > 0
+            config.courtListener.baseUrl.length > 0,
         );
       });
 
@@ -216,10 +214,7 @@ describe('Configuration Management (TypeScript)', () => {
 
       const { getConfig } = await importConfigFresh();
 
-      assert.throws(
-        () => getConfig(),
-        /OAuth and OIDC auth cannot both be enabled at startup/
-      );
+      assert.throws(() => getConfig(), /OAuth and OIDC auth cannot both be enabled at startup/);
     });
 
     it('should expose canonical auth precedence without leaking secrets', async () => {
@@ -232,11 +227,7 @@ describe('Configuration Management (TypeScript)', () => {
       };
 
       assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, 'oidc');
-      assert.deepStrictEqual(diagnostics.authPolicy?.precedence, [
-        'oauth',
-        'serviceToken',
-        'oidc',
-      ]);
+      assert.deepStrictEqual(diagnostics.authPolicy?.precedence, ['oauth', 'serviceToken', 'oidc']);
 
       const serialized = JSON.stringify(diagnostics);
       assert.strictEqual(serialized.includes('static-secret-token'), false);
@@ -256,13 +247,174 @@ describe('Configuration Management (TypeScript)', () => {
       assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, null);
       assert.ok(
         diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_AUTH_PRIMARY is deprecated and ignored')
-        )
+          warning.includes('MCP_AUTH_PRIMARY is deprecated and ignored'),
+        ),
       );
       assert.ok(
         diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored')
-        )
+          warning.includes('MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored'),
+        ),
+      );
+    });
+
+    it('should surface dev fallback risk in startup diagnostics when fully enabled', async () => {
+      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
+      process.env.MCP_ALLOW_DEV_FALLBACK = 'true';
+
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        authPolicy?: {
+          devFallback?: {
+            enabled?: boolean;
+            riskLevel?: string;
+            productionLike?: boolean;
+          };
+        };
+        invariants?: { warnings?: string[] };
+      };
+
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, true);
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'enabled');
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.productionLike, false);
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('OAuth dev fallback is enabled'),
+        ),
+      );
+    });
+
+    it('should warn when dev fallback env is only partially configured', async () => {
+      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
+
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        authPolicy?: {
+          devFallback?: {
+            enabled?: boolean;
+            riskLevel?: string;
+            allowFlagEnabled?: boolean;
+          };
+        };
+        invariants?: { warnings?: string[] };
+      };
+
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, false);
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.allowFlagEnabled, false);
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'misconfigured');
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_OAUTH_DEV_USER_ID is configured but inert'),
+        ),
+      );
+    });
+
+    it('should warn when deprecated broad Cloudflare Access trust is configured', async () => {
+      process.env.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS = 'true';
+
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        invariants?: { warnings?: string[] };
+      };
+
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and ignored'),
+        ),
+      );
+    });
+
+    it('should warn when scoped Cloudflare Access trust is enabled', async () => {
+      process.env.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION = 'true';
+      process.env.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS = 'true';
+
+      const { getStartupDiagnostics } = await importConfigFresh();
+      const diagnostics = getStartupDiagnostics() as {
+        invariants?: { warnings?: string[] };
+      };
+
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION is enabled'),
+        ),
+      );
+      assert.ok(
+        diagnostics.invariants?.warnings?.some((warning) =>
+          warning.includes('MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS is enabled'),
+        ),
+      );
+    });
+
+    it('should fail fast when dev fallback is enabled in production mode', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
+      process.env.MCP_ALLOW_DEV_FALLBACK = 'true';
+
+      const { getConfig, getStartupDiagnostics } = await importConfigFresh();
+
+      assert.throws(
+        () => getConfig(),
+        /OAuth dev fallback cannot be enabled when NODE_ENV=production/,
+      );
+
+      const diagnostics = getStartupDiagnostics() as {
+        status?: string;
+        authPolicy?: {
+          devFallback?: {
+            enabled?: boolean;
+            productionLike?: boolean;
+            riskLevel?: string;
+          };
+        };
+        invariants?: { errors?: string[] };
+      };
+
+      assert.strictEqual(diagnostics.status, 'error');
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, true);
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.productionLike, true);
+      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'enabled');
+      assert.ok(
+        diagnostics.invariants?.errors?.some((error) =>
+          error.includes('OAuth dev fallback cannot be enabled when NODE_ENV=production'),
+        ),
+      );
+    });
+
+    it('should fail fast when hosted auth client config is present without MCP_UI_SESSION_SECRET', async () => {
+      process.env.OIDC_ISSUER = 'https://issuer.example.com';
+      process.env.MCP_AUTH_OIDC_CLIENT_ID = 'worker-client-id';
+      process.env.MCP_AUTH_OIDC_CLIENT_SECRET = 'worker-client-secret';
+
+      const { getConfig, getStartupDiagnostics } = await importConfigFresh();
+
+      assert.throws(() => getConfig(), /Hosted auth requires MCP_UI_SESSION_SECRET/);
+
+      const diagnostics = getStartupDiagnostics() as {
+        hostedAuth?: { ready?: boolean; errors?: string[] };
+      };
+      assert.strictEqual(diagnostics.hostedAuth?.ready, false);
+      assert.ok(
+        diagnostics.hostedAuth?.errors?.some((error) => error.includes('MCP_UI_SESSION_SECRET')),
+      );
+    });
+
+    it('should fail fast on partial Worker-native hosted auth config even when legacy fallback exists', async () => {
+      process.env.OIDC_ISSUER = 'https://issuer.example.com';
+      process.env.MCP_AUTH_OIDC_CLIENT_ID = 'worker-client-id';
+      process.env.LOGTO_APP_ID = 'legacy-app-id';
+      process.env.LOGTO_APP_SECRET = 'legacy-app-secret';
+      process.env.MCP_UI_SESSION_SECRET = 'session-secret';
+
+      const { getConfig, getStartupDiagnostics } = await importConfigFresh();
+
+      assert.throws(() => getConfig(), /Hosted auth Worker-native OIDC config is incomplete/);
+
+      const diagnostics = getStartupDiagnostics() as {
+        hostedAuth?: { ready?: boolean; credentialSource?: string | null; errors?: string[] };
+      };
+      assert.strictEqual(diagnostics.hostedAuth?.ready, false);
+      assert.strictEqual(diagnostics.hostedAuth?.credentialSource, null);
+      assert.ok(
+        diagnostics.hostedAuth?.errors?.some((error) => error.includes('MCP_AUTH_OIDC_CLIENT_ID')),
       );
     });
   });

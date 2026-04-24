@@ -7,6 +7,8 @@ import {
   summarizeOAuthRequest,
   summarizeOAuthResponse,
 } from './oauth-diagnostics.js';
+import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-limit.js';
+import { getOAuthFrontdoorRateLimitedResponse } from './worker-oauth-frontdoor-rate-limit.js';
 
 interface RegistrationEnv {
   MCP_OAUTH_DIAGNOSTICS?: string;
@@ -29,24 +31,27 @@ interface RegistrationDeps<TEnv extends RegistrationEnv> {
     clientId: string,
     presentedToken: string,
   ) => Promise<boolean>;
+  getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+  getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+  now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
 }
 
 function getClientRegistrationManagementUrl(origin: string, clientId: string): string {
-  return new URL(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/${encodeURIComponent(clientId)}`, origin)
-    .toString();
+  return new URL(
+    `${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/${encodeURIComponent(clientId)}`,
+    origin,
+  ).toString();
 }
 
 function asNonEmptyStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.filter(
-    (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
+    (candidate): candidate is string =>
+      typeof candidate === 'string' && candidate.trim().length > 0,
   );
 }
 
-function applyClientMetadata(
-  target: Partial<ClientInfo>,
-  metadata: Record<string, unknown>,
-): void {
+function applyClientMetadata(target: Partial<ClientInfo>, metadata: Record<string, unknown>): void {
   const redirectUris = asNonEmptyStringArray(metadata.redirect_uris);
   if (redirectUris) target.redirectUris = redirectUris;
 
@@ -74,7 +79,9 @@ function applyClientMetadata(
 function validateClientMetadataShape(
   body: unknown,
   options: { requireRedirectUris: boolean },
-): { ok: true; metadata: Record<string, unknown> } | { ok: false; response: Response; reason: string } {
+):
+  | { ok: true; metadata: Record<string, unknown> }
+  | { ok: false; response: Response; reason: string } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return {
       ok: false,
@@ -119,7 +126,10 @@ function validateClientMetadataShape(
     }
   }
 
-  if (Array.isArray(metadata.redirect_uris) && (asNonEmptyStringArray(metadata.redirect_uris)?.length ?? 0) === 0) {
+  if (
+    Array.isArray(metadata.redirect_uris) &&
+    (asNonEmptyStringArray(metadata.redirect_uris)?.length ?? 0) === 0
+  ) {
     return {
       ok: false,
       response: new Response(
@@ -175,9 +185,15 @@ async function mapRegistrationResponse<TEnv extends RegistrationEnv>(
     response.client_secret_issued_at = clientInfo.registrationDate;
   }
 
-  const registrationAccessToken = await deps.createRegistrationAccessToken(env, clientInfo.clientId);
+  const registrationAccessToken = await deps.createRegistrationAccessToken(
+    env,
+    clientInfo.clientId,
+  );
   if (registrationAccessToken) {
-    response.registration_client_uri = getClientRegistrationManagementUrl(origin, clientInfo.clientId);
+    response.registration_client_uri = getClientRegistrationManagementUrl(
+      origin,
+      clientInfo.clientId,
+    );
     response.registration_access_token = registrationAccessToken;
   }
 
@@ -388,6 +404,16 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
   const managementPrefix = `${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`;
 
   if (url.pathname.startsWith(managementPrefix)) {
+    const rateLimited = await getOAuthFrontdoorRateLimitedResponse(
+      request,
+      env,
+      'register-management',
+      deps,
+    );
+    if (rateLimited) {
+      return deps.withRegistrationCors(rateLimited, request, env);
+    }
+
     const clientId = decodeURIComponent(url.pathname.slice(managementPrefix.length)).trim();
     if (!clientId) {
       const response = deps.withRegistrationCors(
@@ -430,12 +456,13 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
     // ChatGPT probes GET /register to confirm RFC 7591 DCR support before
     // sending POST.  Return a 200 with minimal endpoint metadata so the
     // client recognises the endpoint as active.
-    const body = request.method === 'GET'
-      ? JSON.stringify({
-          registration_endpoint: `${new URL(request.url).origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.register}`,
-          registration_endpoint_auth_methods_supported: ['none'],
-        })
-      : null;
+    const body =
+      request.method === 'GET'
+        ? JSON.stringify({
+            registration_endpoint: `${new URL(request.url).origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.register}`,
+            registration_endpoint_auth_methods_supported: ['none'],
+          })
+        : null;
     const response = deps.withRegistrationCors(
       new Response(body, {
         status: 200,
@@ -466,6 +493,11 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
       ...(await summarizeOAuthResponse(response)),
     });
     return response;
+  }
+
+  const rateLimited = await getOAuthFrontdoorRateLimitedResponse(request, env, 'register', deps);
+  if (rateLimited) {
+    return deps.withRegistrationCors(rateLimited, request, env);
   }
 
   let body: unknown;
@@ -507,17 +539,17 @@ export async function handleWorkerDynamicClientRegistration<TEnv extends Registr
       'content-type': 'application/json',
       'cache-control': 'no-store',
     };
-    if (typeof responseBody.registration_client_uri === 'string' && responseBody.registration_client_uri.length > 0) {
+    if (
+      typeof responseBody.registration_client_uri === 'string' &&
+      responseBody.registration_client_uri.length > 0
+    ) {
       responseHeaders.Location = responseBody.registration_client_uri;
     }
     const response = deps.withRegistrationCors(
-      new Response(
-        JSON.stringify(responseBody),
-        {
-          status: 201,
-          headers: responseHeaders,
-        },
-      ),
+      new Response(JSON.stringify(responseBody), {
+        status: 201,
+        headers: responseHeaders,
+      }),
       request,
       env,
     );
