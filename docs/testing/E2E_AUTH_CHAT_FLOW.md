@@ -33,6 +33,10 @@ pnpm run test:e2e:oauth-remote
 
 Workflow: `.github/workflows/e2e-auth-chat-flow.yml`
 
+This workflow probes a deployed remote base URL from `E2E_BASE_URL`. It is not
+coupled to the code in the current commit, so it runs as a manual/scheduled
+deployment monitor instead of a `push` gate for `main`.
+
 Configure these repository secrets:
 
 - `E2E_BASE_URL`
