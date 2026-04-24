@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 
 import { handleWorkerAuthHandoffRoutes } from '../../src/server/worker-auth-handoff-routes.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 type FetchCall = { url: string; init?: RequestInit };
 

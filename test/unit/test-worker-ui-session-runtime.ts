@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createWorkerUiSessionRuntime } from '../../src/server/worker-ui-session-runtime.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 interface TestEnv {
   MCP_UI_SESSION_SECRET?: string;

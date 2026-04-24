@@ -5,7 +5,10 @@ import { afterEach, describe, it } from 'node:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 
 import { UnifiedAuthMiddleware } from '../../src/middleware/unified-auth.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
 import { createMockLogger } from '../utils/test-helpers.ts';
+
+installNodeWebCryptoForTests();
 
 const originalFetch = globalThis.fetch;
 

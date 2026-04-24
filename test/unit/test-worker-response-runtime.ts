@@ -13,6 +13,9 @@ import {
   spaAssetResponse,
   withCors,
 } from '../../src/server/worker-response-runtime.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 describe('worker response runtime', () => {
   it('applies secure headers to JSON responses', async () => {
@@ -47,7 +50,10 @@ describe('worker response runtime', () => {
     const response = redirectResponse('https://example.com/app', 302);
 
     assert.equal(response.headers.get('location'), 'https://example.com/app');
-    assert.equal(response.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains; preload');
+    assert.equal(
+      response.headers.get('strict-transport-security'),
+      'max-age=31536000; includeSubDomains; preload',
+    );
   });
 
   it('applies CORS and security headers when wrapping responses', () => {
@@ -57,7 +63,10 @@ describe('worker response runtime', () => {
       ['https://auth.courtlistenermcp.blakeoxford.com'],
     );
 
-    assert.equal(response.headers.get('access-control-allow-origin'), 'https://auth.courtlistenermcp.blakeoxford.com');
+    assert.equal(
+      response.headers.get('access-control-allow-origin'),
+      'https://auth.courtlistenermcp.blakeoxford.com',
+    );
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   });
 

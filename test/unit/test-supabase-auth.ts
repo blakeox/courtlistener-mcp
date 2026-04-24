@@ -7,6 +7,9 @@ import {
   getSupabaseConfig,
   validateSupabaseApiKey,
 } from '../../src/server/supabase-auth.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 afterEach(() => {
   clearSupabaseAuthValidationCacheForTests();

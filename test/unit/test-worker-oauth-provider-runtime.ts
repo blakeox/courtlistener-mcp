@@ -18,6 +18,9 @@ import {
   resolveExternalOAuthToken,
   withRegistrationCors,
 } from '../../src/server/worker-oauth-provider-runtime-helpers.js';
+import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
+
+installNodeWebCryptoForTests();
 
 const originalFetch = globalThis.fetch;
 
