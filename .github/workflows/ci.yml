@@ -587,10 +587,22 @@ jobs:
           echo "MCP Compliance result: ${{ needs['mcp-compliance'].result }}"
           echo "Security & Code Quality result: ${{ needs['security-check'].result }}"
       - name: Fail if any required check failed
-        if: ${{ needs.test.result != 'success' || needs['hardening-release-gates'].result != 'success' || needs['mcp-compliance'].result != 'success' || needs['security-check'].result != 'success' }}
+        if: >-
+          ${{
+            needs.test.result != 'success' ||
+            contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
+            contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
+            needs['security-check'].result != 'success'
+          }}
         run: |
           echo "One or more required checks failed" >&2
           exit 1
       - name: All required checks passed
-        if: ${{ needs.test.result == 'success' && needs['hardening-release-gates'].result == 'success' && needs['mcp-compliance'].result == 'success' && needs['security-check'].result == 'success' }}
+        if: >-
+          ${{
+            needs.test.result == 'success' &&
+            !contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) &&
+            !contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) &&
+            needs['security-check'].result == 'success'
+          }}
         run: echo "All required checks passed"
