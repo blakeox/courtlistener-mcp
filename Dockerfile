@@ -18,7 +18,7 @@ RUN addgroup -g 1001 -S mcp && \
 
 # Install dependencies first (for better caching)
 COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY . .
