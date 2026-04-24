@@ -1,9 +1,6 @@
 name: Enhanced MCP Inspector Integration
 
 on:
-  schedule:
-    # Run comprehensive Inspector validation daily
-    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       test_type:
@@ -69,7 +66,7 @@ jobs:
           echo "🧪 Testing Inspector ${{ matrix.inspector-version }} with Node ${{ matrix.node-version }}"
 
           # Run basic compatibility tests
-          node test/runners/ci-test-mcp-inspector.js
+          pnpm run ci:test-inspector
 
           # Test web interface compatibility
           timeout 30s pnpm run inspect:local &

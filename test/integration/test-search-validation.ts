@@ -8,9 +8,11 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 interface MCPRequest {
   jsonrpc: string;
@@ -41,7 +43,7 @@ async function testSearchValidation(): Promise<void> {
   console.log('Testing search parameter validation...');
 
   // Start the MCP server
-  const server: ChildProcess = spawn('node', [join(projectRoot, 'dist/index.js')], {
+  const server: ChildProcess = spawn(localServerRuntime.command, localServerRuntime.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -82,7 +84,10 @@ async function testSearchValidation(): Promise<void> {
   const expectedResponses = 2;
 
   server.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n').filter((line) => line.trim());
+    const lines = data
+      .toString()
+      .split('\n')
+      .filter((line) => line.trim());
     for (const line of lines) {
       try {
         const response = JSON.parse(line) as MCPResponse;
@@ -90,20 +95,14 @@ async function testSearchValidation(): Promise<void> {
           responseCount++;
 
           if (response.error) {
-            console.log(
-              `❌ Test ${response.id} failed with error: ${response.error.message}`
-            );
+            console.log(`❌ Test ${response.id} failed with error: ${response.error.message}`);
           } else if (response.result?.content) {
-            console.log(
-              `✅ Test ${response.id} succeeded - order_by was filtered out`
-            );
+            console.log(`✅ Test ${response.id} succeeded - order_by was filtered out`);
             try {
               const resultData = JSON.parse(response.result.content[0].text);
               // Verify that order_by is not in the result (it should have been filtered)
               if (!resultData.order_by) {
-                console.log(
-                  `✅ Verified: order_by parameter was successfully filtered out`
-                );
+                console.log(`✅ Verified: order_by parameter was successfully filtered out`);
               }
             } catch {
               // Ignore parse errors
@@ -128,9 +127,7 @@ async function testSearchValidation(): Promise<void> {
 
   server.on('close', () => {
     if (responseCount < expectedResponses) {
-      console.error(
-        `❌ Expected ${expectedResponses} responses, got ${responseCount}`
-      );
+      console.error(`❌ Expected ${expectedResponses} responses, got ${responseCount}`);
       process.exit(1);
     }
   });
@@ -147,9 +144,7 @@ async function testSearchValidation(): Promise<void> {
   // Timeout after 30 seconds
   setTimeout(() => {
     if (responseCount < expectedResponses) {
-      console.error(
-        `❌ Test timed out. Got ${responseCount}/${expectedResponses} responses`
-      );
+      console.error(`❌ Test timed out. Got ${responseCount}/${expectedResponses} responses`);
       server.kill();
       process.exit(1);
     }
@@ -160,4 +155,3 @@ testSearchValidation().catch((error) => {
   console.error('Test failed:', error);
   process.exit(1);
 });
-

@@ -6,14 +6,13 @@ import { describe, it } from 'node:test';
 import { resolveWorkerUsage } from '../../src/server/worker-usage-runtime.js';
 
 describe('resolveWorkerUsage', () => {
-  it('uses the oauth header user id when present', async () => {
-    const request = new Request('https://worker.example/api/usage', {
-      headers: { 'x-oauth-user-id': 'user-7' },
-    });
+  it('uses the prevalidated context user id when present', async () => {
+    const request = new Request('https://worker.example/api/usage');
 
     const result = await resolveWorkerUsage({
       request,
       env: {},
+      ctx: { props: { userId: 'user-7', authMethod: 'oidc' } } as ExecutionContext,
       workerUiSessionRuntime: {
         resolveCloudflareOAuthUserId: async () => 'should-not-be-used',
       },
@@ -27,6 +26,7 @@ describe('resolveWorkerUsage', () => {
     const result = await resolveWorkerUsage({
       request: new Request('https://worker.example/api/usage'),
       env: {},
+      ctx: {} as ExecutionContext,
       workerUiSessionRuntime: {
         resolveCloudflareOAuthUserId: async () => null,
       },
@@ -40,6 +40,7 @@ describe('resolveWorkerUsage', () => {
     const result = await resolveWorkerUsage({
       request: new Request('https://worker.example/api/usage'),
       env: {},
+      ctx: {} as ExecutionContext,
       workerUiSessionRuntime: {
         resolveCloudflareOAuthUserId: async () => 'user-9',
       },
@@ -47,5 +48,21 @@ describe('resolveWorkerUsage', () => {
     });
 
     assert.deepEqual(result, { kind: 'unavailable' });
+  });
+
+  it('ignores spoofed oauth headers without a prevalidated context', async () => {
+    const result = await resolveWorkerUsage({
+      request: new Request('https://worker.example/api/usage', {
+        headers: { 'x-oauth-user-id': 'spoofed-user' },
+      }),
+      env: {},
+      ctx: {} as ExecutionContext,
+      workerUiSessionRuntime: {
+        resolveCloudflareOAuthUserId: async () => 'resolved-user',
+      },
+      getUsageSnapshot: async (_env, userId) => ({ userId, count: 1 }),
+    });
+
+    assert.deepEqual(result, { kind: 'ok', snapshot: { userId: 'resolved-user', count: 1 } });
   });
 });

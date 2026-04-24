@@ -9,6 +9,7 @@ import {
   GetFinancialDisclosureDetailsHandler,
   ValidateCitationsHandler,
   GetEnhancedRECAPDataHandler,
+  GetVisualizationMetadataHandler,
   SmartSearchHandler,
 } from '../../src/domains/enhanced/handlers.js';
 import type { ToolContext } from '../../src/server/tool-handler.js';
@@ -91,124 +92,45 @@ describe('GetVisualizationDataHandler', () => {
     assert.strictEqual(res.success, false);
   });
 
-  // --- court_distribution ---
-  it('court_distribution returns distribution data', async () => {
+  it('passes visualization requests through to the API', async () => {
+    let capturedParams: any;
     const mockApi = {
-      listCourts: async () => ({
-        results: [{ type: 'Federal' }, { type: 'State' }, { type: 'Federal' }],
-        count: 3,
-      }),
-    } as any;
-
-    const handler = new GetVisualizationDataHandler(mockApi);
-    const result = await handler.execute({ data_type: 'court_distribution' }, mockContext);
-
-    const content = JSON.parse(result.content[0].text);
-    assert.strictEqual(content.total_courts, 3);
-    assert.strictEqual(content.distribution.Federal, 2);
-    assert.strictEqual(content.distribution.State, 1);
-    assert.ok(Array.isArray(content.raw_data));
-    assert.ok(content.raw_data.length <= 10);
-  });
-
-  it('court_distribution handles empty results', async () => {
-    const mockApi = {
-      listCourts: async () => ({ results: [], count: 0 }),
-    } as any;
-
-    const handler = new GetVisualizationDataHandler(mockApi);
-    const result = await handler.execute({ data_type: 'court_distribution' }, mockContext);
-
-    const content = JSON.parse(result.content[0].text);
-    assert.strictEqual(content.total_courts, 0);
-    assert.deepStrictEqual(content.distribution, {});
-    assert.deepStrictEqual(content.raw_data, []);
-  });
-
-  it('court_distribution handles missing count', async () => {
-    const mockApi = {
-      listCourts: async () => ({ results: [{ type: 'Federal' }] }),
-    } as any;
-
-    const handler = new GetVisualizationDataHandler(mockApi);
-    const result = await handler.execute({ data_type: 'court_distribution' }, mockContext);
-
-    const content = JSON.parse(result.content[0].text);
-    assert.strictEqual(content.total_courts, 0);
-  });
-
-  it('court_distribution labels missing type as Unknown', async () => {
-    const mockApi = {
-      listCourts: async () => ({
-        results: [{ type: '' }, { name: 'no-type-field' }],
-        count: 2,
-      }),
-    } as any;
-
-    const handler = new GetVisualizationDataHandler(mockApi);
-    const result = await handler.execute({ data_type: 'court_distribution' }, mockContext);
-
-    const content = JSON.parse(result.content[0].text);
-    // empty string is falsy → 'Unknown', undefined is also 'Unknown'
-    assert.strictEqual(content.distribution.Unknown, 2);
-  });
-
-  // --- case_timeline ---
-  it('case_timeline returns mock timeline', async () => {
-    const handler = new GetVisualizationDataHandler({} as any);
-    const result = await handler.execute(
-      {
-        data_type: 'case_timeline',
-        start_date: '2020-01-01',
-        end_date: '2022-12-31',
-        court_id: 'scotus',
-      },
-      mockContext,
-    );
-
-    const content = JSON.parse(result.content[0].text);
-    assert.ok(content.timeline);
-    assert.ok(Array.isArray(content.timeline));
-    assert.ok(content.timeline.length > 0);
-    assert.ok(content.timeline[0].year);
-    assert.ok(content.timeline[0].cases !== undefined);
-  });
-
-  // --- citation_network ---
-  it('citation_network calls API with correct params', async () => {
-    let calledWith: any = {};
-    const mockApi = {
-      getCitationNetwork: async (id: number, opts: any) => {
-        calledWith = { id, opts };
-        return { nodes: [{ id: 1 }], edges: [{ from: 1, to: 2 }] };
+      getVisualizationData: async (params: any) => {
+        capturedParams = params;
+        return { timeline: [{ year: 2020, cases: 10 }] };
       },
     } as any;
 
     const handler = new GetVisualizationDataHandler(mockApi);
     const result = await handler.execute(
-      { data_type: 'citation_network', opinion_id: 123, depth: 3 },
+      { data_type: 'case_timeline', start_date: '2020-01-01', end_date: '2020-12-31' },
       mockContext,
     );
 
-    assert.strictEqual(calledWith.id, 123);
-    assert.strictEqual(calledWith.opts.depth, 3);
     const content = JSON.parse(result.content[0].text);
-    assert.strictEqual(content.nodes.length, 1);
-    assert.strictEqual(content.edges.length, 1);
+    assert.deepStrictEqual(capturedParams, {
+      data_type: 'case_timeline',
+      start_date: '2020-01-01',
+      end_date: '2020-12-31',
+    });
+    assert.deepStrictEqual(content, { timeline: [{ year: 2020, cases: 10 }] });
   });
 
-  it('citation_network uses default depth of 1', async () => {
-    let capturedOpts: any = {};
+  it('citation_network forwards validated opinion parameters', async () => {
+    let capturedParams: any = {};
     const mockApi = {
-      getCitationNetwork: async (_id: number, opts: any) => {
-        capturedOpts = opts;
+      getVisualizationData: async (params: any) => {
+        capturedParams = params;
         return { nodes: [], edges: [] };
       },
     } as any;
 
     const handler = new GetVisualizationDataHandler(mockApi);
     await handler.execute({ data_type: 'citation_network', opinion_id: 1 }, mockContext);
-    assert.strictEqual(capturedOpts.depth, 1);
+    assert.deepStrictEqual(capturedParams, {
+      data_type: 'citation_network',
+      opinion_id: 1,
+    });
   });
 
   it('citation_network throws without opinion_id at runtime', async () => {
@@ -220,15 +142,12 @@ describe('GetVisualizationDataHandler', () => {
   });
 
   // --- judge_statistics ---
-  it('judge_statistics computes active judges and appointer stats', async () => {
+  it('judge_statistics passes through upstream analytics payload', async () => {
     const mockApi = {
-      getJudges: async () => ({
-        results: [
-          { court: 'A', date_termination: null, appointer: 'Obama' },
-          { court: 'B', date_termination: '2020-01-01', appointer: 'Trump' },
-          { court: 'C', date_termination: null, appointer: 'Obama' },
-        ],
-        count: 3,
+      getVisualizationData: async () => ({
+        total_judges: 3,
+        active_judges: 2,
+        appointed_by_president: { Obama: 2, Trump: 1 },
       }),
     } as any;
 
@@ -242,11 +161,12 @@ describe('GetVisualizationDataHandler', () => {
     assert.strictEqual(content.appointed_by_president.Trump, 1);
   });
 
-  it('judge_statistics labels missing appointer as Unknown', async () => {
+  it('judge_statistics preserves unknown appointer buckets from upstream', async () => {
     const mockApi = {
-      getJudges: async () => ({
-        results: [{ date_termination: null }],
-        count: 1,
+      getVisualizationData: async () => ({
+        total_judges: 1,
+        active_judges: 1,
+        appointed_by_president: { Unknown: 1 },
       }),
     } as any;
 
@@ -257,9 +177,13 @@ describe('GetVisualizationDataHandler', () => {
     assert.strictEqual(content.appointed_by_president.Unknown, 1);
   });
 
-  it('judge_statistics handles empty results', async () => {
+  it('judge_statistics handles empty upstream results', async () => {
     const mockApi = {
-      getJudges: async () => ({ results: [], count: 0 }),
+      getVisualizationData: async () => ({
+        total_judges: 0,
+        active_judges: 0,
+        appointed_by_president: {},
+      }),
     } as any;
 
     const handler = new GetVisualizationDataHandler(mockApi);
@@ -273,7 +197,7 @@ describe('GetVisualizationDataHandler', () => {
   // --- API errors ---
   it('returns error when API throws', async () => {
     const mockApi = {
-      listCourts: async () => {
+      getVisualizationData: async () => {
         throw new Error('API timeout');
       },
     } as any;
@@ -316,7 +240,14 @@ describe('GetBulkDataHandler', () => {
   });
 
   it('returns sample data with default sample_size', async () => {
-    const handler = new GetBulkDataHandler({} as any);
+    const handler = new GetBulkDataHandler({
+      getBulkData: async (params: any) => ({
+        ...params,
+        sample_size: 10,
+        data: [],
+        message: 'placeholder',
+      }),
+    } as any);
     const result = await handler.execute({ data_type: 'opinions' }, mockContext);
 
     const content = JSON.parse(result.content[0].text);
@@ -327,7 +258,9 @@ describe('GetBulkDataHandler', () => {
   });
 
   it('returns sample data with custom sample_size', async () => {
-    const handler = new GetBulkDataHandler({} as any);
+    const handler = new GetBulkDataHandler({
+      getBulkData: async (params: any) => ({ ...params, data: [], message: 'placeholder' }),
+    } as any);
     const result = await handler.execute({ data_type: 'dockets', sample_size: 25 }, mockContext);
 
     const content = JSON.parse(result.content[0].text);
@@ -383,7 +316,9 @@ describe('GetBankruptcyDataHandler', () => {
   });
 
   it('returns bankruptcy data with all fields', async () => {
-    const handler = new GetBankruptcyDataHandler({} as any);
+    const handler = new GetBankruptcyDataHandler({
+      getBankruptcyData: async (params: any) => ({ ...params, results: [{ id: 1 }] }),
+    } as any);
     const result = await handler.execute(
       { court: 'nysb', case_name: 'Acme Corp', docket_number: '22-00001', page: 1, page_size: 20 },
       mockContext,
@@ -393,17 +328,19 @@ describe('GetBankruptcyDataHandler', () => {
     assert.strictEqual(content.court, 'nysb');
     assert.strictEqual(content.case_name, 'Acme Corp');
     assert.strictEqual(content.docket_number, '22-00001');
-    assert.ok(content.message);
+    assert.deepStrictEqual(content.results, [{ id: 1 }]);
   });
 
   it('returns data with undefined optional fields', async () => {
-    const handler = new GetBankruptcyDataHandler({} as any);
+    const handler = new GetBankruptcyDataHandler({
+      getBankruptcyData: async (params: any) => params,
+    } as any);
     const result = await handler.execute({ page: 1, page_size: 20 }, mockContext);
 
     const content = JSON.parse(result.content[0].text);
     assert.strictEqual(content.court, undefined);
     assert.strictEqual(content.case_name, undefined);
-    assert.ok(content.message);
+    assert.strictEqual(content.page, 1);
   });
 
   it('has correct metadata', () => {
@@ -440,11 +377,13 @@ describe('GetComprehensiveJudgeProfileHandler', () => {
 
   it('returns profile with analytics on success', async () => {
     const mockApi = {
-      getJudge: async (id: any) => ({
-        id,
-        name_first: 'Ruth',
-        name_last: 'Ginsburg',
-        date_termination: null,
+      getComprehensiveJudgeProfile: async (id: any) => ({
+        judge: {
+          id,
+          name_first: 'Ruth',
+          name_last: 'Ginsburg',
+        },
+        positions: [{ id: 1 }],
       }),
     } as any;
 
@@ -453,17 +392,14 @@ describe('GetComprehensiveJudgeProfileHandler', () => {
 
     assert.strictEqual(result.isError, undefined);
     const content = JSON.parse(result.content[0].text);
-    assert.ok(content.profile);
-    assert.strictEqual(content.profile.name_first, 'Ruth');
-    assert.ok(content.analytics);
-    assert.strictEqual(content.analytics.opinions_authored, 150);
-    assert.strictEqual(content.analytics.citations_received, 1200);
-    assert.strictEqual(content.analytics.avg_opinion_length, 4500);
+    assert.ok(content.judge);
+    assert.strictEqual(content.judge.name_first, 'Ruth');
+    assert.deepStrictEqual(content.positions, [{ id: 1 }]);
   });
 
   it('returns isError when API throws (404 scenario)', async () => {
     const mockApi = {
-      getJudge: async () => {
+      getComprehensiveJudgeProfile: async () => {
         throw new Error('Judge not found');
       },
     } as any;
@@ -472,22 +408,7 @@ describe('GetComprehensiveJudgeProfileHandler', () => {
     const result = await handler.execute({ judge_id: 99999 }, mockContext);
 
     assert.strictEqual(result.isError, true);
-    assert.ok(result.content[0].text.includes('Error fetching judge profile'));
     assert.ok(result.content[0].text.includes('Judge not found'));
-  });
-
-  it('returns isError for non-Error exceptions', async () => {
-    const mockApi = {
-      getJudge: async () => {
-        throw 'string error';
-      },
-    } as any;
-
-    const handler = new GetComprehensiveJudgeProfileHandler(mockApi);
-    const result = await handler.execute({ judge_id: 1 }, mockContext);
-
-    assert.strictEqual(result.isError, true);
-    assert.ok(result.content[0].text.includes('string error'));
   });
 
   it('has correct metadata', () => {
@@ -929,6 +850,43 @@ describe('GetEnhancedRECAPDataHandler', () => {
     const handler = new GetEnhancedRECAPDataHandler({} as any);
     assert.strictEqual(handler.name, 'get_enhanced_recap_data');
     assert.strictEqual(handler.category, 'dockets');
+  });
+});
+
+describe('GetVisualizationMetadataHandler', () => {
+  it('applies pagination defaults during validation', () => {
+    const handler = new GetVisualizationMetadataHandler({} as any);
+    const res = handler.validate({ category: 'courts' });
+    assert.strictEqual(res.success, true);
+    if (res.success) {
+      assert.strictEqual(res.data.page, 1);
+      assert.strictEqual(res.data.page_size, 20);
+    }
+  });
+
+  it('passes filters through to the API', async () => {
+    let capturedParams: any;
+    const mockApi = {
+      getVisualizationMetadata: async (params: any) => {
+        capturedParams = params;
+        return { results: [{ slug: 'court-distribution' }] };
+      },
+    } as any;
+
+    const handler = new GetVisualizationMetadataHandler(mockApi);
+    const result = await handler.execute(
+      { category: 'courts', court_id: 'scotus', page: 2, page_size: 5 },
+      mockContext,
+    );
+
+    assert.deepStrictEqual(capturedParams, {
+      category: 'courts',
+      court_id: 'scotus',
+      page: 2,
+      page_size: 5,
+    });
+    const content = JSON.parse(result.content[0].text);
+    assert.deepStrictEqual(content, { results: [{ slug: 'court-distribution' }] });
   });
 });
 

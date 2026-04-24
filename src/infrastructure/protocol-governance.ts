@@ -34,6 +34,7 @@ export const GOVERNED_TOOL_NAMES = [
   'advanced_search',
   'analyze_case_authorities',
   'analyze_legal_argument',
+  'get_authorities',
   'get_bankruptcy_data',
   'get_bulk_data',
   'get_case_details',
@@ -41,25 +42,40 @@ export const GOVERNED_TOOL_NAMES = [
   'get_comprehensive_case_analysis',
   'get_comprehensive_judge_profile',
   'get_docket',
+  'get_docket_alerts',
+  'get_docket_entry',
   'get_docket_entries',
   'get_dockets',
   'get_enhanced_recap_data',
+  'get_aba_ratings',
   'get_financial_disclosure',
   'get_financial_disclosure_details',
   'get_financial_disclosures',
   'get_judge',
+  'get_judge_educations',
+  'get_judge_political_affiliations',
   'get_judges',
+  'get_judicial_position',
+  'get_judicial_positions',
+  'get_memberships',
+  'get_opinion_citations',
   'get_opinion_text',
+  'get_originating_court_info',
   'get_oral_argument',
   'get_oral_arguments',
   'get_parties_and_attorneys',
   'get_recap_document',
   'get_recap_documents',
   'get_related_cases',
+  'get_retention_events',
+  'get_schools',
+  'get_tags',
   'get_visualization_data',
+  'get_visualization_metadata',
   'list_courts',
   'lookup_citation',
   'manage_alerts',
+  'create_docket_alert',
   'search_cases',
   'search_opinions',
   'smart_search',
@@ -163,7 +179,9 @@ function getFallbackProfile(
   const requestedPriority = CAPABILITY_PROFILE_PRIORITY[requestedProfile];
   const bestMatch = [...supportedProfiles]
     .filter((profile) => CAPABILITY_PROFILE_PRIORITY[profile] <= requestedPriority)
-    .sort((left, right) => CAPABILITY_PROFILE_PRIORITY[right] - CAPABILITY_PROFILE_PRIORITY[left])[0];
+    .sort(
+      (left, right) => CAPABILITY_PROFILE_PRIORITY[right] - CAPABILITY_PROFILE_PRIORITY[left],
+    )[0];
 
   return bestMatch ?? supportedProfiles[0] ?? 'core';
 }
@@ -284,7 +302,9 @@ export function validateGovernanceDeprecations(
 
     const minimumNoticeMs = policy.minimumNoticeDays * 24 * 60 * 60 * 1000;
     if (removeAfter - announced < minimumNoticeMs) {
-      violations.push(`${entry.id}: deprecation notice is shorter than ${policy.minimumNoticeDays} days`);
+      violations.push(
+        `${entry.id}: deprecation notice is shorter than ${policy.minimumNoticeDays} days`,
+      );
     }
 
     if (policy.requireReplacementForToolChanges && entry.surface === 'tool' && !entry.replacement) {

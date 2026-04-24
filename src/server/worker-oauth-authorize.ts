@@ -7,9 +7,12 @@ import {
   summarizeOAuthRequest,
   summarizeOAuthResponse,
 } from './oauth-diagnostics.js';
+import {
+  hasWorkerHostedAuthConfig,
+  type WorkerHostedAuthEnv,
+} from './worker-upstream-oidc-config.js';
 
-interface OAuthAuthorizeEnv {
-  MCP_AUTH_UI_ORIGIN?: string;
+interface OAuthAuthorizeEnv extends WorkerHostedAuthEnv {
   OAUTH_PROVIDER: OAuthHelpers;
   MCP_OAUTH_DIAGNOSTICS?: string;
 }
@@ -17,7 +20,18 @@ interface OAuthAuthorizeEnv {
 interface OAuthAuthorizeDeps<TEnv extends OAuthAuthorizeEnv> {
   jsonError: (message: string, status: number, errorCode: string) => Response;
   redirectResponse: (location: string, status?: number) => Response;
-  resolveCloudflareOAuthUserId: (request: Request, env: TEnv) => Promise<string | null>;
+  resolveCloudflareOAuthIdentity: (
+    request: Request,
+    env: TEnv,
+  ) => Promise<
+    | {
+        kind: 'authenticated';
+        userId: string;
+        authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access' | 'dev_fallback';
+      }
+    | { kind: 'missing' }
+    | { kind: 'session_revocation_unavailable' }
+  >;
 }
 
 export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthorizeEnv>(
@@ -36,34 +50,63 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
     return response;
   }
 
-  const sessionUserId = await deps.resolveCloudflareOAuthUserId(request, env);
-  if (!sessionUserId) {
-    const authUiOrigin = env.MCP_AUTH_UI_ORIGIN?.trim();
-    if (authUiOrigin) {
+  const identity = await deps.resolveCloudflareOAuthIdentity(request, env);
+  if (identity.kind === 'session_revocation_unavailable') {
+    const response = deps.jsonError(
+      'Unable to validate session revocation.',
+      503,
+      'session_revocation_unavailable',
+    );
+    emitOAuthDiagnostic(env, 'oauth.authorize.reject', {
+      ...requestSummary,
+      reason: 'session_revocation_unavailable',
+      ...(await summarizeOAuthResponse(response)),
+    });
+    return response;
+  }
+
+  if (identity.kind !== 'authenticated') {
+    if (hasWorkerHostedAuthConfig(env)) {
       try {
-        const authStartUrl = new URL('/auth/start', authUiOrigin);
+        const authStartUrl = new URL('/auth/start', request.url);
         authStartUrl.searchParams.set('return_to', request.url);
         const response = deps.redirectResponse(authStartUrl.toString(), 302);
         emitOAuthDiagnostic(env, 'oauth.authorize.redirect_auth_ui', {
           ...requestSummary,
-          auth_ui_origin: authUiOrigin,
-          clerk_handoff: true,
+          auth_ui_origin: new URL(request.url).origin,
+          auth_ui_handoff: true,
           ...(await summarizeOAuthResponse(response)),
         });
         return response;
       } catch {
-        // Ignore invalid auth origin and fall through to JSON error.
+        // Ignore invalid URL construction and fall through to JSON error.
       }
     }
 
     const response = deps.jsonError(
-      'User identity is required for OAuth authorization. Sign in via the configured auth UI or provide a valid OIDC token, or configure MCP_OAUTH_DEV_USER_ID + MCP_ALLOW_DEV_FALLBACK=true for controlled development.',
+      'User identity is required for OAuth authorization. Sign in via the worker-hosted auth flow or provide a valid OIDC token, or configure MCP_OAUTH_DEV_USER_ID + MCP_ALLOW_DEV_FALLBACK=true only for controlled development. This fallback is unsafe for production use.',
       401,
       'identity_required',
     );
     emitOAuthDiagnostic(env, 'oauth.authorize.identity_required', {
       ...requestSummary,
-      clerk_handoff: false,
+      auth_ui_handoff: false,
+      ...(await summarizeOAuthResponse(response)),
+    });
+    return response;
+  }
+
+  if (identity.authSource !== 'oidc_bearer') {
+    const approvalUrl = new URL('/auth/approve', request.url);
+    approvalUrl.searchParams.set('return_to', request.url);
+    const response = deps.redirectResponse(approvalUrl.toString(), 302);
+    emitOAuthDiagnostic(env, 'oauth.authorize.redirect_auth_ui', {
+      ...requestSummary,
+      auth_ui_origin: new URL(request.url).origin,
+      auth_ui_handoff: true,
+      approval_required: true,
+      auth_source: identity.authSource,
+      dev_fallback_unsafe: identity.authSource === 'dev_fallback',
       ...(await summarizeOAuthResponse(response)),
     });
     return response;
@@ -92,10 +135,13 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
 
   let completion;
   try {
-    const completionDetails = buildHostedOAuthCompletionDetails('cloudflare_oauth', sessionUserId);
+    const completionDetails = buildHostedOAuthCompletionDetails(
+      'cloudflare_oauth',
+      identity.userId,
+    );
     completion = await env.OAUTH_PROVIDER.completeAuthorization({
       request: authRequest,
-      userId: sessionUserId,
+      userId: identity.userId,
       metadata: completionDetails.metadata,
       scope: grantedScopes,
       props: completionDetails.props,

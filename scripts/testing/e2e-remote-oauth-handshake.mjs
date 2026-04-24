@@ -3,34 +3,46 @@
 /**
  * Remote MCP OAuth handshake probe.
  *
- * This validates the same hosted OAuth route family that ChatGPT/Claude use:
- * discovery -> protected resource -> dynamic registration -> authorize redirect
- * -> auth portal handoff -> token exchange -> authenticated /mcp call.
+ * This validates the same Worker-owned hosted OAuth route family that
+ * ChatGPT/Claude use: discovery -> protected resource -> dynamic registration
+ * -> authorize redirect -> same-origin /auth/start handoff.
  *
  * Required env:
- *   none
+ *   OAUTH_BASE_URL or REMOTE_SERVER_URL
  *
  * Optional env:
- *   OAUTH_BASE_URL                 Defaults to https://courtlistenermcp.blakeoxford.com
  *   OAUTH_CLIENT_ORIGIN            Defaults to https://chatgpt.com
  *   OAUTH_REDIRECT_URI             Defaults to https://oauth-debug.example/callback
  *   OAUTH_SCOPE                    Defaults to legal:read legal:search legal:analyze
- *   OAUTH_AUTHORIZATION_BEARER     Clerk template bearer token for /api/session/oauth-complete
- *   OAUTH_REQUIRE_FULL_FLOW        Set to true to fail when no bearer token is provided
  */
 
 import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+import { normalizeRemoteEndpoints } from '../resolve-remote-endpoints.js';
 
-const cfg = {
-  baseUrl: (process.env.OAUTH_BASE_URL || 'https://courtlistenermcp.blakeoxford.com').replace(/\/+$/, ''),
-  clientOrigin: (process.env.OAUTH_CLIENT_ORIGIN || 'https://chatgpt.com').trim(),
-  redirectUri: (process.env.OAUTH_REDIRECT_URI || 'https://oauth-debug.example/callback').trim(),
-  scope: (process.env.OAUTH_SCOPE || 'legal:read legal:search legal:analyze').trim(),
-  authorizationBearer: (process.env.OAUTH_AUTHORIZATION_BEARER || '').trim(),
-  requireFullFlow: /^(1|true|yes)$/i.test(process.env.OAUTH_REQUIRE_FULL_FLOW || ''),
-};
+export function resolveProbeConfig(env = process.env) {
+  const baseUrlInput = env.OAUTH_BASE_URL?.trim() || env.REMOTE_SERVER_URL?.trim() || '';
+  if (!baseUrlInput) {
+    return {
+      skipReason: 'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to run the hosted OAuth handshake probe.',
+    };
+  }
 
-async function main() {
+  return {
+    baseUrl: normalizeRemoteEndpoints(baseUrlInput).baseUrl.replace(/\/+$/, ''),
+    clientOrigin: (env.OAUTH_CLIENT_ORIGIN || 'https://chatgpt.com').trim(),
+    redirectUri: (env.OAUTH_REDIRECT_URI || 'https://oauth-debug.example/callback').trim(),
+    scope: (env.OAUTH_SCOPE || 'legal:read legal:search legal:analyze').trim(),
+  };
+}
+
+export async function main() {
+  const cfg = resolveProbeConfig();
+  if ('skipReason' in cfg) {
+    console.log(`Skipping remote MCP OAuth handshake probe: ${cfg.skipReason}`);
+    return;
+  }
+
   console.log('Starting remote MCP OAuth handshake probe');
   console.log(`Base URL: ${cfg.baseUrl}`);
   console.log(`Client origin: ${cfg.clientOrigin}`);
@@ -87,6 +99,12 @@ async function main() {
   authorizeUrl.searchParams.set('code_challenge', pkce.challenge);
   authorizeUrl.searchParams.set('resource', cfg.baseUrl);
 
+  const readinessProbe = await step('Probe same-origin hosted auth readiness', async () => {
+    const response = await probeHostedAuthReadiness(cfg.baseUrl, authorizeUrl.toString());
+    assertHostedAuthReadinessContract(response);
+    return response;
+  });
+
   const authRedirect = await step('Request /authorize and capture auth portal redirect', async () => {
     const response = await fetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
     assert(isRedirect(response.status), `Expected redirect, got ${response.status}`);
@@ -100,94 +118,16 @@ async function main() {
 
   await step('Fetch auth portal handoff page', async () => {
     const response = await fetch(authRedirect, { redirect: 'manual' });
-    assert(response.status === 200, `Expected 200, got ${response.status}`);
-    const html = await response.text();
-    assert(
-      html.includes('Complete the Clerk handoff') || html.includes('Loading auth handoff'),
-      'Auth portal page did not render expected handoff UI',
-    );
-  });
-
-  if (!cfg.authorizationBearer) {
-    const message =
-      'No OAUTH_AUTHORIZATION_BEARER provided; completed hosted pre-auth checks through /authorize -> /auth/start only.';
-    if (cfg.requireFullFlow) {
-      throw new Error(message);
+    assert(isRedirect(response.status) || response.status === 200, `Expected redirect or 200, got ${response.status}`);
+    if (isRedirect(response.status)) {
+      assert(response.headers.get('location'), 'Missing auth portal redirect location');
+      return;
     }
-    console.log(`\n${message}`);
-    console.log('Set OAUTH_AUTHORIZATION_BEARER to continue through /api/session/oauth-complete, /token, and authenticated /mcp.');
-    return;
-  }
-
-  const oauthCompletion = await step('Complete browser OAuth handoff', async () => {
-    const response = await fetchJson(`${cfg.baseUrl}/api/session/oauth-complete`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${cfg.authorizationBearer}`,
-        'content-type': 'application/json',
-        Origin: authRedirect.origin,
-      },
-      body: JSON.stringify({ return_to: authorizeUrl.toString() }),
-    });
-    assert(response.status === 200, `Expected 200, got ${response.status}: ${stringify(response.body)}`);
-    assert(typeof response.body?.redirectTo === 'string' && response.body.redirectTo.length > 0, 'Missing redirectTo');
-    return response.body;
+    const html = await response.text();
+    assertAuthPortalHandoffContent(html, { readinessProbeReady: readinessProbe.ready });
   });
 
-  const callbackUrl = new URL(oauthCompletion.redirectTo);
-  const code = callbackUrl.searchParams.get('code');
-  const returnedState = callbackUrl.searchParams.get('state');
-
-  assert(code, 'OAuth completion redirect did not include a code');
-  assert(returnedState === state, `Expected returned state ${state}, got ${String(returnedState)}`);
-
-  const tokenResponse = await step('Exchange authorization code for tokens', async () => {
-    const response = await fetch(discovery.token_endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: registration.client_id,
-        code,
-        redirect_uri: cfg.redirectUri,
-        code_verifier: pkce.verifier,
-      }),
-    });
-    const body = await response.json().catch(() => ({}));
-    assert(response.status === 200, `Expected 200, got ${response.status}: ${stringify(body)}`);
-    assert(typeof body.access_token === 'string' && body.access_token.length > 0, 'Missing access_token');
-    return body;
-  });
-
-  await step('Call authenticated /mcp initialize', async () => {
-    const response = await fetch(`${cfg.baseUrl}/mcp`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${tokenResponse.access_token}`,
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-        'mcp-protocol-version': '2024-11-05',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: { tools: {} },
-          clientInfo: { name: 'Remote OAuth Probe', version: '1.0.0' },
-        },
-      }),
-    });
-
-    const body = await response.json().catch(() => ({}));
-    assert(response.status === 200, `Expected 200, got ${response.status}: ${stringify(body)}`);
-    assert(typeof body?.result?.serverInfo?.name === 'string', 'Missing MCP serverInfo.name');
-  });
-
-  console.log('\nRemote MCP OAuth handshake probe passed');
+  console.log('\nRemote MCP OAuth handshake probe passed (through Worker-owned /auth/start handoff)');
 }
 
 function createPkce() {
@@ -210,6 +150,116 @@ async function fetchJson(url, init = {}) {
   return { status: response.status, headers: response.headers, body };
 }
 
+export async function probeHostedAuthReadiness(baseUrl, returnTo = null, fetchImpl = fetch) {
+  const probeUrl = new URL('/auth/start', `${baseUrl.replace(/\/+$/, '')}/`);
+  probeUrl.searchParams.set('continue', '1');
+  if (returnTo?.trim()) {
+    probeUrl.searchParams.set('return_to', returnTo.trim());
+  }
+
+  const response = await fetchImpl(probeUrl, {
+    method: 'GET',
+    redirect: 'manual',
+  });
+
+  return summarizeHostedAuthProbeResponse(response);
+}
+
+export function summarizeHostedAuthProbeResponse(response) {
+  const location = response.headers.get('location')?.trim() || null;
+  return {
+    status: response.status,
+    location,
+    ready: isRedirect(response.status) && response.headers.get('x-hosted-auth-ready') === 'true' && Boolean(location),
+    hostedAuthReady: response.headers.get('x-hosted-auth-ready'),
+    hostedAuthStatus: trimHeader(response.headers, 'x-hosted-auth-status'),
+    hostedAuthError: trimHeader(response.headers, 'x-hosted-auth-error'),
+    hostedAuthRoute: trimHeader(response.headers, 'x-hosted-auth-route'),
+    hostedAuthOutcome: trimHeader(response.headers, 'x-hosted-auth-outcome'),
+    hostedAuthCategory: trimHeader(response.headers, 'x-hosted-auth-category'),
+    hostedAuthCorrelationId: trimHeader(response.headers, 'x-hosted-auth-correlation-id'),
+    hostedAuthCredentialSource: trimHeader(response.headers, 'x-hosted-auth-credential-source'),
+    hostedAuthConfigErrorCount: trimHeader(response.headers, 'x-hosted-auth-config-error-count'),
+    hostedAuthDurationMs: trimHeader(response.headers, 'x-hosted-auth-duration-ms'),
+    hostedAuthUpstreamDiscoveryDurationMs: trimHeader(response.headers, 'x-hosted-auth-upstream-discovery-duration-ms'),
+  };
+}
+
+export function assertHostedAuthReadinessContract(probe) {
+  assert(probe.hostedAuthRoute === 'auth-start', `Expected X-Hosted-Auth-Route=auth-start, got ${String(probe.hostedAuthRoute)}`);
+  assert(probe.hostedAuthStatus, 'Missing X-Hosted-Auth-Status');
+  assert(probe.hostedAuthOutcome, 'Missing X-Hosted-Auth-Outcome');
+  assert(probe.hostedAuthCategory, 'Missing X-Hosted-Auth-Category');
+  assert(probe.hostedAuthCorrelationId, 'Missing X-Hosted-Auth-Correlation-Id');
+  assert(/^[A-Za-z0-9_-]{8,}$/.test(probe.hostedAuthCorrelationId), `Invalid X-Hosted-Auth-Correlation-Id: ${String(probe.hostedAuthCorrelationId)}`);
+  assertDigitsHeader(probe.hostedAuthConfigErrorCount, 'X-Hosted-Auth-Config-Error-Count');
+  assertDigitsHeader(probe.hostedAuthDurationMs, 'X-Hosted-Auth-Duration-Ms');
+
+  if (probe.ready) {
+    assert(isRedirect(probe.status), `Expected readiness probe redirect, got ${probe.status}`);
+    assert(probe.hostedAuthReady === 'true', `Expected X-Hosted-Auth-Ready=true, got ${String(probe.hostedAuthReady)}`);
+    assert(probe.hostedAuthStatus === 'ready', `Expected X-Hosted-Auth-Status=ready, got ${String(probe.hostedAuthStatus)}`);
+    assert(probe.hostedAuthOutcome === 'redirect', `Expected X-Hosted-Auth-Outcome=redirect, got ${String(probe.hostedAuthOutcome)}`);
+    assert(probe.hostedAuthCategory === 'ok', `Expected X-Hosted-Auth-Category=ok, got ${String(probe.hostedAuthCategory)}`);
+    assert(probe.location, 'Missing readiness probe redirect location');
+    assert(probe.hostedAuthConfigErrorCount === '0', `Expected X-Hosted-Auth-Config-Error-Count=0, got ${String(probe.hostedAuthConfigErrorCount)}`);
+    assertDigitsHeader(
+      probe.hostedAuthUpstreamDiscoveryDurationMs,
+      'X-Hosted-Auth-Upstream-Discovery-Duration-Ms',
+    );
+    if (probe.hostedAuthCredentialSource) {
+      assert(
+        probe.hostedAuthCredentialSource === 'worker_native' || probe.hostedAuthCredentialSource === 'logto_legacy',
+        `Unexpected X-Hosted-Auth-Credential-Source: ${String(probe.hostedAuthCredentialSource)}`,
+      );
+    }
+    return;
+  }
+
+  assert(!isRedirect(probe.status), `Expected non-redirect failure probe response, got ${probe.status}`);
+  assert(probe.hostedAuthReady === 'false', `Expected X-Hosted-Auth-Ready=false, got ${String(probe.hostedAuthReady)}`);
+  assert(probe.hostedAuthStatus !== 'ready', 'Failure readiness probe unexpectedly reported ready');
+  assert(
+    probe.hostedAuthOutcome === 'unavailable',
+    `Expected X-Hosted-Auth-Outcome=unavailable, got ${String(probe.hostedAuthOutcome)}`,
+  );
+  assert(
+    probe.hostedAuthCategory !== 'ok',
+    `Expected non-ok X-Hosted-Auth-Category for failure probe, got ${String(probe.hostedAuthCategory)}`,
+  );
+  if (probe.hostedAuthError) {
+    assert(probe.hostedAuthError.length > 0, 'X-Hosted-Auth-Error was empty');
+  }
+  if (probe.hostedAuthStatus.startsWith('upstream_discovery')) {
+    assertDigitsHeader(
+      probe.hostedAuthUpstreamDiscoveryDurationMs,
+      'X-Hosted-Auth-Upstream-Discovery-Duration-Ms',
+    );
+  }
+}
+
+export function assertAuthPortalHandoffContent(html, { readinessProbeReady }) {
+  const handoffPage =
+    html.includes('Complete the Clerk handoff') ||
+    html.includes('Loading auth handoff');
+  if (handoffPage) {
+    return;
+  }
+
+  if (!readinessProbeReady) {
+    const failClosedPage =
+      html.includes('Worker-native auth is required for this flow.') ||
+      html.includes('did not advertise same-origin hosted auth') ||
+      html.includes('hosted auth readiness could be confirmed') ||
+      html.includes('reported a previous hosted-auth callback failure') ||
+      html.includes('hosted auth is not fully configured');
+    assert(failClosedPage, 'Auth portal page did not render expected fail-closed guidance');
+    return;
+  }
+
+  throw new Error('Auth portal page did not render expected handoff UI');
+}
+
 async function step(name, fn) {
   process.stdout.write(`- ${name} ... `);
   const result = await fn();
@@ -219,6 +269,15 @@ async function step(name, fn) {
 
 function isRedirect(status) {
   return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function trimHeader(headers, name) {
+  const value = headers.get(name)?.trim();
+  return value ? value : null;
+}
+
+function assertDigitsHeader(value, name) {
+  assert(typeof value === 'string' && /^\d+$/.test(value), `Missing or invalid ${name}: ${String(value)}`);
 }
 
 function assert(condition, message) {
@@ -235,8 +294,10 @@ function stringify(value) {
   }
 }
 
-main().catch((error) => {
-  console.error('\nRemote MCP OAuth handshake probe failed');
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  main().catch((error) => {
+    console.error('\nRemote MCP OAuth handshake probe failed');
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

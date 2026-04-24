@@ -1,9 +1,5 @@
-import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
-
-import { buildHostedOAuthCompletionDetails } from '../auth/oauth-authorization-completion.js';
-import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
-import { resolveGrantedScopes } from '../auth/oauth-scope-resolver.js';
 import { buildWorkerHealthPayload } from './worker-health-runtime.js';
+import type { WorkerDurableRuntime, WorkerDurableRuntimeEnv } from './worker-durable-runtime.js';
 import { resolveWorkerUsage } from './worker-usage-runtime.js';
 import type {
   WorkerUiSessionRuntime,
@@ -16,6 +12,7 @@ interface WorkerCoreRouteContext<TEnv> {
   origin: string | null;
   allowedOrigins: string[];
   env: TEnv;
+  ctx: ExecutionContext;
   pathname: string;
   requestMethod: string;
   mcpPath: boolean;
@@ -29,7 +26,9 @@ interface SessionSnapshot {
   evictionSweepLimit: number;
 }
 
-export interface HandleWorkerCoreRoutesDeps<TEnv extends WorkerUiSessionRuntimeEnv> {
+export interface HandleWorkerCoreRoutesDeps<
+  TEnv extends WorkerUiSessionRuntimeEnv & WorkerDurableRuntimeEnv,
+> {
   isAllowedOrigin: (origin: string | null, allowedOrigins: string[]) => boolean;
   buildCorsHeaders: (origin: string | null, allowedOrigins: string[]) => Headers;
   withCors: (response: Response, origin: string | null, allowedOrigins: string[]) => Response;
@@ -41,30 +40,31 @@ export interface HandleWorkerCoreRoutesDeps<TEnv extends WorkerUiSessionRuntimeE
     extraHeaders?: HeadersInit,
   ) => Response;
   jsonResponse: (payload: unknown, status?: number, extraHeaders?: HeadersInit) => Response;
-  getOAuthHelpers: (env: TEnv) => OAuthHelpers;
   isRemovedLegacyUiRoute: (pathname: string) => boolean;
   workerUiSessionRuntime: WorkerUiSessionRuntime<TEnv>;
   getCachedSessionTopology: (env: TEnv) => SessionSnapshot;
   getWorkerLatencySnapshot: () => unknown;
   getUsageSnapshot: (env: TEnv, userId: string) => Promise<unknown | null>;
+  workerDurableRuntime: WorkerDurableRuntime<TEnv>;
   now: () => number;
 }
 
-export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntimeEnv>(
+export async function handleWorkerCoreRoutes<
+  TEnv extends WorkerUiSessionRuntimeEnv & WorkerDurableRuntimeEnv,
+>(
   context: WorkerCoreRouteContext<TEnv>,
   deps: HandleWorkerCoreRoutesDeps<TEnv>,
 ): Promise<Response | null> {
-  const { request, origin, allowedOrigins, env, pathname, requestMethod, mcpPath } = context;
+  const { request, url, origin, allowedOrigins, env, ctx, pathname, requestMethod, mcpPath } =
+    context;
 
   if (
-    requestMethod === 'OPTIONS'
-    && (
-      mcpPath
-      || pathname === '/api/session'
-      || pathname === '/api/session/bootstrap'
-      || pathname === '/api/session/oauth-complete'
-      || pathname === '/api/usage'
-    )
+    requestMethod === 'OPTIONS' &&
+    (mcpPath ||
+      pathname === '/api/session' ||
+      pathname === '/api/session/bootstrap' ||
+      pathname === '/api/logout' ||
+      pathname === '/api/usage')
   ) {
     if (!deps.isAllowedOrigin(origin, allowedOrigins)) {
       return new Response('Forbidden origin', { status: 403 });
@@ -92,7 +92,12 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
         'Allow: /',
         '',
       ].join('\n'),
-      { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } },
+      {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+        },
+      },
     );
   }
 
@@ -105,10 +110,29 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
 
   if (pathname === '/api/session') {
     if (requestMethod !== 'GET') {
-      return deps.withCors(deps.jsonError('Method not allowed', 405, 'method_not_allowed'), origin, allowedOrigins);
+      return deps.withCors(
+        deps.jsonError('Method not allowed', 405, 'method_not_allowed'),
+        origin,
+        allowedOrigins,
+      );
     }
-    const sessionUserId = await deps.workerUiSessionRuntime.resolveUiSessionUserId(request, env);
-    const bearerUserId = await deps.workerUiSessionRuntime.resolveCloudflareOAuthUserId(request, env);
+    const sessionState = await deps.workerUiSessionRuntime.resolveUiSession(request, env);
+    if (sessionState.kind === 'revocation_unavailable') {
+      return deps.withCors(
+        deps.jsonError(
+          'Unable to validate session revocation.',
+          503,
+          'session_revocation_unavailable',
+        ),
+        origin,
+        allowedOrigins,
+      );
+    }
+    const sessionUserId = sessionState.kind === 'authenticated' ? sessionState.userId : null;
+    const bearerUserId = await deps.workerUiSessionRuntime.resolveCloudflareOAuthUserId(
+      request,
+      env,
+    );
     return deps.withCors(
       deps.jsonResponse({
         authenticated: Boolean(sessionUserId),
@@ -124,14 +148,19 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
 
   if (pathname === '/api/session/bootstrap') {
     if (requestMethod !== 'POST') {
-      return deps.withCors(deps.jsonError('Method not allowed', 405, 'method_not_allowed'), origin, allowedOrigins);
+      return deps.withCors(
+        deps.jsonError('Method not allowed', 405, 'method_not_allowed'),
+        origin,
+        allowedOrigins,
+      );
     }
 
-    const bootstrapRateLimited = await deps.workerUiSessionRuntime.getSessionBootstrapRateLimitedResponse(
-      request,
-      env,
-      deps.now(),
-    );
+    const bootstrapRateLimited =
+      await deps.workerUiSessionRuntime.getSessionBootstrapRateLimitedResponse(
+        request,
+        env,
+        deps.now(),
+      );
     if (bootstrapRateLimited) {
       return deps.withCors(bootstrapRateLimited, origin, allowedOrigins);
     }
@@ -145,7 +174,8 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
       );
     }
 
-    const bootstrapVerification = await deps.workerUiSessionRuntime.verifyBootstrapUserIdFromAuthorization(request, env);
+    const bootstrapVerification =
+      await deps.workerUiSessionRuntime.verifyBootstrapUserIdFromAuthorization(request, env);
     if (!bootstrapVerification.userId) {
       return deps.withCors(
         buildInvalidBootstrapAssertionResponse(deps, bootstrapVerification.error),
@@ -188,100 +218,44 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
     );
   }
 
-  if (pathname === '/api/session/oauth-complete') {
+  if (pathname === '/api/logout') {
     if (requestMethod !== 'POST') {
-      return deps.withCors(deps.jsonError('Method not allowed', 405, 'method_not_allowed'), origin, allowedOrigins);
-    }
-
-    const body = await parseOauthCompletionRequest(request);
-    if (!body?.returnTo) {
       return deps.withCors(
-        deps.jsonError('return_to is required.', 400, 'invalid_oauth_completion_request'),
+        deps.jsonError('Method not allowed', 405, 'method_not_allowed'),
         origin,
         allowedOrigins,
       );
     }
 
-    const authorizationUrl = validateOauthCompletionReturnTo(body.returnTo, request.url);
-    if (!authorizationUrl) {
-      return deps.withCors(
-        deps.jsonError(
-          'return_to must be a valid /authorize URL on this worker origin.',
-          400,
-          'invalid_oauth_completion_request',
-        ),
-        origin,
-        allowedOrigins,
-      );
+    const csrfError = deps.workerUiSessionRuntime.requireCsrfToken(request);
+    if (csrfError) {
+      return deps.withCors(csrfError, origin, allowedOrigins);
     }
 
-    const bootstrapVerification = await deps.workerUiSessionRuntime.verifyBootstrapUserIdFromAuthorization(request, env);
-    if (!bootstrapVerification.userId) {
-      return deps.withCors(
-        buildInvalidBootstrapAssertionResponse(deps, bootstrapVerification.error),
-        origin,
-        allowedOrigins,
-      );
-    }
-
-    const oauthHelpers = deps.getOAuthHelpers(env);
-    let authRequest;
-    try {
-      authRequest = await oauthHelpers.parseAuthRequest(new Request(authorizationUrl.toString()));
-    } catch {
-      return deps.withCors(
-        deps.jsonError('Invalid OAuth authorization request.', 400, 'invalid_authorization_request'),
-        origin,
-        allowedOrigins,
-      );
-    }
-
-    const grantedScopes = resolveGrantedScopes(authRequest);
-
-    try {
-      const completionDetails = buildHostedOAuthCompletionDetails(
-        'browser_oauth_complete',
-        bootstrapVerification.userId,
-      );
-      const completion = await oauthHelpers.completeAuthorization({
-        request: authRequest,
-        userId: bootstrapVerification.userId,
-        metadata: completionDetails.metadata,
-        scope: grantedScopes,
-        props: completionDetails.props,
-      });
-      return deps.withCors(
-        deps.jsonResponse({
-          ok: true,
-          userId: bootstrapVerification.userId,
-          redirectTo: completion.redirectTo,
-        }),
-        origin,
-        allowedOrigins,
-      );
-    } catch (error) {
-      return deps.withCors(
-        deps.jsonError(
-          error instanceof Error && error.message
-            ? error.message
-            : 'OAuth authorization could not be completed.',
-          400,
-          'authorization_completion_failed',
-        ),
-        origin,
-        allowedOrigins,
-      );
-    }
+    return deps.withCors(
+      deps.jsonResponse(
+        { ok: true },
+        200,
+        deps.workerUiSessionRuntime.buildUiSessionLogoutHeaders(request, env),
+      ),
+      origin,
+      allowedOrigins,
+    );
   }
 
   if (pathname === '/api/usage') {
     if (requestMethod !== 'GET') {
-      return deps.withCors(deps.jsonError('Method not allowed', 405, 'method_not_allowed'), origin, allowedOrigins);
+      return deps.withCors(
+        deps.jsonError('Method not allowed', 405, 'method_not_allowed'),
+        origin,
+        allowedOrigins,
+      );
     }
 
     const usageResolution = await resolveWorkerUsage({
       request,
       env,
+      ctx,
       workerUiSessionRuntime: deps.workerUiSessionRuntime,
       getUsageSnapshot: deps.getUsageSnapshot,
     });
@@ -313,42 +287,13 @@ export async function handleWorkerCoreRoutes<TEnv extends WorkerUiSessionRuntime
   return null;
 }
 
-async function parseOauthCompletionRequest(
-  request: Request,
-): Promise<{ returnTo: string | null } | null> {
-  try {
-    const body = (await request.json()) as { return_to?: unknown };
-    const returnTo =
-      typeof body?.return_to === 'string' && body.return_to.trim().length > 0
-        ? body.return_to.trim()
-        : null;
-    return { returnTo };
-  } catch {
-    return null;
-  }
-}
-
-function validateOauthCompletionReturnTo(returnTo: string, requestUrl: string): URL | null {
-  try {
-    const requestOrigin = new URL(requestUrl).origin;
-    const url = new URL(returnTo);
-    if (url.origin !== requestOrigin || url.pathname !== HOSTED_MCP_OAUTH_CONTRACT.paths.authorize) {
-      return null;
-    }
-    return url;
-  } catch {
-    return null;
-  }
-}
-
-function buildInvalidBootstrapAssertionResponse<TEnv extends WorkerUiSessionRuntimeEnv>(
+function buildInvalidBootstrapAssertionResponse<
+  TEnv extends WorkerUiSessionRuntimeEnv & WorkerDurableRuntimeEnv,
+>(
   deps: Pick<HandleWorkerCoreRoutesDeps<TEnv>, 'jsonError'>,
   bootstrapError: string | null,
 ): Response {
-  return deps.jsonError(
-    'Valid OIDC bearer token is required.',
-    401,
-    'invalid_bootstrap_token',
-    { bootstrap_error: bootstrapError || 'Bootstrap bearer token verification failed.' },
-  );
+  return deps.jsonError('Valid OIDC bearer token is required.', 401, 'invalid_bootstrap_token', {
+    bootstrap_error: bootstrapError || 'Bootstrap bearer token verification failed.',
+  });
 }

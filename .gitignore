@@ -69,6 +69,7 @@ coverage/
 .nyc_output/
 junit.xml
 test-results/
+playwright-report/
 
 # Enhanced MCP Inspector test artifacts
 test-output/

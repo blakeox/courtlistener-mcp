@@ -9,12 +9,9 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 
-const {
-  GetCaseDetailsHandler,
-  GetRelatedCasesHandler,
-  AnalyzeCaseAuthoritiesHandler,
-} = await import('../../dist/domains/cases/handlers.js');
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+const { GetCaseDetailsHandler, GetRelatedCasesHandler, AnalyzeCaseAuthoritiesHandler } =
+  await import('../../src/domains/cases/handlers.ts');
+const { Logger } = await import('../../src/infrastructure/logger.ts');
 
 class SilentLogger extends Logger {
   constructor() {
@@ -185,7 +182,11 @@ describe('AnalyzeCaseAuthoritiesHandler (TypeScript)', () => {
 
   it('executes analysis and returns authorities', async () => {
     const api = {
-      async analyzeCaseAuthorities(input: { case_id: string; include_citations?: boolean; depth?: number }): Promise<Array<{ id: number; citation: string }>> {
+      async analyzeCaseAuthorities(input: {
+        case_id: string;
+        include_citations?: boolean;
+        depth?: number;
+      }): Promise<Array<{ id: number; citation: string }>> {
         assert.ok(input.case_id.length > 0);
         return [{ id: 1, citation: '123 U.S. 456' }];
       },
@@ -207,14 +208,13 @@ describe('AnalyzeCaseAuthoritiesHandler (TypeScript)', () => {
         payload.summary.includes('authorities') ||
           payload.summary.includes('cited') ||
           payload.summary.includes('Authority') ||
-          payload.summary.includes('Analyzed')
+          payload.summary.includes('Analyzed'),
       );
       assert.ok(
         payload.analysis !== undefined ||
           Array.isArray(payload.authorities) ||
-          Array.isArray(payload.cited_cases)
+          Array.isArray(payload.cited_cases),
       );
     }
   });
 });
-

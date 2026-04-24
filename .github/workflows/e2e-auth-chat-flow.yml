@@ -1,4 +1,4 @@
-name: E2E Auth + Chat Flow
+name: E2E Hosted OAuth Handshake
 
 on:
   push:
@@ -14,14 +14,11 @@ concurrency:
 
 jobs:
   e2e-auth-chat-flow:
-    name: End-to-End Auth and MCP Chat
+    name: End-to-End Hosted OAuth Handshake
     runs-on: ubuntu-latest
 
     env:
-      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
-      SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
-      E2E_TURNSTILE_TOKEN: ${{ secrets.E2E_TURNSTILE_TOKEN }}
+      OAUTH_BASE_URL: ${{ secrets.E2E_BASE_URL }}
 
     steps:
       - name: Checkout repository
@@ -47,24 +44,13 @@ jobs:
       - name: Verify required E2E secrets
         run: |
           missing=0
-          if [ -z "${E2E_BASE_URL}" ]; then
+          if [ -z "${OAUTH_BASE_URL}" ]; then
             echo "Missing secret: E2E_BASE_URL"
-            missing=1
-          fi
-          if [ -z "${SUPABASE_URL}" ]; then
-            echo "Missing secret: E2E_SUPABASE_URL"
-            missing=1
-          fi
-          if [ -z "${SUPABASE_SECRET_KEY}" ]; then
-            echo "Missing secret: E2E_SUPABASE_SECRET_KEY"
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run end-to-end auth/chat flow
-        run: pnpm run test:e2e:auth-chat-flow
+      - name: Run hosted OAuth handshake probe
+        run: pnpm run test:e2e:oauth-remote

@@ -41,6 +41,7 @@ function createRuntime() {
   return createWorkerDurableRuntime<TestEnv>({
     now: () => 1_700_000_000_000,
     recordDurableObjectLatency: () => {},
+    recordDurableObjectUnavailable: () => {},
     getCachedSessionTopology: () => ({
       version: 'v2',
       shardCount: 16,
@@ -196,6 +197,37 @@ describe('createWorkerDurableRuntime', () => {
     const result = await runtime.isUiSessionRevoked(env, 'session-jti');
 
     assert.deepEqual(result, { kind: 'unavailable' });
+  });
+
+  it('consumes browser bootstrap handoffs exactly once', async () => {
+    const capturedBodies: Array<Record<string, unknown>> = [];
+    const runtime = createRuntime();
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async (request) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        capturedBodies.push(body);
+        return Response.json({ accepted: capturedBodies.length === 1 });
+      }),
+    };
+
+    const first = await runtime.consumeBrowserBootstrapHandoff(
+      env,
+      'handoff-jti-1',
+      1_700_000_060_000,
+    );
+    const second = await runtime.consumeBrowserBootstrapHandoff(
+      env,
+      'handoff-jti-1',
+      1_700_000_060_000,
+    );
+
+    assert.deepEqual(first, { kind: 'ok', value: true });
+    assert.deepEqual(second, { kind: 'ok', value: false });
+    assert.deepEqual(capturedBodies[0], {
+      action: 'browser_bootstrap_consume',
+      nowMs: 1_700_000_000_000,
+      expiresAtMs: 1_700_000_060_000,
+    });
   });
 
   it('returns a 503 when MCP boundary protections are unavailable', async () => {

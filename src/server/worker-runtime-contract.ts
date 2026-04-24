@@ -7,12 +7,13 @@ export interface Env {
   MCP_SERVICE_TOKEN_HEADER?: string;
   MCP_ALLOWED_ORIGINS?: string;
   MCP_REQUIRE_PROTOCOL_VERSION?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
   OIDC_REQUIRED_SCOPE?: string;
   MCP_UI_PUBLIC_ORIGIN?: string;
-  MCP_AUTH_UI_ORIGIN?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED?: string;
@@ -38,6 +39,13 @@ export interface Env {
   MCP_UI_SESSION_SECRET?: string;
   MCP_UI_INSECURE_COOKIES?: string;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
+  MCP_OAUTH_REGISTRATION_TOKEN_SECRET?: string;
+  MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS?: string;
+  MCP_AUTH_OIDC_CLIENT_ID?: string;
+  MCP_AUTH_OIDC_CLIENT_SECRET?: string;
+  MCP_AUTH_OIDC_SCOPES?: string;
+  LOGTO_APP_ID?: string;
+  LOGTO_APP_SECRET?: string;
   MCP_SESSION_SHARD_COUNT?: string;
   MCP_SESSION_IDLE_TTL_SECONDS?: string;
   MCP_SESSION_ABSOLUTE_TTL_SECONDS?: string;
@@ -78,10 +86,21 @@ export interface LatencyStats {
   totalMs: number;
   maxMs: number;
   lastMs: number;
+  unavailableCount: number;
 }
 
-export type DurableObjectLatencyDimension = 'auth_limiter' | 'session_revocation' | 'ai_chat_quota';
-export type LatencySnapshot = { count: number; avg_ms: number; max_ms: number; last_ms: number };
+export type DurableObjectLatencyDimension =
+  | 'auth_limiter'
+  | 'session_revocation'
+  | 'mcp_session_lifecycle'
+  | 'ai_chat_quota';
+export type LatencySnapshot = {
+  count: number;
+  avg_ms: number;
+  max_ms: number;
+  last_ms: number;
+  unavailable_count: number;
+};
 export type SlowOperationSnapshot = LatencySnapshot & { operation: string; slow_score: number };
 export type DurableObjectOutlierSignal = LatencySnapshot & {
   dimension: DurableObjectLatencyDimension;
@@ -119,6 +138,16 @@ export interface SessionRevocationResponseBody {
   revoked: boolean;
 }
 
+export interface BrowserBootstrapConsumeRequestBody {
+  action: 'browser_bootstrap_consume';
+  nowMs: number;
+  expiresAtMs: number;
+}
+
+export interface BrowserBootstrapConsumeResponseBody {
+  accepted: boolean;
+}
+
 export interface UsageCounterRequestBody {
   action: 'usage_increment' | 'usage_get';
   nowMs: number;
@@ -135,7 +164,10 @@ export interface UsageCounterResponseBody {
   byRoute: Record<string, number>;
 }
 
-export type McpSessionLifecycleAction = 'mcp_session_register' | 'mcp_session_touch' | 'mcp_session_close';
+export type McpSessionLifecycleAction =
+  | 'mcp_session_register'
+  | 'mcp_session_touch'
+  | 'mcp_session_close';
 
 export interface McpSessionLifecycleRequestBody {
   action: McpSessionLifecycleAction;
@@ -147,7 +179,12 @@ export interface McpSessionLifecycleRequestBody {
   shardHint?: string;
 }
 
-export type McpSessionEvictionReason = 'active' | 'missing' | 'idle_evicted' | 'absolute_evicted' | 'closed';
+export type McpSessionEvictionReason =
+  | 'active'
+  | 'missing'
+  | 'idle_evicted'
+  | 'absolute_evicted'
+  | 'closed';
 
 export interface McpSessionLifecycleResponseBody {
   active: boolean;

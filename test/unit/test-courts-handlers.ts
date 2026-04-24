@@ -9,10 +9,9 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 
-const { ListCourtsHandler, GetJudgesHandler, GetJudgeHandler } = await import(
-  '../../dist/domains/courts/handlers.js'
-);
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+const { ListCourtsHandler, GetJudgesHandler, GetJudgeHandler } =
+  await import('../../src/domains/courts/handlers.ts');
+const { Logger } = await import('../../src/infrastructure/logger.ts');
 
 class SilentLogger extends Logger {
   constructor() {
@@ -118,7 +117,7 @@ describe('GetJudgesHandler (TypeScript)', () => {
       assert.ok(
         payload.summary.includes('judges') ||
           payload.summary.includes('Judge') ||
-          payload.summary.includes('Retrieved')
+          payload.summary.includes('Retrieved'),
       );
     }
   });
@@ -134,7 +133,7 @@ describe('GetJudgeHandler (TypeScript)', () => {
       assert.ok(
         res.error.message.includes('id') ||
           res.error.message.includes('judge_id') ||
-          res.error.message.includes('required')
+          res.error.message.includes('required'),
       );
     }
   });
@@ -177,9 +176,8 @@ describe('GetJudgeHandler (TypeScript)', () => {
       assert.ok(
         payload.summary.includes('judge') ||
           payload.summary.includes('Judge') ||
-          payload.summary.includes('Retrieved')
+          payload.summary.includes('Retrieved'),
       );
     }
   });
 });
-

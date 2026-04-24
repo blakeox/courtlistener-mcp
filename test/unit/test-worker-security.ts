@@ -41,7 +41,8 @@ describe('worker-security protocol header validation', () => {
   it('matches protocol negotiation contract', async () => {
     await runProtocolHeaderNegotiationContract(
       { supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS[0] },
-      async (fixture) => validateProtocolVersionHeader(fixture.headerValue, fixture.required, supported),
+      async (fixture) =>
+        validateProtocolVersionHeader(fixture.headerValue, fixture.required, supported),
     );
   });
 
@@ -80,7 +81,10 @@ describe('worker-security auth', () => {
     assert.ok(res);
     assert.equal(res.status, 401);
     const challenge = res.headers.get('www-authenticate') ?? '';
-    assert.match(challenge, /^Bearer resource_metadata="https:\/\/example\.workers\.dev\/\.well-known\/oauth-protected-resource"$/);
+    assert.match(
+      challenge,
+      /^Bearer resource_metadata="https:\/\/example\.workers\.dev\/\.well-known\/oauth-protected-resource"$/,
+    );
     const link = res.headers.get('link') ?? '';
     assert.match(link, /rel="oauth-protected-resource"/);
   });
@@ -112,7 +116,10 @@ describe('worker-security auth', () => {
   it('accepts valid Cloudflare Access assertion token', async () => {
     const res = await authorizeMcpRequest(
       req({ 'CF-Access-Jwt-Assertion': 'cf-access-jwt' }),
-      { OIDC_ISSUER: 'https://issuer.example.com' },
+      {
+        OIDC_ISSUER: 'https://issuer.example.com',
+        MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION: 'true',
+      },
       {
         verifyAccessTokenFn: async () => ({ payload: { sub: 'user-2' } }),
       },
@@ -126,7 +133,10 @@ describe('worker-security auth', () => {
         Authorization: 'Bearer invalid-jwt',
         'CF-Access-Jwt-Assertion': 'valid-access-jwt',
       }),
-      { OIDC_ISSUER: 'https://issuer.example.com' },
+      {
+        OIDC_ISSUER: 'https://issuer.example.com',
+        MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION: 'true',
+      },
       {
         verifyAccessTokenFn: async (token) => {
           if (token === 'valid-access-jwt') {
@@ -137,6 +147,35 @@ describe('worker-security auth', () => {
       },
     );
     assert.equal(res, null);
+  });
+
+  it('rejects Cloudflare Access assertion token unless explicit trust is enabled', async () => {
+    const res = await authorizeMcpRequest(
+      req({ 'CF-Access-Jwt-Assertion': 'cf-access-jwt' }),
+      { OIDC_ISSUER: 'https://issuer.example.com' },
+      {
+        verifyAccessTokenFn: async () => ({ payload: { sub: 'user-2' } }),
+      },
+    );
+    assert.ok(res);
+    assert.equal(res.status, 401);
+    assert.match(await res.text(), /MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION=true/i);
+  });
+
+  it('does not accept Cloudflare Access assertion token when only identity-header trust is enabled', async () => {
+    const res = await authorizeMcpRequest(
+      req({ 'CF-Access-Jwt-Assertion': 'cf-access-jwt' }),
+      {
+        OIDC_ISSUER: 'https://issuer.example.com',
+        MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS: 'true',
+      },
+      {
+        verifyAccessTokenFn: async () => ({ payload: { sub: 'user-2' } }),
+      },
+    );
+    assert.ok(res);
+    assert.equal(res.status, 401);
+    assert.match(await res.text(), /MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION=true/i);
   });
 
   it('returns 403 for insufficient scope', async () => {
@@ -238,12 +277,9 @@ describe('worker-security auth', () => {
   });
 
   it('requires Authorization bearer token for OIDC auth', async () => {
-    const res = await authorizeMcpRequest(
-      req({}),
-      {
-        OIDC_ISSUER: 'https://issuer.example.com',
-      },
-    );
+    const res = await authorizeMcpRequest(req({}), {
+      OIDC_ISSUER: 'https://issuer.example.com',
+    });
     assert.ok(res);
     assert.equal(res.status, 401);
   });

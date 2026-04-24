@@ -24,7 +24,11 @@ export interface WorkerObservabilityRuntime<TEnv extends Env> {
   buildWorkerRouteMetricKey(method: string, pathname: string): string;
   recordRouteLatency(route: string, elapsedMs: number): void;
   recordDurableObjectLatency(dimension: DurableObjectLatencyDimension, elapsedMs: number): void;
-  getCachedAllowedOrigins(rawAllowedOrigins: string | undefined, authUiOriginRaw?: string): string[];
+  recordDurableObjectUnavailable(dimension: DurableObjectLatencyDimension): void;
+  getCachedAllowedOrigins(
+    rawAllowedOrigins: string | undefined,
+    authUiOriginRaw?: string,
+  ): string[];
   getCachedSessionTopology(env: TEnv): WorkerMcpSessionTopologyV2;
   getWorkerLatencySnapshot(): {
     routes: Record<string, LatencySnapshot>;
@@ -73,6 +77,7 @@ function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
     avg_ms: stats.count > 0 ? Number((stats.totalMs / stats.count).toFixed(2)) : 0,
     max_ms: Number(stats.maxMs.toFixed(2)),
     last_ms: Number(stats.lastMs.toFixed(2)),
+    unavailable_count: stats.unavailableCount,
   };
 }
 
@@ -83,9 +88,10 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
   const allowedOriginsCache = new Map<string, string[]>();
   const sessionTopologyCache = new Map<string, WorkerMcpSessionTopologyV2>();
   const durableObjectLatency: Record<DurableObjectLatencyDimension, LatencyStats> = {
-    auth_limiter: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
-    session_revocation: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
-    ai_chat_quota: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 },
+    auth_limiter: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
+    session_revocation: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
+    mcp_session_lifecycle: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
+    ai_chat_quota: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
   };
 
   return {
@@ -131,6 +137,7 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
         totalMs: durationMs,
         maxMs: durationMs,
         lastMs: durationMs,
+        unavailableCount: 0,
       });
     },
 
@@ -138,15 +145,18 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
       recordLatency(durableObjectLatency[dimension], elapsedMs);
     },
 
-    getCachedAllowedOrigins(rawAllowedOrigins: string | undefined, authUiOriginRaw?: string): string[] {
-      const cacheKey = `${rawAllowedOrigins ?? ''}|${authUiOriginRaw ?? ''}`;
+    recordDurableObjectUnavailable(dimension: DurableObjectLatencyDimension): void {
+      durableObjectLatency[dimension].unavailableCount += 1;
+    },
+
+    getCachedAllowedOrigins(
+      rawAllowedOrigins: string | undefined,
+      _authUiOriginRaw?: string,
+    ): string[] {
+      const cacheKey = `${rawAllowedOrigins ?? ''}|worker-only-hosted-auth`;
       const cached = allowedOriginsCache.get(cacheKey);
       if (cached) return cached;
       const parsed = parseAllowedOrigins(rawAllowedOrigins);
-      const authUiOrigin = normalizeOriginFromUrlLike(authUiOriginRaw);
-      if (authUiOrigin && !parsed.includes('*') && !parsed.includes(authUiOrigin)) {
-        parsed.push(authUiOrigin);
-      }
       allowedOriginsCache.set(cacheKey, parsed);
       return parsed;
     },
@@ -182,6 +192,7 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
       const durableObjects = {
         auth_limiter: getLatencySnapshot(durableObjectLatency.auth_limiter),
         session_revocation: getLatencySnapshot(durableObjectLatency.session_revocation),
+        mcp_session_lifecycle: getLatencySnapshot(durableObjectLatency.mcp_session_lifecycle),
         ai_chat_quota: getLatencySnapshot(durableObjectLatency.ai_chat_quota),
       };
       const topSlowOperations = Object.entries(routes)
@@ -192,10 +203,13 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
         }))
         .sort((a, b) => b.slow_score - a.slow_score || b.count - a.count)
         .slice(0, deps.exportTopSlowOperationLimit);
-      const durableObjectSamples = Object.values(durableObjects).filter((snapshot) => snapshot.count > 0);
+      const durableObjectSamples = Object.values(durableObjects).filter(
+        (snapshot) => snapshot.count > 0,
+      );
       const durableObjectGlobalAvg =
         durableObjectSamples.length > 0
-          ? durableObjectSamples.reduce((sum, snapshot) => sum + snapshot.avg_ms, 0) / durableObjectSamples.length
+          ? durableObjectSamples.reduce((sum, snapshot) => sum + snapshot.avg_ms, 0) /
+            durableObjectSamples.length
           : 0;
       const durableObjectLatencyOutliers: DurableObjectOutlierSignal[] = (
         Object.entries(durableObjects) as Array<[DurableObjectLatencyDimension, LatencySnapshot]>
@@ -203,14 +217,18 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
         .map(([dimension, snapshot]) => {
           const selfRatioAvg = snapshot.avg_ms > 0 ? snapshot.max_ms / snapshot.avg_ms : 0;
           const selfRatioLast = snapshot.avg_ms > 0 ? snapshot.last_ms / snapshot.avg_ms : 0;
-          const globalRatio = durableObjectGlobalAvg > 0 ? snapshot.avg_ms / durableObjectGlobalAvg : 0;
-          const outlierScore = Number(Math.max(selfRatioAvg, selfRatioLast, globalRatio).toFixed(2));
+          const globalRatio =
+            durableObjectGlobalAvg > 0 ? snapshot.avg_ms / durableObjectGlobalAvg : 0;
+          const outlierScore = Number(
+            Math.max(selfRatioAvg, selfRatioLast, globalRatio).toFixed(2),
+          );
           return {
             dimension,
             ...snapshot,
             outlier_score: outlierScore,
             is_outlier:
-              snapshot.count >= deps.doOutlierMinSamples && outlierScore >= deps.doOutlierScoreThreshold,
+              snapshot.count >= deps.doOutlierMinSamples &&
+              outlierScore >= deps.doOutlierScoreThreshold,
           };
         })
         .sort((a, b) => b.outlier_score - a.outlier_score);

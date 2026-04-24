@@ -9,6 +9,8 @@ import type {
   AuthFailureLimiterRequestBody,
   AuthFailureLimiterResponseBody,
   AuthFailureState,
+  BrowserBootstrapConsumeRequestBody,
+  BrowserBootstrapConsumeResponseBody,
   DurableObjectLatencyDimension,
   LifetimeQuotaRequestBody,
   LifetimeQuotaResponseBody,
@@ -41,7 +43,7 @@ import {
 import { parsePositiveInt } from '../common/validation.js';
 import { parseBoolean } from './worker-security.js';
 
-interface WorkerDurableRuntimeEnv {
+export interface WorkerDurableRuntimeEnv {
   AUTH_FAILURE_LIMITER: DurableObjectNamespace;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
   MCP_SESSION_SHARD_COUNT?: string;
@@ -68,6 +70,7 @@ type DurableObjectCheckResult<T> = { kind: 'ok'; value: T } | { kind: 'unavailab
 export interface CreateWorkerDurableRuntimeDeps<TEnv extends WorkerDurableRuntimeEnv> {
   now: () => number;
   recordDurableObjectLatency: (dimension: DurableObjectLatencyDimension, elapsedMs: number) => void;
+  recordDurableObjectUnavailable: (dimension: DurableObjectLatencyDimension) => void;
   getCachedSessionTopology: (env: TEnv) => WorkerMcpSessionTopologyV2;
   jsonError: (
     message: string,
@@ -76,6 +79,23 @@ export interface CreateWorkerDurableRuntimeDeps<TEnv extends WorkerDurableRuntim
     extra?: Record<string, unknown>,
     extraHeaders?: HeadersInit,
   ) => Response;
+}
+
+function logDurableObjectFailure(
+  durableObject: DurableObjectLatencyDimension,
+  operation: string,
+  failureKind: 'http_error' | 'fetch_error',
+  status?: number,
+): void {
+  console.error(
+    JSON.stringify({
+      event: 'durable_object_unavailable',
+      durable_object: durableObject,
+      operation,
+      failure_kind: failureKind,
+      ...(typeof status === 'number' ? { status } : {}),
+    }),
+  );
 }
 
 export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
@@ -87,6 +107,11 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     nowMs: number,
     config: { maxAttempts: number; windowMs: number; blockMs: number },
   ) => Promise<DurableObjectCheckResult<AuthFailureLimiterResponseBody>>;
+  consumeBrowserBootstrapHandoff: (
+    env: TEnv,
+    handoffId: string,
+    expiresAtMs: number,
+  ) => Promise<DurableObjectCheckResult<boolean>>;
   getUserUsageSnapshot: (env: TEnv, userId: string) => Promise<UsageCounterResponseBody | null>;
   incrementUserUsage: (
     env: TEnv,
@@ -102,6 +127,11 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
   ) => Promise<Response | null>;
   getAuthRateLimitedResponse: (
     clientId: string,
+    env: TEnv,
+    nowMs: number,
+  ) => Promise<Response | null>;
+  getAuthRouteRateLimitedResponse: (
+    bucketId: string,
     env: TEnv,
     nowMs: number,
   ) => Promise<Response | null>;
@@ -192,6 +222,14 @@ function getAuthLimiterStub<TEnv extends WorkerDurableRuntimeEnv>(
   return env.AUTH_FAILURE_LIMITER.get(objectId);
 }
 
+function getBrowserBootstrapStub<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+  handoffId: string,
+): DurableObjectStub {
+  const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`browser-bootstrap:${handoffId}`);
+  return env.AUTH_FAILURE_LIMITER.get(objectId);
+}
+
 function getMcpSessionLifecycleStub<TEnv extends WorkerDurableRuntimeEnv>(
   env: TEnv,
   sessionId: string,
@@ -206,7 +244,10 @@ async function callSessionRevocation<TEnv extends WorkerDurableRuntimeEnv>(
   env: TEnv,
   sessionJti: string,
   body: SessionRevocationRequestBody,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'now' | 'recordDurableObjectLatency'>,
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    'now' | 'recordDurableObjectLatency' | 'recordDurableObjectUnavailable'
+  >,
 ): Promise<DurableObjectCheckResult<SessionRevocationResponseBody>> {
   const stub = getSessionRevocationStub(env, sessionJti);
   const startedAt = deps.now();
@@ -217,10 +258,14 @@ async function callSessionRevocation<TEnv extends WorkerDurableRuntimeEnv>(
       body: JSON.stringify(body),
     });
     if (!response.ok) {
+      deps.recordDurableObjectUnavailable('session_revocation');
+      logDurableObjectFailure('session_revocation', body.action, 'http_error', response.status);
       return { kind: 'unavailable' };
     }
     return { kind: 'ok', value: (await response.json()) as SessionRevocationResponseBody };
   } catch {
+    deps.recordDurableObjectUnavailable('session_revocation');
+    logDurableObjectFailure('session_revocation', body.action, 'fetch_error');
     return { kind: 'unavailable' };
   } finally {
     deps.recordDurableObjectLatency('session_revocation', deps.now() - startedAt);
@@ -232,7 +277,10 @@ async function callAuthLimiter<TEnv extends WorkerDurableRuntimeEnv>(
   clientId: string,
   action: AuthFailureLimiterRequestBody['action'],
   nowMs: number,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'now' | 'recordDurableObjectLatency'>,
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    'now' | 'recordDurableObjectLatency' | 'recordDurableObjectUnavailable'
+  >,
   limits?: { maxAttempts: number; windowMs: number; blockMs: number },
 ): Promise<DurableObjectCheckResult<AuthFailureLimiterResponseBody>> {
   const cfg =
@@ -260,10 +308,14 @@ async function callAuthLimiter<TEnv extends WorkerDurableRuntimeEnv>(
       } satisfies AuthFailureLimiterRequestBody),
     });
     if (!response.ok) {
+      deps.recordDurableObjectUnavailable('auth_limiter');
+      logDurableObjectFailure('auth_limiter', action, 'http_error', response.status);
       return { kind: 'unavailable' };
     }
     return { kind: 'ok', value: (await response.json()) as AuthFailureLimiterResponseBody };
   } catch {
+    deps.recordDurableObjectUnavailable('auth_limiter');
+    logDurableObjectFailure('auth_limiter', action, 'fetch_error');
     return { kind: 'unavailable' };
   } finally {
     deps.recordDurableObjectLatency('auth_limiter', deps.now() - startedAt);
@@ -275,11 +327,18 @@ async function callMcpSessionLifecycle<TEnv extends WorkerDurableRuntimeEnv>(
   sessionId: string,
   action: McpSessionLifecycleAction,
   nowMs: number,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'getCachedSessionTopology'>,
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    | 'getCachedSessionTopology'
+    | 'now'
+    | 'recordDurableObjectLatency'
+    | 'recordDurableObjectUnavailable'
+  >,
 ): Promise<DurableObjectCheckResult<McpSessionLifecycleResponseBody>> {
   const topology = deps.getCachedSessionTopology(env);
   const placement = getWorkerMcpSessionPlacementHint(sessionId, topology);
   const stub = getMcpSessionLifecycleStub(env, sessionId, topology);
+  const startedAt = deps.now();
   try {
     const response = await stub.fetch('https://auth-failure-limiter/internal', {
       method: 'POST',
@@ -299,11 +358,17 @@ async function callMcpSessionLifecycle<TEnv extends WorkerDurableRuntimeEnv>(
       } satisfies McpSessionLifecycleRequestBody),
     });
     if (!response.ok) {
+      deps.recordDurableObjectUnavailable('mcp_session_lifecycle');
+      logDurableObjectFailure('mcp_session_lifecycle', action, 'http_error', response.status);
       return { kind: 'unavailable' };
     }
     return { kind: 'ok', value: (await response.json()) as McpSessionLifecycleResponseBody };
   } catch {
+    deps.recordDurableObjectUnavailable('mcp_session_lifecycle');
+    logDurableObjectFailure('mcp_session_lifecycle', action, 'fetch_error');
     return { kind: 'unavailable' };
+  } finally {
+    deps.recordDurableObjectLatency('mcp_session_lifecycle', deps.now() - startedAt);
   }
 }
 
@@ -367,6 +432,28 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
 
     async recordSessionBootstrapRateLimit(env, clientId, nowMs, config) {
       return callAuthLimiter(env, `session-bootstrap:${clientId}`, 'record', nowMs, deps, config);
+    },
+
+    async consumeBrowserBootstrapHandoff(env, handoffId, expiresAtMs) {
+      const stub = getBrowserBootstrapStub(env, handoffId);
+      try {
+        const response = await stub.fetch('https://auth-failure-limiter/internal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'browser_bootstrap_consume',
+            nowMs: deps.now(),
+            expiresAtMs,
+          } satisfies BrowserBootstrapConsumeRequestBody),
+        });
+        if (!response.ok) {
+          return { kind: 'unavailable' };
+        }
+        const payload = (await response.json()) as BrowserBootstrapConsumeResponseBody;
+        return { kind: 'ok', value: payload.accepted === true };
+      } catch {
+        return { kind: 'unavailable' };
+      }
     },
 
     async incrementUserUsage(env, userId, metadata = {}) {
@@ -456,6 +543,40 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         'Too many failed authentication attempts',
         429,
         'auth_rate_limited',
+        { retry_after_seconds: retryAfterSeconds },
+        { 'Retry-After': String(retryAfterSeconds) },
+      );
+    },
+
+    async getAuthRouteRateLimitedResponse(bucketId, env, nowMs) {
+      const cfg = getAuthFailureRateLimitConfig(env);
+      if (!cfg.enabled) return null;
+      const limiterState = await callAuthLimiter(
+        env,
+        `oauth-frontdoor:${bucketId}`,
+        'record',
+        nowMs,
+        deps,
+        {
+          maxAttempts: cfg.maxAttempts,
+          windowMs: cfg.windowMs,
+          blockMs: cfg.blockMs,
+        },
+      );
+      if (limiterState.kind === 'unavailable') {
+        return deps.jsonError(
+          'Unable to validate OAuth route rate limit.',
+          503,
+          'oauth_route_rate_limit_unavailable',
+        );
+      }
+      if (!limiterState.value.blocked) return null;
+
+      const retryAfterSeconds = limiterState.value.retryAfterSeconds;
+      return deps.jsonError(
+        'Too many OAuth route attempts.',
+        429,
+        'oauth_route_rate_limited',
         { retry_after_seconds: retryAfterSeconds },
         { 'Retry-After': String(retryAfterSeconds) },
       );
@@ -580,6 +701,8 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
           } satisfies LifetimeQuotaRequestBody),
         });
       } catch {
+        deps.recordDurableObjectUnavailable('ai_chat_quota');
+        logDurableObjectFailure('ai_chat_quota', 'quota_increment_check', 'fetch_error');
         return deps.jsonError(
           'Unable to validate hosted AI chat quota.',
           503,
@@ -590,6 +713,13 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
       }
 
       if (!response.ok) {
+        deps.recordDurableObjectUnavailable('ai_chat_quota');
+        logDurableObjectFailure(
+          'ai_chat_quota',
+          'quota_increment_check',
+          'http_error',
+          response.status,
+        );
         return deps.jsonError(
           'Unable to validate hosted AI chat quota.',
           503,
@@ -614,6 +744,8 @@ export class AuthFailureLimiterDO {
   private static readonly AUTH_FAILURE_CLEANUP_AT_MS_KEY = 'auth_failure_cleanup_at_ms';
   private static readonly UI_SESSION_REVOKED_UNTIL_MS_KEY = 'ui_session_revoked_until_ms';
   private static readonly MCP_SESSION_ALARM_AT_MS_KEY = 'mcp_session_alarm_at_ms';
+  private static readonly BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY = 'browser_bootstrap_expires_at_ms';
+  private static readonly BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY = 'browser_bootstrap_consumed_at_ms';
 
   constructor(private readonly state: DurableObjectState) {}
 
@@ -779,6 +911,7 @@ export class AuthFailureLimiterDO {
     const body = await parseJsonBody<
       | AuthFailureLimiterRequestBody
       | SessionRevocationRequestBody
+      | BrowserBootstrapConsumeRequestBody
       | UsageCounterRequestBody
       | LifetimeQuotaRequestBody
       | McpSessionLifecycleRequestBody
@@ -889,6 +1022,33 @@ export class AuthFailureLimiterDO {
       }
 
       return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
+    }
+
+    if (body.action === 'browser_bootstrap_consume') {
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const expiresAtMs = Number.isFinite(body.expiresAtMs) ? body.expiresAtMs : 0;
+      if (expiresAtMs <= nowMs) {
+        return Response.json({ accepted: false } satisfies BrowserBootstrapConsumeResponseBody);
+      }
+
+      const consumedAtMs =
+        (await this.state.storage.get<number>(
+          AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY,
+        )) ?? 0;
+      if (consumedAtMs > 0) {
+        return Response.json({ accepted: false } satisfies BrowserBootstrapConsumeResponseBody);
+      }
+
+      await this.state.storage.put(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY,
+        nowMs,
+      );
+      await this.state.storage.put(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY,
+        expiresAtMs,
+      );
+      await this.state.storage.setAlarm(expiresAtMs);
+      return Response.json({ accepted: true } satisfies BrowserBootstrapConsumeResponseBody);
     }
 
     if (body.action === 'usage_increment' || body.action === 'usage_get') {
@@ -1054,6 +1214,21 @@ export class AuthFailureLimiterDO {
         await this.state.storage.deleteAlarm();
       } else {
         await this.state.storage.setAlarm(revokedUntilMs);
+      }
+      return;
+    }
+
+    const browserBootstrapExpiresAt =
+      (await this.state.storage.get<number>(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY,
+      )) ?? 0;
+    if (browserBootstrapExpiresAt > 0) {
+      if (browserBootstrapExpiresAt <= nowMs) {
+        await this.state.storage.delete(AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY);
+        await this.state.storage.delete(AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY);
+        await this.state.storage.deleteAlarm();
+      } else {
+        await this.state.storage.setAlarm(browserBootstrapExpiresAt);
       }
       return;
     }

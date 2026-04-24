@@ -9,10 +9,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 const SERVER_URL = process.env.SERVER_URL?.trim();
 const MCP_REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
@@ -199,7 +201,9 @@ function getTests(): TestCase[] {
   ];
 }
 
-async function sendHttpRequest(payload: object): Promise<{ ok: boolean; response: MCPResponse | null }> {
+async function sendHttpRequest(
+  payload: object,
+): Promise<{ ok: boolean; response: MCPResponse | null }> {
   if (!SERVER_URL) {
     throw new Error('SERVER_URL is required for HTTP transport');
   }
@@ -224,7 +228,7 @@ function createStdioClient(): {
   send: (payload: { id: number; [key: string]: unknown }) => Promise<MCPResponse>;
   close: () => void;
 } {
-  const server = spawn('node', [join(projectRoot, 'dist/index.js')], {
+  const server = spawn(localServerRuntime.command, localServerRuntime.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     cwd: projectRoot,
   });
@@ -288,7 +292,11 @@ function createStdioClient(): {
 async function testMCPServer(): Promise<boolean> {
   console.log('🧪 Testing Legal MCP Server');
   console.log('============================\n');
-  console.log(SERVER_URL ? `Transport: HTTP (${SERVER_URL})\n` : 'Transport: Local stdio (dist/index.js)\n');
+  console.log(
+    SERVER_URL
+      ? `Transport: HTTP (${SERVER_URL})\n`
+      : `Transport: Local stdio (${localServerRuntime.label})\n`,
+  );
 
   const tests = getTests();
   let passed = 0;
