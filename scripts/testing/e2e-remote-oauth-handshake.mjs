@@ -45,7 +45,6 @@ export async function main() {
 
   console.log('Starting remote MCP OAuth handshake probe');
   console.log(`Base URL: ${cfg.baseUrl}`);
-  console.log(`Client origin: ${cfg.clientOrigin}`);
 
   const discoveryUrl = `${cfg.baseUrl}/.well-known/oauth-authorization-server`;
   const protectedResourceUrl = `${cfg.baseUrl}/.well-known/oauth-protected-resource`;
