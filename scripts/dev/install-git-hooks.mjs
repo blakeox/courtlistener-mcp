@@ -14,8 +14,25 @@ function log(message) {
   process.stdout.write(`${message}\n`);
 }
 
+function isGitAvailable() {
+  try {
+    execFileSync('git', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
 if (!existsSync(gitDir)) {
   log('Skipping git hook installation because `.git` is not present.');
+  process.exit(0);
+}
+
+if (!isGitAvailable()) {
+  log('Skipping git hook installation because `git` is not available.');
   process.exit(0);
 }
 

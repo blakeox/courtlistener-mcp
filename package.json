@@ -27,6 +27,7 @@
     "cloudflare:tail": "wrangler tail",
     "cloudflare:register:oauth": "node scripts/cloudflare/register-oauth-client.mjs",
     "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
     "doctor": "node dist/index.js --doctor",
     "setup": "node dist/index.js --setup",
     "mcp": "node dist/index.js",
