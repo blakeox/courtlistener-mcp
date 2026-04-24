@@ -11,8 +11,16 @@ permissions:
 
 jobs:
   release-please:
+    if: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
         with:
           release-type: node
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+  release-please-skipped:
+    if: ${{ secrets.RELEASE_PLEASE_TOKEN == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping release-please because RELEASE_PLEASE_TOKEN is not configured."

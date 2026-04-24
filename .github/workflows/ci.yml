@@ -337,7 +337,7 @@ jobs:
               ;;
             stress-reliability)
               mkdir -p performance-data
-              TRANSPORT=http MCP_HTTP_PORT=3002 METRICS_ENABLED=true METRICS_PORT=3001 pnpm start > performance-data/local-gate-server.log 2>&1 &
+              MCP_HTTP_PORT=3002 MCP_HTTP_HOST=127.0.0.1 pnpm run start:http > performance-data/local-gate-server.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -345,12 +345,12 @@ jobs:
               trap cleanup EXIT
 
               for _ in $(seq 1 30); do
-                if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+                if curl -fsS http://127.0.0.1:3002/health >/dev/null 2>&1; then
                   break
                 fi
                 sleep 1
               done
-              curl -fsS http://127.0.0.1:3001/health >/dev/null
+              curl -fsS http://127.0.0.1:3002/health >/dev/null
 
               pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-baseline.json
               pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-current.json
@@ -367,7 +367,7 @@ jobs:
               ;;
             release-readiness)
               mkdir -p performance-data test-output
-              TRANSPORT=http MCP_HTTP_PORT=3002 METRICS_ENABLED=true METRICS_PORT=3001 pnpm start > performance-data/local-release-readiness-server.log 2>&1 &
+              MCP_HTTP_PORT=3002 MCP_HTTP_HOST=127.0.0.1 pnpm run start:http > performance-data/local-release-readiness-server.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -375,12 +375,12 @@ jobs:
               trap cleanup EXIT
 
               for _ in $(seq 1 30); do
-                if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+                if curl -fsS http://127.0.0.1:3002/health >/dev/null 2>&1; then
                   break
                 fi
                 sleep 1
               done
-              curl -fsS http://127.0.0.1:3001/health >/dev/null
+              curl -fsS http://127.0.0.1:3002/health >/dev/null
 
               RELEASE_READINESS_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
               RUNTIME_SAFETY_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
