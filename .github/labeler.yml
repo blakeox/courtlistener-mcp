@@ -1,9 +1,17 @@
 area/docs:
-  - 'docs/**'
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
 area/tests:
-  - 'test/**'
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'test/**'
 area/build:
-  - '.github/workflows/**'
-  - 'Dockerfile*'
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - 'Dockerfile*'
 area/code:
-  - 'src/**'
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/**'
