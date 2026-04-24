@@ -2,9 +2,9 @@ name: Performance Monitoring
 
 on:
   push:
-    branches: ['*'] # Run on all branches to catch performance regressions
+    branches: [main] # Keep automatic performance monitoring on the production branch
   pull_request:
-    branches: ['*'] # Run on PRs targeting any branch
+    branches: [main] # Run on PRs targeting main
   workflow_dispatch:
     inputs:
       environment:

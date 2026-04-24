@@ -29,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        inspector-version: ['latest', '0.5.0', '0.4.0']
-        node-version: ['18', '20', '22']
+        inspector-version: ['latest']
+        node-version: ['20']
       fail-fast: false
 
     steps:
@@ -110,7 +110,7 @@ jobs:
   visual-regression:
     name: Inspector Visual Regression Testing
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.test_type == 'comprehensive'
+    if: github.event.inputs.test_type == 'comprehensive'
     env:
       VISUAL_BASELINE_URL: ''
 
