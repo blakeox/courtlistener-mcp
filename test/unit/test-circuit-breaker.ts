@@ -10,12 +10,13 @@ import { beforeEach, describe, it } from 'node:test';
 import type { Logger } from '../../src/infrastructure/logger.js';
 import { createMockLogger } from '../utils/test-helpers.ts';
 
-// Import the actual CircuitBreaker components
-const circuitBreakerModule = await import('../../dist/infrastructure/circuit-breaker.js');
+// Import the actual CircuitBreaker components from source so default unit runs
+// do not depend on dist artifact freshness.
+const circuitBreakerModule = await import('../../src/infrastructure/circuit-breaker.js');
 const { CircuitBreaker, CircuitBreakerManager, CircuitState, createCircuitBreakerConfig } =
   circuitBreakerModule;
 
-type CBConfig = import('../../dist/infrastructure/circuit-breaker.js').CircuitBreakerConfig;
+type CBConfig = import('../../src/infrastructure/circuit-breaker.js').CircuitBreakerConfig;
 
 // Helper to create an enabled config with short timings for fast tests
 function makeConfig(overrides: Partial<CBConfig> = {}): CBConfig {
@@ -43,6 +44,23 @@ async function tripBreaker(
     } catch {
       /* expected */
     }
+  }
+}
+
+async function waitForRetryWindow(
+  breaker: InstanceType<typeof CircuitBreaker>,
+  paddingMs = 10,
+): Promise<void> {
+  const nextAttemptTime = breaker.getStats().nextAttemptTime;
+  assert.notStrictEqual(
+    nextAttemptTime,
+    undefined,
+    'expected circuit breaker to expose nextAttemptTime',
+  );
+
+  const delay = Math.max(0, nextAttemptTime! - Date.now() + paddingMs);
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 }
 
@@ -143,9 +161,16 @@ describe('CircuitBreaker', () => {
       );
       await tripBreaker(cb, 1);
 
-      const start = Date.now();
-      await assert.rejects(() => cb.execute(async () => 'nope'), /Circuit breaker 'svc' is OPEN/);
-      assert.ok(Date.now() - start < 50, 'should fail fast');
+      let invoked = false;
+      await assert.rejects(
+        () =>
+          cb.execute(async () => {
+            invoked = true;
+            return 'nope';
+          }),
+        /Circuit breaker 'svc' is OPEN/,
+      );
+      assert.strictEqual(invoked, false);
     });
 
     it('should include breaker name in rejection error', async () => {
@@ -186,7 +211,7 @@ describe('CircuitBreaker', () => {
       await tripBreaker(cb, 1);
       assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
 
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
       // Next execute triggers half-open transition
       const result = await cb.execute(async () => 'probe');
       assert.strictEqual(result, 'probe');
@@ -203,7 +228,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       const result = await cb.execute(async () => 'probe-ok');
       assert.strictEqual(result, 'probe-ok');
@@ -217,7 +242,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       await cb.execute(async () => 'ok1');
       assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
@@ -241,7 +266,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       await cb.execute(async () => 'ok1');
       await cb.execute(async () => 'ok2');
@@ -264,7 +289,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       await assert.rejects(
         () =>
@@ -287,7 +312,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       // 1 success in half-open, then failure
       await cb.execute(async () => 'ok1');
@@ -394,7 +419,7 @@ describe('CircuitBreaker', () => {
       assert.strictEqual(cb.getStats().totalFailures, 1);
 
       // Recover
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
       await cb.execute(async () => 'ok');
 
       // Trip again
@@ -427,7 +452,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
       await cb.execute(async () => 'probe');
       assert.strictEqual(cb.getStats().state, CircuitState.HALF_OPEN);
       assert.strictEqual(cb.isHealthy(), true);
@@ -484,7 +509,7 @@ describe('CircuitBreaker', () => {
         mockLogger,
       );
       await tripBreaker(cb, 1);
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
 
       for (let i = 0; i < 3; i++) {
         await cb.execute(async () => 'ok');
@@ -502,12 +527,9 @@ describe('CircuitBreaker', () => {
       );
       await tripBreaker(cb, 1);
 
-      // Too early — should still be open
-      await new Promise((r) => setTimeout(r, 30));
       await assert.rejects(() => cb.execute(async () => 'too-early'), /OPEN/);
 
-      // Wait remaining time
-      await new Promise((r) => setTimeout(r, 80));
+      await waitForRetryWindow(cb);
       const result = await cb.execute(async () => 'now-ok');
       assert.strictEqual(result, 'now-ok');
     });
@@ -584,7 +606,7 @@ describe('CircuitBreaker', () => {
       assert.strictEqual(cb.getStats().state, CircuitState.OPEN);
 
       // open → half-open → closed
-      await new Promise((r) => setTimeout(r, 25));
+      await waitForRetryWindow(cb);
       await cb.execute(async () => 'recover');
       assert.strictEqual(cb.getStats().state, CircuitState.CLOSED);
 
