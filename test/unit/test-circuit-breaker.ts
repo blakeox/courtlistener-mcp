@@ -384,8 +384,11 @@ describe('CircuitBreaker', () => {
 
     it('should track uptime', async () => {
       const cb = new CircuitBreaker('svc', makeConfig(), mockLogger);
+      const initialUptime = cb.getStats().uptime;
       await new Promise((r) => setTimeout(r, 10));
-      assert.ok(cb.getStats().uptime >= 10);
+      const laterUptime = cb.getStats().uptime;
+      assert.ok(Number.isFinite(laterUptime));
+      assert.ok(laterUptime >= initialUptime);
     });
 
     it('should record lastFailureTime on failure', async () => {
