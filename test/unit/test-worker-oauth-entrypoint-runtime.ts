@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { handleWorkerOAuthEntrypoint } from '../../src/server/worker-oauth-entrypoint-runtime.js';
+import {
+  handleWorkerOAuthEntrypoint,
+  isWorkerManagedRegistrationPath,
+} from '../../src/server/worker-oauth-entrypoint-runtime.js';
 
 describe('handleWorkerOAuthEntrypoint', () => {
   it('rate limits authorize requests before provider execution', async () => {
@@ -36,5 +39,19 @@ describe('handleWorkerOAuthEntrypoint', () => {
     assert.equal(limiterCalls, 1);
     assert.equal(providerCalls, 0);
     assert.equal(response.status, 429);
+  });
+});
+
+describe('isWorkerManagedRegistrationPath', () => {
+  it('claims the public registration endpoint', () => {
+    assert.equal(isWorkerManagedRegistrationPath('/register'), true);
+  });
+
+  it('claims registration management endpoints', () => {
+    assert.equal(isWorkerManagedRegistrationPath('/register/client-123'), true);
+  });
+
+  it('does not claim unrelated oauth routes', () => {
+    assert.equal(isWorkerManagedRegistrationPath('/authorize'), false);
   });
 });
