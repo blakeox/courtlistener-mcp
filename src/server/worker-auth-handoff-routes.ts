@@ -273,6 +273,470 @@ const AUTH_PAGE_STYLES = `
     font-weight: 700;
   }
 
+  .auth-home-shell {
+    min-height: 100vh;
+    padding: 18px 24px 32px;
+  }
+
+  .auth-home-frame {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+  }
+
+  .auth-home-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 0 18px;
+  }
+
+  .auth-home-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 800;
+    color: var(--auth-ink);
+    text-decoration: none;
+  }
+
+  .auth-home-brand-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(55, 104, 255, 0.12), rgba(55, 104, 255, 0.02));
+    border: 1px solid rgba(55, 104, 255, 0.18);
+    color: #2551d8;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+  }
+
+  .auth-home-brand-copy {
+    display: grid;
+    gap: 2px;
+  }
+
+  .auth-home-brand-copy strong {
+    font-size: 1.65rem;
+    line-height: 1;
+  }
+
+  .auth-home-brand-copy span {
+    color: var(--auth-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .auth-home-surface-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--auth-line);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--auth-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .auth-home-surface-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #34c77b;
+    box-shadow: 0 0 0 5px rgba(52, 199, 123, 0.12);
+  }
+
+  .auth-home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .auth-home-card {
+    border: 1px solid rgba(16, 35, 61, 0.08);
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.84);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 20px 60px rgba(26, 44, 81, 0.08);
+  }
+
+  .auth-home-hero {
+    padding: 28px 30px 18px;
+  }
+
+  .auth-home-kicker,
+  .auth-home-panel-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 18px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #4b6ff4;
+  }
+
+  .auth-home-kicker::before,
+  .auth-home-panel-kicker::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.72;
+  }
+
+  .auth-home-title {
+    margin: 0;
+    max-width: 8ch;
+    font-size: clamp(3rem, 6vw, 4.9rem);
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+    color: #102a63;
+  }
+
+  .auth-home-subtitle {
+    margin: 20px 0 0;
+    max-width: 60ch;
+    color: #5f6f8a;
+    font-size: 1.03rem;
+    line-height: 1.7;
+  }
+
+  .auth-home-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .auth-home-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(58, 95, 186, 0.16);
+    background: rgba(245, 248, 255, 0.92);
+    color: #3050a1;
+    font-weight: 700;
+  }
+
+  .auth-home-chip--success {
+    border-color: rgba(40, 168, 118, 0.2);
+    background: rgba(233, 249, 241, 0.98);
+    color: #19855f;
+  }
+
+  .auth-home-feature-list {
+    display: grid;
+    gap: 14px;
+    margin: 28px 0 0;
+    padding-top: 26px;
+    border-top: 1px solid rgba(16, 35, 61, 0.08);
+  }
+
+  .auth-home-feature {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .auth-home-feature-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(238, 242, 255, 0.96);
+    border: 1px solid rgba(55, 104, 255, 0.1);
+    color: #4162c9;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .auth-home-feature-copy h2 {
+    margin: 4px 0 4px;
+    font-size: 1.05rem;
+  }
+
+  .auth-home-feature-copy p {
+    margin: 0;
+    color: #667791;
+    line-height: 1.55;
+  }
+
+  .auth-home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 26px 0 0;
+  }
+
+  .auth-home-button,
+  .auth-home-button:visited {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 22px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-weight: 800;
+    text-decoration: none;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .auth-home-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .auth-home-button--primary {
+    background: linear-gradient(180deg, #2d64f4 0%, #2457d8 100%);
+    color: #ffffff;
+    box-shadow: 0 16px 28px rgba(37, 87, 216, 0.2);
+  }
+
+  .auth-home-button--secondary {
+    border-color: rgba(16, 35, 61, 0.1);
+    background: rgba(255, 255, 255, 0.94);
+    color: #1b3160;
+  }
+
+  .auth-home-button--tertiary {
+    border-color: rgba(16, 35, 61, 0.08);
+    background: rgba(246, 248, 252, 0.92);
+    color: #40506d;
+  }
+
+  .auth-home-button-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    border: 1.5px solid currentColor;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+
+  .auth-home-actions-note {
+    margin: 14px 0 0;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .auth-home-status {
+    padding: 26px;
+  }
+
+  .auth-home-status-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+  }
+
+  .auth-home-status-copy h2 {
+    margin: 10px 0 8px;
+    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    line-height: 1.05;
+    color: #162f66;
+  }
+
+  .auth-home-status-copy p {
+    margin: 0;
+    color: #62728c;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92rem;
+  }
+
+  .auth-home-lock {
+    width: 118px;
+    height: 118px;
+    border-radius: 999px;
+    position: relative;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(86, 125, 255, 0.2), transparent 55%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(240, 245, 255, 0.92));
+    border: 1px solid rgba(100, 127, 226, 0.14);
+  }
+
+  .auth-home-lock::before {
+    content: '';
+    position: absolute;
+    inset: 35px 36px 30px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(117, 150, 255, 0.95), rgba(88, 122, 239, 0.95));
+  }
+
+  .auth-home-lock::after {
+    content: '';
+    position: absolute;
+    left: 42px;
+    top: 20px;
+    width: 34px;
+    height: 28px;
+    border: 6px solid rgba(117, 150, 255, 0.95);
+    border-bottom: 0;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .auth-home-status-stack {
+    display: grid;
+    gap: 12px;
+    margin: 22px 0 0;
+  }
+
+  .auth-home-status-card {
+    border: 1px solid rgba(16, 35, 61, 0.08);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 16px 16px 16px 58px;
+    position: relative;
+  }
+
+  .auth-home-status-card::before {
+    content: attr(data-step);
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 243, 255, 0.95);
+    border: 1px solid rgba(75, 111, 244, 0.12);
+    color: #4c67d6;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .auth-home-status-card h3 {
+    margin: 0 0 5px;
+    font-size: 1rem;
+    color: #1a2f5f;
+  }
+
+  .auth-home-status-card p {
+    margin: 0;
+    color: #61738e;
+    line-height: 1.55;
+  }
+
+  .auth-home-details {
+    margin: 18px 0 0;
+    border: 1px solid rgba(101, 124, 177, 0.14);
+    border-radius: 18px;
+    background: rgba(245, 248, 255, 0.72);
+    overflow: hidden;
+  }
+
+  .auth-home-details summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 18px;
+    font-weight: 700;
+    color: #4d5e7d;
+  }
+
+  .auth-home-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .auth-home-detail-grid {
+    display: grid;
+    gap: 12px;
+    padding: 0 18px 18px;
+  }
+
+  .auth-home-detail-row {
+    display: grid;
+    gap: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-home-detail-row dt {
+    margin: 0;
+    color: #5f6f8c;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .auth-home-detail-row dd {
+    margin: 0;
+    color: #21345c;
+    line-height: 1.55;
+  }
+
+  .auth-home-note-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 18px 0 0;
+  }
+
+  .auth-home-note {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    padding: 18px 22px;
+  }
+
+  .auth-home-note-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(240, 244, 255, 0.98);
+    border: 1px solid rgba(74, 104, 206, 0.14);
+    color: #4564c0;
+    font-size: 0.82rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .auth-home-note h3 {
+    margin: 4px 0 6px;
+    font-size: 1rem;
+    color: #1a2f5f;
+  }
+
+  .auth-home-note p {
+    margin: 0;
+    color: #657692;
+    line-height: 1.58;
+  }
+
   @media (max-width: 640px) {
     .auth-shell { padding: 16px; }
     .auth-card-inner { padding: 20px; }
@@ -285,6 +749,56 @@ const AUTH_PAGE_STYLES = `
     .auth-button,
     .auth-inline-form .auth-button {
       width: 100%;
+    }
+
+    .auth-home-shell {
+      padding: 16px 14px 22px;
+    }
+
+    .auth-home-topbar,
+    .auth-home-status-head,
+    .auth-home-note-grid {
+      grid-template-columns: 1fr;
+      display: grid;
+    }
+
+    .auth-home-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .auth-home-hero,
+    .auth-home-status,
+    .auth-home-note {
+      padding: 22px;
+    }
+
+    .auth-home-actions {
+      display: grid;
+    }
+
+    .auth-home-button {
+      width: 100%;
+    }
+
+    .auth-home-title {
+      font-size: clamp(2.5rem, 16vw, 3.7rem);
+    }
+
+    .auth-home-lock {
+      width: 96px;
+      height: 96px;
+    }
+
+    .auth-home-lock::before {
+      inset: 30px 30px 24px;
+      border-radius: 14px;
+    }
+
+    .auth-home-lock::after {
+      left: 35px;
+      top: 16px;
+      width: 24px;
+      height: 21px;
     }
   }
 `;
@@ -910,6 +1424,167 @@ function renderAuthButtonLink(
   variant: 'primary' | 'secondary' = 'primary',
 ): string {
   return `<a class="auth-button auth-button-${variant}" href="${escapeHtml(href)}">${escapeHtml(label)}</a>`;
+}
+
+function renderAuthStartLandingPage(params: {
+  nonce: string;
+  continueHref: string;
+  returnTarget: string;
+  hasExplicitReturnTarget: boolean;
+}): string {
+  const returnTargetStatus = params.hasExplicitReturnTarget
+    ? 'Return target detected'
+    : 'Worker session ready';
+  const completionPath = params.hasExplicitReturnTarget
+    ? 'Direct OAuth completion from the worker authorize flow.'
+    : 'Hosted sign-in for the worker account session.';
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Complete the Clerk handoff</title>
+    <style nonce="${escapeHtml(params.nonce)}">${AUTH_PAGE_STYLES}</style>
+  </head>
+  <body>
+    <main class="auth-home-shell">
+      <div class="auth-home-frame">
+        <header class="auth-home-topbar">
+          <a class="auth-home-brand" href="/auth/start">
+            <span class="auth-home-brand-mark" aria-hidden="true">CL</span>
+            <span class="auth-home-brand-copy">
+              <strong>CourtListener</strong>
+              <span>MCP</span>
+            </span>
+          </a>
+          <div class="auth-home-surface-badge">
+            <span>Public auth surface</span>
+            <span class="auth-home-surface-dot" aria-hidden="true"></span>
+          </div>
+        </header>
+
+        <section class="auth-home-grid" aria-label="Hosted auth handoff">
+          <article class="auth-home-card auth-home-hero">
+            <p class="auth-home-kicker">Authorization start</p>
+            <h1 class="auth-home-title">Complete the Clerk handoff</h1>
+            <p class="auth-home-subtitle">
+              You're about to sign in and securely hand off to CourtListener MCP. This page keeps the authentication flow simple and secure.
+            </p>
+
+            <ul class="auth-home-chip-list" aria-label="Handoff state">
+              <li class="auth-home-chip">Authentication required</li>
+              <li class="auth-home-chip auth-home-chip--success">${escapeHtml(returnTargetStatus)}</li>
+            </ul>
+
+            <div class="auth-home-feature-list">
+              <div class="auth-home-feature">
+                <div class="auth-home-feature-icon" aria-hidden="true">ID</div>
+                <div class="auth-home-feature-copy">
+                  <h2>Secure and trusted</h2>
+                  <p>Clerk verifies your identity and securely returns you to CourtListener MCP.</p>
+                </div>
+              </div>
+              <div class="auth-home-feature">
+                <div class="auth-home-feature-icon" aria-hidden="true">2X</div>
+                <div class="auth-home-feature-copy">
+                  <h2>Two completion paths</h2>
+                  <p>Complete OAuth directly with Clerk or authorize via your worker session.</p>
+                </div>
+              </div>
+              <div class="auth-home-feature">
+                <div class="auth-home-feature-icon" aria-hidden="true">OK</div>
+                <div class="auth-home-feature-copy">
+                  <h2>You're in control</h2>
+                  <p>We only request what's needed to complete this handoff.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="auth-home-actions">
+              <a class="auth-home-button auth-home-button--primary" href="${escapeHtml(params.continueHref)}">
+                <span class="auth-home-button-icon" aria-hidden="true">IN</span>
+                <span>Sign in with Clerk</span>
+              </a>
+              <a class="auth-home-button auth-home-button--secondary" href="${escapeHtml(params.continueHref)}">
+                <span class="auth-home-button-icon" aria-hidden="true">UP</span>
+                <span>Create account</span>
+              </a>
+              <a class="auth-home-button auth-home-button--tertiary" href="#worker-metadata">
+                <span class="auth-home-button-icon" aria-hidden="true">MD</span>
+                <span>View worker metadata</span>
+              </a>
+            </div>
+            <p class="auth-home-actions-note">
+              We only use the template token to complete this handoff and return you to the CourtListener worker or MCP client.
+            </p>
+          </article>
+
+          <aside class="auth-home-card auth-home-status" aria-label="Handoff status">
+            <div class="auth-home-status-head">
+              <div class="auth-home-status-copy">
+                <p class="auth-home-panel-kicker">Live status</p>
+                <h2>Sign in to continue</h2>
+                <p>Waiting for sign-in...</p>
+              </div>
+              <div class="auth-home-lock" aria-hidden="true"></div>
+            </div>
+
+            <div class="auth-home-status-stack">
+              <section class="auth-home-status-card" data-step="ST">
+                <h3>Clerk state</h3>
+                <p>Loaded and waiting for a user session.</p>
+              </section>
+              <section class="auth-home-status-card" data-step="WK">
+                <h3>Worker handoff mode</h3>
+                <p>${escapeHtml(completionPath)}</p>
+              </section>
+              <section class="auth-home-status-card" data-step="NX">
+                <h3>Next action</h3>
+                <p>Authenticate with Clerk to continue.</p>
+              </section>
+            </div>
+
+            <details class="auth-home-details" id="worker-metadata">
+              <summary>Long redirect targets are contained below so troubleshooting stays available without overwhelming the handoff. Show details</summary>
+              <dl class="auth-home-detail-grid">
+                <div class="auth-home-detail-row">
+                  <dt>Return target</dt>
+                  <dd>${escapeHtml(params.returnTarget)}</dd>
+                </div>
+                <div class="auth-home-detail-row">
+                  <dt>Auth route</dt>
+                  <dd>/auth/start</dd>
+                </div>
+                <div class="auth-home-detail-row">
+                  <dt>Completion mode</dt>
+                  <dd>${escapeHtml(completionPath)}</dd>
+                </div>
+              </dl>
+            </details>
+          </aside>
+        </section>
+
+        <section class="auth-home-note-grid" aria-label="Auth handoff notes">
+          <article class="auth-home-card auth-home-note">
+            <div class="auth-home-note-icon" aria-hidden="true">HW</div>
+            <div>
+              <h3>How this handoff works</h3>
+              <p>The page keeps the auth decision simple even though it supports two worker completion paths.</p>
+            </div>
+          </article>
+          <article class="auth-home-card auth-home-note">
+            <div class="auth-home-note-icon" aria-hidden="true">TS</div>
+            <div>
+              <h3>Trusted handoff notes</h3>
+              <p>Keep the Clerk portal and worker on the same trust chain so the redirect can finish cleanly.</p>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+  </body>
+  </html>`;
 }
 
 function renderAuthPage(
@@ -1734,16 +2409,15 @@ export async function handleWorkerAuthHandoffRoutes<
     if (!continueFlow) {
       const nonce = deps.generateCspNonce();
       const response = deps.htmlResponse(
-        renderAuthPage(
-          'Sign in to continue',
-          [
-            'This hosted Worker can complete OAuth for remote MCP clients and browser sessions on the same origin.',
-            'Use the sign-in link below to continue with the configured upstream identity provider.',
-          ],
-          buildAuthContinueUrl(request, null),
-          'Continue to sign in',
+        renderAuthStartLandingPage({
           nonce,
-        ),
+          continueHref: buildAuthContinueUrl(
+            request,
+            resolvedReturnTo.isExplicit ? resolvedReturnTo.value : null,
+          ),
+          returnTarget: resolvedReturnTo.value,
+          hasExplicitReturnTarget: resolvedReturnTo.isExplicit,
+        }),
         nonce,
       );
       return attachHostedAuthHeaders(
