@@ -13,8 +13,8 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.0.1",
-    "next": "^15.2.4",
+    "@clerk/nextjs": "^7.2.1",
+    "next": "^15.5.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
