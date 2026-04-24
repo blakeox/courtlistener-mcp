@@ -256,20 +256,8 @@ jobs:
     if: >-
       ${{
         github.event_name != 'pull_request' ||
-        (
-          (matrix.gate == 'auth-security-matrix' || matrix.gate == 'auth-release-gate') &&
-          needs.detect-relevant-changes.outputs.auth_related == 'true'
-        ) ||
-        (
-          (
-            matrix.gate == 'protocol-contract' ||
-            matrix.gate == 'stress-reliability' ||
-            matrix.gate == 'runtime-parity-security-async' ||
-            matrix.gate == 'release-readiness' ||
-            matrix.gate == 'startup-diagnostics'
-          ) &&
-          needs.detect-relevant-changes.outputs.worker_related == 'true'
-        )
+        needs.detect-relevant-changes.outputs.auth_related == 'true' ||
+        needs.detect-relevant-changes.outputs.worker_related == 'true'
       }}
     strategy:
       fail-fast: false
