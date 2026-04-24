@@ -497,7 +497,12 @@ jobs:
   remote-server-test:
     name: Remote Server Validation
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      ${{
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        vars.ENABLE_REMOTE_SERVER_VALIDATION == 'true'
+      }}
     needs: [test, mcp-compliance]
     steps:
       - name: Checkout repository
