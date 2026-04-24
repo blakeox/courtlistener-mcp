@@ -304,9 +304,13 @@ class HTTPClient {
     data: unknown;
     ok: boolean;
   }> {
-    const response = await fetch(url, {
+    const requestUrl = url.replace('://localhost:', '://127.0.0.1:');
+    const response = await fetch(requestUrl, {
       method: options.method || 'GET',
-      headers: options.headers || {},
+      headers: {
+        Connection: 'close',
+        ...(options.headers || {}),
+      },
       body: options.body ? JSON.stringify(options.body) : undefined,
       ...options,
     });
