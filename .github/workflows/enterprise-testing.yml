@@ -79,6 +79,8 @@ jobs:
     name: 📊 Comprehensive Testing & Coverage
     runs-on: ubuntu-latest
     needs: unit-tests
+    env:
+      COMPREHENSIVE_NODE_VERSION: '20'
 
     steps:
       - name: 📥 Checkout Repository
@@ -89,7 +91,7 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.COMPREHENSIVE_NODE_VERSION }}
           cache: 'pnpm'
 
       - name: 📦 Install Dependencies
@@ -125,7 +127,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-reports-node-${{ env.NODE_VERSION }}
+          name: test-reports-node-${{ env.COMPREHENSIVE_NODE_VERSION }}
           path: |
             test-report.json
             TEST-REPORT.md
