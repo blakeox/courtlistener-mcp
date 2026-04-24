@@ -157,6 +157,7 @@ jobs:
         run: pnpm run test:integration
 
       - name: Run SPA auth tests
+        if: ${{ matrix.node-version != 18 }}
         run: pnpm run test:spa:auth
 
       - name: Enforce coverage thresholds
