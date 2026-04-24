@@ -51,6 +51,13 @@ export function shouldBypassOAuthProvider(pathname: string): boolean {
   );
 }
 
+export function isWorkerManagedRegistrationPath(pathname: string): boolean {
+  return (
+    pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.register ||
+    pathname.startsWith(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`)
+  );
+}
+
 export async function handleWorkerOAuthEntrypoint<TEnv extends OAuthEntrypointEnv>(
   request: Request,
   env: TEnv,

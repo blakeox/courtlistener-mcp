@@ -72,6 +72,7 @@ import {
 import { createWorkerLegacyFetchHandler } from './server/worker-request-runtime.js';
 import {
   handleWorkerOAuthEntrypoint,
+  isWorkerManagedRegistrationPath,
   shouldBypassOAuthProvider,
 } from './server/worker-oauth-entrypoint-runtime.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
@@ -424,9 +425,7 @@ export default {
     if (shouldBypassOAuthProvider(url.pathname)) {
       return handleLegacyWorkerFetch(request, env, ctx);
     }
-    // Let the OAuthProvider handle base /register (RFC 7591 DCR) natively.
-    // Only intercept /register/{clientId} for client management (RFC 7592).
-    if (url.pathname.startsWith(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`)) {
+    if (isWorkerManagedRegistrationPath(url.pathname)) {
       return handleWorkerDynamicClientRegistration(request, env, {
         getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
         getRegistrationAllowedOrigins: (runtimeEnv) =>
