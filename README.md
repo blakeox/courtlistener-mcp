@@ -90,6 +90,25 @@ cp .env.production .env
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+## Publishing to npm
+
+This repository is configured to publish from `.github/workflows/release.yml` when you push a
+version tag such as `v1.0.2`.
+
+You have two supported auth paths:
+
+1. **Repository secret**: create an npm publish token and store it as the GitHub Actions secret
+   `NPM_TOKEN`.
+2. **Trusted publishing**: connect the npm package to this GitHub repository and let npm trust
+   GitHub Actions OIDC, with no token stored in GitHub.
+
+Once one of those is configured, publish with:
+
+```bash
+git tag v1.0.2
+git push origin v1.0.2
+```
+
 ## Deployment Modes
 
 ### 1. Local mode (`stdio`)

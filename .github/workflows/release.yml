@@ -227,13 +227,15 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
-      - name: Validate npm publish token
+      - name: Configure npm publish auth
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::NPM_TOKEN GitHub secret is required to publish courtlistener-mcp to npm."
-            exit 1
+          if [ -n "$NPM_TOKEN" ]; then
+            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
+            echo "Using NPM_TOKEN repository secret for npm publish."
+          else
+            echo "No NPM_TOKEN secret configured; attempting npm trusted publishing via GitHub OIDC."
           fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
