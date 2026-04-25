@@ -8,7 +8,7 @@ import {
   summarizeOAuthResponse,
 } from './oauth-diagnostics.js';
 import {
-  hasWorkerHostedAuthConfig,
+  evaluateWorkerHostedAuthConfig,
   type WorkerHostedAuthEnv,
 } from './worker-upstream-oidc-config.js';
 
@@ -66,7 +66,8 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
   }
 
   if (identity.kind !== 'authenticated') {
-    if (hasWorkerHostedAuthConfig(env)) {
+    const hostedAuthDiagnostics = evaluateWorkerHostedAuthConfig(env);
+    if (hostedAuthDiagnostics.relevantEnvPresent) {
       try {
         const authStartUrl = new URL('/auth/start', request.url);
         authStartUrl.searchParams.set('return_to', request.url);
