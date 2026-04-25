@@ -34,6 +34,45 @@ interface MiddlewareToolExecutionServiceParams extends DirectToolExecutionServic
   sampling: SamplingService;
 }
 
+function resolveExecutableToolName(name: string, toolRegistry: ToolHandlerRegistry): string {
+  if (!name.includes(':')) {
+    return name;
+  }
+
+  if (toolRegistry.get(name) || isAsyncControlToolName(name)) {
+    return name;
+  }
+
+  const normalizedName = name.split(':').pop()?.trim();
+  if (!normalizedName) {
+    return name;
+  }
+
+  if (toolRegistry.get(normalizedName) || isAsyncControlToolName(normalizedName)) {
+    return normalizedName;
+  }
+
+  return name;
+}
+
+function normalizeExecutableRequest(
+  request: CallToolRequest,
+  toolRegistry: ToolHandlerRegistry,
+): CallToolRequest {
+  const normalizedName = resolveExecutableToolName(request.params.name, toolRegistry);
+  if (normalizedName === request.params.name) {
+    return request;
+  }
+
+  return {
+    ...request,
+    params: {
+      ...request.params,
+      name: normalizedName,
+    },
+  };
+}
+
 export function createDirectToolExecutionService(
   params: DirectToolExecutionServiceParams,
 ): ToolExecutionService {
@@ -42,11 +81,13 @@ export function createDirectToolExecutionService(
 
   return {
     execute: async (request, requestId) => {
-      if (isAsyncControlToolName(request.params.name)) {
-        return asyncWorkflow.handleControlToolCall(request);
+      const normalizedRequest = normalizeExecutableRequest(request, toolRegistry);
+
+      if (isAsyncControlToolName(normalizedRequest.params.name)) {
+        return asyncWorkflow.handleControlToolCall(normalizedRequest);
       }
 
-      const parsedRequest = parseAsyncExecutionDirective(request);
+      const parsedRequest = parseAsyncExecutionDirective(normalizedRequest);
       const principal = getPrincipalContext();
 
       if (parsedRequest.directive?.mode === 'async') {
@@ -104,21 +145,22 @@ export function createMiddlewareToolExecutionService(
     requestId: string,
     disableInlineRetry: boolean,
   ): Promise<CallToolResult> => {
+    const normalizedRequest = normalizeExecutableRequest(request, toolRegistry);
     const startTime = Date.now();
     const context: RequestContext = {
       requestId,
       startTime,
       metadata: {
-        toolName: request.params.name,
-        arguments: request.params.arguments,
+        toolName: normalizedRequest.params.name,
+        arguments: normalizedRequest.params.arguments,
       },
     };
     const middlewares = middlewareFactory.createMiddlewareStack(config);
 
     const executeTool = async () => {
       const principal = getPrincipalContext();
-      return await toolRegistry.execute(request, {
-        logger: logger.child(`Tool:${request.params.name}`),
+      return await toolRegistry.execute(normalizedRequest, {
+        logger: logger.child(`Tool:${normalizedRequest.params.name}`),
         requestId,
         cache,
         metrics,
@@ -129,31 +171,28 @@ export function createMiddlewareToolExecutionService(
     };
 
     try {
-      const result = (await middlewareFactory.executeMiddlewareStack(
-        middlewares,
-        context,
-        () =>
-          disableInlineRetry
-            ? executeTool()
-            : retry(executeTool, {
-                maxAttempts: 3,
-                baseDelay: 750,
-                maxDelay: 5_000,
-              }),
+      const result = (await middlewareFactory.executeMiddlewareStack(middlewares, context, () =>
+        disableInlineRetry
+          ? executeTool()
+          : retry(executeTool, {
+              maxAttempts: 3,
+              baseDelay: 750,
+              maxDelay: 5_000,
+            }),
       )) as CallToolResult;
 
       const duration = Date.now() - startTime;
       if (result.isError) {
-        throw new Error(extractToolErrorMessage(result, request.params.name));
+        throw new Error(extractToolErrorMessage(result, normalizedRequest.params.name));
       }
 
-      metrics.recordRequest(duration, false, `mcp.tool.${request.params.name}`);
-      logger.toolExecution(request.params.name, duration, true, { requestId });
+      metrics.recordRequest(duration, false, `mcp.tool.${normalizedRequest.params.name}`);
+      logger.toolExecution(normalizedRequest.params.name, duration, true, { requestId });
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      metrics.recordFailure(duration, `mcp.tool.${request.params.name}`);
-      logger.toolExecution(request.params.name, duration, false, {
+      metrics.recordFailure(duration, `mcp.tool.${normalizedRequest.params.name}`);
+      logger.toolExecution(normalizedRequest.params.name, duration, false, {
         requestId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -163,11 +202,13 @@ export function createMiddlewareToolExecutionService(
 
   return {
     execute: async (request, requestId) => {
-      if (isAsyncControlToolName(request.params.name)) {
-        return asyncWorkflow.handleControlToolCall(request);
+      const normalizedRequest = normalizeExecutableRequest(request, toolRegistry);
+
+      if (isAsyncControlToolName(normalizedRequest.params.name)) {
+        return asyncWorkflow.handleControlToolCall(normalizedRequest);
       }
 
-      const parsedRequest = parseAsyncExecutionDirective(request);
+      const parsedRequest = parseAsyncExecutionDirective(normalizedRequest);
       const principal = getPrincipalContext();
       if (parsedRequest.directive?.mode === 'async') {
         if (!asyncWorkflow.isEnabled()) {
