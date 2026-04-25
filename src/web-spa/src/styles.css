@@ -2189,6 +2189,14 @@ footer a {
   margin-bottom: 1.25rem;
 }
 
+.landing-command-caption {
+  margin: 0.6rem 0 0;
+  max-width: 36rem;
+  color: var(--landing-color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
 .landing-command-chip {
   color: var(--landing-color-blue-600);
 }

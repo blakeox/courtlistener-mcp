@@ -178,7 +178,12 @@
               "type": {
                 "default": "o",
                 "type": "string",
-                "enum": ["o", "r", "p", "oa"]
+                "enum": [
+                  "o",
+                  "r",
+                  "p",
+                  "oa"
+                ]
               },
               "query": {
                 "type": "string",
@@ -410,7 +415,9 @@
                 "maximum": 3
               }
             },
-            "required": ["case_id"]
+            "required": [
+              "case_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -454,10 +461,16 @@
               "format": {
                 "default": "text",
                 "type": "string",
-                "enum": ["text", "html", "pdf"]
+                "enum": [
+                  "text",
+                  "html",
+                  "pdf"
+                ]
               }
             },
-            "required": ["opinion_id"]
+            "required": [
+              "opinion_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -504,7 +517,10 @@
                 "type": "string"
               }
             },
-            "required": ["argument", "search_query"]
+            "required": [
+              "argument",
+              "search_query"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -552,7 +568,11 @@
               "direction": {
                 "default": "both",
                 "type": "string",
-                "enum": ["cited_by", "cites", "both"]
+                "enum": [
+                  "cited_by",
+                  "cites",
+                  "both"
+                ]
               },
               "limit": {
                 "default": 50,
@@ -561,7 +581,9 @@
                 "maximum": 100
               }
             },
-            "required": ["opinion_id"]
+            "required": [
+              "opinion_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -603,7 +625,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["citation"]
+            "required": [
+              "citation"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -643,7 +667,9 @@
                 ]
               }
             },
-            "required": ["opinion_id"]
+            "required": [
+              "opinion_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -683,7 +709,9 @@
                 ]
               }
             },
-            "required": ["opinion_id"]
+            "required": [
+              "opinion_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -717,7 +745,13 @@
               },
               "court_type": {
                 "type": "string",
-                "enum": ["federal", "state", "appellate", "district", "supreme"]
+                "enum": [
+                  "federal",
+                  "state",
+                  "appellate",
+                  "district",
+                  "supreme"
+                ]
               },
               "page": {
                 "default": 1,
@@ -839,7 +873,9 @@
                 ]
               }
             },
-            "required": ["judge_id"]
+            "required": [
+              "judge_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -943,7 +979,9 @@
                 ]
               }
             },
-            "required": ["position_id"]
+            "required": [
+              "position_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1409,7 +1447,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["docket_id"]
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1484,7 +1524,9 @@
                 "maximum": 100
               }
             },
-            "required": ["docket"]
+            "required": [
+              "docket"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1524,7 +1566,9 @@
                 ]
               }
             },
-            "required": ["entry_id"]
+            "required": [
+              "entry_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1578,7 +1622,9 @@
                 "maximum": 100
               }
             },
-            "required": ["docket_id"]
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1622,7 +1668,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["document_id"]
+            "required": [
+              "document_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1841,7 +1889,9 @@
                 "type": "string"
               }
             },
-            "required": ["docket"]
+            "required": [
+              "docket"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1936,7 +1986,9 @@
                 ]
               }
             },
-            "required": ["disclosure_id"]
+            "required": [
+              "disclosure_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -1984,7 +2036,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["docket_id"]
+            "required": [
+              "docket_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2015,7 +2069,12 @@
             "properties": {
               "action": {
                 "type": "string",
-                "enum": ["create", "list", "update", "delete"]
+                "enum": [
+                  "create",
+                  "list",
+                  "update",
+                  "delete"
+                ]
               },
               "alert_id": {
                 "anyOf": [
@@ -2032,14 +2091,24 @@
               },
               "frequency": {
                 "type": "string",
-                "enum": ["daily", "weekly", "monthly"]
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ]
               },
               "alert_type": {
                 "type": "string",
-                "enum": ["case", "opinion", "docket"]
+                "enum": [
+                  "case",
+                  "opinion",
+                  "docket"
+                ]
               }
             },
-            "required": ["action"]
+            "required": [
+              "action"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2146,7 +2215,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["oral_argument_id"]
+            "required": [
+              "oral_argument_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2214,7 +2285,9 @@
                 "type": "string"
               }
             },
-            "required": ["data_type"]
+            "required": [
+              "data_type"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2253,7 +2326,9 @@
                 "maximum": 50
               }
             },
-            "required": ["data_type"]
+            "required": [
+              "data_type"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2349,7 +2424,9 @@
                 ]
               }
             },
-            "required": ["judge_id"]
+            "required": [
+              "judge_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2389,7 +2466,9 @@
                 ]
               }
             },
-            "required": ["cluster_id"]
+            "required": [
+              "cluster_id"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2459,7 +2538,9 @@
                 "maximum": 100
               }
             },
-            "required": ["disclosure_type"],
+            "required": [
+              "disclosure_type"
+            ],
             "additionalProperties": {}
           },
           "annotations": {
@@ -2494,7 +2575,9 @@
                 "minLength": 1
               }
             },
-            "required": ["text"]
+            "required": [
+              "text"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2525,10 +2608,16 @@
             "properties": {
               "action": {
                 "type": "string",
-                "enum": ["fetch", "query", "email"]
+                "enum": [
+                  "fetch",
+                  "query",
+                  "email"
+                ]
               }
             },
-            "required": ["action"],
+            "required": [
+              "action"
+            ],
             "additionalProperties": {}
           },
           "annotations": {
@@ -2617,7 +2706,9 @@
                 "maximum": 20
               }
             },
-            "required": ["query"]
+            "required": [
+              "query"
+            ]
           },
           "annotations": {
             "readOnlyHint": true,
@@ -2651,7 +2742,9 @@
                 "description": "Async job ID returned by async tool execution"
               }
             },
-            "required": ["jobId"]
+            "required": [
+              "jobId"
+            ]
           },
           "execution": {
             "taskSupport": "forbidden"
@@ -2679,7 +2772,9 @@
                 "description": "Async job ID returned by async tool execution"
               }
             },
-            "required": ["jobId"]
+            "required": [
+              "jobId"
+            ]
           },
           "execution": {
             "taskSupport": "forbidden"
@@ -2707,7 +2802,9 @@
                 "description": "Async job ID returned by async tool execution"
               }
             },
-            "required": ["jobId"]
+            "required": [
+              "jobId"
+            ]
           },
           "execution": {
             "taskSupport": "forbidden"
@@ -2751,8 +2848,13 @@
           "title": "Example Opinion 123456",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "opinion"],
-              "examples": ["courtlistener://opinion/123456"],
+              "tags": [
+                "resource",
+                "opinion"
+              ],
+              "examples": [
+                "courtlistener://opinion/123456"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://opinion/{id}",
                 "dynamic": true
@@ -2768,8 +2870,14 @@
           "title": "Opinion Schema",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "courtlistener", "schemas"],
-              "examples": ["courtlistener://schema/opinion"],
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/opinion"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://schema/{type}",
                 "dynamic": true
@@ -2785,8 +2893,14 @@
           "title": "Docket Schema",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "courtlistener", "schemas"],
-              "examples": ["courtlistener://schema/docket"],
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/docket"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://schema/{type}",
                 "dynamic": true
@@ -2802,8 +2916,14 @@
           "title": "Court Schema",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "courtlistener", "schemas"],
-              "examples": ["courtlistener://schema/court"],
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/court"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://schema/{type}",
                 "dynamic": true
@@ -2819,8 +2939,14 @@
           "title": "Judge Schema",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "courtlistener", "schemas"],
-              "examples": ["courtlistener://schema/judge"],
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/judge"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://schema/{type}",
                 "dynamic": true
@@ -2836,8 +2962,14 @@
           "title": "Search-params Schema",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "courtlistener", "schemas"],
-              "examples": ["courtlistener://schema/search-params"],
+              "tags": [
+                "resource",
+                "courtlistener",
+                "schemas"
+              ],
+              "examples": [
+                "courtlistener://schema/search-params"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://schema/{type}",
                 "dynamic": true
@@ -2853,8 +2985,13 @@
           "title": "Example Case 123456",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "case"],
-              "examples": ["courtlistener://case/123456"],
+              "tags": [
+                "resource",
+                "case"
+              ],
+              "examples": [
+                "courtlistener://case/123456"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://case/{id}",
                 "dynamic": true
@@ -2870,8 +3007,13 @@
           "title": "Example Docket 123456",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "docket"],
-              "examples": ["courtlistener://docket/123456"],
+              "tags": [
+                "resource",
+                "docket"
+              ],
+              "examples": [
+                "courtlistener://docket/123456"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://docket/{id}",
                 "dynamic": true
@@ -2887,8 +3029,13 @@
           "title": "Example Court (SCOTUS)",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "court"],
-              "examples": ["courtlistener://court/scotus"],
+              "tags": [
+                "resource",
+                "court"
+              ],
+              "examples": [
+                "courtlistener://court/scotus"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://court/{id}",
                 "dynamic": true
@@ -2904,8 +3051,13 @@
           "title": "Example Judge 123456",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "judge"],
-              "examples": ["courtlistener://judge/123456"],
+              "tags": [
+                "resource",
+                "judge"
+              ],
+              "examples": [
+                "courtlistener://judge/123456"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://judge/{id}",
                 "dynamic": true
@@ -2921,8 +3073,14 @@
           "title": "Recent Opinions",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "recent", "opinions"],
-              "examples": ["courtlistener://search/recent"],
+              "tags": [
+                "resource",
+                "recent",
+                "opinions"
+              ],
+              "examples": [
+                "courtlistener://search/recent"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://search/recent",
                 "dynamic": false
@@ -2938,8 +3096,14 @@
           "title": "API Status",
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["resource", "api", "status"],
-              "examples": ["courtlistener://api/status"],
+              "tags": [
+                "resource",
+                "api",
+                "status"
+              ],
+              "examples": [
+                "courtlistener://api/status"
+              ],
               "descriptors": {
                 "uriTemplate": "courtlistener://api/status",
                 "dynamic": false
@@ -2969,7 +3133,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "legal", "assistant", "focus_area", "jurisdiction"],
+              "tags": [
+                "prompt",
+                "legal",
+                "assistant",
+                "focus_area",
+                "jurisdiction"
+              ],
               "examples": [
                 {
                   "description": "Run legal_assistant with starter arguments",
@@ -3004,7 +3174,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "summarize", "statute", "statute_text", "jurisdiction"],
+              "tags": [
+                "prompt",
+                "summarize",
+                "statute",
+                "statute_text",
+                "jurisdiction"
+              ],
               "examples": [
                 {
                   "description": "Run summarize-statute with starter arguments",
@@ -3016,7 +3192,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["statute_text"]
+                "requiredArguments": [
+                  "statute_text"
+                ]
               }
             }
           }
@@ -3039,7 +3217,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "compare", "precedents", "case_citations", "focus_issue"],
+              "tags": [
+                "prompt",
+                "compare",
+                "precedents",
+                "case_citations",
+                "focus_issue"
+              ],
               "examples": [
                 {
                   "description": "Run compare-precedents with starter arguments",
@@ -3051,7 +3235,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["case_citations"]
+                "requiredArguments": [
+                  "case_citations"
+                ]
               }
             }
           }
@@ -3074,7 +3260,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "analyze", "case", "case_citation", "analysis_type"],
+              "tags": [
+                "prompt",
+                "analyze",
+                "case",
+                "case_citation",
+                "analysis_type"
+              ],
               "examples": [
                 {
                   "description": "Run analyze-case with starter arguments",
@@ -3086,7 +3278,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["case_citation"]
+                "requiredArguments": [
+                  "case_citation"
+                ]
               }
             }
           }
@@ -3135,7 +3329,10 @@
               ],
               "descriptors": {
                 "argumentCount": 3,
-                "requiredArguments": ["section_type", "key_points"]
+                "requiredArguments": [
+                  "section_type",
+                  "key_points"
+                ]
               }
             }
           }
@@ -3158,7 +3355,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "identify", "issues", "fact_pattern", "jurisdiction"],
+              "tags": [
+                "prompt",
+                "identify",
+                "issues",
+                "fact_pattern",
+                "jurisdiction"
+              ],
               "examples": [
                 {
                   "description": "Run identify-issues with starter arguments",
@@ -3170,7 +3373,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["fact_pattern"]
+                "requiredArguments": [
+                  "fact_pattern"
+                ]
               }
             }
           }
@@ -3193,7 +3398,14 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "legal", "research", "workflow", "topic", "jurisdiction"],
+              "tags": [
+                "prompt",
+                "legal",
+                "research",
+                "workflow",
+                "topic",
+                "jurisdiction"
+              ],
               "examples": [
                 {
                   "description": "Run legal_research_workflow with starter arguments",
@@ -3205,7 +3417,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["topic"]
+                "requiredArguments": [
+                  "topic"
+                ]
               }
             }
           }
@@ -3223,7 +3437,12 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "citation", "analysis", "case_citation"],
+              "tags": [
+                "prompt",
+                "citation",
+                "analysis",
+                "case_citation"
+              ],
               "examples": [
                 {
                   "description": "Run citation_analysis with starter arguments",
@@ -3234,7 +3453,9 @@
               ],
               "descriptors": {
                 "argumentCount": 1,
-                "requiredArguments": ["case_citation"]
+                "requiredArguments": [
+                  "case_citation"
+                ]
               }
             }
           }
@@ -3257,7 +3478,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "jurisdiction", "comparison", "legal_issue", "jurisdictions"],
+              "tags": [
+                "prompt",
+                "jurisdiction",
+                "comparison",
+                "legal_issue",
+                "jurisdictions"
+              ],
               "examples": [
                 {
                   "description": "Run jurisdiction_comparison with starter arguments",
@@ -3269,7 +3496,10 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["legal_issue", "jurisdictions"]
+                "requiredArguments": [
+                  "legal_issue",
+                  "jurisdictions"
+                ]
               }
             }
           }
@@ -3287,7 +3517,12 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "case", "brief", "opinion_id"],
+              "tags": [
+                "prompt",
+                "case",
+                "brief",
+                "opinion_id"
+              ],
               "examples": [
                 {
                   "description": "Run case_brief with starter arguments",
@@ -3298,7 +3533,9 @@
               ],
               "descriptors": {
                 "argumentCount": 1,
-                "requiredArguments": ["opinion_id"]
+                "requiredArguments": [
+                  "opinion_id"
+                ]
               }
             }
           }
@@ -3321,7 +3558,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "motion", "drafting", "motion_type", "supporting_cases"],
+              "tags": [
+                "prompt",
+                "motion",
+                "drafting",
+                "motion_type",
+                "supporting_cases"
+              ],
               "examples": [
                 {
                   "description": "Run motion_drafting with starter arguments",
@@ -3333,7 +3576,9 @@
               ],
               "descriptors": {
                 "argumentCount": 2,
-                "requiredArguments": ["motion_type"]
+                "requiredArguments": [
+                  "motion_type"
+                ]
               }
             }
           }
@@ -3351,7 +3596,13 @@
           ],
           "_meta": {
             "courtlistener/discoverability": {
-              "tags": ["prompt", "judicial", "due", "diligence", "judge_name"],
+              "tags": [
+                "prompt",
+                "judicial",
+                "due",
+                "diligence",
+                "judge_name"
+              ],
               "examples": [
                 {
                   "description": "Run judicial_due_diligence with starter arguments",
@@ -3362,7 +3613,9 @@
               ],
               "descriptors": {
                 "argumentCount": 1,
-                "requiredArguments": ["judge_name"]
+                "requiredArguments": [
+                  "judge_name"
+                ]
               }
             }
           }

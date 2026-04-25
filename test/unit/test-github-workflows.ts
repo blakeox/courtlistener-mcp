@@ -63,6 +63,15 @@ describe('GitHub workflow hardening', () => {
     assert.doesNotMatch(inspectorWorkflow, /ci-test-mcp-inspector\.js/);
   });
 
+  it('does not advertise an unpublished npm install path in the README', () => {
+    const readme = read('../../README.md');
+
+    assert.doesNotMatch(readme, /npx courtlistener-mcp/);
+    assert.match(readme, /Run locally from a checkout/);
+    assert.match(readme, /node dist\/index\.js --setup/);
+    assert.match(readme, /node dist\/http\.js/);
+  });
+
   it('runs browser auth coverage in CI on the dedicated browser-auth job', () => {
     const workflow = read('../../.github/workflows/ci.yml');
 

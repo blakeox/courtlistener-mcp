@@ -4,7 +4,8 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const REPOSITORY_URL = 'https://github.com/blakeox/courtlistener-mcp';
 const DOCUMENTATION_URL = `${REPOSITORY_URL}#readme`;
-const INSTALL_COMMAND = 'npx -y courtlistener-mcp';
+const INSTALL_COMMAND =
+  'git clone https://github.com/blakeox/courtlistener-mcp.git && cd courtlistener-mcp && pnpm install && pnpm build';
 const featureItems = [
   {
     title: 'Search Opinions',
@@ -49,7 +50,7 @@ const trustItems = [
 const openSourceStats = [
   { label: 'Repository', value: 'blakeox/courtlistener-mcp' },
   { label: 'License', value: 'MIT' },
-  { label: 'Install', value: 'npx-ready' },
+  { label: 'Install', value: 'Source checkout' },
 ] as const;
 
 const setupClients = [
@@ -60,7 +61,7 @@ const setupClients = [
     description:
       'Add CourtListener MCP to Claude Desktop so local or hosted AI workflows can query federal court data through MCP.',
     steps: [
-      'Run the package once with npx to verify the command resolves cleanly.',
+      'Clone the repository, install dependencies with pnpm, and build the dist output.',
       'Add the JSON snippet below to your Claude Desktop MCP configuration.',
       'Restart Claude Desktop and confirm CourtListener appears as an available MCP server.',
     ],
@@ -73,7 +74,7 @@ const setupClients = [
       'Wire the server into Cursor for research-heavy drafting, citation checks, and legal context directly inside developer workflows.',
     steps: [
       'Open Cursor MCP settings or client configuration.',
-      'Register the courtlistener server with the same npx command and args.',
+      'Register the courtlistener server with the same node command, args, and cwd.',
       'Reload Cursor, then verify tool discovery succeeds before relying on the workflow.',
     ],
   },
@@ -85,7 +86,7 @@ const setupClients = [
       'Use the same MCP server definition in any compatible client that accepts command-based MCP server registrations.',
     steps: [
       'Create a new MCP server entry in your client settings.',
-      'Use the npx command and args shown here with the server name courtlistener.',
+      'Use the node command, args, and cwd shown here with the server name courtlistener.',
       'Verify the client can enumerate tools before using the server in research flows.',
     ],
   },
@@ -97,7 +98,7 @@ const setupClients = [
       'Run the package directly during local development when you want to test the server or inspect MCP behavior end to end.',
     steps: [
       'Clone the repository and install dependencies with pnpm.',
-      'Use the same npx entrypoint for quick validation or run local scripts for development workflows.',
+      'Use node dist/index.js for quick validation or run local scripts for development workflows.',
       'Point your MCP-capable client at the local command while iterating on tools and auth posture.',
     ],
   },
@@ -251,8 +252,8 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
               <span className="landing-section-label">Developer setup</span>
               <h2>Add CourtListener MCP to your AI client</h2>
               <p>
-                Start with the standard MCP server definition, then register it in the client you
-                already use for research or developer workflows.
+                Start from the source checkout workflow below, then register the built MCP server in
+                the client you already use for research or developer workflows.
               </p>
             </div>
 
@@ -294,6 +295,10 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   <div>
                     <span className="landing-section-label">Install command</span>
                     <h3>{INSTALL_COMMAND}</h3>
+                    <p className="landing-command-caption">
+                      The npm package is not published yet, so local stdio setup currently runs from
+                      a repository checkout.
+                    </p>
                   </div>
                   <span className="landing-command-chip">MCP server</span>
                 </div>
@@ -417,13 +422,19 @@ function CodeBlock(): React.JSX.Element {
         {'      '}
         <span className="landing-code-key">"command"</span>
         <span className="landing-code-punctuation">:</span>{' '}
-        <span className="landing-code-string">"npx"</span>
+        <span className="landing-code-string">"node"</span>
         <span className="landing-code-punctuation">,</span>
         {'\n'}
         {'      '}
         <span className="landing-code-key">"args"</span>
         <span className="landing-code-punctuation">:</span>{' '}
-        <span className="landing-code-array">["-y", "courtlistener-mcp"]</span>
+        <span className="landing-code-array">["dist/index.js"]</span>
+        <span className="landing-code-punctuation">,</span>
+        {'\n'}
+        {'      '}
+        <span className="landing-code-key">"cwd"</span>
+        <span className="landing-code-punctuation">:</span>{' '}
+        <span className="landing-code-string">"/path/to/courtlistener-mcp"</span>
         {'\n'}
         {'    '}
         <span className="landing-code-punctuation">{'}'}</span>

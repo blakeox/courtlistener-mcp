@@ -6,5 +6,17 @@
     "noEmit": true
   },
   "include": ["src", "test", "*.ts"],
-  "exclude": ["node_modules", "dist", "dist-test"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-test",
+    "**/* 2.ts",
+    "**/* 3.ts",
+    "**/* 4.ts",
+    "**/* 5.ts",
+    "**/* 6.ts",
+    "**/* 7.ts",
+    "**/* 8.ts",
+    "**/* 9.ts"
+  ]
 }

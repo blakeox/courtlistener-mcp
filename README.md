@@ -43,28 +43,41 @@ the server locally:
 }
 ```
 
-### 2. Run locally with `npx`
+### 2. Run locally from a checkout
 
-Best for privacy, local development, and bring-your-own-auth setups:
-
-```bash
-npx courtlistener-mcp --setup
-```
-
-Or run directly:
-
-```bash
-npx courtlistener-mcp
-```
-
-### 3. Self-host from source
+Best for privacy, local development, and bring-your-own-auth setups. The npm
+package is not currently published, so the local `stdio` server should be run
+from this repository checkout:
 
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
 cd courtlistener-mcp
 pnpm install
 pnpm build
+node dist/index.js --setup
+```
+
+Or run it directly:
+
+```bash
 node dist/index.js
+```
+
+If you want a local shell command after building:
+
+```bash
+npm link
+courtlistener-mcp --setup
+```
+
+### 3. Self-host the HTTP runtime from source
+
+```bash
+git clone https://github.com/blakeox/courtlistener-mcp.git
+cd courtlistener-mcp
+pnpm install
+pnpm build
+node dist/http.js
 ```
 
 ### 4. Self-host with Docker

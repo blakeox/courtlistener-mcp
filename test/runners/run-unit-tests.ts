@@ -8,12 +8,16 @@
 
 import { spawn } from 'child_process';
 import fs from 'fs';
+import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.join(__dirname, '../..');
+const require = createRequire(import.meta.url);
+const tsxPackageJsonPath = require.resolve('tsx/package.json');
+const tsxCliPath = path.join(path.dirname(tsxPackageJsonPath), 'dist', 'cli.mjs');
 
 interface TestResult {
   file: string;
@@ -28,6 +32,7 @@ class UnitTestRunner {
   private totalTests = 0;
   private passedTests = 0;
   private failedTests = 0;
+  private readonly backupCopyPattern = / \d+\.ts$/;
 
   async runAllTests(): Promise<void> {
     console.log('🧪 Running Legal MCP Server Unit Tests');
@@ -44,8 +49,13 @@ class UnitTestRunner {
     const testFiles = fs
       .readdirSync(testDir)
       .filter((file) => {
-        // Only TypeScript test files
-        return file.startsWith('test-') && file.endsWith('.ts');
+        // Only real TypeScript test files; ignore local backup copies such as
+        // "test-foo 3.ts" that can appear in shared worktrees.
+        return (
+          file.startsWith('test-') &&
+          file.endsWith('.ts') &&
+          !this.backupCopyPattern.test(file)
+        );
       })
       .filter((file) => {
         // Skip empty test files
@@ -84,22 +94,23 @@ class UnitTestRunner {
     const testPath = path.join(projectRoot, 'test', 'unit', testFile);
 
     return new Promise((resolve) => {
-      // Use tsx directly to avoid npx wrapper issues with process cleanup
-      const command = path.join(projectRoot, 'node_modules', '.bin', 'tsx');
-      const args = ['--test', testPath];
+      // Use tsx directly to avoid npx wrapper issues with process cleanup.
+      // Detached subprocesses can exit with code 1 on macOS even when the same
+      // test passes normally, so keep the child attached and kill it directly
+      // on timeout.
+      const command = process.execPath;
+      const args = [tsxCliPath, '--test', testPath];
 
       const child = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: projectRoot,
-        detached: true,
       });
 
-      // Add a timeout to prevent hanging tests
-      // Kill entire process group to avoid orphaned child processes
+      // Add a timeout to prevent hanging tests.
       const timeout = setTimeout(() => {
         console.log(`   ⏰ ${testFile} - TIMEOUT (killing process)`);
         try {
-          process.kill(-child.pid!, 'SIGKILL');
+          child.kill('SIGKILL');
         } catch {
           /* already exited */
         }
