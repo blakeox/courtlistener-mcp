@@ -6,6 +6,10 @@ function read(relativePath: string): string {
   return fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 }
 
+function listWorkflowFiles(): string[] {
+  return fs.readdirSync(new URL('../../.github/workflows/', import.meta.url));
+}
+
 describe('GitHub workflow hardening', () => {
   it('treats src/auth changes as auth-related CI changes', () => {
     const workflow = read('../../.github/workflows/ci.yml');
@@ -17,10 +21,15 @@ describe('GitHub workflow hardening', () => {
 
   it('publishes only from the validated release workflow', () => {
     const releaseWorkflow = read('../../.github/workflows/release.yml');
+    const workflowFiles = listWorkflowFiles();
+    const strayPublishWorkflows = workflowFiles.filter((file) =>
+      /^publish(?:\s.*)?\.ya?ml$/iu.test(file),
+    );
 
-    assert.equal(
-      fs.existsSync(new URL('../../.github/workflows/publish.yml', import.meta.url)),
-      false,
+    assert.deepEqual(
+      strayPublishWorkflows,
+      [],
+      `unexpected publish workflow files: ${strayPublishWorkflows.join(', ')}`,
     );
     assert.match(releaseWorkflow, /publish-npm:/);
     assert.match(releaseWorkflow, /publish-docker:/);
