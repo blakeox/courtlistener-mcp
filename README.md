@@ -93,7 +93,7 @@ docker compose -f docker-compose.prod.yml up -d
 ## Publishing to npm
 
 This repository is configured to publish from `.github/workflows/release.yml` when you push a
-version tag such as `v1.0.3`.
+version tag such as `v1.0.4`.
 
 You have two supported auth paths:
 
@@ -105,8 +105,8 @@ You have two supported auth paths:
 Once one of those is configured, publish with:
 
 ```bash
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.0.4
+git push origin v1.0.4
 ```
 
 ## Deployment Modes

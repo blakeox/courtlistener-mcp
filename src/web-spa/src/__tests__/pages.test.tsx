@@ -177,7 +177,7 @@ describe('OnboardingPage', () => {
         body: {
           result: {
             protocolVersion: '2025-06-18',
-            serverInfo: { name: 'courtlistener-mcp', version: '1.0.3' },
+            serverInfo: { name: 'courtlistener-mcp', version: '1.0.4' },
             capabilities: {
               tools: {},
               resources: { subscribe: true, listChanged: true },
@@ -314,7 +314,7 @@ describe('OnboardingPage', () => {
         body: {
           result: {
             protocolVersion: '2024-11-05',
-            serverInfo: { name: 'courtlistener-mcp', version: '1.0.3' },
+            serverInfo: { name: 'courtlistener-mcp', version: '1.0.4' },
             capabilities: { tools: {} },
           },
         },
@@ -397,7 +397,7 @@ describe('AccountPage', () => {
         body: {
           result: {
             protocolVersion: '2025-06-18',
-            serverInfo: { name: 'courtlistener-mcp', version: '1.0.3' },
+            serverInfo: { name: 'courtlistener-mcp', version: '1.0.4' },
             capabilities: { tools: {}, prompts: { listChanged: true } },
           },
         },
@@ -447,7 +447,7 @@ describe('AccountPage', () => {
         body: {
           result: {
             protocolVersion: '2024-11-05',
-            serverInfo: { name: 'courtlistener-mcp', version: '1.0.3' },
+            serverInfo: { name: 'courtlistener-mcp', version: '1.0.4' },
             capabilities: { tools: {} },
           },
         },

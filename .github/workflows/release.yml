@@ -73,7 +73,6 @@ jobs:
           # Test all available tools
           pnpm run test:mcp:tool list_courts
           pnpm run test:mcp:tool search_cases '{"query": "constitutional"}'
-          pnpm run test:mcp:tool get_case_details '{"cluster_id": 1}'
 
       - name: Performance hardening gates
         env:

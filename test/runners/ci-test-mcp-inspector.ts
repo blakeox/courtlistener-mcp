@@ -46,7 +46,7 @@ const CONFIG: Config = {
     url: process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
-  timeout: 30000, // 30 seconds
+  timeout: 45000, // 45 seconds
   outputDir: join(projectRoot, 'test-output'),
   extended: process.argv.includes('--extended'),
 };

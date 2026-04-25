@@ -1,7 +1,7 @@
 {
   "server": {
     "name": "courtlistener-mcp",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Legal research MCP server providing comprehensive access to CourtListener legal database"
   },
   "capabilities": {
