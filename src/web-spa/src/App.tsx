@@ -8,6 +8,7 @@ import { OnboardingPage } from './pages/OnboardingPage';
 import { PlaygroundPage } from './pages/PlaygroundPage';
 import { AccountPage } from './pages/AccountPage';
 import { HostedAuthRedirectPage } from './pages/HostedAuthRedirectPage';
+import { LandingPage } from './pages/LandingPage';
 import { useAuth } from './lib/auth';
 import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
@@ -36,6 +37,7 @@ function AppContent(): React.JSX.Element {
   const { session, loading: sessionLoading, sessionReady } = useAuth();
   const { token } = useToken();
   const location = useLocation();
+  const isAppRoute = location.pathname === '/app' || location.pathname.startsWith('/app/');
 
   const hasVerifiedAndLoggedIn = Boolean(session?.authenticated);
   const hasToken = Boolean(token.trim());
@@ -47,8 +49,8 @@ function AppContent(): React.JSX.Element {
     retry: false,
   });
   const hasProtocolMismatch = Boolean(
-    mcpReadinessQuery.data?.protocolVersion
-      && mcpReadinessQuery.data.protocolVersion !== expectedProtocolVersion,
+    mcpReadinessQuery.data?.protocolVersion &&
+    mcpReadinessQuery.data.protocolVersion !== expectedProtocolVersion,
   );
   const hasMcpSuccess = Boolean(mcpReadinessQuery.data?.ready) && !hasProtocolMismatch;
   const isPath = (paths: string[]): boolean => paths.includes(location.pathname);
@@ -74,9 +76,32 @@ function AppContent(): React.JSX.Element {
       disabled: !hasToken,
     },
   ];
-  const smartRedirectElement = sessionLoading || !sessionReady
-    ? <PageLoader />
-    : <SmartRedirect hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasToken={hasToken} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />;
+  const smartRedirectElement =
+    sessionLoading || !sessionReady ? (
+      <PageLoader />
+    ) : (
+      <SmartRedirect
+        hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn}
+        hasToken={hasToken}
+        hasMcpSuccess={hasMcpSuccess}
+        hasProtocolMismatch={hasProtocolMismatch}
+      />
+    );
+
+  if (!isAppRoute) {
+    return (
+      <ErrorBoundary>
+        <React.Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/get-started" element={<LandingPage initialSectionId="setup" />} />
+            <Route path="/account" element={<Navigate to="/app/account" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </React.Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <Shell steps={steps}>
@@ -100,7 +125,12 @@ function AppContent(): React.JSX.Element {
   );
 }
 
-function SmartRedirect(props: { hasVerifiedAndLoggedIn: boolean; hasToken: boolean; hasMcpSuccess: boolean; hasProtocolMismatch: boolean }): React.JSX.Element {
+function SmartRedirect(props: {
+  hasVerifiedAndLoggedIn: boolean;
+  hasToken: boolean;
+  hasMcpSuccess: boolean;
+  hasProtocolMismatch: boolean;
+}): React.JSX.Element {
   let target = '/app/control-center';
   if (props.hasMcpSuccess) target = '/app/control-center';
   else if (props.hasProtocolMismatch) target = '/app/control-center';

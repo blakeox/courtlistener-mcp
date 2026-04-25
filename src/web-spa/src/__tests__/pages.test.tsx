@@ -9,7 +9,9 @@ import { createTestQueryClient, stubBrowserStorage } from './test-utils';
 
 // Mock the API module to avoid real fetches
 vi.mock('../lib/api', () => ({
-  getSession: vi.fn().mockResolvedValue({ authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' }),
+  getSession: vi
+    .fn()
+    .mockResolvedValue({ authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' }),
   getUsage: vi.fn().mockResolvedValue({
     userId: 'u1',
     totalRequests: 0,
@@ -20,10 +22,32 @@ vi.mock('../lib/api', () => ({
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn().mockResolvedValue({ message: 'ok', api_key: { id: 'k1', label: 'test', created_at: '2024-01-01', expires_at: null, token: 'tok' } }),
+  createKey: vi
+    .fn()
+    .mockResolvedValue({
+      message: 'ok',
+      api_key: {
+        id: 'k1',
+        label: 'test',
+        created_at: '2024-01-01',
+        expires_at: null,
+        token: 'tok',
+      },
+    }),
   revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
-  aiChat: vi.fn().mockResolvedValue({ test_mode: true, fallback_used: false, mode: 'cheap', tool: 'search_cases', tool_reason: 'Default search', session_id: 'sid', ai_response: 'resp', mcp_result: {} }),
+  aiChat: vi
+    .fn()
+    .mockResolvedValue({
+      test_mode: true,
+      fallback_used: false,
+      mode: 'cheap',
+      tool: 'search_cases',
+      tool_reason: 'Default search',
+      session_id: 'sid',
+      ai_response: 'resp',
+      mcp_result: {},
+    }),
   aiPlain: vi.fn().mockResolvedValue({ ai_response: 'plain resp', mode: 'cheap' }),
   toErrorMessage: vi.fn().mockReturnValue('Error'),
 }));
@@ -78,7 +102,10 @@ describe('HostedAuthRedirectPage', () => {
     const { HostedAuthRedirectPage } = await import('../pages/HostedAuthRedirectPage');
     render(<HostedAuthRedirectPage />, { wrapper: Wrapper });
     expect(screen.getByText('Redirecting to sign in')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
+    expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
     await waitFor(() => {
       expect(hostedAuth.redirectToHostedAuth).toHaveBeenCalledTimes(1);
     });
@@ -87,7 +114,9 @@ describe('HostedAuthRedirectPage', () => {
   it('explains that the route now redirects into hosted auth', async () => {
     const { HostedAuthRedirectPage } = await import('../pages/HostedAuthRedirectPage');
     render(<HostedAuthRedirectPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/this app route has been retired in favor of the hosted auth flow/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/this app route has been retired in favor of the hosted auth flow/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/legacy/i)).not.toBeInTheDocument();
   });
 });
@@ -132,7 +161,16 @@ describe('OnboardingPage', () => {
     const api = await import('../lib/api');
     vi.mocked(api.listKeys).mockResolvedValueOnce({
       user_id: 'u1',
-      keys: [{ id: 'k1', label: 'Primary', is_active: true, revoked_at: null, expires_at: null, created_at: '2024-01-01' }],
+      keys: [
+        {
+          id: 'k1',
+          label: 'Primary',
+          is_active: true,
+          revoked_at: null,
+          expires_at: null,
+          created_at: '2024-01-01',
+        },
+      ],
     });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
@@ -152,16 +190,18 @@ describe('OnboardingPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            tools: [{
-              name: 'search_cases',
-              description: 'Search legal cases',
-              inputSchema: {
-                type: 'object',
-                properties: { page_size: { type: 'integer', minimum: 1, maximum: 20 } },
-                required: ['page_size'],
+            tools: [
+              {
+                name: 'search_cases',
+                description: 'Search legal cases',
+                inputSchema: {
+                  type: 'object',
+                  properties: { page_size: { type: 'integer', minimum: 1, maximum: 20 } },
+                  required: ['page_size'],
+                },
+                metadata: { category: 'search' },
               },
-              metadata: { category: 'search' },
-            }],
+            ],
             metadata: { categories: ['search'] },
           },
         },
@@ -170,7 +210,9 @@ describe('OnboardingPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            resources: [{ uri: 'courtlistener://status', name: 'status', description: 'Service status' }],
+            resources: [
+              { uri: 'courtlistener://status', name: 'status', description: 'Service status' },
+            ],
           },
         },
         sessionId: 'sid-observe',
@@ -178,7 +220,13 @@ describe('OnboardingPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            prompts: [{ name: 'summarize_case', description: 'Summarize opinion', arguments: [{ name: 'citation' }] }],
+            prompts: [
+              {
+                name: 'summarize_case',
+                description: 'Summarize opinion',
+                arguments: [{ name: 'citation' }],
+              },
+            ],
           },
         },
         sessionId: 'sid-observe',
@@ -211,9 +259,15 @@ describe('OnboardingPage', () => {
     render(<OnboardingPage />, { wrapper: Wrapper });
 
     expect(screen.getByText(/no operator session/i)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
     expect(screen.getByRole('button', { name: /clear local credential/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open account page/i })).toHaveAttribute('href', '/app/account');
+    expect(screen.getByRole('link', { name: /open account page/i })).toHaveAttribute(
+      'href',
+      '/app/account',
+    );
     expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
   });
 
@@ -244,7 +298,16 @@ describe('OnboardingPage', () => {
     const api = await import('../lib/api');
     vi.mocked(api.listKeys).mockResolvedValueOnce({
       user_id: 'u1',
-      keys: [{ id: 'k1', label: 'Primary', is_active: true, revoked_at: null, expires_at: null, created_at: '2024-01-01' }],
+      keys: [
+        {
+          id: 'k1',
+          label: 'Primary',
+          is_active: true,
+          revoked_at: null,
+          expires_at: null,
+          created_at: '2024-01-01',
+        },
+      ],
     });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
@@ -257,7 +320,14 @@ describe('OnboardingPage', () => {
         },
         sessionId: 'sid-mismatch',
       })
-      .mockResolvedValueOnce({ body: { result: { tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }] } }, sessionId: 'sid-mismatch' })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }],
+          },
+        },
+        sessionId: 'sid-mismatch',
+      })
       .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-mismatch' })
       .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-mismatch' });
 
@@ -268,6 +338,34 @@ describe('OnboardingPage', () => {
       expect(screen.getAllByText(/protocol mismatch detected/i).length).toBeGreaterThan(0);
       expect(screen.getByText(/blocked by protocol mismatch/i)).toBeInTheDocument();
     });
+  });
+});
+
+describe('LandingPage', () => {
+  beforeEach(() => {
+    stubBrowserStorage();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders the public landing page hero and core setup copy', async () => {
+    const { LandingPage } = await import('../pages/LandingPage');
+    render(<LandingPage />, { wrapper: Wrapper });
+    expect(
+      screen.getByRole('heading', { name: /connect ai to the law\. responsibly\./i, level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /secure, structured access to u\.s\. federal court data via the model context protocol/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute(
+      'href',
+      '/get-started',
+    );
+    expect(screen.getByText(/search opinions/i)).toBeInTheDocument();
   });
 });
 
@@ -308,16 +406,28 @@ describe('AccountPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            tools: [{
-              name: 'search_cases',
-              inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
-            }],
+            tools: [
+              {
+                name: 'search_cases',
+                inputSchema: {
+                  type: 'object',
+                  properties: { q: { type: 'string' } },
+                  required: ['q'],
+                },
+              },
+            ],
           },
         },
         sessionId: 'sid-account',
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [{ uri: 'courtlistener://status', name: 'status' }] } }, sessionId: 'sid-account' })
-      .mockResolvedValueOnce({ body: { result: { prompts: [{ name: 'summarize_case', arguments: [] }] } }, sessionId: 'sid-account' });
+      .mockResolvedValueOnce({
+        body: { result: { resources: [{ uri: 'courtlistener://status', name: 'status' }] } },
+        sessionId: 'sid-account',
+      })
+      .mockResolvedValueOnce({
+        body: { result: { prompts: [{ name: 'summarize_case', arguments: [] }] } },
+        sessionId: 'sid-account',
+      });
 
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
@@ -343,7 +453,14 @@ describe('AccountPage', () => {
         },
         sessionId: 'sid-account',
       })
-      .mockResolvedValueOnce({ body: { result: { tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }] } }, sessionId: 'sid-account' })
+      .mockResolvedValueOnce({
+        body: {
+          result: {
+            tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }],
+          },
+        },
+        sessionId: 'sid-account',
+      })
       .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-account' })
       .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-account' });
 
@@ -424,7 +541,9 @@ describe('KeysPage', () => {
 });
 
 describe('PlaygroundPage', () => {
-  function asyncJobSnapshot(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  function asyncJobSnapshot(
+    overrides: Partial<Record<string, unknown>> = {},
+  ): Record<string, unknown> {
     return {
       id: 'job-1',
       status: 'queued',
@@ -438,7 +557,10 @@ describe('PlaygroundPage', () => {
     };
   }
 
-  function asyncEnvelope(job: Record<string, unknown>, extras: Record<string, unknown> = {}): { body: unknown; sessionId: string } {
+  function asyncEnvelope(
+    job: Record<string, unknown>,
+    extras: Record<string, unknown> = {},
+  ): { body: unknown; sessionId: string } {
     return {
       body: {
         result: {
@@ -537,7 +659,10 @@ describe('PlaygroundPage', () => {
   });
 
   it('shows recent prompts when stored locally', async () => {
-    localStorage.setItem('clmcp_recent_ai_prompts', JSON.stringify(['Find recent cases about ADA website accessibility']));
+    localStorage.setItem(
+      'clmcp_recent_ai_prompts',
+      JSON.stringify(['Find recent cases about ADA website accessibility']),
+    );
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
     expect(screen.getByText(/recent prompts/i)).toBeInTheDocument();
@@ -595,7 +720,8 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'tools/list')
+        return { body: { result: { tools: [] } }, sessionId: 'sid' };
       if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
       if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
       if (args.params.name === 'mcp_async_cancel_job') {
@@ -613,7 +739,11 @@ describe('PlaygroundPage', () => {
           }),
         );
       }
-      if (args.params.name === 'search_cases' && args.params.arguments && '__mcp_async' in args.params.arguments) {
+      if (
+        args.params.name === 'search_cases' &&
+        args.params.arguments &&
+        '__mcp_async' in args.params.arguments
+      ) {
         const requestedJobId = (args.id as number) > 3 ? 'job-2' : 'job-1';
         return asyncEnvelope(asyncJobSnapshot({ id: requestedJobId }));
       }
@@ -639,10 +769,12 @@ describe('PlaygroundPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     await waitFor(() => {
-      expect(vi.mocked(api.mcpCall).mock.calls.some(([call]) => {
-        const payload = call as { method?: string; params?: { name?: string } };
-        return payload.method === 'tools/call' && payload.params?.name === 'mcp_async_cancel_job';
-      })).toBe(true);
+      expect(
+        vi.mocked(api.mcpCall).mock.calls.some(([call]) => {
+          const payload = call as { method?: string; params?: { name?: string } };
+          return payload.method === 'tools/call' && payload.params?.name === 'mcp_async_cancel_job';
+        }),
+      ).toBe(true);
     });
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^retry$/i })).toBeEnabled();
@@ -658,14 +790,22 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'tools/list')
+        return { body: { result: { tools: [] } }, sessionId: 'sid' };
       if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
       if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
       if (args.params.name === 'mcp_async_get_job') {
-        const error = Object.assign(new Error('Too many requests'), { status: 429, retry_after_seconds: 3 });
+        const error = Object.assign(new Error('Too many requests'), {
+          status: 429,
+          retry_after_seconds: 3,
+        });
         throw error;
       }
-      if (args.params.name === 'search_cases' && args.params.arguments && '__mcp_async' in args.params.arguments) {
+      if (
+        args.params.name === 'search_cases' &&
+        args.params.arguments &&
+        '__mcp_async' in args.params.arguments
+      ) {
         return asyncEnvelope(asyncJobSnapshot({ id: 'job-rl' }));
       }
       return { body: {}, sessionId: 'sid' };
@@ -697,15 +837,22 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list') return { body: { result: { tools: [] } }, sessionId: 'sid' };
+      if (args.method === 'tools/list')
+        return { body: { result: { tools: [] } }, sessionId: 'sid' };
       if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
       if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
       if (args.params.name === 'mcp_async_get_job') {
-        return asyncEnvelope(asyncJobSnapshot({ id: 'job-deep', status: 'running', attempts: { current: 1, max: 3 } }));
+        return asyncEnvelope(
+          asyncJobSnapshot({ id: 'job-deep', status: 'running', attempts: { current: 1, max: 3 } }),
+        );
       }
       if (args.params.name === 'mcp_async_get_job_result') {
         return asyncEnvelope(
-          asyncJobSnapshot({ id: 'job-deep', status: 'succeeded', attempts: { current: 1, max: 3 } }),
+          asyncJobSnapshot({
+            id: 'job-deep',
+            status: 'succeeded',
+            attempts: { current: 1, max: 3 },
+          }),
           { result: { content: [{ type: 'text', text: '{"ok":true}' }] } },
         );
       }
@@ -727,7 +874,10 @@ describe('PlaygroundPage', () => {
     };
 
     render(<PlaygroundPage />, { wrapper: DeepLinkWrapper });
-    expect(screen.getByRole('tab', { name: /raw mcp console/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /raw mcp console/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByText(/job detail: job-deep/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
@@ -758,12 +908,18 @@ describe('PlaygroundPage', () => {
           body: {
             jsonrpc: '2.0',
             result: {
-              tools: [{
-                name: 'live_lookup_tool',
-                description: 'Live-discovered tool',
-                inputSchema: { type: 'object', properties: { citation: { type: 'string' } }, required: ['citation'] },
-                metadata: { category: 'Live' },
-              }],
+              tools: [
+                {
+                  name: 'live_lookup_tool',
+                  description: 'Live-discovered tool',
+                  inputSchema: {
+                    type: 'object',
+                    properties: { citation: { type: 'string' } },
+                    required: ['citation'],
+                  },
+                  metadata: { category: 'Live' },
+                },
+              ],
               metadata: { categories: ['Live'] },
             },
           },
@@ -779,7 +935,10 @@ describe('PlaygroundPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /show tool catalog \(1\)/i })).toBeInTheDocument();
     });
-    expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(expect.objectContaining({ method: 'tools/list' }), 'test-token');
+    expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'tools/list' }),
+      'test-token',
+    );
   });
 
   it('falls back to static catalog when tools/list discovery fails', async () => {
@@ -794,10 +953,15 @@ describe('PlaygroundPage', () => {
     render(<PlaygroundPage />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(expect.objectContaining({ method: 'tools/list' }), 'test-token');
+      expect(vi.mocked(api.mcpCall)).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'tools/list' }),
+        'test-token',
+      );
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /show tool catalog/i }).textContent).not.toContain('(1)');
+      expect(screen.getByRole('button', { name: /show tool catalog/i }).textContent).not.toContain(
+        '(1)',
+      );
     });
   });
 
@@ -809,19 +973,21 @@ describe('PlaygroundPage', () => {
         return {
           body: {
             result: {
-              tools: [{
-                name: 'live_lookup_tool',
-                description: 'Live-discovered tool',
-                inputSchema: {
-                  type: 'object',
-                  properties: {
-                    citation: { type: 'string', description: 'Citation text' },
-                    page_size: { type: 'integer', description: 'Number of results' },
+              tools: [
+                {
+                  name: 'live_lookup_tool',
+                  description: 'Live-discovered tool',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      citation: { type: 'string', description: 'Citation text' },
+                      page_size: { type: 'integer', description: 'Number of results' },
+                    },
+                    required: ['citation'],
                   },
-                  required: ['citation'],
+                  metadata: { category: 'Live' },
                 },
-                metadata: { category: 'Live' },
-              }],
+              ],
               metadata: { categories: ['Live'] },
             },
           },
@@ -855,16 +1021,18 @@ describe('PlaygroundPage', () => {
         return {
           body: {
             result: {
-              tools: [{
-                name: 'live_lookup_tool',
-                description: 'Live-discovered tool',
-                inputSchema: {
-                  type: 'object',
-                  properties: { citation: { type: 'string' } },
-                  required: ['citation'],
+              tools: [
+                {
+                  name: 'live_lookup_tool',
+                  description: 'Live-discovered tool',
+                  inputSchema: {
+                    type: 'object',
+                    properties: { citation: { type: 'string' } },
+                    required: ['citation'],
+                  },
+                  metadata: { category: 'Live' },
                 },
-                metadata: { category: 'Live' },
-              }],
+              ],
               metadata: { categories: ['Live'] },
             },
           },
@@ -887,7 +1055,9 @@ describe('PlaygroundPage', () => {
       expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
     });
     await waitFor(() => {
-      const discoveryCalls = vi.mocked(api.mcpCall).mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
+      const discoveryCalls = vi
+        .mocked(api.mcpCall)
+        .mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
       expect(discoveryCalls.length).toBeGreaterThanOrEqual(2);
     });
     fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
@@ -895,6 +1065,10 @@ describe('PlaygroundPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/fix argument errors before sending/i)).toBeInTheDocument();
     });
-    expect(vi.mocked(api.mcpCall).mock.calls.some(([call]) => (call as { method?: string }).method === 'tools/call')).toBe(false);
+    expect(
+      vi
+        .mocked(api.mcpCall)
+        .mock.calls.some(([call]) => (call as { method?: string }).method === 'tools/call'),
+    ).toBe(false);
   });
 });

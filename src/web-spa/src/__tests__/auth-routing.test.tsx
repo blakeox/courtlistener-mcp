@@ -3,11 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
 import { App } from '../App';
-import {
-  createMatchMediaMock,
-  renderWithSpaProviders,
-  stubBrowserStorage,
-} from './test-utils';
+import { createMatchMediaMock, renderWithSpaProviders, stubBrowserStorage } from './test-utils';
 
 vi.mock('../lib/hosted-auth', () => ({
   buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Faccount'),
@@ -15,7 +11,9 @@ vi.mock('../lib/hosted-auth', () => ({
 }));
 
 vi.mock('../lib/api', () => ({
-  getSession: vi.fn().mockResolvedValue({ authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' }),
+  getSession: vi
+    .fn()
+    .mockResolvedValue({ authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' }),
   getUsage: vi.fn().mockResolvedValue({
     userId: 'u1',
     totalRequests: 0,
@@ -95,7 +93,10 @@ describe('App auth routing', () => {
     await waitFor(() => {
       expect(hostedAuth.redirectToHostedAuth).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
+    expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
   });
 
   it('redirects /app/signup into hosted auth', async () => {
@@ -118,7 +119,31 @@ describe('App auth routing', () => {
 
   it('redirects /app/keys to the operator session page', async () => {
     renderApp('/app/keys');
-    expect(await screen.findByRole('heading', { name: 'Operator Session', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Operator Session', level: 2 }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the public landing page on /', async () => {
+    renderApp('/');
+    expect(
+      await screen.findByRole('heading', {
+        name: /connect ai to the law\. responsibly\./i,
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /account/i })[0]).toHaveAttribute(
+      'href',
+      '/app/account',
+    );
+    expect(screen.queryByText(/operator console/i)).not.toBeInTheDocument();
+  });
+
+  it('redirects /account to the operator session route', async () => {
+    renderApp('/account');
+    expect(
+      await screen.findByRole('heading', { name: 'Operator Session', level: 2 }),
+    ).toBeInTheDocument();
   });
 
   it('shows a primary sign-in entry when signed out on /app/control-center', async () => {
@@ -134,8 +159,13 @@ describe('App auth routing', () => {
 
     renderApp('/app/control-center');
 
-    expect(await screen.findByRole('heading', { name: 'Sign in to continue', level: 2 })).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in to continue', level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
     expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
   });
 
@@ -153,13 +183,17 @@ describe('App auth routing', () => {
     renderApp('/app/unknown');
 
     expect(await screen.findByLabelText('Loading page')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Operator Session', level: 2 })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Operator Session', level: 2 }),
+    ).not.toBeInTheDocument();
   });
 
   it('sends authenticated unknown routes to /app/account before diagnostics', async () => {
     renderApp('/app/unknown');
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Operator Session', level: 2 })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Operator Session', level: 2 }),
+      ).toBeInTheDocument();
     });
   });
 });
