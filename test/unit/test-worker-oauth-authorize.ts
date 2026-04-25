@@ -133,7 +133,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(redirect.searchParams.get('return_to'), request.url);
   });
 
-  it('does not mix partial Worker-native credentials with legacy Logto fallbacks', async () => {
+  it('redirects partial Worker-native credential mixes into the same-origin auth handoff', async () => {
     const env: TestEnv = {
       OIDC_ISSUER: 'https://issuer.example',
       MCP_AUTH_OIDC_CLIENT_ID: 'same-origin-client',
@@ -156,16 +156,48 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       resolveCloudflareOAuthIdentity: async () => ({ kind: 'missing' }),
     });
 
-    assert.equal(response.status, 401);
-    const payload = (await response.json()) as { error?: string };
-    assert.equal(payload.error, 'identity_required');
+    assert.equal(response.status, 302);
+    const location = response.headers.get('Location');
+    assert.ok(location);
+    const redirect = new URL(String(location));
+    assert.equal(redirect.origin, 'https://worker.example');
+    assert.equal(redirect.pathname, '/auth/start');
+    assert.equal(redirect.searchParams.get('return_to'), request.url);
   });
 
-  it('does not redirect into same-origin hosted auth when the session secret is missing', async () => {
+  it('redirects missing-session-secret hosted auth setups into the same-origin auth handoff', async () => {
     const env: TestEnv = {
       OIDC_ISSUER: 'https://issuer.example',
       MCP_AUTH_OIDC_CLIENT_ID: 'same-origin-client',
       MCP_AUTH_OIDC_CLIENT_SECRET: 'same-origin-secret',
+      OAUTH_PROVIDER: {
+        parseAuthRequest: async () => ({ scope: ['legal:read'] }),
+        completeAuthorization: async () => ({
+          redirectTo: 'https://client.example/callback?code=abc',
+        }),
+      },
+    };
+    const request = new Request(
+      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+    );
+
+    const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
+      jsonError,
+      redirectResponse,
+      resolveCloudflareOAuthIdentity: async () => ({ kind: 'missing' }),
+    });
+
+    assert.equal(response.status, 302);
+    const location = response.headers.get('Location');
+    assert.ok(location);
+    const redirect = new URL(String(location));
+    assert.equal(redirect.origin, 'https://worker.example');
+    assert.equal(redirect.pathname, '/auth/start');
+    assert.equal(redirect.searchParams.get('return_to'), request.url);
+  });
+
+  it('returns identity_required when no hosted auth configuration is present at all', async () => {
+    const env: TestEnv = {
       OAUTH_PROVIDER: {
         parseAuthRequest: async () => ({ scope: ['legal:read'] }),
         completeAuthorization: async () => ({

@@ -10,7 +10,11 @@ import {
   type AsyncJobSnapshot,
 } from '../../src/server/async-tool-workflow.js';
 import { createDirectToolExecutionService } from '../../src/server/tool-execution-service.js';
-import { BaseToolHandler, ToolHandlerRegistry, type ToolContext } from '../../src/server/tool-handler.js';
+import {
+  BaseToolHandler,
+  ToolHandlerRegistry,
+  type ToolContext,
+} from '../../src/server/tool-handler.js';
 
 type TestInput = {
   delayMs?: number;
@@ -118,6 +122,78 @@ async function waitForTerminalStatus(
 }
 
 describe('async tool execution service', () => {
+  it('accepts client-prefixed tool names for direct execution and async control polling', async () => {
+    const registry = new ToolHandlerRegistry();
+    registry.register(new DelayedFlakyHandler());
+    const service = createDirectToolExecutionService({
+      toolRegistry: registry,
+      logger: new SilentLogger() as never,
+      asyncWorkflow: new AsyncToolWorkflowOrchestrator(new SilentLogger() as never, {
+        queueConcurrency: 1,
+        defaultRetryDelayMs: 1,
+      }),
+    });
+
+    const directResult = await service.execute(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'courtlistener:delayed_flaky',
+          arguments: {},
+        },
+      },
+      'prefixed-direct',
+    );
+    const directPayload = parsePayload(directResult);
+    assert.strictEqual(directPayload.ok, true);
+
+    const queued = await service.execute(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'courtlistener:delayed_flaky',
+          arguments: {
+            delayMs: 15,
+            __mcp_async: {
+              mode: 'async',
+            },
+          },
+        },
+      },
+      'prefixed-queue',
+    );
+    const queuedPayload = parsePayload(queued);
+    const job = queuedPayload.job as AsyncJobSnapshot;
+
+    let terminal: AsyncJobSnapshot | null = null;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      const statusResult = await service.execute(
+        {
+          method: 'tools/call',
+          params: {
+            name: 'courtlistener:mcp_async_get_job',
+            arguments: { jobId: job.id },
+          },
+        },
+        `prefixed-status-${attempt}`,
+      );
+      const statusPayload = parsePayload(statusResult);
+      const statusJob = statusPayload.job as AsyncJobSnapshot;
+      if (
+        statusJob.status === 'succeeded' ||
+        statusJob.status === 'failed' ||
+        statusJob.status === 'expired'
+      ) {
+        terminal = statusJob;
+        break;
+      }
+      await sleep(10);
+    }
+
+    assert.ok(terminal);
+    assert.strictEqual(terminal?.status, 'succeeded');
+  });
+
   it('executes async jobs through queued lifecycle and returns result envelope', async () => {
     const registry = new ToolHandlerRegistry();
     registry.register(new DelayedFlakyHandler());

@@ -96,7 +96,9 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     assert.ok(response);
     assert.equal(response?.status, 200);
-    assert.match(await response.text(), /Hosted auth is not configured/i);
+    const html = await response.text();
+    assert.match(html, /Hosted auth is not configured/i);
+    assert.match(html, /hosted auth is not fully configured/i);
   });
 
   it('surfaces missing MCP_UI_SESSION_SECRET before starting hosted auth', async () => {
@@ -132,6 +134,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(response.headers.get('x-hosted-auth-signal'), 'config_missing');
     assert.equal(response.headers.get('x-hosted-auth-failure'), 'true');
     assert.equal(response.headers.get('x-hosted-auth-terminal'), 'true');
+    assert.match(
+      String(response.headers.get('x-hosted-auth-correlation-id')),
+      /^[A-Za-z0-9_-]{8,}$/,
+    );
   });
 
   it('surfaces partial Worker-native OIDC config instead of silently falling back', async () => {
