@@ -213,7 +213,7 @@ export async function installSpaMocks(
             protocolVersion: runtime.protocolVersion ?? '2025-06-18',
             serverInfo: {
               name: runtime.serverName ?? 'courtlistener-mcp',
-              version: runtime.serverVersion ?? '1.0.4-test',
+              version: runtime.serverVersion ?? '1.0.5-test',
             },
             capabilities: runtime.capabilities ?? {
               tools: {},

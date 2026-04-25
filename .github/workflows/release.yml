@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "⚡ Running release performance hardening gates..."
           mkdir -p performance-data
-          pnpm start > performance-data/release-gate-server.log 2>&1 &
+          pnpm run start:http > performance-data/release-gate-server.log 2>&1 &
           SERVER_PID=$!
           cleanup() {
             kill "$SERVER_PID" >/dev/null 2>&1 || true

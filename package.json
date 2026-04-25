@@ -1,6 +1,6 @@
 {
   "name": "courtlistener-mcp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Legal research MCP server providing comprehensive access to CourtListener legal database",
   "private": false,
   "type": "module",

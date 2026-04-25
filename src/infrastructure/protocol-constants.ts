@@ -17,7 +17,7 @@ function getPackageVersion(): string {
   // Check if running in Cloudflare Workers
   if (typeof process === 'undefined' || typeof process.versions === 'undefined') {
     // Workers environment - use env or default
-    return '1.0.4';
+    return '1.0.5';
   }
 
   // Node.js environment - try to read package.json
@@ -31,9 +31,9 @@ function getPackageVersion(): string {
     const __dirname = dirname(__filename);
     const packageJsonPath = join(__dirname, '../../package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-    return packageJson.version || '1.0.4';
+    return packageJson.version || '1.0.5';
   } catch {
-    return '1.0.4';
+    return '1.0.5';
   }
 }
 
