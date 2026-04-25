@@ -15,18 +15,54 @@ describe('handleWorkerUiShellRoutes', () => {
         spaBuildId: 'build-1',
         jsonError: (message, status, errorCode) =>
           Response.json({ error: message, error_code: errorCode }, { status }),
-        spaAssetResponse: (content, contentType) => new Response(content, { status: 200, headers: { 'content-type': contentType } }),
+        spaAssetResponse: (content, contentType) =>
+          new Response(content, { status: 200, headers: { 'content-type': contentType } }),
         generateCspNonce: () => 'nonce',
         getOrCreateCsrfCookieHeader: () => null,
         htmlResponse: (html) => new Response(html, { status: 200 }),
         renderSpaShellHtml: () => '<html></html>',
         redirectResponse: (location, status, extraHeaders) =>
-          new Response(null, { status, headers: { Location: location, ...(extraHeaders as Record<string, string>) } }),
+          new Response(null, {
+            status,
+            headers: { Location: location, ...(extraHeaders as Record<string, string>) },
+          }),
       },
     });
 
     assert.equal(response?.status, 200);
     assert.equal(await response?.text(), 'console.log("ok")');
+  });
+
+  it('serves the SPA shell for the public landing page route', async () => {
+    const response = await handleWorkerUiShellRoutes({
+      request: new Request('https://example.com/', { method: 'GET' }),
+      url: new URL('https://example.com/'),
+      env: {},
+      deps: {
+        spaJs: '',
+        spaCss: '',
+        spaBuildId: 'build-1',
+        jsonError: (message, status, errorCode) =>
+          Response.json({ error: message, error_code: errorCode }, { status }),
+        spaAssetResponse: (content) => new Response(content, { status: 200 }),
+        generateCspNonce: () => 'nonce',
+        getOrCreateCsrfCookieHeader: () => 'csrf=1',
+        htmlResponse: (html, _nonce, extraHeaders) => {
+          const headers = new Headers(extraHeaders);
+          return new Response(html, { status: 200, headers });
+        },
+        renderSpaShellHtml: () => '<html><body>landing</body></html>',
+        redirectResponse: (location, status, extraHeaders) => {
+          const headers = new Headers(extraHeaders);
+          headers.set('Location', location);
+          return new Response(null, { status, headers });
+        },
+      },
+    });
+
+    assert.equal(response?.status, 200);
+    assert.equal(await response?.text(), '<html><body>landing</body></html>');
+    assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
   });
 
   it('redirects legacy UI paths to /app routes', async () => {

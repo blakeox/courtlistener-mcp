@@ -27,9 +27,14 @@ export async function handleWorkerUiShellRoutes<TEnv>(
   params: HandleWorkerUiShellRoutesParams<TEnv>,
 ): Promise<Response | null> {
   const { request, url, env, deps } = params;
+  const publicSpaPaths = new Set(['/', '/get-started', '/account']);
 
   if (request.method === 'GET' && url.pathname === '/app/assets/spa.js') {
-    return deps.spaAssetResponse(deps.spaJs, 'application/javascript; charset=utf-8', deps.spaBuildId);
+    return deps.spaAssetResponse(
+      deps.spaJs,
+      'application/javascript; charset=utf-8',
+      deps.spaBuildId,
+    );
   }
 
   if (request.method === 'GET' && url.pathname === '/app/assets/spa.css') {
@@ -40,7 +45,12 @@ export async function handleWorkerUiShellRoutes<TEnv>(
     return deps.jsonError('Method not allowed', 405, 'method_not_allowed');
   }
 
-  if (request.method === 'GET' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) {
+  if (
+    request.method === 'GET' &&
+    (publicSpaPaths.has(url.pathname) ||
+      url.pathname === '/app' ||
+      url.pathname.startsWith('/app/'))
+  ) {
     if (url.pathname.startsWith('/app/assets/')) {
       return deps.jsonError('Asset not found', 404, 'asset_not_found');
     }
@@ -55,7 +65,6 @@ export async function handleWorkerUiShellRoutes<TEnv>(
 
   if (request.method === 'GET') {
     const previousUiPathMap: Record<string, string> = {
-      '/': '/app/onboarding',
       '/signup': '/app/signup',
       '/login': '/app/login',
       '/reset-password': '/app/reset-password',
