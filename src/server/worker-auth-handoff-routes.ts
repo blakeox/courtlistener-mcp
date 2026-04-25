@@ -890,13 +890,13 @@ function getHostedAuthSetupMessages(
 ): string[] {
   if (diagnostics.errors.length > 0) {
     return [
-      'This Worker can serve the hosted auth handoff directly, but the current hosted auth configuration is incomplete.',
+      'This Worker can serve the hosted auth handoff directly, but hosted auth is not fully configured.',
       ...diagnostics.errors,
     ];
   }
 
   return [
-    'This Worker can serve the hosted auth handoff directly, but the upstream OIDC client configuration is missing.',
+    'This Worker can serve the hosted auth handoff directly, but hosted auth is not fully configured because the upstream OIDC client configuration is missing.',
     'Configure OIDC_ISSUER plus MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET. During migration, LOGTO_APP_ID and LOGTO_APP_SECRET still work as the fallback pair when the generic Worker-native pair is absent.',
     'MCP_UI_SESSION_SECRET is also required so the Worker can sign UI session and auth-state cookies.',
   ];

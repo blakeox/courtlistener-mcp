@@ -96,7 +96,9 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     assert.ok(response);
     assert.equal(response?.status, 200);
-    assert.match(await response.text(), /Hosted auth is not configured/i);
+    const html = await response.text();
+    assert.match(html, /Hosted auth is not configured/i);
+    assert.match(html, /hosted auth is not fully configured/i);
   });
 
   it('surfaces missing MCP_UI_SESSION_SECRET before starting hosted auth', async () => {
