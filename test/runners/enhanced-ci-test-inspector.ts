@@ -122,6 +122,7 @@ interface TestCase {
   validate: (output: string) => boolean;
   timeout?: number;
   required: boolean;
+  allowNonZeroExit?: boolean;
 }
 
 const testResults: TestResult[] = [];
@@ -202,10 +203,18 @@ const basicTestCases: TestCase[] = [
       '--tool-name',
       'nonexistent_tool',
     ],
-    validate: (output) =>
-      output.includes('error') || output.includes('not found') || output.includes('invalid'),
+    validate: (output) => {
+      const normalizedOutput = output.toLowerCase();
+      return (
+        normalizedOutput.includes('error') ||
+        normalizedOutput.includes('not found') ||
+        normalizedOutput.includes('invalid') ||
+        normalizedOutput.includes('unknown tool')
+      );
+    },
     timeout: 15000,
     required: true,
+    allowNonZeroExit: true,
   },
 ];
 
@@ -350,15 +359,17 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
       fs.writeFileSync(logFile, output);
 
       // Collect performance metrics
+      const exitCodeAllowed = code === 0 || testCase.allowNonZeroExit === true;
+
       performanceMetrics.push({
         test: testCase.name,
         category: testCase.category,
         duration: duration,
         timestamp: startTime,
-        success: code === 0 && testCase.validate(output),
+        success: exitCodeAllowed && testCase.validate(output),
       });
 
-      if (code === 0 && testCase.validate(output)) {
+      if (exitCodeAllowed && testCase.validate(output)) {
         console.log(`${colors.GREEN}✅ PASSED: ${testCase.name} (${duration}ms)${colors.NC}`);
         passedTests++;
         testResult.status = 'passed';

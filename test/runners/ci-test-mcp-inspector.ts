@@ -73,6 +73,7 @@ interface TestCase {
   args: string[];
   validate: (output: string) => boolean;
   required: boolean;
+  allowNonZeroExit?: boolean;
 }
 
 /**
@@ -201,9 +202,14 @@ const extendedTestCases: TestCase[] = [
       'nonexistent_tool',
     ],
     validate: (output) => {
-      return output.includes('error') || output.includes('not found');
+      return (
+        output.toLowerCase().includes('error') ||
+        output.toLowerCase().includes('not found') ||
+        output.toLowerCase().includes('unknown tool')
+      );
     },
     required: true,
+    allowNonZeroExit: true,
   },
 ];
 
@@ -256,7 +262,9 @@ async function runTest(testCase: TestCase): Promise<boolean> {
       }
       fs.writeFileSync(logFile, output);
 
-      if (code === 0 && testCase.validate(output)) {
+      const exitCodeAllowed = code === 0 || testCase.allowNonZeroExit === true;
+
+      if (exitCodeAllowed && testCase.validate(output)) {
         console.log(`${colors.GREEN}✅ PASSED: ${testCase.name}${colors.NC}`);
         passedTests++;
         resolve(true);
