@@ -49,6 +49,9 @@ Best for privacy, local development, and bring-your-own-auth setups. The npm
 package is not currently published, so the local `stdio` server should be run
 from this repository checkout:
 
+- Download ZIP: https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.zip
+- Download tar.gz: https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.tar.gz
+
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
 cd courtlistener-mcp

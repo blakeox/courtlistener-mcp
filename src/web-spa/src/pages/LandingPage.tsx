@@ -4,6 +4,8 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const REPOSITORY_URL = 'https://github.com/blakeox/courtlistener-mcp';
 const DOCUMENTATION_URL = `${REPOSITORY_URL}#readme`;
+const DOWNLOAD_ZIP_URL = `${REPOSITORY_URL}/archive/refs/heads/main.zip`;
+const DOWNLOAD_TAR_URL = `${REPOSITORY_URL}/archive/refs/heads/main.tar.gz`;
 const INSTALL_COMMAND =
   'git clone https://github.com/blakeox/courtlistener-mcp.git && cd courtlistener-mcp && pnpm install && pnpm build';
 const featureItems = [
@@ -50,7 +52,7 @@ const trustItems = [
 const openSourceStats = [
   { label: 'Repository', value: 'blakeox/courtlistener-mcp' },
   { label: 'License', value: 'MIT' },
-  { label: 'Install', value: 'Source checkout' },
+  { label: 'Download', value: 'ZIP or tar.gz' },
 ] as const;
 
 const setupClients = [
@@ -299,6 +301,14 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                       The npm package is not published yet, so local stdio setup currently runs from
                       a repository checkout.
                     </p>
+                    <div className="landing-inline-links">
+                      <a href={DOWNLOAD_ZIP_URL} target="_blank" rel="noreferrer">
+                        Download ZIP
+                      </a>
+                      <a href={DOWNLOAD_TAR_URL} target="_blank" rel="noreferrer">
+                        Download tar.gz
+                      </a>
+                    </div>
                   </div>
                   <span className="landing-command-chip">MCP server</span>
                 </div>
@@ -352,6 +362,14 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                 className="landing-button landing-button-primary"
               >
                 View on GitHub
+              </a>
+              <a
+                href={DOWNLOAD_ZIP_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="landing-button landing-button-secondary"
+              >
+                Download ZIP
               </a>
             </div>
 

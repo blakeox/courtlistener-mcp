@@ -2197,6 +2197,23 @@ footer a {
   line-height: 1.55;
 }
 
+.landing-inline-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.landing-inline-links a {
+  color: var(--landing-color-blue-600);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.landing-inline-links a:hover {
+  text-decoration: underline;
+}
+
 .landing-command-chip {
   color: var(--landing-color-blue-600);
 }
