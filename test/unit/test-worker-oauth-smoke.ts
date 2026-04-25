@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { handleWorkerOAuthRoutes, type WorkerOAuthRouteDeps } from '../../src/server/worker-oauth-routes.js';
+import {
+  handleWorkerOAuthRoutes,
+  type WorkerOAuthRouteDeps,
+} from '../../src/server/worker-oauth-routes.js';
 import { HOSTED_MCP_OAUTH_CONTRACT } from '../../src/auth/oauth-contract.js';
 
 type TestEnv = Record<string, unknown>;
@@ -21,11 +24,16 @@ function jsonError(message: string, status: number, errorCode: string): Response
   return jsonResponse({ error: message, error_code: errorCode }, status);
 }
 
+function withCors(response: Response): Response {
+  return response;
+}
+
 describe('worker OAuth smoke', () => {
   it('serves discovery metadata and leaves provider endpoints unhandled', async () => {
     const deps: WorkerOAuthRouteDeps<TestEnv> = {
       jsonError,
       jsonResponse,
+      withCors,
     };
 
     const discoveryRequest = new Request(
@@ -33,19 +41,34 @@ describe('worker OAuth smoke', () => {
       { method: 'GET' },
     );
     const discoveryResponse = await handleWorkerOAuthRoutes(
-      { request: discoveryRequest, url: new URL(discoveryRequest.url), env: {} },
+      {
+        request: discoveryRequest,
+        url: new URL(discoveryRequest.url),
+        origin: null,
+        allowedOrigins: [],
+        env: {},
+      },
       deps,
     );
     assert.ok(discoveryResponse);
     assert.equal(discoveryResponse.status, 200);
 
-    const tokenRequest = new Request(`https://worker.example${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=authorization_code&code=x&code_verifier=y',
-    });
+    const tokenRequest = new Request(
+      `https://worker.example${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=authorization_code&code=x&code_verifier=y',
+      },
+    );
     const tokenResponse = await handleWorkerOAuthRoutes(
-      { request: tokenRequest, url: new URL(tokenRequest.url), env: {} },
+      {
+        request: tokenRequest,
+        url: new URL(tokenRequest.url),
+        origin: null,
+        allowedOrigins: [],
+        env: {},
+      },
       deps,
     );
     assert.equal(tokenResponse, null);

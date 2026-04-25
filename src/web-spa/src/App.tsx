@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { PlaygroundPage } from './pages/PlaygroundPage';
 import { AccountPage } from './pages/AccountPage';
+import { HostedAuthRedirectPage } from './pages/HostedAuthRedirectPage';
 import { useAuth } from './lib/auth';
 import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
@@ -32,7 +33,7 @@ export function App(): React.JSX.Element {
 }
 
 function AppContent(): React.JSX.Element {
-  const { session } = useAuth();
+  const { session, loading: sessionLoading, sessionReady } = useAuth();
   const { token } = useToken();
   const location = useLocation();
 
@@ -73,6 +74,9 @@ function AppContent(): React.JSX.Element {
       disabled: !hasToken,
     },
   ];
+  const smartRedirectElement = sessionLoading || !sessionReady
+    ? <PageLoader />
+    : <SmartRedirect hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasToken={hasToken} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />;
 
   return (
     <Shell steps={steps}>
@@ -81,14 +85,14 @@ function AppContent(): React.JSX.Element {
           <Routes>
             <Route path="/app" element={<Navigate to="/app/control-center" replace />} />
             <Route path="/app/control-center" element={<OnboardingPage />} />
-            <Route path="/app/signup" element={<Navigate to="/app/control-center" replace />} />
-            <Route path="/app/login" element={<Navigate to="/app/control-center" replace />} />
-            <Route path="/app/reset-password" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/signup" element={<HostedAuthRedirectPage />} />
+            <Route path="/app/login" element={<HostedAuthRedirectPage />} />
+            <Route path="/app/reset-password" element={<HostedAuthRedirectPage />} />
             <Route path="/app/onboarding" element={<Navigate to="/app/control-center" replace />} />
-            <Route path="/app/keys" element={<Navigate to="/app/control-center" replace />} />
+            <Route path="/app/keys" element={<Navigate to="/app/account" replace />} />
             <Route path="/app/playground" element={<PlaygroundPage />} />
             <Route path="/app/account" element={<AccountPage />} />
-            <Route path="*" element={<SmartRedirect hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn} hasToken={hasToken} hasMcpSuccess={hasMcpSuccess} hasProtocolMismatch={hasProtocolMismatch} />} />
+            <Route path="*" element={smartRedirectElement} />
           </Routes>
         </React.Suspense>
       </ErrorBoundary>

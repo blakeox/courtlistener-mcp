@@ -1,18 +1,21 @@
 # Contributing to CourtListener MCP
 
-Thank you for your interest in contributing! This guide will help you understand the architecture and best practices.
+Thank you for your interest in contributing! This guide will help you understand
+the architecture and best practices.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ or 20+
 - npm or yarn
 - TypeScript knowledge
 - Familiarity with Zod schemas
 
 ### Setup
+
 ```bash
 # Clone the repository
 git clone https://github.com/blakeox/courtlistener-mcp.git
@@ -31,6 +34,10 @@ npm run build
 npm test
 ```
 
+Git hooks are installed into `.githooks/` and executed by Lefthook via
+`lefthook.yml`. This repo intentionally avoids a `.husky/` hook path so the
+active hook manager is unambiguous.
+
 ---
 
 ## 🏗️ Architecture Overview
@@ -38,6 +45,7 @@ npm test
 See `ARCHITECTURE.md` for comprehensive architecture documentation.
 
 **Key Principles**:
+
 1. **100% Type Safety** - No `any` types
 2. **Decorator-Based** - Use `@withDefaults` for cross-cutting concerns
 3. **Zod Validation** - All input validated via Zod schemas
@@ -78,11 +86,11 @@ export class MyNewHandler extends TypedToolHandler<typeof myNewHandlerSchema> {
   @withDefaults({ cache: { ttl: 3600 } }) // Optional: configure TTL
   async execute(
     input: z.infer<typeof myNewHandlerSchema>, // ← Automatically typed!
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     // Pure business logic - everything else is automatic!
     const result = await this.apiClient.someMethod(input);
-    
+
     return this.success({
       summary: 'A human-readable summary',
       data: result,
@@ -97,7 +105,7 @@ export class MyNewHandler extends TypedToolHandler<typeof myNewHandlerSchema> {
 // In the same file
 export function registerMyDomainHandlers(
   registry: ToolHandlerRegistry,
-  apiClient: CourtListenerAPI
+  apiClient: CourtListenerAPI,
 ): void {
   registry.register(new MyNewHandler(apiClient));
   // ... other handlers
@@ -139,6 +147,7 @@ When creating a handler, ensure:
 ## 🎨 Best Practices
 
 ### 1. Type Safety
+
 ```typescript
 // ✅ Good - Full type inference
 const schema = z.object({ id: z.string() });
@@ -155,6 +164,7 @@ async execute(input: any, context: any) {
 ```
 
 ### 2. Using Decorators
+
 ```typescript
 // ✅ Good - Use @withDefaults for automatic concerns
 @withDefaults({ cache: { ttl: 3600 } })
@@ -167,7 +177,7 @@ async execute(input, context) {
 async execute(input, context) {
   const cached = context.cache.get('key', input);
   if (cached) return this.success(cached);
-  
+
   const timer = context.logger.startTimer();
   try {
     const result = await this.apiClient.getData();
@@ -182,13 +192,14 @@ async execute(input, context) {
 ```
 
 ### 3. Using Utilities
+
 ```typescript
 // ✅ Good - Use pagination utilities
 import { createPaginationInfo } from '../common/pagination-utils.js';
 
 return this.success({
   results: response.results,
-  pagination: createPaginationInfo(response, input.page, input.page_size)
+  pagination: createPaginationInfo(response, input.page, input.page_size),
 });
 
 // ❌ Bad - Manual pagination
@@ -200,11 +211,12 @@ return this.success({
     total_pages: Math.ceil(response.count / input.page_size),
     has_next: input.page * input.page_size < response.count,
     has_previous: input.page > 1,
-  }
+  },
 });
 ```
 
 ### 4. Using Query Builders
+
 ```typescript
 // ✅ Good - Fluent, type-safe query building
 import { QueryBuilder } from '../infrastructure/query-builder.js';
@@ -232,6 +244,7 @@ const params = {
 ## 🧪 Testing
 
 ### Unit Test Template
+
 ```typescript
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
@@ -250,7 +263,7 @@ describe('MyNewHandler', () => {
   it('should handle valid input', async () => {
     const input = { required_param: 'test' };
     const result = await handler.handle(input, context);
-    
+
     assert.strictEqual(result.isError, false);
     assert.ok(result.content);
   });
@@ -258,13 +271,14 @@ describe('MyNewHandler', () => {
   it('should validate input schema', async () => {
     const invalid = { wrong_param: 'test' };
     const result = await handler.handle(invalid, context);
-    
+
     assert.strictEqual(result.isError, true);
   });
 });
 ```
 
 ### Running Tests
+
 ```bash
 # Run all tests
 npm test
@@ -299,21 +313,25 @@ test/
 ## 🔄 Development Workflow
 
 ### 1. Create Feature Branch
+
 ```bash
 git checkout -b feature/my-new-handler
 ```
 
 ### 2. Implement Handler
+
 - Follow the handler template above
 - Use `@withDefaults` decorator
 - Focus on business logic only
 
 ### 3. Write Tests
+
 - Unit tests for handler logic
 - Integration tests if needed
 - Maintain 100% test pass rate
 
 ### 4. Build & Test
+
 ```bash
 npm run build    # Should pass with 0 errors
 npm test         # Should pass 100%
@@ -321,6 +339,7 @@ npm run lint     # Should pass
 ```
 
 ### 5. Commit
+
 ```bash
 git add .
 git commit -m "feat(domain): add my new handler
@@ -330,6 +349,7 @@ git commit -m "feat(domain): add my new handler
 ```
 
 ### 6. Push & PR
+
 ```bash
 git push origin feature/my-new-handler
 # Create PR on GitHub
@@ -340,12 +360,14 @@ git push origin feature/my-new-handler
 ## 🎯 Code Style
 
 ### TypeScript
+
 - **Always** use explicit types for public APIs
 - **Prefer** `const` over `let`
 - **Use** async/await over promises
 - **Avoid** `any` types (use `unknown` if needed)
 
 ### Naming Conventions
+
 - **Handlers**: `<Verb><Noun>Handler` (e.g., `GetCaseDetailsHandler`)
 - **Schemas**: `<camelCase>Schema` (e.g., `getCaseDetailsSchema`)
 - **Methods**: `camelCase`
@@ -353,6 +375,7 @@ git push origin feature/my-new-handler
 - **Constants**: `UPPER_SNAKE_CASE`
 
 ### File Organization
+
 - One handler class per file OR related handlers grouped by domain
 - Schemas at top of file
 - Handlers below schemas
@@ -363,6 +386,7 @@ git push origin feature/my-new-handler
 ## 🐛 Debugging
 
 ### Enable Debug Logging
+
 ```bash
 export LOG_LEVEL=debug
 npm run start
@@ -406,4 +430,4 @@ Your contributions make this project better for everyone!
 
 ---
 
-*Last updated: November 3, 2025*
+_Last updated: November 3, 2025_

@@ -110,12 +110,29 @@ function buildDeps(records: Map<string, ClientRecord>) {
       },
     }),
     createRegistrationAccessToken: async (_env: TestEnv, clientId: string) => `token:${clientId}`,
-    verifyRegistrationAccessToken: async (_env: TestEnv, clientId: string, presentedToken: string) =>
-      presentedToken === `token:${clientId}`,
+    verifyRegistrationAccessToken: async (
+      _env: TestEnv,
+      clientId: string,
+      presentedToken: string,
+    ) => presentedToken === `token:${clientId}`,
   };
 }
 
 describe('worker OAuth registration', () => {
+  it('returns 200 for GET on the registration endpoint for ChatGPT DCR probe', async () => {
+    const records = new Map<string, ClientRecord>();
+    const request = new Request('https://worker.example/register', {
+      method: 'GET',
+      headers: { origin: 'https://chatgpt.com' },
+    });
+
+    const response = await handleWorkerDynamicClientRegistration(request, {}, buildDeps(records));
+    const payload = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.registration_endpoint, 'https://worker.example/register');
+  });
+
   it('creates a client and returns registration management details', async () => {
     const records = new Map<string, ClientRecord>();
     const request = new Request('https://worker.example/register', {
@@ -141,6 +158,33 @@ describe('worker OAuth registration', () => {
     assert.equal(payload.registration_client_uri, 'https://worker.example/register/client-1');
     assert.equal(payload.registration_access_token, 'token:client-1');
     assert.equal(payload.client_secret, 'secret-1');
+    assert.equal(response.headers.get('location'), 'https://worker.example/register/client-1');
+  });
+
+  it('rate limits client registration writes before creating a client', async () => {
+    const records = new Map<string, ClientRecord>();
+    const deps = {
+      ...buildDeps(records),
+      getClientIdentifier: () => '127.0.0.1',
+      getAuthRouteRateLimitedResponse: async () =>
+        Response.json({ error: 'oauth_route_rate_limited' }, { status: 429 }),
+      now: () => 123,
+    };
+    const request = new Request('https://worker.example/register', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://chatgpt.com',
+      },
+      body: JSON.stringify({
+        redirect_uris: ['https://chatgpt.com/aip/callback'],
+        client_name: 'ChatGPT',
+      }),
+    });
+
+    const response = await handleWorkerDynamicClientRegistration(request, {}, deps);
+    assert.equal(response.status, 429);
+    assert.equal(records.size, 0);
   });
 
   it('rejects PUT with an explicitly empty redirect_uris list', async () => {

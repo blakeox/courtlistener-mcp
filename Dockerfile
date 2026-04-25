@@ -17,8 +17,8 @@ RUN addgroup -g 1001 -S mcp && \
     adduser -S mcp -u 1001
 
 # Install dependencies first (for better caching)
-COPY package*.json ./
-RUN npm ci --include=dev && npm cache clean --force
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -27,7 +27,7 @@ COPY . .
 RUN npm run build
 
 # Remove dev dependencies to reduce size
-RUN npm prune --production
+RUN pnpm prune --prod && pnpm store prune
 
 # Change ownership of app directory to non-root user
 RUN chown -R mcp:mcp /app

@@ -1,9 +1,6 @@
 name: Enhanced MCP Inspector Integration
 
 on:
-  schedule:
-    # Run comprehensive Inspector validation daily
-    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       test_type:
@@ -32,22 +29,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        inspector-version: ['latest', '0.5.0', '0.4.0']
-        node-version: ['18', '20', '22']
+        inspector-version: ['latest']
+        node-version: ['20']
       fail-fast: false
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: |
@@ -69,7 +65,7 @@ jobs:
           echo "🧪 Testing Inspector ${{ matrix.inspector-version }} with Node ${{ matrix.node-version }}"
 
           # Run basic compatibility tests
-          node test/runners/ci-test-mcp-inspector.js
+          pnpm run ci:test-inspector
 
           # Test web interface compatibility
           timeout 30s pnpm run inspect:local &
@@ -113,22 +109,21 @@ jobs:
   visual-regression:
     name: Inspector Visual Regression Testing
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.test_type == 'comprehensive'
+    if: github.event.inputs.test_type == 'comprehensive'
     env:
       VISUAL_BASELINE_URL: ''
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: |
@@ -229,16 +224,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: |

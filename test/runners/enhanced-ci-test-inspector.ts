@@ -10,9 +10,11 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import os from 'os';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '../..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 // Enhanced Configuration
 interface Config {
@@ -47,14 +49,12 @@ interface Config {
 
 const CONFIG: Config = {
   server: {
-    command: 'node',
-    args: [join(projectRoot, 'dist/index.js')],
+    command: localServerRuntime.command,
+    args: localServerRuntime.args,
     env: { NODE_ENV: 'test' },
   },
   remoteServer: {
-    url:
-      process.env.REMOTE_SERVER_URL ||
-      'https://courtlistenermcp.blakeoxford.com/mcp',
+    url: process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   inspector: {
@@ -137,8 +137,8 @@ const basicTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'resources/list',
     ],
@@ -154,8 +154,8 @@ const basicTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/list',
     ],
@@ -174,8 +174,8 @@ const basicTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
@@ -183,8 +183,7 @@ const basicTestCases: TestCase[] = [
       '--tool-arg',
       'jurisdiction=F',
     ],
-    validate: (output) =>
-      output.includes('courts') || output.includes('result'),
+    validate: (output) => output.includes('courts') || output.includes('result'),
     timeout: 30000,
     required: true,
   },
@@ -196,17 +195,15 @@ const basicTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
       'nonexistent_tool',
     ],
     validate: (output) =>
-      output.includes('error') ||
-      output.includes('not found') ||
-      output.includes('invalid'),
+      output.includes('error') || output.includes('not found') || output.includes('invalid'),
     timeout: 15000,
     required: true,
   },
@@ -221,8 +218,8 @@ const extendedTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
@@ -233,9 +230,7 @@ const extendedTestCases: TestCase[] = [
       'page_size=3',
     ],
     validate: (output) =>
-      output.includes('results') ||
-      output.includes('cases') ||
-      output.includes('total'),
+      output.includes('results') || output.includes('cases') || output.includes('total'),
     timeout: 45000,
     required: false,
   },
@@ -247,8 +242,8 @@ const extendedTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/list',
     ],
@@ -262,12 +257,7 @@ const extendedTestCases: TestCase[] = [
         'list_courts',
         'analyze_legal_argument',
       ];
-      const advancedTools = [
-        'get_dockets',
-        'get_judges',
-        'get_oral_arguments',
-        'advanced_search',
-      ];
+      const advancedTools = ['get_dockets', 'get_judges', 'get_oral_arguments', 'advanced_search'];
       return (
         allTools.every((tool) => output.includes(tool)) &&
         advancedTools.some((tool) => output.includes(tool))
@@ -286,10 +276,10 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
   const startTime = Date.now();
 
   console.log(
-    `\n${colors.BLUE}🧪 [${testCase.category.toUpperCase()}] ${testCase.name}${colors.NC}`
+    `\n${colors.BLUE}🧪 [${testCase.category.toUpperCase()}] ${testCase.name}${colors.NC}`,
   );
   console.log(
-    `${colors.CYAN}   Priority: ${testCase.priority} | Timeout: ${testCase.timeout || CONFIG.inspector.timeout}ms${colors.NC}`
+    `${colors.CYAN}   Priority: ${testCase.priority} | Timeout: ${testCase.timeout || CONFIG.inspector.timeout}ms${colors.NC}`,
   );
 
   const testResult: TestResult = {
@@ -327,9 +317,7 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
       testResult.status = 'timeout';
       testResult.error = `Test timed out after ${testCase.timeout || CONFIG.inspector.timeout}ms`;
 
-      console.log(
-        `${colors.YELLOW}⏱️  TIMEOUT: ${testCase.name} (${duration}ms)${colors.NC}`
-      );
+      console.log(`${colors.YELLOW}⏱️  TIMEOUT: ${testCase.name} (${duration}ms)${colors.NC}`);
 
       if (testCase.required) {
         failedTests++;
@@ -354,7 +342,7 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
       // Save detailed test output
       const logFile = join(
         CONFIG.reporting.outputDir,
-        `${testCase.name.replace(/[^a-zA-Z0-9]/g, '_')}.log`
+        `${testCase.name.replace(/[^a-zA-Z0-9]/g, '_')}.log`,
       );
       if (!fs.existsSync(CONFIG.reporting.outputDir)) {
         fs.mkdirSync(CONFIG.reporting.outputDir, { recursive: true });
@@ -371,16 +359,12 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
       });
 
       if (code === 0 && testCase.validate(output)) {
-        console.log(
-          `${colors.GREEN}✅ PASSED: ${testCase.name} (${duration}ms)${colors.NC}`
-        );
+        console.log(`${colors.GREEN}✅ PASSED: ${testCase.name} (${duration}ms)${colors.NC}`);
         passedTests++;
         testResult.status = 'passed';
       } else {
         if (testCase.required) {
-          console.log(
-            `${colors.RED}❌ FAILED: ${testCase.name} (${duration}ms)${colors.NC}`
-          );
+          console.log(`${colors.RED}❌ FAILED: ${testCase.name} (${duration}ms)${colors.NC}`);
           if (code !== 0) {
             console.log(`${colors.RED}   Exit code: ${code}${colors.NC}`);
           }
@@ -389,7 +373,7 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
           testResult.error = `Exit code: ${code}, Validation failed`;
         } else {
           console.log(
-            `${colors.YELLOW}⏭️  SKIPPED: ${testCase.name} (optional test failed)${colors.NC}`
+            `${colors.YELLOW}⏭️  SKIPPED: ${testCase.name} (optional test failed)${colors.NC}`,
           );
           skippedTests++;
           testResult.status = 'skipped';
@@ -408,9 +392,7 @@ async function runEnhancedTest(testCase: TestCase): Promise<boolean> {
       testResult.status = 'error';
       testResult.error = error.message;
 
-      console.log(
-        `${colors.RED}❌ ERROR: ${testCase.name} - ${error.message}${colors.NC}`
-      );
+      console.log(`${colors.RED}❌ ERROR: ${testCase.name} - ${error.message}${colors.NC}`);
 
       if (testCase.required) {
         failedTests++;
@@ -434,16 +416,12 @@ async function testWebInterface(): Promise<boolean> {
   // In CI environments, we'll just test that the inspector can start
   // without actually testing the web interface to avoid complex dependencies
   if (process.env.CI === 'true') {
-    console.log(
-      `${colors.YELLOW}⏭️  Skipping web interface tests in CI environment${colors.NC}`
-    );
+    console.log(`${colors.YELLOW}⏭️  Skipping web interface tests in CI environment${colors.NC}`);
     return true;
   }
 
   if (!CONFIG.features.visualTesting) {
-    console.log(
-      `${colors.YELLOW}⏭️  Skipping web interface tests (not enabled)${colors.NC}`
-    );
+    console.log(`${colors.YELLOW}⏭️  Skipping web interface tests (not enabled)${colors.NC}`);
     return true;
   }
 
@@ -468,11 +446,8 @@ async function testWebInterface(): Promise<boolean> {
         console.log(`${colors.GREEN}✅ Inspector started successfully${colors.NC}`);
         webTestPassed = true;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        console.log(
-          `${colors.YELLOW}⚠️  Web interface test error: ${errorMessage}${colors.NC}`
-        );
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.log(`${colors.YELLOW}⚠️  Web interface test error: ${errorMessage}${colors.NC}`);
       } finally {
         clearTimeout(timeout);
         inspector.kill();
@@ -491,14 +466,11 @@ function analyzePerformance(): void {
   console.log(`\n${colors.MAGENTA}📊 Performance Analysis${colors.NC}`);
 
   const avgDuration =
-    performanceMetrics.reduce((sum, m) => sum + m.duration, 0) /
-    performanceMetrics.length;
+    performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / performanceMetrics.length;
   const maxDuration = Math.max(...performanceMetrics.map((m) => m.duration));
   const minDuration = Math.min(...performanceMetrics.map((m) => m.duration));
   const successRate =
-    (performanceMetrics.filter((m) => m.success).length /
-      performanceMetrics.length) *
-    100;
+    (performanceMetrics.filter((m) => m.success).length / performanceMetrics.length) * 100;
 
   console.log(`   Average duration: ${avgDuration.toFixed(0)}ms`);
   console.log(`   Min/Max duration: ${minDuration}ms / ${maxDuration}ms`);
@@ -558,14 +530,11 @@ function generateEnhancedReports(): {
       averageDuration:
         performanceMetrics.length > 0
           ? (
-              performanceMetrics.reduce((sum, m) => sum + m.duration, 0) /
-              performanceMetrics.length
+              performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / performanceMetrics.length
             ).toFixed(0)
           : '0',
       maxDuration:
-        performanceMetrics.length > 0
-          ? Math.max(...performanceMetrics.map((m) => m.duration))
-          : 0,
+        performanceMetrics.length > 0 ? Math.max(...performanceMetrics.map((m) => m.duration)) : 0,
     },
   };
 
@@ -583,10 +552,7 @@ function generateEnhancedReports(): {
       },
     };
 
-    const jsonPath = join(
-      CONFIG.reporting.outputDir,
-      'enhanced-mcp-inspector-report.json'
-    );
+    const jsonPath = join(CONFIG.reporting.outputDir, 'enhanced-mcp-inspector-report.json');
     fs.writeFileSync(jsonPath, JSON.stringify(jsonReport, null, 2));
     console.log(`${colors.BLUE}📄 Enhanced JSON report: ${jsonPath}${colors.NC}`);
   }
@@ -624,7 +590,7 @@ ${Object.entries(
     if (!acc[test.category]) acc[test.category] = [];
     acc[test.category].push(test);
     return acc;
-  }, {} as CategoryGroup)
+  }, {} as CategoryGroup),
 )
   .map(
     ([category, tests]) => `
@@ -633,10 +599,10 @@ ${Object.entries(
 ${tests
   .map(
     (test) =>
-      `- ${test.status === 'passed' ? '✅' : test.status === 'failed' ? '❌' : '⏭️'} **${test.name}** (${test.duration}ms)`
+      `- ${test.status === 'passed' ? '✅' : test.status === 'failed' ? '❌' : '⏭️'} **${test.name}** (${test.duration}ms)`,
   )
   .join('\n')}
-`
+`,
   )
   .join('\n')}
 
@@ -647,14 +613,9 @@ ${failedTests > 0 ? '⚠️ **Action Required:** Some critical tests failed. Rev
 ${summary.performance.maxDuration > 30000 ? '⚠️ **Performance Warning:** Some tests took longer than 30 seconds. Consider optimizing or increasing timeouts.' : ''}
 `;
 
-    const markdownPath = join(
-      CONFIG.reporting.outputDir,
-      'enhanced-mcp-inspector-report.md'
-    );
+    const markdownPath = join(CONFIG.reporting.outputDir, 'enhanced-mcp-inspector-report.md');
     fs.writeFileSync(markdownPath, markdownReport);
-    console.log(
-      `${colors.BLUE}📄 Enhanced Markdown report: ${markdownPath}${colors.NC}`
-    );
+    console.log(`${colors.BLUE}📄 Enhanced Markdown report: ${markdownPath}${colors.NC}`);
   }
 
   return summary;
@@ -665,20 +626,16 @@ ${summary.performance.maxDuration > 30000 ? '⚠️ **Performance Warning:** Som
  */
 async function main(): Promise<void> {
   console.log(
-    `${colors.YELLOW}🚀 Enhanced Legal MCP Server - Inspector Integration Testing${colors.NC}`
+    `${colors.YELLOW}🚀 Enhanced Legal MCP Server - Inspector Integration Testing${colors.NC}`,
   );
   console.log(
-    `${colors.YELLOW}===============================================================${colors.NC}\n`
+    `${colors.YELLOW}===============================================================${colors.NC}\n`,
   );
 
   console.log(`Configuration:`);
   console.log(`- Extended mode: ${CONFIG.features.extended ? 'ON' : 'OFF'}`);
-  console.log(
-    `- Visual testing: ${CONFIG.features.visualTesting ? 'ON' : 'OFF'}`
-  );
-  console.log(
-    `- Performance testing: ${CONFIG.features.performanceTesting ? 'ON' : 'OFF'}`
-  );
+  console.log(`- Visual testing: ${CONFIG.features.visualTesting ? 'ON' : 'OFF'}`);
+  console.log(`- Performance testing: ${CONFIG.features.performanceTesting ? 'ON' : 'OFF'}`);
   console.log(`- Output directory: ${CONFIG.reporting.outputDir}\n`);
 
   try {
@@ -688,9 +645,7 @@ async function main(): Promise<void> {
     }
 
     // Run basic test cases
-    console.log(
-      `${colors.YELLOW}=== Basic Inspector Integration Tests ===${colors.NC}`
-    );
+    console.log(`${colors.YELLOW}=== Basic Inspector Integration Tests ===${colors.NC}`);
     for (const testCase of basicTestCases) {
       await runEnhancedTest(testCase);
     }
@@ -723,14 +678,12 @@ async function main(): Promise<void> {
     console.log(`Success rate: ${summary.successRate}%`);
 
     if (performanceMetrics.length > 0) {
-      console.log(
-        `Average test duration: ${summary.performance.averageDuration}ms`
-      );
+      console.log(`Average test duration: ${summary.performance.averageDuration}ms`);
     }
 
     if (failedTests === 0) {
       console.log(
-        `\n${colors.GREEN}🎉 All critical Inspector integration tests passed!${colors.NC}`
+        `\n${colors.GREEN}🎉 All critical Inspector integration tests passed!${colors.NC}`,
       );
       process.exit(0);
     } else {
@@ -738,30 +691,26 @@ async function main(): Promise<void> {
       const coreTests = testResults.filter(
         (test) =>
           test.name === 'Inspector Tools Discovery' ||
-          test.name === 'Inspector Core Tool Execution'
+          test.name === 'Inspector Core Tool Execution',
       );
       const coreTestsPassed = coreTests.every((test) => test.status === 'passed');
 
       if (coreTestsPassed && coreTests.length >= 2) {
         console.log(
-          `\n${colors.YELLOW}⚠️  ${failedTests} test(s) failed, but core functionality is working${colors.NC}`
+          `\n${colors.YELLOW}⚠️  ${failedTests} test(s) failed, but core functionality is working${colors.NC}`,
         );
         console.log(
-          `${colors.GREEN}✅ Tools Discovery and Core Tool Execution passed - MCP Server is functional${colors.NC}`
+          `${colors.GREEN}✅ Tools Discovery and Core Tool Execution passed - MCP Server is functional${colors.NC}`,
         );
         process.exit(0);
       } else {
-        console.log(
-          `\n${colors.RED}❌ ${failedTests} critical test(s) failed${colors.NC}`
-        );
+        console.log(`\n${colors.RED}❌ ${failedTests} critical test(s) failed${colors.NC}`);
         process.exit(1);
       }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(
-      `${colors.RED}❌ Enhanced CI test suite failed: ${errorMessage}${colors.NC}`
-    );
+    console.error(`${colors.RED}❌ Enhanced CI test suite failed: ${errorMessage}${colors.NC}`);
     process.exit(1);
   }
 }
@@ -774,7 +723,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const nodeVersion = parseInt(nodeVersionMatch[1], 10);
     if (nodeVersion < 18) {
       console.error(
-        `${colors.RED}❌ This script requires Node.js 18+ for fetch support${colors.NC}`
+        `${colors.RED}❌ This script requires Node.js 18+ for fetch support${colors.NC}`,
       );
       process.exit(1);
     }

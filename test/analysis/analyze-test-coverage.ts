@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '..');
+const projectRoot = path.join(__dirname, '../..');
 
 interface SourceFileData {
   path: string;
@@ -126,10 +126,7 @@ class TestCoverageAnalyzer {
     console.log(`   Found ${this.testFiles.size} test files`);
   }
 
-  private async getAllFiles(
-    dir: string,
-    extension: string
-  ): Promise<string[]> {
+  private async getAllFiles(dir: string, extension: string): Promise<string[]> {
     const files: string[] = [];
 
     if (!fs.existsSync(dir)) return files;
@@ -203,10 +200,7 @@ class TestCoverageAnalyzer {
     const methods: string[] = [];
 
     // Find class definition
-    const classPattern = new RegExp(
-      `class\\s+${className}[^{]*{([^}]*(?:{[^}]*}[^}]*)*)}`,
-      's'
-    );
+    const classPattern = new RegExp(`class\\s+${className}[^{]*{([^}]*(?:{[^}]*}[^}]*)*)}`, 's');
     const classMatch = classPattern.exec(content);
 
     if (classMatch) {
@@ -298,10 +292,7 @@ class TestCoverageAnalyzer {
       analysis.testFiles = possibleTestFiles;
 
       if (possibleTestFiles.length > 0) {
-        analysis.coverage = this.calculateCoverage(
-          sourceData,
-          possibleTestFiles
-        );
+        analysis.coverage = this.calculateCoverage(sourceData, possibleTestFiles);
       }
 
       // Categorize
@@ -342,7 +333,7 @@ class TestCoverageAnalyzer {
 
   private calculateCoverage(
     sourceData: SourceFileData,
-    testFiles: Array<{ file: string; data: TestFileData }>
+    testFiles: Array<{ file: string; data: TestFileData }>,
   ): 'none' | 'minimal' | 'partial' | 'full' {
     let coveredItems = 0;
     let totalItems = sourceData.exports.length + sourceData.functions.length;
@@ -402,15 +393,9 @@ class TestCoverageAnalyzer {
     console.log(`\n📈 Coverage Summary:`);
     console.log(`   Total Files: ${total}`);
     if (total > 0) {
-      console.log(
-        `   ✅ Full Coverage: ${covered} (${((covered / total) * 100).toFixed(1)}%)`
-      );
-      console.log(
-        `   🟡 Partial Coverage: ${partial} (${((partial / total) * 100).toFixed(1)}%)`
-      );
-      console.log(
-        `   ❌ No Coverage: ${uncovered} (${((uncovered / total) * 100).toFixed(1)}%)`
-      );
+      console.log(`   ✅ Full Coverage: ${covered} (${((covered / total) * 100).toFixed(1)}%)`);
+      console.log(`   🟡 Partial Coverage: ${partial} (${((partial / total) * 100).toFixed(1)}%)`);
+      console.log(`   ❌ No Coverage: ${uncovered} (${((uncovered / total) * 100).toFixed(1)}%)`);
     }
 
     // Detailed uncovered files
@@ -422,9 +407,7 @@ class TestCoverageAnalyzer {
           console.log(`      Exports: ${file.exports.join(', ')}`);
         }
         if (file.classes.length > 0) {
-          console.log(
-            `      Classes: ${file.classes.map((c) => c.name).join(', ')}`
-          );
+          console.log(`      Classes: ${file.classes.map((c) => c.name).join(', ')}`);
         }
         if (file.functions.length > 0) {
           console.log(`      Functions: ${file.functions.join(', ')}`);
@@ -439,9 +422,7 @@ class TestCoverageAnalyzer {
       console.log(`\n🟡 Files with PARTIAL Test Coverage:`);
       for (const file of this.coverageReport.partialCoverage) {
         console.log(`   📄 ${file.file} (${file.coverage} coverage)`);
-        console.log(
-          `      Test files: ${file.testFiles.map((t) => t.file).join(', ')}`
-        );
+        console.log(`      Test files: ${file.testFiles.map((t) => t.file).join(', ')}`);
         console.log('');
       }
     }
@@ -454,10 +435,7 @@ class TestCoverageAnalyzer {
     console.log(`\n💡 Testing Recommendations:`);
 
     const highPriorityUntested = this.coverageReport.uncovered.filter(
-      (file) =>
-        file.exports.length > 3 ||
-        file.classes.length > 0 ||
-        file.lines > 100
+      (file) => file.exports.length > 3 || file.classes.length > 0 || file.lines > 100,
     );
 
     if (highPriorityUntested.length > 0) {
@@ -466,16 +444,14 @@ class TestCoverageAnalyzer {
         console.log(
           `   📄 ${file.file} - ${
             file.exports.length + file.classes.length + file.functions.length
-          } public items, ${file.lines} lines`
+          } public items, ${file.lines} lines`,
         );
       }
     }
 
     const utilityFiles = this.coverageReport.uncovered.filter(
       (file) =>
-        file.file.includes('utils') ||
-        file.file.includes('helper') ||
-        file.file.includes('config')
+        file.file.includes('utils') || file.file.includes('helper') || file.file.includes('config'),
     );
 
     if (utilityFiles.length > 0) {
@@ -487,8 +463,8 @@ class TestCoverageAnalyzer {
 
     const coreFiles = this.coverageReport.uncovered.filter((file) =>
       ['cache.ts', 'config.ts', 'logger.ts', 'metrics.ts', 'types.ts'].includes(
-        path.basename(file.file)
-      )
+        path.basename(file.file),
+      ),
     );
 
     if (coreFiles.length > 0) {
@@ -513,4 +489,3 @@ analyzer.analyze().catch((error) => {
   console.error('Error analyzing test coverage:', error);
   process.exit(1);
 });
-

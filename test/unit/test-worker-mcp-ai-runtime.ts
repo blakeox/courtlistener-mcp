@@ -70,6 +70,32 @@ describe('worker MCP AI runtime', () => {
     assert.deepEqual(calls, [{ userId: 'user-77', route: '/mcp', method: 'POST' }]);
   });
 
+  it('does not record usage from spoofable oauth headers without an authorized principal', async () => {
+    const calls: Array<{ route?: string; method?: string; userId: string }> = [];
+    const runtime = createWorkerMcpAiRuntime({
+      authorizeMcpGatewayRequest: async () => ({ principal: {} }),
+      runWithPrincipalContext: async (_principal, callback) => callback(),
+      mcpStreamableFetch: async () => new Response('{}', { status: 200 }),
+      preferredMcpProtocolVersion: '2025-03-26',
+      supportedMcpProtocolVersions: new Set(['2025-03-26']),
+      redactSecretsInText: (value) => value,
+      incrementUserUsage: async (_env, userId, metadata) => {
+        calls.push({ userId, ...metadata });
+      },
+    });
+
+    await runtime.recordAuthorizedMcpUsage(
+      new Request('https://worker.example/mcp', {
+        method: 'POST',
+        headers: { 'x-oauth-user-id': 'spoofed-user' },
+      }),
+      {} as never,
+      undefined,
+    );
+
+    assert.deepEqual(calls, []);
+  });
+
   it('prefers the caller token over the static service token for internal MCP calls', async () => {
     let seenAuthorization = '';
     let seenServiceHeader = '';

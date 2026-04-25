@@ -17,6 +17,8 @@ export interface WorkerSecurityEnv {
   MCP_SERVICE_TOKEN_HEADER?: string;
   MCP_REQUIRE_PROTOCOL_VERSION?: string;
   MCP_ALLOWED_ORIGINS?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION?: string;
+  MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
@@ -39,8 +41,8 @@ export interface McpAuthorizationResult {
   protocolNegotiation?: ProtocolHeaderNegotiationDiagnostics;
 }
 
-export function parseBoolean(value: string | undefined): boolean {
-  if (!value) return false;
+export function parseBoolean(value: string | undefined, fallback = false): boolean {
+  if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
@@ -65,6 +67,18 @@ export function extractBearerToken(authHeader: string | null): string | null {
   return authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 }
 
+export function trustCloudflareAccessJwtAssertion(
+  env: Pick<WorkerSecurityEnv, 'MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION'>,
+): boolean {
+  return parseBoolean(env.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION);
+}
+
+export function trustCloudflareAccessIdentityHeaders(
+  env: Pick<WorkerSecurityEnv, 'MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS'>,
+): boolean {
+  return parseBoolean(env.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS);
+}
+
 function getOidcConfig(env: WorkerSecurityEnv): OAuthConfig | null {
   if (!env.OIDC_ISSUER) return null;
   return {
@@ -81,7 +95,7 @@ function escapeHeaderValue(value: string): string {
 
 function buildMcpOAuthProtectedResourceMetadataUrl(request: Request): string {
   const origin = new URL(request.url).origin;
-  return `${origin}/.well-known/oauth-protected-resource/mcp`;
+  return `${origin}/.well-known/oauth-protected-resource`;
 }
 
 function buildWwwAuthenticateHeader(
@@ -91,12 +105,11 @@ function buildWwwAuthenticateHeader(
   status: number,
 ): string {
   const parts = [
-    'Bearer realm="mcp"',
-    `error="${escapeHeaderValue(code)}"`,
-    `error_description="${escapeHeaderValue(message)}"`,
-    `resource_metadata="${escapeHeaderValue(buildMcpOAuthProtectedResourceMetadataUrl(request))}"`,
+    `Bearer resource_metadata="${escapeHeaderValue(buildMcpOAuthProtectedResourceMetadataUrl(request))}"`,
   ];
   if (status === 403 && code === 'insufficient_scope') {
+    parts.push(`error="${escapeHeaderValue(code)}"`);
+    parts.push(`error_description="${escapeHeaderValue(message)}"`);
     parts.push('scope="legal:read legal:search legal:analyze"');
   }
   return parts.join(', ');
@@ -161,7 +174,8 @@ function extractUserIdFromClaims(payload: Record<string, unknown>): string | und
 /**
  * Authorize MCP requests using either:
  * 0) Internal service-token header validation (x-mcp-service-token by default)
- * 1) OIDC/Cloudflare Access JWT verification (if OIDC_* configured)
+ * 1) OIDC bearer verification, plus optional trusted Cloudflare Access JWT
+ *    verification when MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION=true
  *
  * Public MCP access is OAuth/OIDC only. MCP_AUTH_TOKEN is reserved for the
  * explicit service-token header path and is never accepted as a public bearer
@@ -175,7 +189,9 @@ export async function authorizeMcpRequestWithPrincipal(
   const bearerToken = extractBearerToken(request.headers.get('Authorization'));
   const serviceTokenHeader = env.MCP_SERVICE_TOKEN_HEADER?.trim() || 'x-mcp-service-token';
   const serviceTokenCandidate = request.headers.get(serviceTokenHeader)?.trim() || null;
-  const cfAccessJwt = request.headers.get('CF-Access-Jwt-Assertion')?.trim() || null;
+  const presentedCfAccessJwt = request.headers.get('CF-Access-Jwt-Assertion')?.trim() || null;
+  const trustedCfAccessJwtAssertion = trustCloudflareAccessJwtAssertion(env);
+  const cfAccessJwt = trustedCfAccessJwtAssertion ? presentedCfAccessJwt : null;
   const serviceToken = env.MCP_AUTH_TOKEN?.trim();
   const oidcConfig = getOidcConfig(env);
   const decisionEngine = buildEdgeAuthDecisionEngine({
@@ -242,19 +258,23 @@ export async function authorizeMcpRequestWithPrincipal(
           lastError instanceof Error ? lastError.message : 'token_verification_failed';
         if (message === 'insufficient_scope') {
           return {
-            authError: jsonError(403, 'Token missing required scope', 'insufficient_scope', request),
+            authError: jsonError(
+              403,
+              'Token missing required scope',
+              'insufficient_scope',
+              request,
+            ),
           };
         }
         return { authError: jsonError(401, 'Invalid OIDC access token', 'invalid_token', request) };
       }
     } else if (!shouldTryServiceToken) {
+      const missingTokenMessage =
+        presentedCfAccessJwt && !trustedCfAccessJwtAssertion
+          ? 'CF-Access-Jwt-Assertion is only accepted when MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION=true.'
+          : 'Missing access token (Authorization: Bearer or trusted CF-Access-Jwt-Assertion)';
       return {
-        authError: jsonError(
-          401,
-          'Missing access token (Authorization: Bearer or CF-Access-Jwt-Assertion)',
-          'missing_token',
-          request,
-        ),
+        authError: jsonError(401, missingTokenMessage, 'missing_token', request),
       };
     }
   }
@@ -280,7 +300,8 @@ export function validateProtocolVersionHeader(
   required: boolean,
   supportedVersions: ReadonlySet<string>,
 ): Response | null {
-  return validateProtocolHeaderNegotiation(protocolVersion, null, required, supportedVersions).error;
+  return validateProtocolHeaderNegotiation(protocolVersion, null, required, supportedVersions)
+    .error;
 }
 
 export function validateProtocolHeaderNegotiation(

@@ -1,3 +1,5 @@
+import { parsePositiveInt } from '../common/validation.js';
+
 export interface WorkerMcpSessionTopologyEnv {
   MCP_SESSION_SHARD_COUNT?: string;
   MCP_SESSION_IDLE_TTL_SECONDS?: string;
@@ -24,13 +26,6 @@ const DEFAULT_SESSION_IDLE_TTL_SECONDS = 30 * 60;
 const DEFAULT_SESSION_ABSOLUTE_TTL_SECONDS = 24 * 60 * 60;
 const DEFAULT_SESSION_EVICTION_SWEEP_LIMIT = 64;
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
-
 function hashSessionId(sessionId: string): number {
   let hash = 2166136261;
   for (let i = 0; i < sessionId.length; i += 1) {
@@ -45,14 +40,23 @@ export function resolveWorkerMcpSessionTopologyV2(
 ): WorkerMcpSessionTopologyV2 {
   return {
     version: 'v2',
-    shardCount: Math.max(1, parsePositiveInt(env.MCP_SESSION_SHARD_COUNT, DEFAULT_SESSION_SHARD_COUNT)),
-    idleTtlMs:
-      Math.max(1, parsePositiveInt(env.MCP_SESSION_IDLE_TTL_SECONDS, DEFAULT_SESSION_IDLE_TTL_SECONDS)) *
-      1000,
-    absoluteTtlMs: Math.max(
+    shardCount: Math.max(
       1,
-      parsePositiveInt(env.MCP_SESSION_ABSOLUTE_TTL_SECONDS, DEFAULT_SESSION_ABSOLUTE_TTL_SECONDS),
-    ) * 1000,
+      parsePositiveInt(env.MCP_SESSION_SHARD_COUNT, DEFAULT_SESSION_SHARD_COUNT),
+    ),
+    idleTtlMs:
+      Math.max(
+        1,
+        parsePositiveInt(env.MCP_SESSION_IDLE_TTL_SECONDS, DEFAULT_SESSION_IDLE_TTL_SECONDS),
+      ) * 1000,
+    absoluteTtlMs:
+      Math.max(
+        1,
+        parsePositiveInt(
+          env.MCP_SESSION_ABSOLUTE_TTL_SECONDS,
+          DEFAULT_SESSION_ABSOLUTE_TTL_SECONDS,
+        ),
+      ) * 1000,
     evictionSweepLimit: Math.max(
       1,
       parsePositiveInt(env.MCP_SESSION_EVICTION_SWEEP_LIMIT, DEFAULT_SESSION_EVICTION_SWEEP_LIMIT),

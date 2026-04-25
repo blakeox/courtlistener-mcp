@@ -1,3 +1,5 @@
+import { getPrevalidatedOAuthIdentity } from './prevalidated-oauth-context.js';
+
 interface WorkerUsageSessionRuntime<TEnv> {
   resolveCloudflareOAuthUserId(request: Request, env: TEnv): Promise<string | null>;
 }
@@ -5,6 +7,7 @@ interface WorkerUsageSessionRuntime<TEnv> {
 interface ResolveWorkerUsageParams<TEnv> {
   request: Request;
   env: TEnv;
+  ctx: ExecutionContext;
   workerUiSessionRuntime: WorkerUsageSessionRuntime<TEnv>;
   getUsageSnapshot: (env: TEnv, userId: string) => Promise<unknown | null>;
 }
@@ -17,10 +20,12 @@ export type WorkerUsageResolution =
 export async function resolveWorkerUsage<TEnv>(
   params: ResolveWorkerUsageParams<TEnv>,
 ): Promise<WorkerUsageResolution> {
-  const { request, env, workerUiSessionRuntime, getUsageSnapshot } = params;
+  const { request, env, ctx, workerUiSessionRuntime, getUsageSnapshot } = params;
 
-  const oauthUserId = request.headers.get('x-oauth-user-id')?.trim() || null;
-  const userId = oauthUserId || (await workerUiSessionRuntime.resolveCloudflareOAuthUserId(request, env));
+  const prevalidatedOAuthUserId = getPrevalidatedOAuthIdentity(ctx)?.userId ?? null;
+  const userId =
+    prevalidatedOAuthUserId ||
+    (await workerUiSessionRuntime.resolveCloudflareOAuthUserId(request, env));
   if (!userId) {
     return { kind: 'unauthenticated' };
   }

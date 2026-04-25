@@ -7,8 +7,6 @@ import { createWorkerLegacyFetchHandler } from '../../src/server/worker-request-
 
 interface TestEnv {
   MCP_ALLOWED_ORIGINS?: string;
-  MCP_AUTH_UI_ORIGIN?: string;
-  oauthEnabled?: boolean;
 }
 
 function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs: number }>) {
@@ -28,7 +26,8 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
       };
     })(),
     workerCoreRouteDeps: {
-      isAllowedOrigin: (origin, allowedOrigins) => origin === null || allowedOrigins.includes(origin),
+      isAllowedOrigin: (origin, allowedOrigins) =>
+        origin === null || allowedOrigins.includes(origin),
       buildCorsHeaders: (origin) => {
         const headers = new Headers();
         if (origin) headers.set('access-control-allow-origin', origin);
@@ -61,7 +60,6 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
             ...(extraHeaders ? Object.fromEntries(new Headers(extraHeaders).entries()) : {}),
           },
         }),
-      isCloudflareOAuthBackendEnabled: (env) => env.oauthEnabled === true,
       isRemovedLegacyUiRoute: (pathname) => pathname === '/api/login',
       workerUiSessionRuntime: {
         resolveCloudflareOAuthUserId: async () => 'user-1',
@@ -70,7 +68,8 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
         verifyBootstrapUserIdFromAuthorization: async () => ({ userId: 'user-1', error: null }),
         createUiSessionToken: async () => 'signed-session',
         parseUiSessionToken: () => ({ sub: 'user-1', exp: 9999999999, jti: 'jti-1' }),
-        buildUiSessionBootstrapHeaders: () => new Headers({ 'set-cookie': 'clmcp_ui=signed-session' }),
+        buildUiSessionBootstrapHeaders: () =>
+          new Headers({ 'set-cookie': 'clmcp_ui=signed-session' }),
         createUiSessionState: async () => ({
           sessionToken: 'signed-session',
           expiresInSeconds: 43200,
@@ -119,6 +118,18 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
       htmlResponse: () => new Response(),
       renderSpaShellHtml: () => '',
       redirectResponse: () => new Response(),
+      buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+      resolveGrantedScopes: () => [],
+      getOAuthHelpers: () => ({
+        parseAuthRequest: async () => ({ scope: [] }),
+        completeAuthorization: async () => ({
+          redirectTo: 'https://client.example/callback?code=abc',
+        }),
+      }),
+      workerUiSessionRuntime: {
+        getUiSessionSecret: () => 'session-secret',
+        isSecureCookieRequest: () => true,
+      },
       mcpBoundaryPolicy: {
         supportedProtocolVersions: new Set(['2025-03-26']),
         mcpStreamableHandler: { fetch: async () => new Response('stream') },
@@ -130,7 +141,11 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
         recordAuthFailure: async () => {},
         clearAuthFailures: async () => {},
         evaluateMcpBoundaryRequest: async () => null,
-        validateSessionRequest: async () => ({ ok: true as const, sessionId: null, response: null }),
+        validateSessionRequest: async () => ({
+          ok: true as const,
+          sessionId: null,
+          response: null,
+        }),
         finalizeSessionResponse: (response: Response) => response,
         onAuthorizedRequest: async () => {},
       },
@@ -145,7 +160,7 @@ describe('createWorkerLegacyFetchHandler', () => {
 
     const response = await handler(
       new Request('https://worker.example/health'),
-      { oauthEnabled: true },
+      {},
       {} as ExecutionContext,
     );
     const payload = (await response.json()) as Record<string, unknown>;
@@ -161,7 +176,7 @@ describe('createWorkerLegacyFetchHandler', () => {
 
     const response = await handler(
       new Request('https://worker.example/not-found'),
-      { oauthEnabled: true },
+      {},
       {} as ExecutionContext,
       { skipGatewayAuth: true },
     );

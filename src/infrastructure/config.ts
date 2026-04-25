@@ -7,11 +7,15 @@ import { parseLogFormat, parseLogLevel, parsePositiveInt } from '../common/valid
 import { ServerConfig } from '../types.js';
 import { validateConfigWithZod } from './config-schema.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from './protocol-constants.js';
-import {
-  type AuthPolicyDiagnostics,
-  evaluateAuthPolicyMatrix,
-} from './auth-policy-matrix.js';
+import { type AuthPolicyDiagnostics, evaluateAuthPolicyMatrix } from './auth-policy-matrix.js';
 import { redactSecretsInText } from './secret-redaction.js';
+import { evaluateWorkerHostedAuthConfig } from '../server/worker-upstream-oidc-config.js';
+
+function parseBooleanEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
 
 const defaultConfig: ServerConfig = {
   courtListener: {
@@ -172,7 +176,11 @@ const defaultConfig: ServerConfig = {
     defaultTtlSeconds: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
     maxStoredJobs: parsePositiveInt(process.env.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
     maxQueueDepth: parsePositiveInt(process.env.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
-    queueLatencyGuardrailMs: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS, 2_000, 1),
+    queueLatencyGuardrailMs: parsePositiveInt(
+      process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS,
+      2_000,
+      1,
+    ),
     completionLatencyGuardrailMs: parsePositiveInt(
       process.env.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
       15_000,
@@ -389,6 +397,7 @@ export function getConfigSummary() {
       status: startupInvariants.errors.length === 0 ? 'ok' : 'error',
       invariants: startupInvariants,
       authPolicy: startupInvariants.authPolicy,
+      hostedAuth: startupInvariants.authPolicy.hostedAuth,
       protocol: {
         requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
         supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
@@ -411,6 +420,7 @@ export function getStartupDiagnostics() {
         gatewayTokenConfigured: Boolean(process.env.MCP_AUTH_TOKEN),
       },
       authPolicy: invariants.authPolicy,
+      hostedAuth: invariants.authPolicy.hostedAuth,
       session: {
         sessionsEnabled: config.httpTransport?.enableSessions ?? true,
         resumabilityEnabled: config.httpTransport?.enableResumability ?? false,
@@ -426,6 +436,9 @@ export function getStartupDiagnostics() {
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
+    const hostedAuth = evaluateWorkerHostedAuthConfig(
+      process.env as Parameters<typeof evaluateWorkerHostedAuthConfig>[0],
+    );
     return {
       status: 'error',
       invariants: {
@@ -439,6 +452,23 @@ export function getStartupDiagnostics() {
             serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
             oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
           },
+          devFallback: {
+            userIdConfigured: Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()),
+            allowFlagEnabled: parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
+            enabled:
+              Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
+              parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
+            productionLike: process.env.NODE_ENV === 'production',
+            riskLevel:
+              Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
+              parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
+                ? 'enabled'
+                : Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) ||
+                    parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
+                  ? 'misconfigured'
+                  : 'disabled',
+          },
+          hostedAuth,
           effectivePrimary: null,
           incompatibleRulesTriggered: [],
         },
@@ -456,9 +486,27 @@ export function getStartupDiagnostics() {
           serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
         },
+        devFallback: {
+          userIdConfigured: Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()),
+          allowFlagEnabled: parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
+          enabled:
+            Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
+            parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
+          productionLike: process.env.NODE_ENV === 'production',
+          riskLevel:
+            Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
+            parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
+              ? 'enabled'
+              : Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) ||
+                  parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
+                ? 'misconfigured'
+                : 'disabled',
+        },
+        hostedAuth,
         effectivePrimary: null,
         incompatibleRulesTriggered: [],
       },
+      hostedAuth,
       session: {
         sessionsEnabled: process.env.MCP_SESSIONS !== 'false',
         resumabilityEnabled: process.env.MCP_RESUMABILITY === 'true',

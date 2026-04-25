@@ -5,10 +5,29 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - id: token-check
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [[ -n "${RELEASE_PLEASE_TOKEN}" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: ${{ steps.token-check.outputs.configured == 'false' }}
+        run: echo "Skipping release-please because RELEASE_PLEASE_TOKEN is not configured."
+
+      - if: ${{ steps.token-check.outputs.configured == 'true' }}
+        uses: googleapis/release-please-action@v4
         with:
           release-type: node
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}

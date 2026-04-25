@@ -12,8 +12,10 @@
  * Secrets (set via `wrangler secret put`):
  *   COURTLISTENER_API_KEY  — CourtListener API token (required)
  *   MCP_AUTH_TOKEN          — Optional service token for x-mcp-service-token only
+ *   MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION — Optional explicit trust gate for CF-Access-Jwt-Assertion
+ *   MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS — Optional explicit trust gate for cf-access-authenticated-user-* headers
  *   OIDC_ISSUER             — Optional OIDC issuer URL for JWT validation
- *   OIDC_AUDIENCE           — Optional OIDC audience
+ *   OIDC_AUDIENCE           — Optional OIDC audience/resource bound used during worker-side JWT validation
  *   OIDC_JWKS_URL           — Optional explicit JWKS URL
  *   OIDC_REQUIRED_SCOPE     — Optional required scope
  *   MCP_OAUTH_DEV_USER_ID   — Optional controlled dev fallback identity for /authorize
@@ -28,6 +30,7 @@ import {
   type CallToolRequest,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 import { generateId } from './common/utils.js';
 import { bootstrapServices } from './infrastructure/bootstrap.js';
@@ -47,9 +50,7 @@ import { SubscriptionManager } from './server/subscription-manager.js';
 import { buildToolDefinitions, buildEnhancedMetadata } from './server/tool-builder.js';
 import { setupHandlers } from './server/handler-registry.js';
 import { createDirectToolExecutionService } from './server/tool-execution-service.js';
-import {
-  type WorkerDelegatedRouteDeps,
-} from './server/worker-route-composition.js';
+import { type WorkerDelegatedRouteDeps } from './server/worker-route-composition.js';
 import type { HandleWorkerCoreRoutesDeps } from './server/worker-core-routes.js';
 import {
   buildLowCostSummary,
@@ -69,25 +70,28 @@ import {
   type WorkerMcpAiRuntime,
 } from './server/worker-mcp-ai-runtime.js';
 import { createWorkerLegacyFetchHandler } from './server/worker-request-runtime.js';
-import { handleWorkerOAuthEntrypoint } from './server/worker-oauth-entrypoint-runtime.js';
+import {
+  handleWorkerOAuthEntrypoint,
+  isWorkerManagedRegistrationPath,
+  shouldBypassOAuthProvider,
+} from './server/worker-oauth-entrypoint-runtime.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
 import { handleWorkerOAuthAuthorizeRoute } from './server/worker-oauth-authorize.js';
 import { handleWorkerDynamicClientRegistration } from './server/worker-oauth-registration.js';
 import {
   createCloudflareOAuthProviderRuntime,
-  createRegistrationAccessToken,
   getRegistrationAllowedOrigins,
-  verifyRegistrationAccessToken,
   withRegistrationCors,
 } from './server/worker-oauth-provider-runtime.js';
+import {
+  createRegistrationAccessToken,
+  verifyRegistrationAccessToken,
+} from './server/worker-oauth-registration-token.js';
 import {
   createWorkerUiSessionRuntime,
   type WorkerUiSessionRuntime,
 } from './server/worker-ui-session-runtime.js';
-import {
-  extractBearerToken,
-  isAllowedOrigin,
-} from './server/worker-security.js';
+import { extractBearerToken, isAllowedOrigin } from './server/worker-security.js';
 import {
   emitOAuthDiagnostic,
   summarizeOAuthRequest,
@@ -119,8 +123,13 @@ import {
   CHEAP_MODE_MAX_TOKENS,
   BALANCED_MODE_MAX_TOKENS,
 } from './server/worker-runtime-contract.js';
-import { AuthFailureLimiterDO, createWorkerDurableRuntime } from './server/worker-durable-runtime.js';
+import {
+  AuthFailureLimiterDO,
+  createWorkerDurableRuntime,
+} from './server/worker-durable-runtime.js';
 import { HOSTED_MCP_OAUTH_CONTRACT } from './auth/oauth-contract.js';
+import { buildHostedOAuthCompletionDetails } from './auth/oauth-authorization-completion.js';
+import { resolveGrantedScopes } from './auth/oauth-scope-resolver.js';
 
 // ---------------------------------------------------------------------------
 // MCP Agent — one Durable Object instance per client session
@@ -232,35 +241,30 @@ function isMcpPath(pathname: string): boolean {
   return pathname === '/mcp' || pathname === '/sse';
 }
 
-function isCloudflareOAuthBackendEnabled(env: Env): boolean {
-  // Hard-cut migration posture: Cloudflare OAuth provider is now the only supported runtime.
-  void env;
-  return true;
-}
-
 function isRemovedLegacyUiRoute(pathname: string): boolean {
   return (
     pathname === '/oauth/consent' ||
     pathname.startsWith('/api/login') ||
-    pathname.startsWith('/api/logout') ||
     pathname.startsWith('/api/signup') ||
     pathname.startsWith('/api/password') ||
     pathname.startsWith('/api/keys')
   );
 }
 
-const workerObservabilityRuntime: WorkerObservabilityRuntime<Env> = createWorkerObservabilityRuntime<Env>({
-  routeLatencyMaxRoutes: WORKER_ROUTE_LATENCY_MAX_ROUTES,
-  routeLatencyOverflowRoute: WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE,
-  exportTopSlowOperationLimit: WORKER_EXPORT_TOP_SLOW_OPERATION_LIMIT,
-  doOutlierScoreThreshold: WORKER_DO_OUTLIER_SCORE_THRESHOLD,
-  doOutlierMinSamples: WORKER_DO_OUTLIER_MIN_SAMPLES,
-  resolveWorkerMcpSessionTopologyV2,
-});
+const workerObservabilityRuntime: WorkerObservabilityRuntime<Env> =
+  createWorkerObservabilityRuntime<Env>({
+    routeLatencyMaxRoutes: WORKER_ROUTE_LATENCY_MAX_ROUTES,
+    routeLatencyOverflowRoute: WORKER_ROUTE_LATENCY_OVERFLOW_ROUTE,
+    exportTopSlowOperationLimit: WORKER_EXPORT_TOP_SLOW_OPERATION_LIMIT,
+    doOutlierScoreThreshold: WORKER_DO_OUTLIER_SCORE_THRESHOLD,
+    doOutlierMinSamples: WORKER_DO_OUTLIER_MIN_SAMPLES,
+    resolveWorkerMcpSessionTopologyV2,
+  });
 
 const workerDurableRuntime = createWorkerDurableRuntime<Env>({
   now: () => Date.now(),
   recordDurableObjectLatency: workerObservabilityRuntime.recordDurableObjectLatency,
+  recordDurableObjectUnavailable: workerObservabilityRuntime.recordDurableObjectUnavailable,
   getCachedSessionTopology: workerObservabilityRuntime.getCachedSessionTopology,
   jsonError,
 });
@@ -295,6 +299,7 @@ function rejectDisallowedUiOrigin(
 const workerDelegatedRouteDeps = {
   jsonError,
   jsonResponse,
+  withCors,
   rejectDisallowedUiOrigin,
   requireCsrfToken: workerUiSessionRuntime.requireCsrfToken,
   parseJsonBody,
@@ -322,6 +327,13 @@ const workerDelegatedRouteDeps = {
   htmlResponse,
   renderSpaShellHtml,
   redirectResponse,
+  workerUiSessionRuntime,
+  getOAuthHelpers: (env: Env) => getOAuthHelpersRef(env),
+  buildHostedOAuthCompletionDetails,
+  resolveGrantedScopes,
+  getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
+  getAuthRouteRateLimitedResponse: workerDurableRuntime.getAuthRouteRateLimitedResponse,
+  now: () => Date.now(),
   mcpBoundaryPolicy: {
     supportedProtocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
     mcpStreamableHandler,
@@ -340,15 +352,19 @@ const workerDelegatedRouteDeps = {
   },
 } satisfies WorkerDelegatedRouteDeps<Env>;
 
+let getOAuthHelpersRef: (env: Env) => OAuthHelpers = () => {
+  throw new Error('OAuth helpers are not initialized.');
+};
+
 const workerCoreRouteDeps = {
   isAllowedOrigin,
   buildCorsHeaders,
   withCors,
   jsonError,
   jsonResponse,
-  isCloudflareOAuthBackendEnabled,
   isRemovedLegacyUiRoute,
   workerUiSessionRuntime,
+  workerDurableRuntime,
   getCachedSessionTopology: workerObservabilityRuntime.getCachedSessionTopology,
   getWorkerLatencySnapshot: workerObservabilityRuntime.getWorkerLatencySnapshot,
   getUsageSnapshot: workerDurableRuntime.getUserUsageSnapshot,
@@ -386,7 +402,7 @@ const cloudflareOAuthProviderRuntime = createCloudflareOAuthProviderRuntime<Env>
     handleWorkerOAuthAuthorizeRoute(request, env, {
       jsonError,
       redirectResponse,
-      resolveCloudflareOAuthUserId: workerUiSessionRuntime.resolveCloudflareOAuthUserId,
+      resolveCloudflareOAuthIdentity: workerUiSessionRuntime.resolveCloudflareOAuthIdentity,
     }),
   handleLegacyWorkerFetch,
   getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
@@ -396,43 +412,52 @@ const cloudflareOAuthProviderRuntime = createCloudflareOAuthProviderRuntime<Env>
 
 const cloudflareOAuthProvider = cloudflareOAuthProviderRuntime.provider;
 const getOAuthHelpers = cloudflareOAuthProviderRuntime.getOAuthHelpers;
+getOAuthHelpersRef = getOAuthHelpers;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (isCloudflareOAuthBackendEnabled(env)) {
-      if (
-        url.pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.register ||
-        url.pathname.startsWith(`${HOSTED_MCP_OAUTH_CONTRACT.paths.register}/`)
-      ) {
-        return handleWorkerDynamicClientRegistration(request, env, {
-          getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
-          getRegistrationAllowedOrigins: (runtimeEnv) =>
-            getRegistrationAllowedOrigins(runtimeEnv, {
-              getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
-            }),
-          isAllowedOrigin,
-          extractBearerToken,
-          buildCorsHeaders,
-          withRegistrationCors: (response, corsRequest, runtimeEnv) =>
-            withRegistrationCors(response, corsRequest, runtimeEnv, {
-              getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
-              buildCorsHeaders,
-              getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
-            }),
-          jsonRegistrationError,
-          getOAuthHelpers,
-          createRegistrationAccessToken,
-          verifyRegistrationAccessToken,
-        });
-      }
-      return handleWorkerOAuthEntrypoint(request, env, ctx, {
-        cloudflareOAuthProvider,
-        summarizeOAuthRequest,
-        summarizeOAuthResponse,
-        emitOAuthDiagnostic,
+    // Capture the request origin so the OAuthProvider's onError callback
+    // builds resource_metadata URLs relative to the domain the client used
+    // (workers.dev vs custom domain).
+    cloudflareOAuthProviderRuntime.setCurrentRequestOrigin(url.origin);
+
+    if (shouldBypassOAuthProvider(url.pathname)) {
+      return handleLegacyWorkerFetch(request, env, ctx);
+    }
+    if (isWorkerManagedRegistrationPath(url.pathname)) {
+      return handleWorkerDynamicClientRegistration(request, env, {
+        getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
+        getRegistrationAllowedOrigins: (runtimeEnv) =>
+          getRegistrationAllowedOrigins(runtimeEnv, {
+            getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
+          }),
+        isAllowedOrigin,
+        extractBearerToken,
+        buildCorsHeaders,
+        withRegistrationCors: (response, corsRequest, runtimeEnv) =>
+          withRegistrationCors(response, corsRequest, runtimeEnv, {
+            getRequestOrigin: workerObservabilityRuntime.getRequestOrigin,
+            buildCorsHeaders,
+            getCachedAllowedOrigins: workerObservabilityRuntime.getCachedAllowedOrigins,
+          }),
+        jsonRegistrationError,
+        getOAuthHelpers,
+        createRegistrationAccessToken,
+        verifyRegistrationAccessToken,
+        getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
+        getAuthRouteRateLimitedResponse: workerDurableRuntime.getAuthRouteRateLimitedResponse,
+        now: () => Date.now(),
       });
     }
-    return handleLegacyWorkerFetch(request, env, ctx);
+    return handleWorkerOAuthEntrypoint(request, env, ctx, {
+      cloudflareOAuthProvider,
+      summarizeOAuthRequest,
+      summarizeOAuthResponse,
+      emitOAuthDiagnostic,
+      getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
+      getAuthRouteRateLimitedResponse: workerDurableRuntime.getAuthRouteRateLimitedResponse,
+      now: () => Date.now(),
+    });
   },
 };

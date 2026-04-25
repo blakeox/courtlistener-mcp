@@ -1,11 +1,10 @@
 {
   "name": "courtlistener-mcp",
-  "compatibility_date": "2025-07-25",
+  "compatibility_date": "2026-03-02",
   "main": "src/worker.ts",
   "workers_dev": false,
   "vars": {
     "MCP_OAUTH_BACKEND": "cloudflare",
-    "MCP_AUTH_UI_ORIGIN": "https://auth.courtlistenermcp.blakeoxford.com",
     "MCP_ALLOW_DEV_FALLBACK": "false",
     "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
     "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",

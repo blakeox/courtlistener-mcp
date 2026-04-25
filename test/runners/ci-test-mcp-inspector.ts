@@ -10,9 +10,11 @@ import { spawn, type ChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '../..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 const REMOTE_BEARER_TOKEN =
   process.env.MCP_REMOTE_BEARER_TOKEN?.trim() ||
   process.env.REMOTE_SERVER_BEARER_TOKEN?.trim() ||
@@ -36,14 +38,12 @@ interface Config {
 
 const CONFIG: Config = {
   server: {
-    command: 'node',
-    args: [join(projectRoot, 'dist/index.js')],
+    command: localServerRuntime.command,
+    args: localServerRuntime.args,
     env: { NODE_ENV: 'test' },
   },
   remoteServer: {
-    url:
-      process.env.REMOTE_SERVER_URL ||
-      'https://courtlistenermcp.blakeoxford.com/mcp',
+    url: process.env.REMOTE_SERVER_URL || 'https://courtlistenermcp.blakeoxford.com/mcp',
     transport: 'streamable-http',
   },
   timeout: 30000, // 30 seconds
@@ -85,8 +85,8 @@ const testCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/list',
     ],
@@ -105,8 +105,8 @@ const testCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
@@ -125,8 +125,8 @@ const testCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
@@ -151,8 +151,8 @@ const extendedTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/list',
     ],
@@ -176,18 +176,13 @@ const extendedTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/list',
     ],
     validate: (output) => {
-      const advancedTools = [
-        'get_dockets',
-        'get_judges',
-        'get_oral_arguments',
-        'advanced_search',
-      ];
+      const advancedTools = ['get_dockets', 'get_judges', 'get_oral_arguments', 'advanced_search'];
       return advancedTools.some((tool) => output.includes(tool));
     },
     required: true,
@@ -198,8 +193,8 @@ const extendedTestCases: TestCase[] = [
       'npx',
       '@modelcontextprotocol/inspector',
       '--cli',
-      'node',
-      join(projectRoot, 'dist/index.js'),
+      localServerRuntime.command,
+      ...localServerRuntime.args,
       '--method',
       'tools/call',
       '--tool-name',
@@ -239,9 +234,7 @@ async function runTest(testCase: TestCase): Promise<boolean> {
 
     const timeout = setTimeout(() => {
       childProcess.kill();
-      console.log(
-        `${colors.YELLOW}⚠️  Test timed out: ${testCase.name}${colors.NC}`
-      );
+      console.log(`${colors.YELLOW}⚠️  Test timed out: ${testCase.name}${colors.NC}`);
       if (testCase.required) {
         failedTests++;
         resolve(false);
@@ -255,10 +248,7 @@ async function runTest(testCase: TestCase): Promise<boolean> {
       clearTimeout(timeout);
 
       const output = stdout + stderr;
-      const logFile = join(
-        CONFIG.outputDir,
-        `${testCase.name.replace(/[^a-zA-Z0-9]/g, '_')}.log`
-      );
+      const logFile = join(CONFIG.outputDir, `${testCase.name.replace(/[^a-zA-Z0-9]/g, '_')}.log`);
 
       // Save test output
       if (!fs.existsSync(CONFIG.outputDir)) {
@@ -274,15 +264,11 @@ async function runTest(testCase: TestCase): Promise<boolean> {
         if (testCase.required) {
           console.log(`${colors.RED}❌ FAILED: ${testCase.name}${colors.NC}`);
           console.log(`${colors.RED}Exit code: ${code}${colors.NC}`);
-          console.log(
-            `${colors.RED}Output: ${output.substring(0, 500)}...${colors.NC}`
-          );
+          console.log(`${colors.RED}Output: ${output.substring(0, 500)}...${colors.NC}`);
           failedTests++;
           resolve(false);
         } else {
-          console.log(
-            `${colors.YELLOW}⏭️  SKIPPED: ${testCase.name} (optional)${colors.NC}`
-          );
+          console.log(`${colors.YELLOW}⏭️  SKIPPED: ${testCase.name} (optional)${colors.NC}`);
           resolve(true);
         }
       }
@@ -290,9 +276,7 @@ async function runTest(testCase: TestCase): Promise<boolean> {
 
     childProcess.on('error', (error: Error) => {
       clearTimeout(timeout);
-      console.log(
-        `${colors.RED}❌ ERROR: ${testCase.name} - ${error.message}${colors.NC}`
-      );
+      console.log(`${colors.RED}❌ ERROR: ${testCase.name} - ${error.message}${colors.NC}`);
       if (testCase.required) {
         failedTests++;
         resolve(false);
@@ -308,21 +292,17 @@ async function runTest(testCase: TestCase): Promise<boolean> {
  */
 async function testRemoteServer(): Promise<boolean> {
   if (!CONFIG.remoteServer.url) {
-    console.log(
-      `${colors.YELLOW}⏭️  Skipping remote server tests (no URL configured)${colors.NC}`
-    );
+    console.log(`${colors.YELLOW}⏭️  Skipping remote server tests (no URL configured)${colors.NC}`);
     return true;
   }
   if (!REMOTE_BEARER_TOKEN && process.env.REMOTE_SERVER_ALLOW_UNAUTH !== 'true') {
     console.log(
-      `\n${colors.YELLOW}⏭️  Skipping remote server tests (set MCP_REMOTE_BEARER_TOKEN or REMOTE_SERVER_ALLOW_UNAUTH=true)${colors.NC}`
+      `\n${colors.YELLOW}⏭️  Skipping remote server tests (set MCP_REMOTE_BEARER_TOKEN or REMOTE_SERVER_ALLOW_UNAUTH=true)${colors.NC}`,
     );
     return true;
   }
 
-  console.log(
-    `\n${colors.BLUE}🌐 Testing Remote Server: ${CONFIG.remoteServer.url}${colors.NC}`
-  );
+  console.log(`\n${colors.BLUE}🌐 Testing Remote Server: ${CONFIG.remoteServer.url}${colors.NC}`);
 
   interface RemoteTest {
     name: string;
@@ -391,17 +371,12 @@ async function testRemoteServer(): Promise<boolean> {
         console.log(`${colors.GREEN}✅ PASSED: ${test.name}${colors.NC}`);
         passedTests++;
       } else {
-        console.log(
-          `${colors.RED}❌ FAILED: Invalid response format${colors.NC}`
-        );
+        console.log(`${colors.RED}❌ FAILED: Invalid response format${colors.NC}`);
         failedTests++;
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.log(
-        `${colors.RED}❌ FAILED: ${test.name} - ${errorMessage}${colors.NC}`
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`${colors.RED}❌ FAILED: ${test.name} - ${errorMessage}${colors.NC}`);
       failedTests++;
     }
   }
@@ -432,9 +407,7 @@ function generateReport(): {
   const reportPath = join(CONFIG.outputDir, 'ci-mcp-inspector-report.json');
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
 
-  console.log(
-    `\n${colors.BLUE}📄 Test report saved: ${reportPath}${colors.NC}`
-  );
+  console.log(`\n${colors.BLUE}📄 Test report saved: ${reportPath}${colors.NC}`);
   return report;
 }
 
@@ -442,12 +415,8 @@ function generateReport(): {
  * Main test runner
  */
 async function main(): Promise<void> {
-  console.log(
-    `${colors.YELLOW}🚀 Legal MCP Server - CI Inspector Testing${colors.NC}`
-  );
-  console.log(
-    `${colors.YELLOW}===========================================${colors.NC}\n`
-  );
+  console.log(`${colors.YELLOW}🚀 Legal MCP Server - CI Inspector Testing${colors.NC}`);
+  console.log(`${colors.YELLOW}===========================================${colors.NC}\n`);
 
   console.log(`Extended mode: ${CONFIG.extended ? 'ON' : 'OFF'}`);
   console.log(`Output directory: ${CONFIG.outputDir}`);
@@ -460,18 +429,14 @@ async function main(): Promise<void> {
     }
 
     // Run basic test cases
-    console.log(
-      `${colors.YELLOW}=== Running Basic MCP Inspector Tests ===${colors.NC}`
-    );
+    console.log(`${colors.YELLOW}=== Running Basic MCP Inspector Tests ===${colors.NC}`);
     for (const testCase of testCases) {
       await runTest(testCase);
     }
 
     // Run extended test cases if requested
     if (CONFIG.extended) {
-      console.log(
-        `\n${colors.YELLOW}=== Running Extended MCP Inspector Tests ===${colors.NC}`
-      );
+      console.log(`\n${colors.YELLOW}=== Running Extended MCP Inspector Tests ===${colors.NC}`);
       for (const testCase of extendedTestCases) {
         await runTest(testCase);
       }
@@ -498,11 +463,9 @@ async function main(): Promise<void> {
       const successRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
       if (successRate >= 80.0) {
         console.log(
-          `\n${colors.YELLOW}⚠️  ${failedTests} test(s) failed, but success rate is ${successRate.toFixed(1)}%${colors.NC}`
+          `\n${colors.YELLOW}⚠️  ${failedTests} test(s) failed, but success rate is ${successRate.toFixed(1)}%${colors.NC}`,
         );
-        console.log(
-          `${colors.GREEN}✅ Core MCP Inspector functionality is working${colors.NC}`
-        );
+        console.log(`${colors.GREEN}✅ Core MCP Inspector functionality is working${colors.NC}`);
         process.exit(0);
       } else {
         console.log(`\n${colors.RED}❌ ${failedTests} test(s) failed${colors.NC}`);
@@ -511,9 +474,7 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(
-      `${colors.RED}❌ CI test suite failed: ${errorMessage}${colors.NC}`
-    );
+    console.error(`${colors.RED}❌ CI test suite failed: ${errorMessage}${colors.NC}`);
     process.exit(1);
   }
 }
@@ -526,7 +487,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const nodeVersion = parseInt(nodeVersionMatch[1], 10);
     if (nodeVersion < 18) {
       console.error(
-        `${colors.RED}❌ This script requires Node.js 18+ for fetch support${colors.NC}`
+        `${colors.RED}❌ This script requires Node.js 18+ for fetch support${colors.NC}`,
       );
       process.exit(1);
     }

@@ -41,7 +41,9 @@ describe('worker observability runtime', () => {
     );
     assert.equal(
       runtime.getClientIdentifier(
-        new Request('https://worker.example', { headers: { 'X-Forwarded-For': '5.6.7.8, 9.9.9.9' } }),
+        new Request('https://worker.example', {
+          headers: { 'X-Forwarded-For': '5.6.7.8, 9.9.9.9' },
+        }),
       ),
       '5.6.7.8',
     );
@@ -50,7 +52,13 @@ describe('worker observability runtime', () => {
   it('normalizes route metric keys and caps route cardinality with an overflow bucket', () => {
     const runtime = createRuntime();
 
-    assert.equal(runtime.buildWorkerRouteMetricKey('post', '/api/123/item/550e8400-e29b-41d4-a716-446655440000'), 'POST /api/:id/item/:uuid');
+    assert.equal(
+      runtime.buildWorkerRouteMetricKey(
+        'post',
+        '/api/123/item/550e8400-e29b-41d4-a716-446655440000',
+      ),
+      'POST /api/:id/item/:uuid',
+    );
 
     for (let i = 0; i < 80; i += 1) {
       runtime.recordRouteLatency(`GET /route-${i}`, i + 1);
@@ -76,11 +84,29 @@ describe('worker observability runtime', () => {
     const secondTopology = runtime.getCachedSessionTopology(env);
     assert.equal(firstTopology, secondTopology);
 
-    const origins = runtime.getCachedAllowedOrigins('https://chatgpt.com', 'https://auth.courtlistenermcp.blakeoxford.com');
-    assert.deepEqual(origins, ['https://chatgpt.com', 'https://auth.courtlistenermcp.blakeoxford.com']);
-    assert.equal(
-      runtime.getCachedAllowedOrigins('https://chatgpt.com', 'https://auth.courtlistenermcp.blakeoxford.com'),
-      origins,
-    );
+    const origins = runtime.getCachedAllowedOrigins('https://chatgpt.com');
+    assert.deepEqual(origins, ['https://chatgpt.com']);
+    assert.equal(runtime.getCachedAllowedOrigins('https://chatgpt.com'), origins);
+  });
+
+  it('tracks DO unavailable counts for bounded health visibility', () => {
+    const runtime = createRuntime();
+
+    runtime.recordDurableObjectLatency('session_revocation', 12);
+    runtime.recordDurableObjectUnavailable('session_revocation');
+    runtime.recordDurableObjectLatency('mcp_session_lifecycle', 8);
+    runtime.recordDurableObjectUnavailable('mcp_session_lifecycle');
+
+    const snapshot = runtime.getWorkerLatencySnapshot();
+
+    assert.deepEqual(Object.keys(snapshot.durable_objects).sort(), [
+      'ai_chat_quota',
+      'auth_limiter',
+      'mcp_session_lifecycle',
+      'session_revocation',
+    ]);
+    assert.equal(snapshot.durable_objects.session_revocation.unavailable_count, 1);
+    assert.equal(snapshot.durable_objects.mcp_session_lifecycle.unavailable_count, 1);
+    assert.equal(snapshot.durable_objects.ai_chat_quota.unavailable_count, 0);
   });
 });

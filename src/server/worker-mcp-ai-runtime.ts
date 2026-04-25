@@ -78,26 +78,57 @@ function extractMcpResponseBody(raw: string): unknown {
 
 export function aiToolFromPrompt(message: string): { tool: string; reason: string } {
   const normalized = message.toLowerCase();
-  if (/\d+\s+(u\.?s\.?|s\.?\s*ct\.?|f\.\s*\d|f\.?\s*supp)/i.test(message) || normalized.includes('v.')) {
-    return { tool: 'lookup_citation', reason: 'Query contains a legal citation pattern (e.g., "v." or reporter reference).' };
+  if (
+    /\d+\s+(u\.?s\.?|s\.?\s*ct\.?|f\.\s*\d|f\.?\s*supp)/i.test(message) ||
+    normalized.includes('v.')
+  ) {
+    return {
+      tool: 'lookup_citation',
+      reason: 'Query contains a legal citation pattern (e.g., "v." or reporter reference).',
+    };
   }
-  if (normalized.includes('opinion') || normalized.includes('holding') || normalized.includes('ruling')) {
+  if (
+    normalized.includes('opinion') ||
+    normalized.includes('holding') ||
+    normalized.includes('ruling')
+  ) {
     return { tool: 'search_opinions', reason: 'Query mentions opinions, holdings, or rulings.' };
   }
-  if (normalized.includes('judge') && (normalized.includes('profile') || normalized.includes('background') || normalized.includes('record'))) {
-    return { tool: 'get_comprehensive_judge_profile', reason: 'Query asks for a judge profile or background.' };
+  if (
+    normalized.includes('judge') &&
+    (normalized.includes('profile') ||
+      normalized.includes('background') ||
+      normalized.includes('record'))
+  ) {
+    return {
+      tool: 'get_comprehensive_judge_profile',
+      reason: 'Query asks for a judge profile or background.',
+    };
   }
-  if (normalized.includes('court') && (normalized.includes('list') || normalized.includes('which') || normalized.includes('all'))) {
+  if (
+    normalized.includes('court') &&
+    (normalized.includes('list') || normalized.includes('which') || normalized.includes('all'))
+  ) {
     return { tool: 'list_courts', reason: 'Query asks to list or identify courts.' };
   }
   if (normalized.includes('docket') || normalized.includes('filing')) {
     return { tool: 'get_docket_entries', reason: 'Query mentions dockets or filings.' };
   }
-  if (normalized.includes('citation') && (normalized.includes('valid') || normalized.includes('check') || normalized.includes('verify'))) {
+  if (
+    normalized.includes('citation') &&
+    (normalized.includes('valid') || normalized.includes('check') || normalized.includes('verify'))
+  ) {
     return { tool: 'validate_citations', reason: 'Query asks to validate or check citations.' };
   }
-  if (normalized.includes('argument') || normalized.includes('precedent') || normalized.includes('legal analysis')) {
-    return { tool: 'analyze_legal_argument', reason: 'Query involves legal argument analysis or precedent research.' };
+  if (
+    normalized.includes('argument') ||
+    normalized.includes('precedent') ||
+    normalized.includes('legal analysis')
+  ) {
+    return {
+      tool: 'analyze_legal_argument',
+      reason: 'Query involves legal argument analysis or precedent research.',
+    };
   }
   return { tool: 'search_cases', reason: 'Default: general case search for broad legal queries.' };
 }
@@ -128,7 +159,10 @@ export function aiToolArguments(toolName: string, prompt: string): Record<string
     return requireNumericIdentifier(prompt, 'opinion_id', 'Opinion lookup');
   }
   if (toolName === 'get_citation_network') {
-    return { ...requireNumericIdentifier(prompt, 'opinion_id', 'Citation network lookup'), depth: 2 };
+    return {
+      ...requireNumericIdentifier(prompt, 'opinion_id', 'Citation network lookup'),
+      depth: 2,
+    };
   }
   if (toolName === 'smart_search') {
     return { query: prompt, max_results: 5 };
@@ -215,7 +249,9 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
       const payload = extractMcpResponseBody(raw);
       const rpcBody = payload as McpJsonRpcResponse<unknown>;
       if (rpcBody.error?.message) {
-        throw new Error(deps.redactSecretsInText(`MCP error ${rpcBody.error.code}: ${rpcBody.error.message}`));
+        throw new Error(
+          deps.redactSecretsInText(`MCP error ${rpcBody.error.code}: ${rpcBody.error.message}`),
+        );
       }
 
       return {
@@ -236,7 +272,7 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
       if (!(request.method === 'POST' || request.method === 'GET')) {
         return;
       }
-      const userId = principal?.userId || request.headers.get('x-oauth-user-id')?.trim() || '';
+      const userId = principal?.userId?.trim() || '';
       if (!userId) {
         return;
       }

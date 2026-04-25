@@ -42,16 +42,23 @@ const DEFAULT_SCENARIO_CLASS_MAP = {
   auth_signup_limiter: 'auth',
   auth_login_limiter: 'auth',
 };
+const DEFAULT_P95_MIN_DELTA_MS = 5;
 
 function sanitizeLabel(value, fallback) {
-  return String(value || fallback).trim().replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase();
+  return String(value || fallback)
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .toLowerCase();
 }
 
 function getCommitShaLabel() {
   const envSha = process.env.PERF_COMMIT_SHA || process.env.GITHUB_SHA;
   if (envSha) return sanitizeLabel(envSha.slice(0, 12), 'unknown-sha');
   try {
-    return sanitizeLabel(execSync('git rev-parse --short=12 HEAD', { encoding: 'utf8' }), 'unknown-sha');
+    return sanitizeLabel(
+      execSync('git rev-parse --short=12 HEAD', { encoding: 'utf8' }),
+      'unknown-sha',
+    );
   } catch {
     return 'unknown-sha';
   }
@@ -60,7 +67,7 @@ function getCommitShaLabel() {
 function getRuntimeModeLabel() {
   return sanitizeLabel(
     process.env.PERF_RUNTIME_MODE || process.env.MCP_RUNTIME_MODE || process.env.NODE_ENV,
-    'default'
+    'default',
   );
 }
 
@@ -114,14 +121,21 @@ function parseJsonMetrics(data) {
 
   if (data && typeof data === 'object' && data.baseline) {
     source = data.baseline;
-  } else if (data && typeof data === 'object' && Array.isArray(data.results) && data.results[0]?.metrics) {
+  } else if (
+    data &&
+    typeof data === 'object' &&
+    Array.isArray(data.results) &&
+    data.results[0]?.metrics
+  ) {
     source = data.results[0].metrics;
   } else if (data && typeof data === 'object' && data.metrics) {
     source = data.metrics;
   }
 
   if (!source || typeof source !== 'object') return metrics;
-  const latencies = Array.isArray(source.request_latency) ? source.request_latency.filter(v => Number.isFinite(v) && v >= 0) : [];
+  const latencies = Array.isArray(source.request_latency)
+    ? source.request_latency.filter((v) => Number.isFinite(v) && v >= 0)
+    : [];
 
   if (typeof source.startup_time === 'number') metrics.averageTime = source.startup_time;
   if (typeof source.minTime === 'number') metrics.minTime = source.minTime;
@@ -240,7 +254,10 @@ function parseEndpointClassMetrics(content, filePath, scenarioClassMap) {
 
 function percentile(sortedValues, percentileValue) {
   if (!sortedValues.length) return 0;
-  const index = Math.min(sortedValues.length - 1, Math.ceil((percentileValue / 100) * sortedValues.length) - 1);
+  const index = Math.min(
+    sortedValues.length - 1,
+    Math.ceil((percentileValue / 100) * sortedValues.length) - 1,
+  );
   return sortedValues[index];
 }
 
@@ -252,7 +269,7 @@ function compareMetrics(baseline, current) {
     improved: [],
     degraded: [],
     unchanged: [],
-    summary: {}
+    summary: {},
   };
 
   // Define what constitutes improvement for each metric
@@ -265,10 +282,10 @@ function compareMetrics(baseline, current) {
     errorRate: (base, curr) => curr < base,
     throughput: (base, curr) => curr >= base,
     requestsTotal: (base, curr) => curr >= base,
-    cacheHits: (base, curr) => curr >= base
+    cacheHits: (base, curr) => curr >= base,
   };
 
-  Object.keys(baseline).forEach(metric => {
+  Object.keys(baseline).forEach((metric) => {
     if (current[metric] !== undefined) {
       const baseValue = baseline[metric];
       const currValue = current[metric];
@@ -280,7 +297,7 @@ function compareMetrics(baseline, current) {
         baseline: baseValue,
         current: currValue,
         difference: diff,
-        percentChange: parseFloat(percentChange)
+        percentChange: parseFloat(percentChange),
       };
 
       // Determine if this is an improvement, degradation, or no change
@@ -302,40 +319,60 @@ function compareMetrics(baseline, current) {
 /**
  * Generate comparison report
  */
-function evaluateThresholds(comparison, thresholds) {
+function evaluateThresholds(comparison, thresholds, p95MinDeltaMs) {
   const warnings = [];
   const failures = [];
 
-  Object.values(comparison.summary).forEach(change => {
+  Object.values(comparison.summary).forEach((change) => {
     const { metric, baseline, current, percentChange } = change;
     if (metric === 'p95' && current > baseline) {
-      if (percentChange >= thresholds.p95.failPct) failures.push(`p95 latency +${percentChange}% (fail ${thresholds.p95.failPct}%)`);
-      else if (percentChange >= thresholds.p95.warnPct) warnings.push(`p95 latency +${percentChange}% (warn ${thresholds.p95.warnPct}%)`);
+      const deltaMs = current - baseline;
+      if (deltaMs >= p95MinDeltaMs) {
+        if (percentChange >= thresholds.p95.failPct)
+          failures.push(`p95 latency +${percentChange}% (fail ${thresholds.p95.failPct}%)`);
+        else if (percentChange >= thresholds.p95.warnPct)
+          warnings.push(`p95 latency +${percentChange}% (warn ${thresholds.p95.warnPct}%)`);
+      }
     }
 
     if (metric === 'throughput' && current < baseline) {
       const dropPct = Math.abs(percentChange);
-      if (dropPct >= thresholds.throughput.failPct) failures.push(`throughput -${dropPct}% (fail ${thresholds.throughput.failPct}%)`);
-      else if (dropPct >= thresholds.throughput.warnPct) warnings.push(`throughput -${dropPct}% (warn ${thresholds.throughput.warnPct}%)`);
+      if (dropPct >= thresholds.throughput.failPct)
+        failures.push(`throughput -${dropPct}% (fail ${thresholds.throughput.failPct}%)`);
+      else if (dropPct >= thresholds.throughput.warnPct)
+        warnings.push(`throughput -${dropPct}% (warn ${thresholds.throughput.warnPct}%)`);
     }
 
     if (metric === 'errorRate' && current > baseline) {
       const delta = current - baseline;
-      if (delta >= thresholds.errorRate.failAbs) failures.push(`error rate +${delta.toFixed(2)}pp (fail ${thresholds.errorRate.failAbs}pp)`);
-      else if (delta >= thresholds.errorRate.warnAbs) warnings.push(`error rate +${delta.toFixed(2)}pp (warn ${thresholds.errorRate.warnAbs}pp)`);
+      if (delta >= thresholds.errorRate.failAbs)
+        failures.push(`error rate +${delta.toFixed(2)}pp (fail ${thresholds.errorRate.failAbs}pp)`);
+      else if (delta >= thresholds.errorRate.warnAbs)
+        warnings.push(`error rate +${delta.toFixed(2)}pp (warn ${thresholds.errorRate.warnAbs}pp)`);
     }
 
     if (metric === 'successRate' && current < baseline) {
       const delta = baseline - current;
-      if (delta >= thresholds.successRate.failAbs) failures.push(`success rate -${delta.toFixed(2)}pp (fail ${thresholds.successRate.failAbs}pp)`);
-      else if (delta >= thresholds.successRate.warnAbs) warnings.push(`success rate -${delta.toFixed(2)}pp (warn ${thresholds.successRate.warnAbs}pp)`);
+      if (delta >= thresholds.successRate.failAbs)
+        failures.push(
+          `success rate -${delta.toFixed(2)}pp (fail ${thresholds.successRate.failAbs}pp)`,
+        );
+      else if (delta >= thresholds.successRate.warnAbs)
+        warnings.push(
+          `success rate -${delta.toFixed(2)}pp (warn ${thresholds.successRate.warnAbs}pp)`,
+        );
     }
   });
 
   return { warnings, failures };
 }
 
-function evaluateEndpointClassThresholds(baselineClasses, currentClasses, classThresholds) {
+function evaluateEndpointClassThresholds(
+  baselineClasses,
+  currentClasses,
+  classThresholds,
+  p95MinDeltaMs,
+) {
   const warnings = [];
   const failures = [];
   const evaluatedClasses = [];
@@ -346,22 +383,58 @@ function evaluateEndpointClassThresholds(baselineClasses, currentClasses, classT
     if (!baseline || !current) continue;
     evaluatedClasses.push(className);
 
-    if (Number.isFinite(baseline.p95) && Number.isFinite(current.p95) && current.p95 > baseline.p95) {
-      const pctIncrease = baseline.p95 === 0 ? 0 : ((current.p95 - baseline.p95) / baseline.p95) * 100;
-      if (pctIncrease >= thresholds.p95.failPct) failures.push(`[${className}] p95 +${pctIncrease.toFixed(1)}% (fail ${thresholds.p95.failPct}%)`);
-      else if (pctIncrease >= thresholds.p95.warnPct) warnings.push(`[${className}] p95 +${pctIncrease.toFixed(1)}% (warn ${thresholds.p95.warnPct}%)`);
+    if (
+      Number.isFinite(baseline.p95) &&
+      Number.isFinite(current.p95) &&
+      current.p95 > baseline.p95
+    ) {
+      const deltaMs = current.p95 - baseline.p95;
+      if (deltaMs >= p95MinDeltaMs) {
+        const pctIncrease = baseline.p95 === 0 ? 0 : (deltaMs / baseline.p95) * 100;
+        if (pctIncrease >= thresholds.p95.failPct)
+          failures.push(
+            `[${className}] p95 +${pctIncrease.toFixed(1)}% (fail ${thresholds.p95.failPct}%)`,
+          );
+        else if (pctIncrease >= thresholds.p95.warnPct)
+          warnings.push(
+            `[${className}] p95 +${pctIncrease.toFixed(1)}% (warn ${thresholds.p95.warnPct}%)`,
+          );
+      }
     }
 
-    if (Number.isFinite(baseline.throughput) && Number.isFinite(current.throughput) && current.throughput < baseline.throughput) {
-      const pctDrop = baseline.throughput === 0 ? 0 : ((baseline.throughput - current.throughput) / baseline.throughput) * 100;
-      if (pctDrop >= thresholds.throughput.failPct) failures.push(`[${className}] throughput -${pctDrop.toFixed(1)}% (fail ${thresholds.throughput.failPct}%)`);
-      else if (pctDrop >= thresholds.throughput.warnPct) warnings.push(`[${className}] throughput -${pctDrop.toFixed(1)}% (warn ${thresholds.throughput.warnPct}%)`);
+    if (
+      Number.isFinite(baseline.throughput) &&
+      Number.isFinite(current.throughput) &&
+      current.throughput < baseline.throughput
+    ) {
+      const pctDrop =
+        baseline.throughput === 0
+          ? 0
+          : ((baseline.throughput - current.throughput) / baseline.throughput) * 100;
+      if (pctDrop >= thresholds.throughput.failPct)
+        failures.push(
+          `[${className}] throughput -${pctDrop.toFixed(1)}% (fail ${thresholds.throughput.failPct}%)`,
+        );
+      else if (pctDrop >= thresholds.throughput.warnPct)
+        warnings.push(
+          `[${className}] throughput -${pctDrop.toFixed(1)}% (warn ${thresholds.throughput.warnPct}%)`,
+        );
     }
 
-    if (Number.isFinite(baseline.errorRate) && Number.isFinite(current.errorRate) && current.errorRate > baseline.errorRate) {
+    if (
+      Number.isFinite(baseline.errorRate) &&
+      Number.isFinite(current.errorRate) &&
+      current.errorRate > baseline.errorRate
+    ) {
       const delta = current.errorRate - baseline.errorRate;
-      if (delta >= thresholds.errorRate.failAbs) failures.push(`[${className}] error rate +${delta.toFixed(2)}pp (fail ${thresholds.errorRate.failAbs}pp)`);
-      else if (delta >= thresholds.errorRate.warnAbs) warnings.push(`[${className}] error rate +${delta.toFixed(2)}pp (warn ${thresholds.errorRate.warnAbs}pp)`);
+      if (delta >= thresholds.errorRate.failAbs)
+        failures.push(
+          `[${className}] error rate +${delta.toFixed(2)}pp (fail ${thresholds.errorRate.failAbs}pp)`,
+        );
+      else if (delta >= thresholds.errorRate.warnAbs)
+        warnings.push(
+          `[${className}] error rate +${delta.toFixed(2)}pp (warn ${thresholds.errorRate.warnAbs}pp)`,
+        );
     }
   }
 
@@ -379,10 +452,15 @@ function resolvePolicyMode(options) {
   const baseRef = process.env.GITHUB_BASE_REF || '';
 
   if (eventName === 'pull_request') return { mode: 'warn', reason: 'auto policy for pull_request' };
-  if (/^refs\/heads\/(main|master)$/.test(ref) || /^refs\/heads\/release\//.test(ref) || /^refs\/tags\/v/i.test(ref)) {
+  if (
+    /^refs\/heads\/(main|master)$/.test(ref) ||
+    /^refs\/heads\/release\//.test(ref) ||
+    /^refs\/tags\/v/i.test(ref)
+  ) {
     return { mode: 'fail', reason: 'auto policy for main/release' };
   }
-  if (/^(main|master|release\/)/.test(baseRef)) return { mode: 'fail', reason: 'auto policy for PR base branch' };
+  if (/^(main|master|release\/)/.test(baseRef))
+    return { mode: 'fail', reason: 'auto policy for PR base branch' };
 
   return { mode: 'warn', reason: 'auto policy default (non-protected branch)' };
 }
@@ -406,40 +484,61 @@ function generateReport(comparison, options = {}) {
   // Detailed results
   if (comparison.improved.length > 0) {
     console.log(`\n✅ Improved Metrics:`);
-    comparison.improved.forEach(change => {
+    comparison.improved.forEach((change) => {
       const direction = change.difference < 0 ? 'decreased' : 'increased';
-      const unit = change.metric.includes('Time') || change.metric === 'p95' ? 'ms' :
-                   change.metric === 'successRate' || change.metric === 'errorRate' ? '%' : '';
+      const unit =
+        change.metric.includes('Time') || change.metric === 'p95'
+          ? 'ms'
+          : change.metric === 'successRate' || change.metric === 'errorRate'
+            ? '%'
+            : '';
 
-      console.log(`   📈 ${change.metric}: ${change.baseline}${unit} → ${change.current}${unit} (${direction} by ${Math.abs(change.percentChange)}%)`);
+      console.log(
+        `   📈 ${change.metric}: ${change.baseline}${unit} → ${change.current}${unit} (${direction} by ${Math.abs(change.percentChange)}%)`,
+      );
     });
   }
 
   if (comparison.degraded.length > 0) {
     console.log(`\n❌ Degraded Metrics:`);
-    comparison.degraded.forEach(change => {
+    comparison.degraded.forEach((change) => {
       const direction = change.difference < 0 ? 'decreased' : 'increased';
-      const unit = change.metric.includes('Time') || change.metric === 'p95' ? 'ms' :
-                   change.metric === 'successRate' || change.metric === 'errorRate' ? '%' : '';
+      const unit =
+        change.metric.includes('Time') || change.metric === 'p95'
+          ? 'ms'
+          : change.metric === 'successRate' || change.metric === 'errorRate'
+            ? '%'
+            : '';
 
-      console.log(`   📉 ${change.metric}: ${change.baseline}${unit} → ${change.current}${unit} (${direction} by ${Math.abs(change.percentChange)}%)`);
+      console.log(
+        `   📉 ${change.metric}: ${change.baseline}${unit} → ${change.current}${unit} (${direction} by ${Math.abs(change.percentChange)}%)`,
+      );
     });
   }
 
   if (comparison.unchanged.length > 0) {
     console.log(`\n📊 Unchanged Metrics:`);
-    comparison.unchanged.forEach(change => {
-      const unit = change.metric.includes('Time') || change.metric === 'p95' ? 'ms' :
-                   change.metric === 'successRate' || change.metric === 'errorRate' ? '%' : '';
+    comparison.unchanged.forEach((change) => {
+      const unit =
+        change.metric.includes('Time') || change.metric === 'p95'
+          ? 'ms'
+          : change.metric === 'successRate' || change.metric === 'errorRate'
+            ? '%'
+            : '';
       console.log(`   ➡️  ${change.metric}: ${change.current}${unit} (no significant change)`);
     });
   }
 
-  const thresholdResult = evaluateThresholds(comparison, options.thresholds || DEFAULT_THRESHOLDS);
+  const thresholdResult = evaluateThresholds(
+    comparison,
+    options.thresholds || DEFAULT_THRESHOLDS,
+    options.p95MinDeltaMs ?? DEFAULT_P95_MIN_DELTA_MS,
+  );
   const endpointThresholdResult = evaluateEndpointClassThresholds(
     options.baselineEndpointClasses || {},
     options.currentEndpointClasses || {},
-    options.endpointClassThresholds || DEFAULT_ENDPOINT_CLASS_THRESHOLDS
+    options.endpointClassThresholds || DEFAULT_ENDPOINT_CLASS_THRESHOLDS,
+    options.p95MinDeltaMs ?? DEFAULT_P95_MIN_DELTA_MS,
   );
   const policy = resolvePolicyMode(options);
 
@@ -447,7 +546,9 @@ function generateReport(comparison, options = {}) {
   console.log(`   Policy mode: ${policy.mode} (${policy.reason})`);
 
   if (endpointThresholdResult.evaluatedClasses.length > 0) {
-    console.log(`   Endpoint classes evaluated: ${endpointThresholdResult.evaluatedClasses.join(', ')}`);
+    console.log(
+      `   Endpoint classes evaluated: ${endpointThresholdResult.evaluatedClasses.join(', ')}`,
+    );
   }
 
   const allFailures = [...thresholdResult.failures, ...endpointThresholdResult.failures];
@@ -455,7 +556,7 @@ function generateReport(comparison, options = {}) {
 
   if (allFailures.length > 0) {
     console.log('   🚨 THRESHOLD FAILURES');
-    allFailures.forEach(item => console.log(`   - ${item}`));
+    allFailures.forEach((item) => console.log(`   - ${item}`));
     if (policy.mode === 'warn') {
       console.log('   ⚠️  warn policy active; continuing without failure.');
       return true;
@@ -465,7 +566,7 @@ function generateReport(comparison, options = {}) {
 
   if (allWarnings.length > 0) {
     console.log('   ⚠️  THRESHOLD WARNINGS');
-    allWarnings.forEach(item => console.log(`   - ${item}`));
+    allWarnings.forEach((item) => console.log(`   - ${item}`));
     return true;
   }
 
@@ -478,7 +579,11 @@ function parseArgs(args) {
   const options = {
     warnOnly: false,
     policyMode: process.env.PERF_GATE_POLICY_MODE || 'auto',
-    endpointClassThresholds: parseJsonEnv('PERF_GATE_ENDPOINT_CLASS_THRESHOLDS_JSON', DEFAULT_ENDPOINT_CLASS_THRESHOLDS),
+    p95MinDeltaMs: Number(process.env.PERF_GATE_P95_MIN_DELTA_MS ?? DEFAULT_P95_MIN_DELTA_MS),
+    endpointClassThresholds: parseJsonEnv(
+      'PERF_GATE_ENDPOINT_CLASS_THRESHOLDS_JSON',
+      DEFAULT_ENDPOINT_CLASS_THRESHOLDS,
+    ),
     scenarioClassMap: parseJsonEnv('PERF_GATE_SCENARIO_CLASS_MAP_JSON', DEFAULT_SCENARIO_CLASS_MAP),
     thresholds: {
       p95: {
@@ -486,16 +591,28 @@ function parseArgs(args) {
         failPct: Number(process.env.PERF_GATE_P95_FAIL_PCT ?? DEFAULT_THRESHOLDS.p95.failPct),
       },
       throughput: {
-        warnPct: Number(process.env.PERF_GATE_THROUGHPUT_WARN_DROP_PCT ?? DEFAULT_THRESHOLDS.throughput.warnPct),
-        failPct: Number(process.env.PERF_GATE_THROUGHPUT_FAIL_DROP_PCT ?? DEFAULT_THRESHOLDS.throughput.failPct),
+        warnPct: Number(
+          process.env.PERF_GATE_THROUGHPUT_WARN_DROP_PCT ?? DEFAULT_THRESHOLDS.throughput.warnPct,
+        ),
+        failPct: Number(
+          process.env.PERF_GATE_THROUGHPUT_FAIL_DROP_PCT ?? DEFAULT_THRESHOLDS.throughput.failPct,
+        ),
       },
       errorRate: {
-        warnAbs: Number(process.env.PERF_GATE_ERROR_RATE_WARN_PP ?? DEFAULT_THRESHOLDS.errorRate.warnAbs),
-        failAbs: Number(process.env.PERF_GATE_ERROR_RATE_FAIL_PP ?? DEFAULT_THRESHOLDS.errorRate.failAbs),
+        warnAbs: Number(
+          process.env.PERF_GATE_ERROR_RATE_WARN_PP ?? DEFAULT_THRESHOLDS.errorRate.warnAbs,
+        ),
+        failAbs: Number(
+          process.env.PERF_GATE_ERROR_RATE_FAIL_PP ?? DEFAULT_THRESHOLDS.errorRate.failAbs,
+        ),
       },
       successRate: {
-        warnAbs: Number(process.env.PERF_GATE_SUCCESS_RATE_WARN_PP ?? DEFAULT_THRESHOLDS.successRate.warnAbs),
-        failAbs: Number(process.env.PERF_GATE_SUCCESS_RATE_FAIL_PP ?? DEFAULT_THRESHOLDS.successRate.failAbs),
+        warnAbs: Number(
+          process.env.PERF_GATE_SUCCESS_RATE_WARN_PP ?? DEFAULT_THRESHOLDS.successRate.warnAbs,
+        ),
+        failAbs: Number(
+          process.env.PERF_GATE_SUCCESS_RATE_FAIL_PP ?? DEFAULT_THRESHOLDS.successRate.failAbs,
+        ),
       },
     },
   };
@@ -509,13 +626,21 @@ function parseArgs(args) {
       process.exit(0);
     } else if (arg === '--p95-warn-pct') options.thresholds.p95.warnPct = Number(args[++i]);
     else if (arg === '--p95-fail-pct') options.thresholds.p95.failPct = Number(args[++i]);
-    else if (arg === '--throughput-warn-drop-pct') options.thresholds.throughput.warnPct = Number(args[++i]);
-    else if (arg === '--throughput-fail-drop-pct') options.thresholds.throughput.failPct = Number(args[++i]);
-    else if (arg === '--error-rate-warn-pp') options.thresholds.errorRate.warnAbs = Number(args[++i]);
-    else if (arg === '--error-rate-fail-pp') options.thresholds.errorRate.failAbs = Number(args[++i]);
-    else if (arg === '--success-rate-warn-pp') options.thresholds.successRate.warnAbs = Number(args[++i]);
-    else if (arg === '--success-rate-fail-pp') options.thresholds.successRate.failAbs = Number(args[++i]);
-    else if (arg === '--policy-mode') options.policyMode = String(args[++i] || options.policyMode).toLowerCase();
+    else if (arg === '--p95-min-delta-ms') options.p95MinDeltaMs = Number(args[++i]);
+    else if (arg === '--throughput-warn-drop-pct')
+      options.thresholds.throughput.warnPct = Number(args[++i]);
+    else if (arg === '--throughput-fail-drop-pct')
+      options.thresholds.throughput.failPct = Number(args[++i]);
+    else if (arg === '--error-rate-warn-pp')
+      options.thresholds.errorRate.warnAbs = Number(args[++i]);
+    else if (arg === '--error-rate-fail-pp')
+      options.thresholds.errorRate.failAbs = Number(args[++i]);
+    else if (arg === '--success-rate-warn-pp')
+      options.thresholds.successRate.warnAbs = Number(args[++i]);
+    else if (arg === '--success-rate-fail-pp')
+      options.thresholds.successRate.failAbs = Number(args[++i]);
+    else if (arg === '--policy-mode')
+      options.policyMode = String(args[++i] || options.policyMode).toLowerCase();
     else positionals.push(arg);
   }
 
@@ -533,13 +658,19 @@ function printUsage() {
   console.log('  --warn-only');
   console.log('  --policy-mode <auto|warn|fail>');
   console.log('  --p95-warn-pct <n> --p95-fail-pct <n>');
+  console.log(`  --p95-min-delta-ms <n> (default ${DEFAULT_P95_MIN_DELTA_MS}ms)`);
   console.log('  --throughput-warn-drop-pct <n> --throughput-fail-drop-pct <n>');
   console.log('  --error-rate-warn-pp <n> --error-rate-fail-pp <n>');
   console.log('  --success-rate-warn-pp <n> --success-rate-fail-pp <n>');
   console.log('Environment overrides: PERF_GATE_* variables for CI usage.');
   console.log('  PERF_GATE_POLICY_MODE=auto|warn|fail (default auto: PR warn, main/release fail)');
-  console.log('  PERF_GATE_ENDPOINT_CLASS_THRESHOLDS_JSON={"mcp":{"p95":{"warnPct":12,"failPct":25},...}}');
-  console.log('  PERF_GATE_SCENARIO_CLASS_MAP_JSON={"mcp_initialize":"mcp","api_session_get":"api",...}');
+  console.log(`  PERF_GATE_P95_MIN_DELTA_MS=${DEFAULT_P95_MIN_DELTA_MS}`);
+  console.log(
+    '  PERF_GATE_ENDPOINT_CLASS_THRESHOLDS_JSON={"mcp":{"p95":{"warnPct":12,"failPct":25},...}}',
+  );
+  console.log(
+    '  PERF_GATE_SCENARIO_CLASS_MAP_JSON={"mcp_initialize":"mcp","api_session_get":"api",...}',
+  );
 }
 
 /**
@@ -580,12 +711,12 @@ function main() {
   const baselineEndpointClasses = parseEndpointClassMetrics(
     baselineContent,
     baselinePath,
-    options.scenarioClassMap || DEFAULT_SCENARIO_CLASS_MAP
+    options.scenarioClassMap || DEFAULT_SCENARIO_CLASS_MAP,
   );
   const currentEndpointClasses = parseEndpointClassMetrics(
     currentContent,
     currentPath,
-    options.scenarioClassMap || DEFAULT_SCENARIO_CLASS_MAP
+    options.scenarioClassMap || DEFAULT_SCENARIO_CLASS_MAP,
   );
 
   console.log(`\n🔍 Parsed ${Object.keys(baselineMetrics).length} baseline metrics`);
@@ -613,7 +744,7 @@ function main() {
   const reportPath = path.join(process.cwd(), 'performance-comparison-report.json');
   const labeledReportPath = path.join(
     process.cwd(),
-    `performance-comparison-report-${artifactLabels.runtimeMode}-${artifactLabels.commitSha}.json`
+    `performance-comparison-report-${artifactLabels.runtimeMode}-${artifactLabels.commitSha}.json`,
   );
   const reportPayload = {
     timestamp: new Date().toISOString(),
@@ -626,7 +757,7 @@ function main() {
       current: currentEndpointClasses,
       thresholds: options.endpointClassThresholds,
     },
-    success
+    success,
   };
   fs.writeFileSync(reportPath, JSON.stringify(reportPayload, null, 2));
   if (labeledReportPath !== reportPath) {

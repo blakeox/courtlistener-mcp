@@ -1,0 +1,94 @@
+import React from 'react';
+import { render, type RenderResult } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { vi } from 'vitest';
+import { TokenProvider } from '../lib/token-context';
+import { ToastProvider } from '../components/Toast';
+
+export function createStorageMock(): Storage {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => (key in store ? store[key] : null),
+    setItem: (key: string, value: string) => {
+      store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+  };
+}
+
+export function stubBrowserStorage(): void {
+  vi.stubGlobal('localStorage', createStorageMock());
+  vi.stubGlobal('sessionStorage', createStorageMock());
+}
+
+export function createMatchMediaMock(
+  matches:
+    | boolean
+    | ((query: string) => boolean) = false,
+): typeof window.matchMedia {
+  return ((query: string) => ({
+    matches: typeof matches === 'function' ? matches(query) : matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia;
+}
+
+export function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+}
+
+export function renderWithSpaProviders(
+  ui: React.ReactElement,
+  options: {
+    initialEntries?: string[];
+    includeQueryClient?: boolean;
+    includeRouter?: boolean;
+    includeTokenProvider?: boolean;
+    includeToastProvider?: boolean;
+  } = {},
+): RenderResult {
+  const {
+    initialEntries = ['/'],
+    includeQueryClient = true,
+    includeRouter = true,
+    includeTokenProvider = false,
+    includeToastProvider = false,
+  } = options;
+
+  let wrapped = ui;
+
+  if (includeToastProvider) {
+    wrapped = <ToastProvider>{wrapped}</ToastProvider>;
+  }
+
+  if (includeTokenProvider) {
+    wrapped = <TokenProvider>{wrapped}</TokenProvider>;
+  }
+
+  if (includeRouter) {
+    wrapped = <MemoryRouter initialEntries={initialEntries}>{wrapped}</MemoryRouter>;
+  }
+
+  if (includeQueryClient) {
+    wrapped = <QueryClientProvider client={createTestQueryClient()}>{wrapped}</QueryClientProvider>;
+  }
+
+  return render(wrapped);
+}

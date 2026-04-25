@@ -50,16 +50,29 @@ import {
   GetRelatedCasesHandler,
 } from '../domains/cases/handlers.js';
 import {
+  GetAbaRatingsHandler,
   GetJudgeHandler,
+  GetJudgeEducationsHandler,
+  GetJudgePoliticalAffiliationsHandler,
   GetJudgesHandler,
+  GetJudicialPositionHandler,
+  GetJudicialPositionsHandler,
+  GetMembershipsHandler,
+  GetRetentionEventsHandler,
+  GetSchoolsHandler,
   ListCourtsHandler,
 } from '../domains/courts/handlers.js';
 import {
+  CreateDocketAlertHandler,
+  GetDocketEntryHandler,
   GetDocketEntriesHandler,
   GetDocketHandler,
+  GetDocketAlertsHandler,
   GetDocketsHandler,
+  GetOriginatingCourtInfoHandler,
   GetRecapDocumentHandler,
   GetRecapDocumentsHandler,
+  GetTagsHandler,
 } from '../domains/dockets/handlers.js';
 import {
   GetBankruptcyDataHandler,
@@ -69,6 +82,7 @@ import {
   GetEnhancedRECAPDataHandler,
   GetFinancialDisclosureDetailsHandler,
   GetVisualizationDataHandler,
+  GetVisualizationMetadataHandler,
   ValidateCitationsHandler,
   SmartSearchHandler,
 } from '../domains/enhanced/handlers.js';
@@ -80,7 +94,9 @@ import {
 } from '../domains/miscellaneous/handlers.js';
 import {
   AnalyzeLegalArgumentHandler,
+  GetAuthoritiesHandler,
   GetCitationNetworkHandler,
+  GetOpinionCitationsHandler,
   GetOpinionTextHandler,
   LookupCitationHandler,
 } from '../domains/opinions/handlers.js';
@@ -277,18 +293,33 @@ function registerToolHandlers(): void {
   toolRegistry.register(new AnalyzeLegalArgumentHandler(courtListenerApi));
   toolRegistry.register(new GetCitationNetworkHandler(courtListenerApi));
   toolRegistry.register(new LookupCitationHandler(courtListenerApi));
+  toolRegistry.register(new GetOpinionCitationsHandler(courtListenerApi));
+  toolRegistry.register(new GetAuthoritiesHandler(courtListenerApi));
 
   // Register court handlers
   toolRegistry.register(new ListCourtsHandler(courtListenerApi));
   toolRegistry.register(new GetJudgesHandler(courtListenerApi));
   toolRegistry.register(new GetJudgeHandler(courtListenerApi));
+  toolRegistry.register(new GetJudicialPositionsHandler(courtListenerApi));
+  toolRegistry.register(new GetJudicialPositionHandler(courtListenerApi));
+  toolRegistry.register(new GetJudgeEducationsHandler(courtListenerApi));
+  toolRegistry.register(new GetJudgePoliticalAffiliationsHandler(courtListenerApi));
+  toolRegistry.register(new GetAbaRatingsHandler(courtListenerApi));
+  toolRegistry.register(new GetRetentionEventsHandler(courtListenerApi));
+  toolRegistry.register(new GetSchoolsHandler(courtListenerApi));
+  toolRegistry.register(new GetMembershipsHandler(courtListenerApi));
 
   // Register docket handlers
   toolRegistry.register(new GetDocketsHandler(courtListenerApi));
   toolRegistry.register(new GetDocketHandler(courtListenerApi));
   toolRegistry.register(new GetDocketEntriesHandler(courtListenerApi));
+  toolRegistry.register(new GetDocketEntryHandler(courtListenerApi));
   toolRegistry.register(new GetRecapDocumentsHandler(courtListenerApi));
   toolRegistry.register(new GetRecapDocumentHandler(courtListenerApi));
+  toolRegistry.register(new GetOriginatingCourtInfoHandler(courtListenerApi));
+  toolRegistry.register(new GetTagsHandler(courtListenerApi));
+  toolRegistry.register(new GetDocketAlertsHandler(courtListenerApi));
+  toolRegistry.register(new CreateDocketAlertHandler(courtListenerApi));
 
   // Register miscellaneous handlers
   toolRegistry.register(new GetFinancialDisclosuresHandler(courtListenerApi));
@@ -309,6 +340,7 @@ function registerToolHandlers(): void {
   toolRegistry.register(new GetFinancialDisclosureDetailsHandler(courtListenerApi));
   toolRegistry.register(new ValidateCitationsHandler(courtListenerApi));
   toolRegistry.register(new GetEnhancedRECAPDataHandler(courtListenerApi));
+  toolRegistry.register(new GetVisualizationMetadataHandler(courtListenerApi));
   toolRegistry.register(new SmartSearchHandler(courtListenerApi));
 }
 

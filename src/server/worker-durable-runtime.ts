@@ -9,6 +9,8 @@ import type {
   AuthFailureLimiterRequestBody,
   AuthFailureLimiterResponseBody,
   AuthFailureState,
+  BrowserBootstrapConsumeRequestBody,
+  BrowserBootstrapConsumeResponseBody,
   DurableObjectLatencyDimension,
   LifetimeQuotaRequestBody,
   LifetimeQuotaResponseBody,
@@ -28,6 +30,8 @@ import {
 } from './worker-mcp-session-topology.js';
 import {
   finalizeSessionLifecycleResponse as finalizeBoundarySessionLifecycleResponse,
+  type McpSessionMutationState,
+  type McpSessionValidationState,
   validateSessionLifecycleRequest as validateBoundarySessionLifecycleRequest,
 } from './mcp-transport-runtime-facade.js';
 import {
@@ -36,9 +40,10 @@ import {
   getMcpBoundaryGuardConfig,
   getRequestContentLength,
 } from './mcp-boundary-abuse-guard.js';
+import { parsePositiveInt } from '../common/validation.js';
 import { parseBoolean } from './worker-security.js';
 
-interface WorkerDurableRuntimeEnv {
+export interface WorkerDurableRuntimeEnv {
   AUTH_FAILURE_LIMITER: DurableObjectNamespace;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
   MCP_SESSION_SHARD_COUNT?: string;
@@ -60,9 +65,12 @@ interface WorkerDurableRuntimeEnv {
   MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
 }
 
+type DurableObjectCheckResult<T> = { kind: 'ok'; value: T } | { kind: 'unavailable' };
+
 export interface CreateWorkerDurableRuntimeDeps<TEnv extends WorkerDurableRuntimeEnv> {
   now: () => number;
   recordDurableObjectLatency: (dimension: DurableObjectLatencyDimension, elapsedMs: number) => void;
+  recordDurableObjectUnavailable: (dimension: DurableObjectLatencyDimension) => void;
   getCachedSessionTopology: (env: TEnv) => WorkerMcpSessionTopologyV2;
   jsonError: (
     message: string,
@@ -73,15 +81,37 @@ export interface CreateWorkerDurableRuntimeDeps<TEnv extends WorkerDurableRuntim
   ) => Response;
 }
 
+function logDurableObjectFailure(
+  durableObject: DurableObjectLatencyDimension,
+  operation: string,
+  failureKind: 'http_error' | 'fetch_error',
+  status?: number,
+): void {
+  console.error(
+    JSON.stringify({
+      event: 'durable_object_unavailable',
+      durable_object: durableObject,
+      operation,
+      failure_kind: failureKind,
+      ...(typeof status === 'number' ? { status } : {}),
+    }),
+  );
+}
+
 export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
-  isUiSessionRevoked: (env: TEnv, sessionJti: string) => Promise<boolean>;
+  isUiSessionRevoked: (env: TEnv, sessionJti: string) => Promise<DurableObjectCheckResult<boolean>>;
   revokeUiSession: (env: TEnv, sessionJti: string, expiresAtEpochSeconds: number) => Promise<void>;
   recordSessionBootstrapRateLimit: (
     env: TEnv,
     clientId: string,
     nowMs: number,
     config: { maxAttempts: number; windowMs: number; blockMs: number },
-  ) => Promise<AuthFailureLimiterResponseBody | null>;
+  ) => Promise<DurableObjectCheckResult<AuthFailureLimiterResponseBody>>;
+  consumeBrowserBootstrapHandoff: (
+    env: TEnv,
+    handoffId: string,
+    expiresAtMs: number,
+  ) => Promise<DurableObjectCheckResult<boolean>>;
   getUserUsageSnapshot: (env: TEnv, userId: string) => Promise<UsageCounterResponseBody | null>;
   incrementUserUsage: (
     env: TEnv,
@@ -94,9 +124,14 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     response: Response,
     env: TEnv,
     nowMs: number,
-  ) => Promise<void>;
+  ) => Promise<Response | null>;
   getAuthRateLimitedResponse: (
     clientId: string,
+    env: TEnv,
+    nowMs: number,
+  ) => Promise<Response | null>;
+  getAuthRouteRateLimitedResponse: (
+    bucketId: string,
     env: TEnv,
     nowMs: number,
   ) => Promise<Response | null>;
@@ -109,13 +144,6 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     nowMs: number,
   ) => Promise<Response | null>;
   applyAiChatLifetimeQuota: (env: TEnv, userId: string) => Promise<Response | null>;
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
 }
 
 async function parseJsonBody<T>(request: Request): Promise<T | null> {
@@ -149,12 +177,17 @@ function getSessionRevocationStub<TEnv extends WorkerDurableRuntimeEnv>(
   return env.AUTH_FAILURE_LIMITER.get(objectId);
 }
 
-function getUsageStub<TEnv extends WorkerDurableRuntimeEnv>(env: TEnv, userId: string): DurableObjectStub {
+function getUsageStub<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+  userId: string,
+): DurableObjectStub {
   const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`usage:user:${userId}`);
   return env.AUTH_FAILURE_LIMITER.get(objectId);
 }
 
-function getAuthFailureRateLimitConfig<TEnv extends WorkerDurableRuntimeEnv>(env: TEnv): {
+function getAuthFailureRateLimitConfig<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+): {
   enabled: boolean;
   maxAttempts: number;
   windowMs: number;
@@ -164,7 +197,10 @@ function getAuthFailureRateLimitConfig<TEnv extends WorkerDurableRuntimeEnv>(env
     enabled: env.MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED
       ? parseBoolean(env.MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED)
       : true,
-    maxAttempts: parsePositiveInt(env.MCP_AUTH_FAILURE_RATE_LIMIT_MAX, DEFAULT_AUTH_FAILURE_LIMIT_MAX),
+    maxAttempts: parsePositiveInt(
+      env.MCP_AUTH_FAILURE_RATE_LIMIT_MAX,
+      DEFAULT_AUTH_FAILURE_LIMIT_MAX,
+    ),
     windowMs:
       parsePositiveInt(
         env.MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS,
@@ -178,8 +214,19 @@ function getAuthFailureRateLimitConfig<TEnv extends WorkerDurableRuntimeEnv>(env
   };
 }
 
-function getAuthLimiterStub<TEnv extends WorkerDurableRuntimeEnv>(env: TEnv, clientId: string): DurableObjectStub {
+function getAuthLimiterStub<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+  clientId: string,
+): DurableObjectStub {
   const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`auth-fail:${clientId}`);
+  return env.AUTH_FAILURE_LIMITER.get(objectId);
+}
+
+function getBrowserBootstrapStub<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+  handoffId: string,
+): DurableObjectStub {
+  const objectId = env.AUTH_FAILURE_LIMITER.idFromName(`browser-bootstrap:${handoffId}`);
   return env.AUTH_FAILURE_LIMITER.get(objectId);
 }
 
@@ -197,8 +244,11 @@ async function callSessionRevocation<TEnv extends WorkerDurableRuntimeEnv>(
   env: TEnv,
   sessionJti: string,
   body: SessionRevocationRequestBody,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'now' | 'recordDurableObjectLatency'>,
-): Promise<SessionRevocationResponseBody | null> {
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    'now' | 'recordDurableObjectLatency' | 'recordDurableObjectUnavailable'
+  >,
+): Promise<DurableObjectCheckResult<SessionRevocationResponseBody>> {
   const stub = getSessionRevocationStub(env, sessionJti);
   const startedAt = deps.now();
   try {
@@ -208,9 +258,15 @@ async function callSessionRevocation<TEnv extends WorkerDurableRuntimeEnv>(
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      return null;
+      deps.recordDurableObjectUnavailable('session_revocation');
+      logDurableObjectFailure('session_revocation', body.action, 'http_error', response.status);
+      return { kind: 'unavailable' };
     }
-    return (await response.json()) as SessionRevocationResponseBody;
+    return { kind: 'ok', value: (await response.json()) as SessionRevocationResponseBody };
+  } catch {
+    deps.recordDurableObjectUnavailable('session_revocation');
+    logDurableObjectFailure('session_revocation', body.action, 'fetch_error');
+    return { kind: 'unavailable' };
   } finally {
     deps.recordDurableObjectLatency('session_revocation', deps.now() - startedAt);
   }
@@ -221,17 +277,22 @@ async function callAuthLimiter<TEnv extends WorkerDurableRuntimeEnv>(
   clientId: string,
   action: AuthFailureLimiterRequestBody['action'],
   nowMs: number,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'now' | 'recordDurableObjectLatency'>,
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    'now' | 'recordDurableObjectLatency' | 'recordDurableObjectUnavailable'
+  >,
   limits?: { maxAttempts: number; windowMs: number; blockMs: number },
-): Promise<AuthFailureLimiterResponseBody | null> {
-  const cfg = limits ?? (() => {
-    const authCfg = getAuthFailureRateLimitConfig(env);
-    return {
-      maxAttempts: authCfg.maxAttempts,
-      windowMs: authCfg.windowMs,
-      blockMs: authCfg.blockMs,
-    };
-  })();
+): Promise<DurableObjectCheckResult<AuthFailureLimiterResponseBody>> {
+  const cfg =
+    limits ??
+    (() => {
+      const authCfg = getAuthFailureRateLimitConfig(env);
+      return {
+        maxAttempts: authCfg.maxAttempts,
+        windowMs: authCfg.windowMs,
+        blockMs: authCfg.blockMs,
+      };
+    })();
   const stub = getAuthLimiterStub(env, clientId);
   const startedAt = deps.now();
   try {
@@ -247,9 +308,15 @@ async function callAuthLimiter<TEnv extends WorkerDurableRuntimeEnv>(
       } satisfies AuthFailureLimiterRequestBody),
     });
     if (!response.ok) {
-      return null;
+      deps.recordDurableObjectUnavailable('auth_limiter');
+      logDurableObjectFailure('auth_limiter', action, 'http_error', response.status);
+      return { kind: 'unavailable' };
     }
-    return (await response.json()) as AuthFailureLimiterResponseBody;
+    return { kind: 'ok', value: (await response.json()) as AuthFailureLimiterResponseBody };
+  } catch {
+    deps.recordDurableObjectUnavailable('auth_limiter');
+    logDurableObjectFailure('auth_limiter', action, 'fetch_error');
+    return { kind: 'unavailable' };
   } finally {
     deps.recordDurableObjectLatency('auth_limiter', deps.now() - startedAt);
   }
@@ -260,32 +327,49 @@ async function callMcpSessionLifecycle<TEnv extends WorkerDurableRuntimeEnv>(
   sessionId: string,
   action: McpSessionLifecycleAction,
   nowMs: number,
-  deps: Pick<CreateWorkerDurableRuntimeDeps<TEnv>, 'getCachedSessionTopology'>,
-): Promise<McpSessionLifecycleResponseBody | null> {
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    | 'getCachedSessionTopology'
+    | 'now'
+    | 'recordDurableObjectLatency'
+    | 'recordDurableObjectUnavailable'
+  >,
+): Promise<DurableObjectCheckResult<McpSessionLifecycleResponseBody>> {
   const topology = deps.getCachedSessionTopology(env);
   const placement = getWorkerMcpSessionPlacementHint(sessionId, topology);
   const stub = getMcpSessionLifecycleStub(env, sessionId, topology);
-  const response = await stub.fetch('https://auth-failure-limiter/internal', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-mcp-session-shard': String(placement.shard),
-      'x-mcp-placement-signal': placement.placementSignal,
-    },
-    body: JSON.stringify({
-      action,
-      sessionId,
-      nowMs,
-      idleTtlMs: topology.idleTtlMs,
-      absoluteTtlMs: topology.absoluteTtlMs,
-      evictionSweepLimit: topology.evictionSweepLimit,
-      shardHint: placement.placementSignal,
-    } satisfies McpSessionLifecycleRequestBody),
-  });
-  if (!response.ok) {
-    return null;
+  const startedAt = deps.now();
+  try {
+    const response = await stub.fetch('https://auth-failure-limiter/internal', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-mcp-session-shard': String(placement.shard),
+        'x-mcp-placement-signal': placement.placementSignal,
+      },
+      body: JSON.stringify({
+        action,
+        sessionId,
+        nowMs,
+        idleTtlMs: topology.idleTtlMs,
+        absoluteTtlMs: topology.absoluteTtlMs,
+        evictionSweepLimit: topology.evictionSweepLimit,
+        shardHint: placement.placementSignal,
+      } satisfies McpSessionLifecycleRequestBody),
+    });
+    if (!response.ok) {
+      deps.recordDurableObjectUnavailable('mcp_session_lifecycle');
+      logDurableObjectFailure('mcp_session_lifecycle', action, 'http_error', response.status);
+      return { kind: 'unavailable' };
+    }
+    return { kind: 'ok', value: (await response.json()) as McpSessionLifecycleResponseBody };
+  } catch {
+    deps.recordDurableObjectUnavailable('mcp_session_lifecycle');
+    logDurableObjectFailure('mcp_session_lifecycle', action, 'fetch_error');
+    return { kind: 'unavailable' };
+  } finally {
+    deps.recordDurableObjectLatency('mcp_session_lifecycle', deps.now() - startedAt);
   }
-  return (await response.json()) as McpSessionLifecycleResponseBody;
 }
 
 export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>(
@@ -293,7 +377,7 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
 ): WorkerDurableRuntime<TEnv> {
   return {
     async isUiSessionRevoked(env, sessionJti) {
-      if (!isUiSessionRevocationEnabled(env)) return false;
+      if (!isUiSessionRevocationEnabled(env)) return { kind: 'ok', value: false };
       const result = await callSessionRevocation(
         env,
         sessionJti,
@@ -303,7 +387,10 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         },
         deps,
       );
-      return Boolean(result && 'revoked' in result && result.revoked === true);
+      if (result.kind === 'unavailable') {
+        return result;
+      }
+      return { kind: 'ok', value: result.value.revoked === true };
     },
 
     async revokeUiSession(env, sessionJti, expiresAtEpochSeconds) {
@@ -324,44 +411,67 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
 
     async getUserUsageSnapshot(env, userId) {
       const stub = getUsageStub(env, userId);
-      const response = await stub.fetch('https://auth-failure-limiter/internal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'usage_get',
-          nowMs: deps.now(),
-        } satisfies UsageCounterRequestBody),
-      });
-      if (!response.ok) {
+      try {
+        const response = await stub.fetch('https://auth-failure-limiter/internal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'usage_get',
+            nowMs: deps.now(),
+          } satisfies UsageCounterRequestBody),
+        });
+        if (!response.ok) {
+          return null;
+        }
+        const payload = (await response.json()) as UsageCounterResponseBody;
+        return { ...payload, userId };
+      } catch {
         return null;
       }
-      const payload = (await response.json()) as UsageCounterResponseBody;
-      return { ...payload, userId };
     },
 
     async recordSessionBootstrapRateLimit(env, clientId, nowMs, config) {
-      return callAuthLimiter(
-        env,
-        `session-bootstrap:${clientId}`,
-        'record',
-        nowMs,
-        deps,
-        config,
-      );
+      return callAuthLimiter(env, `session-bootstrap:${clientId}`, 'record', nowMs, deps, config);
+    },
+
+    async consumeBrowserBootstrapHandoff(env, handoffId, expiresAtMs) {
+      const stub = getBrowserBootstrapStub(env, handoffId);
+      try {
+        const response = await stub.fetch('https://auth-failure-limiter/internal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'browser_bootstrap_consume',
+            nowMs: deps.now(),
+            expiresAtMs,
+          } satisfies BrowserBootstrapConsumeRequestBody),
+        });
+        if (!response.ok) {
+          return { kind: 'unavailable' };
+        }
+        const payload = (await response.json()) as BrowserBootstrapConsumeResponseBody;
+        return { kind: 'ok', value: payload.accepted === true };
+      } catch {
+        return { kind: 'unavailable' };
+      }
     },
 
     async incrementUserUsage(env, userId, metadata = {}) {
       const stub = getUsageStub(env, userId);
-      await stub.fetch('https://auth-failure-limiter/internal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'usage_increment',
-          nowMs: deps.now(),
-          ...(metadata.route ? { route: metadata.route } : {}),
-          ...(metadata.method ? { method: metadata.method } : {}),
-        } satisfies UsageCounterRequestBody),
-      });
+      try {
+        await stub.fetch('https://auth-failure-limiter/internal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'usage_increment',
+            nowMs: deps.now(),
+            ...(metadata.route ? { route: metadata.route } : {}),
+            ...(metadata.method ? { method: metadata.method } : {}),
+          } satisfies UsageCounterRequestBody),
+        });
+      } catch {
+        // Usage accounting should not take down otherwise healthy request paths.
+      }
     },
 
     async validateSessionRequest(request, env, nowMs) {
@@ -370,23 +480,47 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         env,
         nowMs,
         async (sessionId) => {
-          const result = await callMcpSessionLifecycle(env, sessionId, 'mcp_session_touch', nowMs, deps);
-          if (!result) {
-            return null;
+          const result = await callMcpSessionLifecycle(
+            env,
+            sessionId,
+            'mcp_session_touch',
+            nowMs,
+            deps,
+          );
+          if (result.kind === 'unavailable') {
+            return 'unavailable' satisfies McpSessionValidationState;
           }
-          return result.active;
+          return result.value.active ? 'active' : 'invalid';
         },
         { methods: ['POST', 'DELETE'] },
       );
     },
 
     async finalizeSessionResponse(request, response, env, nowMs) {
-      await finalizeBoundarySessionLifecycleResponse(request, response, env, nowMs, {
+      return finalizeBoundarySessionLifecycleResponse(request, response, env, nowMs, {
         registerSession: async (sessionId) => {
-          await callMcpSessionLifecycle(env, sessionId, 'mcp_session_register', nowMs, deps);
+          const result = await callMcpSessionLifecycle(
+            env,
+            sessionId,
+            'mcp_session_register',
+            nowMs,
+            deps,
+          );
+          return result.kind === 'unavailable'
+            ? ('unavailable' satisfies McpSessionMutationState)
+            : 'ok';
         },
         closeSession: async (sessionId) => {
-          await callMcpSessionLifecycle(env, sessionId, 'mcp_session_close', nowMs, deps);
+          const result = await callMcpSessionLifecycle(
+            env,
+            sessionId,
+            'mcp_session_close',
+            nowMs,
+            deps,
+          );
+          return result.kind === 'unavailable'
+            ? ('unavailable' satisfies McpSessionMutationState)
+            : 'ok';
         },
       });
     },
@@ -395,13 +529,54 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
       const cfg = getAuthFailureRateLimitConfig(env);
       if (!cfg.enabled) return null;
       const limiterState = await callAuthLimiter(env, clientId, 'check', nowMs, deps);
-      if (!limiterState?.blocked) return null;
+      if (limiterState.kind === 'unavailable') {
+        return deps.jsonError(
+          'Unable to validate authentication rate limit.',
+          503,
+          'auth_rate_limiter_unavailable',
+        );
+      }
+      if (!limiterState.value.blocked) return null;
 
-      const retryAfterSeconds = limiterState.retryAfterSeconds;
+      const retryAfterSeconds = limiterState.value.retryAfterSeconds;
       return deps.jsonError(
         'Too many failed authentication attempts',
         429,
         'auth_rate_limited',
+        { retry_after_seconds: retryAfterSeconds },
+        { 'Retry-After': String(retryAfterSeconds) },
+      );
+    },
+
+    async getAuthRouteRateLimitedResponse(bucketId, env, nowMs) {
+      const cfg = getAuthFailureRateLimitConfig(env);
+      if (!cfg.enabled) return null;
+      const limiterState = await callAuthLimiter(
+        env,
+        `oauth-frontdoor:${bucketId}`,
+        'record',
+        nowMs,
+        deps,
+        {
+          maxAttempts: cfg.maxAttempts,
+          windowMs: cfg.windowMs,
+          blockMs: cfg.blockMs,
+        },
+      );
+      if (limiterState.kind === 'unavailable') {
+        return deps.jsonError(
+          'Unable to validate OAuth route rate limit.',
+          503,
+          'oauth_route_rate_limit_unavailable',
+        );
+      }
+      if (!limiterState.value.blocked) return null;
+
+      const retryAfterSeconds = limiterState.value.retryAfterSeconds;
+      return deps.jsonError(
+        'Too many OAuth route attempts.',
+        429,
+        'oauth_route_rate_limited',
         { retry_after_seconds: retryAfterSeconds },
         { 'Retry-After': String(retryAfterSeconds) },
       );
@@ -445,8 +620,15 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
           blockMs: cfg.blockMs,
         },
       );
-      if (boundaryRateLimit?.blocked) {
-        const retryAfterSeconds = boundaryRateLimit.retryAfterSeconds;
+      if (boundaryRateLimit.kind === 'unavailable') {
+        return deps.jsonError(
+          'Unable to enforce MCP boundary protections.',
+          503,
+          'mcp_boundary_unavailable',
+        );
+      }
+      if (boundaryRateLimit.value.blocked) {
+        const retryAfterSeconds = boundaryRateLimit.value.retryAfterSeconds;
         return deps.jsonError(
           'MCP boundary rate limit exceeded.',
           429,
@@ -456,7 +638,11 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         );
       }
 
-      const replayFingerprint = await buildMcpReplayFingerprint(request, contentLength, cfg.heavyPayloadBytes);
+      const replayFingerprint = await buildMcpReplayFingerprint(
+        request,
+        contentLength,
+        cfg.heavyPayloadBytes,
+      );
       if (!replayFingerprint) {
         return null;
       }
@@ -473,8 +659,19 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
           blockMs: cfg.replayWindowMs,
         },
       );
-      if (replayState?.blocked) {
-        return deps.jsonError('Replay request detected at MCP boundary.', 409, 'mcp_replay_detected');
+      if (replayState.kind === 'unavailable') {
+        return deps.jsonError(
+          'Unable to enforce MCP replay protections.',
+          503,
+          'mcp_replay_guard_unavailable',
+        );
+      }
+      if (replayState.value.blocked) {
+        return deps.jsonError(
+          'Replay request detected at MCP boundary.',
+          409,
+          'mcp_replay_detected',
+        );
       }
 
       return null;
@@ -503,12 +700,31 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
             maxAllowed,
           } satisfies LifetimeQuotaRequestBody),
         });
+      } catch {
+        deps.recordDurableObjectUnavailable('ai_chat_quota');
+        logDurableObjectFailure('ai_chat_quota', 'quota_increment_check', 'fetch_error');
+        return deps.jsonError(
+          'Unable to validate hosted AI chat quota.',
+          503,
+          'ai_chat_quota_unavailable',
+        );
       } finally {
         deps.recordDurableObjectLatency('ai_chat_quota', deps.now() - startedAt);
       }
 
       if (!response.ok) {
-        return deps.jsonError('Unable to validate hosted AI chat quota.', 503, 'ai_chat_quota_unavailable');
+        deps.recordDurableObjectUnavailable('ai_chat_quota');
+        logDurableObjectFailure(
+          'ai_chat_quota',
+          'quota_increment_check',
+          'http_error',
+          response.status,
+        );
+        return deps.jsonError(
+          'Unable to validate hosted AI chat quota.',
+          503,
+          'ai_chat_quota_unavailable',
+        );
       }
 
       const quota = (await response.json()) as LifetimeQuotaResponseBody;
@@ -524,6 +740,13 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
 }
 
 export class AuthFailureLimiterDO {
+  private static readonly AUTH_FAILURE_WINDOW_MS_KEY = 'auth_failure_window_ms';
+  private static readonly AUTH_FAILURE_CLEANUP_AT_MS_KEY = 'auth_failure_cleanup_at_ms';
+  private static readonly UI_SESSION_REVOKED_UNTIL_MS_KEY = 'ui_session_revoked_until_ms';
+  private static readonly MCP_SESSION_ALARM_AT_MS_KEY = 'mcp_session_alarm_at_ms';
+  private static readonly BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY = 'browser_bootstrap_expires_at_ms';
+  private static readonly BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY = 'browser_bootstrap_consumed_at_ms';
+
   constructor(private readonly state: DurableObjectState) {}
 
   private async loadState(): Promise<AuthFailureState> {
@@ -537,12 +760,57 @@ export class AuthFailureLimiterDO {
     };
   }
 
-  private async saveState(nextState: AuthFailureState): Promise<void> {
-    await this.state.storage.put('auth_failure_state', nextState);
+  private async loadAuthFailureWindowMs(): Promise<number | null> {
+    const stored = await this.state.storage.get<number>(
+      AuthFailureLimiterDO.AUTH_FAILURE_WINDOW_MS_KEY,
+    );
+    return typeof stored === 'number' && Number.isFinite(stored) ? stored : null;
+  }
+
+  private hasAuthFailureState(state: AuthFailureState): boolean {
+    return state.count > 0 || state.windowStartedAtMs > 0 || state.blockedUntilMs > 0;
+  }
+
+  private getAuthFailureCleanupAtMs(state: AuthFailureState, windowMs: number): number {
+    if (!this.hasAuthFailureState(state) || state.windowStartedAtMs <= 0) {
+      return 0;
+    }
+    return Math.max(state.windowStartedAtMs + windowMs, state.blockedUntilMs);
+  }
+
+  private async scheduleAuthFailureCleanupAlarm(nextAtMs: number, force = false): Promise<void> {
+    if (!Number.isFinite(nextAtMs) || nextAtMs <= 0) {
+      await this.clearAuthFailureAlarm();
+      return;
+    }
+    const scheduledAt =
+      (await this.state.storage.get<number>(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY)) ??
+      0;
+    if (!force && scheduledAt > 0 && scheduledAt <= nextAtMs) {
+      return;
+    }
+    await this.state.storage.put(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY, nextAtMs);
+    await this.state.storage.setAlarm(nextAtMs);
+  }
+
+  private async clearAuthFailureAlarm(): Promise<void> {
+    await this.state.storage.delete(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY);
+    await this.state.storage.deleteAlarm();
+  }
+
+  private async saveState(nextState: AuthFailureState, windowMs: number): Promise<void> {
+    await Promise.all([
+      this.state.storage.put('auth_failure_state', nextState),
+      this.state.storage.put(AuthFailureLimiterDO.AUTH_FAILURE_WINDOW_MS_KEY, windowMs),
+    ]);
   }
 
   private async clearState(): Promise<void> {
-    await this.state.storage.delete('auth_failure_state');
+    await Promise.all([
+      this.state.storage.delete('auth_failure_state'),
+      this.state.storage.delete(AuthFailureLimiterDO.AUTH_FAILURE_WINDOW_MS_KEY),
+      this.state.storage.delete(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY),
+    ]);
   }
 
   private getMcpSessionStorageKey(sessionId: string): string {
@@ -601,11 +869,12 @@ export class AuthFailureLimiterDO {
   }
 
   private async scheduleMcpSessionAlarm(nextAtMs: number): Promise<void> {
-    const scheduledAt = (await this.state.storage.get<number>('mcp_session_alarm_at_ms')) ?? 0;
+    const scheduledAt =
+      (await this.state.storage.get<number>(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY)) ?? 0;
     if (scheduledAt > 0 && scheduledAt <= nextAtMs) {
       return;
     }
-    await this.state.storage.put('mcp_session_alarm_at_ms', nextAtMs);
+    await this.state.storage.put(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY, nextAtMs);
     await this.state.storage.setAlarm(nextAtMs);
   }
 
@@ -625,12 +894,12 @@ export class AuthFailureLimiterDO {
     }
 
     if (!Number.isFinite(nextAtMs)) {
-      await this.state.storage.delete('mcp_session_alarm_at_ms');
+      await this.state.storage.delete(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY);
       await this.state.storage.deleteAlarm();
       return;
     }
 
-    await this.state.storage.put('mcp_session_alarm_at_ms', nextAtMs);
+    await this.state.storage.put(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY, nextAtMs);
     await this.state.storage.setAlarm(nextAtMs);
   }
 
@@ -642,6 +911,7 @@ export class AuthFailureLimiterDO {
     const body = await parseJsonBody<
       | AuthFailureLimiterRequestBody
       | SessionRevocationRequestBody
+      | BrowserBootstrapConsumeRequestBody
       | UsageCounterRequestBody
       | LifetimeQuotaRequestBody
       | McpSessionLifecycleRequestBody
@@ -657,7 +927,10 @@ export class AuthFailureLimiterDO {
     ) {
       const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
       const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
-      const idleTtlMs = Math.max(1_000, Number.isFinite(body.idleTtlMs) ? body.idleTtlMs : 30 * 60 * 1000);
+      const idleTtlMs = Math.max(
+        1_000,
+        Number.isFinite(body.idleTtlMs) ? body.idleTtlMs : 30 * 60 * 1000,
+      );
       const absoluteTtlMs = Math.max(
         idleTtlMs,
         Number.isFinite(body.absoluteTtlMs) ? body.absoluteTtlMs : 24 * 60 * 60 * 1000,
@@ -721,8 +994,10 @@ export class AuthFailureLimiterDO {
 
     if (body.action === 'session_check' || body.action === 'session_revoke') {
       const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
-      const key = 'ui_session_revoked_until_ms';
-      const revokedUntilMs = (await this.state.storage.get<number>(key)) ?? 0;
+      const revokedUntilMs =
+        (await this.state.storage.get<number>(
+          AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY,
+        )) ?? 0;
 
       if (body.action === 'session_revoke') {
         const requestedUntil =
@@ -730,18 +1005,50 @@ export class AuthFailureLimiterDO {
             ? body.revokeUntilMs
             : nowMs;
         const nextUntil = Math.max(revokedUntilMs, requestedUntil, nowMs);
-        await this.state.storage.put(key, nextUntil);
+        await this.state.storage.put(
+          AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY,
+          nextUntil,
+        );
+        await this.state.storage.setAlarm(nextUntil);
         return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
       }
 
       if (revokedUntilMs <= nowMs) {
         if (revokedUntilMs > 0) {
-          await this.state.storage.delete(key);
+          await this.state.storage.delete(AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY);
+          await this.state.storage.deleteAlarm();
         }
         return Response.json({ revoked: false } satisfies SessionRevocationResponseBody);
       }
 
       return Response.json({ revoked: true } satisfies SessionRevocationResponseBody);
+    }
+
+    if (body.action === 'browser_bootstrap_consume') {
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const expiresAtMs = Number.isFinite(body.expiresAtMs) ? body.expiresAtMs : 0;
+      if (expiresAtMs <= nowMs) {
+        return Response.json({ accepted: false } satisfies BrowserBootstrapConsumeResponseBody);
+      }
+
+      const consumedAtMs =
+        (await this.state.storage.get<number>(
+          AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY,
+        )) ?? 0;
+      if (consumedAtMs > 0) {
+        return Response.json({ accepted: false } satisfies BrowserBootstrapConsumeResponseBody);
+      }
+
+      await this.state.storage.put(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY,
+        nowMs,
+      );
+      await this.state.storage.put(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY,
+        expiresAtMs,
+      );
+      await this.state.storage.setAlarm(expiresAtMs);
+      return Response.json({ accepted: true } satisfies BrowserBootstrapConsumeResponseBody);
     }
 
     if (body.action === 'usage_increment' || body.action === 'usage_get') {
@@ -756,10 +1063,8 @@ export class AuthFailureLimiterDO {
       let totalRequests = (await this.state.storage.get<number>(totalKey)) ?? 0;
       const storedDayDate = (await this.state.storage.get<string>(dayDateKey)) ?? nowDate;
       let todayRequests = (await this.state.storage.get<number>(dayCountKey)) ?? 0;
-      let byRoute = ((await this.state.storage.get<Record<string, number>>(byRouteKey)) ?? {}) as Record<
-        string,
-        number
-      >;
+      let byRoute = ((await this.state.storage.get<Record<string, number>>(byRouteKey)) ??
+        {}) as Record<string, number>;
 
       const activeDayDate = storedDayDate === nowDate ? storedDayDate : nowDate;
       if (storedDayDate !== nowDate) {
@@ -769,7 +1074,10 @@ export class AuthFailureLimiterDO {
       if (body.action === 'usage_increment') {
         totalRequests += 1;
         todayRequests += 1;
-        const route = typeof body.route === 'string' && body.route.trim().length > 0 ? body.route.trim() : '/mcp';
+        const route =
+          typeof body.route === 'string' && body.route.trim().length > 0
+            ? body.route.trim()
+            : '/mcp';
         byRoute = {
           ...byRoute,
           [route]: (byRoute[route] ?? 0) + 1,
@@ -826,6 +1134,7 @@ export class AuthFailureLimiterDO {
 
     if (action === 'clear') {
       await this.clearState();
+      await this.clearAuthFailureAlarm();
       return Response.json({
         blocked: false,
         retryAfterSeconds: 0,
@@ -834,17 +1143,24 @@ export class AuthFailureLimiterDO {
     }
 
     let current = await this.loadState();
-    let stateChanged = false;
-    if (nowMs - current.windowStartedAtMs >= windowMs) {
-      current = {
-        count: 0,
-        windowStartedAtMs: nowMs,
-        blockedUntilMs: 0,
-      };
-      stateChanged = true;
+    const storedWindowMs = await this.loadAuthFailureWindowMs();
+    const effectiveWindowMs =
+      storedWindowMs && storedWindowMs > 0 ? Math.max(1_000, storedWindowMs) : windowMs;
+    const currentCleanupAt = this.getAuthFailureCleanupAtMs(current, effectiveWindowMs);
+    if (currentCleanupAt > 0 && currentCleanupAt <= nowMs) {
+      current = { ...DEFAULT_AUTH_FAILURE_STATE };
+      await this.clearState();
+      await this.clearAuthFailureAlarm();
     }
 
     if (action === 'record') {
+      if (current.windowStartedAtMs <= 0 || nowMs - current.windowStartedAtMs >= windowMs) {
+        current = {
+          count: 0,
+          windowStartedAtMs: nowMs,
+          blockedUntilMs: 0,
+        };
+      }
       const nextCount = current.count + 1;
       const shouldBlock = nextCount >= maxAttempts;
       current = {
@@ -852,8 +1168,8 @@ export class AuthFailureLimiterDO {
         windowStartedAtMs: current.windowStartedAtMs || nowMs,
         blockedUntilMs: shouldBlock ? nowMs + blockMs : current.blockedUntilMs,
       };
-      await this.saveState(current);
-      stateChanged = false;
+      await this.saveState(current, windowMs);
+      await this.scheduleAuthFailureCleanupAlarm(this.getAuthFailureCleanupAtMs(current, windowMs));
     }
 
     const blocked = current.blockedUntilMs > nowMs;
@@ -861,8 +1177,14 @@ export class AuthFailureLimiterDO {
       ? Math.max(1, Math.ceil((current.blockedUntilMs - nowMs) / 1000))
       : 0;
 
-    if (action === 'check' && stateChanged) {
-      await this.saveState(current);
+    if (action === 'check') {
+      const cleanupAt = this.getAuthFailureCleanupAtMs(current, windowMs);
+      if (cleanupAt > nowMs) {
+        await this.scheduleAuthFailureCleanupAlarm(cleanupAt);
+      } else if (!this.hasAuthFailureState(current)) {
+        await this.clearState();
+        await this.clearAuthFailureAlarm();
+      }
     }
 
     return Response.json({
@@ -874,6 +1196,60 @@ export class AuthFailureLimiterDO {
 
   async alarm(): Promise<void> {
     const nowMs = Date.now();
+    const mcpSessionAlarmAt =
+      (await this.state.storage.get<number>(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY)) ?? 0;
+    if (mcpSessionAlarmAt > 0) {
+      await this.evictExpiredMcpSessions(nowMs, 256);
+      await this.refreshMcpSessionAlarm();
+      return;
+    }
+
+    const revokedUntilMs =
+      (await this.state.storage.get<number>(
+        AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY,
+      )) ?? 0;
+    if (revokedUntilMs > 0) {
+      if (revokedUntilMs <= nowMs) {
+        await this.state.storage.delete(AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY);
+        await this.state.storage.deleteAlarm();
+      } else {
+        await this.state.storage.setAlarm(revokedUntilMs);
+      }
+      return;
+    }
+
+    const browserBootstrapExpiresAt =
+      (await this.state.storage.get<number>(
+        AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY,
+      )) ?? 0;
+    if (browserBootstrapExpiresAt > 0) {
+      if (browserBootstrapExpiresAt <= nowMs) {
+        await this.state.storage.delete(AuthFailureLimiterDO.BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY);
+        await this.state.storage.delete(AuthFailureLimiterDO.BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY);
+        await this.state.storage.deleteAlarm();
+      } else {
+        await this.state.storage.setAlarm(browserBootstrapExpiresAt);
+      }
+      return;
+    }
+
+    const authFailureCleanupAt =
+      (await this.state.storage.get<number>(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY)) ??
+      0;
+    if (authFailureCleanupAt > 0) {
+      const windowMs =
+        (await this.loadAuthFailureWindowMs()) ?? DEFAULT_AUTH_FAILURE_WINDOW_SECONDS * 1000;
+      const current = await this.loadState();
+      const cleanupAt = this.getAuthFailureCleanupAtMs(current, windowMs);
+      if (cleanupAt <= nowMs) {
+        await this.clearState();
+        await this.clearAuthFailureAlarm();
+      } else {
+        await this.scheduleAuthFailureCleanupAlarm(cleanupAt, true);
+      }
+      return;
+    }
+
     await this.evictExpiredMcpSessions(nowMs, 256);
     await this.refreshMcpSessionAlarm();
   }

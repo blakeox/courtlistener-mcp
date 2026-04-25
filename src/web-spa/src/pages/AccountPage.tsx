@@ -139,7 +139,7 @@ export function AccountPage(): React.JSX.Element {
               try {
                 await logout();
               } catch {
-                toast('Logout failed — local state cleared.', 'error');
+                toast('Logout failed — session is still active.', 'error');
               }
             }}
           >

@@ -151,6 +151,14 @@ const lookupCitationSchema = z.object({
   include_alternatives: z.boolean().optional().default(false),
 });
 
+const getOpinionCitationsSchema = z.object({
+  opinion_id: z.union([z.string(), z.number()]).transform(String),
+});
+
+const getAuthoritiesSchema = z.object({
+  opinion_id: z.union([z.string(), z.number()]).transform(String),
+});
+
 /**
  * Handler for citation lookup
  */
@@ -174,11 +182,69 @@ export class LookupCitationHandler extends TypedToolHandler<typeof lookupCitatio
       requestId: context.requestId,
     });
 
-    const response = await this.apiClient.searchCitations(input.citation);
+    const response = await this.apiClient.lookupCitation(input);
 
     return this.success({
       summary: `Found cases for citation: ${input.citation}`,
       results: response,
+    });
+  }
+}
+
+export class GetOpinionCitationsHandler extends TypedToolHandler<typeof getOpinionCitationsSchema> {
+  readonly name = 'get_opinion_citations';
+  readonly description = 'Get the opinions and authorities cited by a specific opinion';
+  readonly category = 'opinions';
+  protected readonly schema = getOpinionCitationsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getOpinionCitationsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    context.logger.info('Getting opinion citations', {
+      opinionId: input.opinion_id,
+      requestId: context.requestId,
+    });
+
+    const response = await this.apiClient.getOpinionCitations(parseInt(input.opinion_id, 10));
+
+    return this.success({
+      summary: `Retrieved citations for opinion ${input.opinion_id}`,
+      citations: response,
+    });
+  }
+}
+
+export class GetAuthoritiesHandler extends TypedToolHandler<typeof getAuthoritiesSchema> {
+  readonly name = 'get_authorities';
+  readonly description = 'Get the authorities referenced by a specific opinion';
+  readonly category = 'opinions';
+  protected readonly schema = getAuthoritiesSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getAuthoritiesSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    context.logger.info('Getting opinion authorities', {
+      opinionId: input.opinion_id,
+      requestId: context.requestId,
+    });
+
+    const response = await this.apiClient.getAuthorities(parseInt(input.opinion_id, 10));
+
+    return this.success({
+      summary: `Retrieved authorities for opinion ${input.opinion_id}`,
+      authorities: response,
     });
   }
 }

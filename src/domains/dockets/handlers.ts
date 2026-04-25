@@ -51,6 +51,55 @@ const getDocketEntriesSchema = z.object({
   limit: z.number().min(1).max(100).optional(),
 });
 
+const getDocketEntrySchema = z.object({
+  entry_id: z.union([z.string(), z.number()]).transform(String),
+});
+
+const getOriginatingCourtInfoSchema = z.object({
+  docket: z.union([z.string(), z.number()]).transform(String).optional(),
+  court: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getTagsSchema = z.object({
+  name: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getDocketAlertsSchema = z.object({
+  docket: z.union([z.string(), z.number()]).transform(String).optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const createDocketAlertSchema = z.object({
+  docket: z.union([z.string(), z.number()]).transform(String),
+  frequency: z.string().optional(),
+  alert_type: z.string().optional(),
+  email: z.string().optional(),
+});
+
+function resolvePagination(input: {
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  page_size?: number | undefined;
+}): { page: number; pageSize: number } {
+  const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
+  return {
+    page: input.cursor ? Math.floor(offset / resolvedLimit) + 1 : (input.page ?? 1),
+    pageSize: input.cursor ? resolvedLimit : (input.page_size ?? 20),
+  };
+}
+
 /**
  * Handler for getting dockets
  */
@@ -209,9 +258,7 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
     input: z.infer<typeof getDocketEntriesSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
-    const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
-    const page = input.cursor ? Math.floor(offset / resolvedLimit) + 1 : input.page;
-    const pageSize = input.cursor ? resolvedLimit : input.page_size;
+    const { page, pageSize } = resolvePagination(input);
 
     const params = {
       docket: input.docket,
@@ -233,6 +280,172 @@ export class GetDocketEntriesHandler extends TypedToolHandler<typeof getDocketEn
       docket_id: params.docket,
       docket_entries: entries,
       pagination: createPaginationInfo(entries, params.page, params.page_size),
+    });
+  }
+}
+
+export class GetDocketEntryHandler extends TypedToolHandler<typeof getDocketEntrySchema> {
+  readonly name = 'get_docket_entry';
+  readonly description = 'Get a specific docket entry';
+  readonly category = 'dockets';
+  protected readonly schema = getDocketEntrySchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 1800 } })
+  async execute(
+    input: z.infer<typeof getDocketEntrySchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    context.logger.info('Getting docket entry', {
+      entryId: input.entry_id,
+      requestId: context.requestId,
+    });
+
+    const response = await this.apiClient.getDocketEntry(parseInt(input.entry_id, 10));
+
+    return this.success({
+      summary: `Retrieved docket entry ${input.entry_id}`,
+      docket_entry: response,
+    });
+  }
+}
+
+export class GetOriginatingCourtInfoHandler extends TypedToolHandler<
+  typeof getOriginatingCourtInfoSchema
+> {
+  readonly name = 'get_originating_court_info';
+  readonly description = 'Get originating court information for appeals and transferred matters';
+  readonly category = 'dockets';
+  protected readonly schema = getOriginatingCourtInfoSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 1800 } })
+  async execute(
+    input: z.infer<typeof getOriginatingCourtInfoSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting originating court info', {
+      docket: input.docket,
+      court: input.court,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getOriginatingCourtInfo({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} originating court records`,
+      originating_court_info: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetTagsHandler extends TypedToolHandler<typeof getTagsSchema> {
+  readonly name = 'get_tags';
+  readonly description = 'Get CourtListener tags used for docket and content organization';
+  readonly category = 'dockets';
+  protected readonly schema = getTagsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 1800 } })
+  async execute(
+    input: z.infer<typeof getTagsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting tags', {
+      name: input.name,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getTags({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} tags`,
+      tags: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetDocketAlertsHandler extends TypedToolHandler<typeof getDocketAlertsSchema> {
+  readonly name = 'get_docket_alerts';
+  readonly description = 'Get docket-specific alert subscriptions';
+  readonly category = 'dockets';
+  protected readonly schema = getDocketAlertsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 1800 } })
+  async execute(
+    input: z.infer<typeof getDocketAlertsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting docket alerts', {
+      docket: input.docket,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getDocketAlerts({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} docket alerts`,
+      docket_alerts: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class CreateDocketAlertHandler extends TypedToolHandler<typeof createDocketAlertSchema> {
+  readonly name = 'create_docket_alert';
+  readonly description = 'Create a docket-specific alert subscription';
+  readonly category = 'dockets';
+  protected readonly schema = createDocketAlertSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults()
+  async execute(
+    input: z.infer<typeof createDocketAlertSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    context.logger.info('Creating docket alert', {
+      docket: input.docket,
+      requestId: context.requestId,
+    });
+
+    const response = await this.apiClient.createDocketAlert(input);
+
+    return this.success({
+      summary: `Created docket alert for docket ${input.docket}`,
+      result: response,
     });
   }
 }

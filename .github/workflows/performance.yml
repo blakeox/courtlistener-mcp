@@ -2,12 +2,9 @@ name: Performance Monitoring
 
 on:
   push:
-    branches: ['*'] # Run on all branches to catch performance regressions
+    branches: [main] # Keep automatic performance monitoring on the production branch
   pull_request:
-    branches: ['*'] # Run on PRs targeting any branch
-  schedule:
-    # Run every 6 hours
-    - cron: '0 */6 * * *'
+    branches: [main] # Run on PRs targeting main
   workflow_dispatch:
     inputs:
       environment:
@@ -31,13 +28,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -158,7 +155,7 @@ jobs:
   health-check:
     name: Remote Server Health Check
     runs-on: ubuntu-latest
-    if: github.event.schedule
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Check remote server health

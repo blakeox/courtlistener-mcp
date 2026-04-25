@@ -10,10 +10,9 @@ import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
 
-const { SearchCasesHandler, AdvancedSearchHandler, SearchOpinionsHandler } = await import(
-  '../../dist/domains/search/handlers.js'
-);
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+const { SearchCasesHandler, AdvancedSearchHandler, SearchOpinionsHandler } =
+  await import('../../src/domains/search/handlers.ts');
+const { Logger } = await import('../../src/infrastructure/logger.ts');
 
 class SilentLogger extends Logger {
   constructor() {
@@ -118,7 +117,10 @@ describe('SearchCasesHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       // withErrorHandling via withDefaults wraps errors with handler name
       assert.strictEqual(payload.error, 'search_cases failed');
       assert.ok(payload.details?.message?.includes('API down'));
@@ -148,7 +150,9 @@ describe('AdvancedSearchHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.ok(result.error.message.includes('At least one') || result.error.message.includes('parameter'));
+      assert.ok(
+        result.error.message.includes('At least one') || result.error.message.includes('parameter'),
+      );
     }
   });
 
@@ -234,11 +238,13 @@ describe('SearchOpinionsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       // withErrorHandling via withDefaults wraps errors with handler name
       assert.strictEqual(payload.error, 'search_opinions failed');
       assert.ok(payload.details?.message?.includes('Search unavailable'));
     }
   });
 });
-

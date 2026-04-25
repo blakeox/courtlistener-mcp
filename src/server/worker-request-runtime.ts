@@ -1,14 +1,16 @@
 import type { HandleWorkerCoreRoutesDeps } from './worker-core-routes.js';
 import { handleWorkerCoreRoutes } from './worker-core-routes.js';
+import type { WorkerDurableRuntimeEnv } from './worker-durable-runtime.js';
+import type { WorkerUiSessionRuntimeEnv } from './worker-ui-session-runtime.js';
 import type {
   WorkerDelegatedRouteContext,
   WorkerDelegatedRouteDeps,
 } from './worker-route-composition.js';
 import { handleDelegatedWorkerRoutes } from './worker-route-composition.js';
 
-export interface WorkerRequestRuntimeEnv {
+export interface WorkerRequestRuntimeEnv
+  extends WorkerUiSessionRuntimeEnv, WorkerDurableRuntimeEnv {
   MCP_ALLOWED_ORIGINS?: string;
-  MCP_AUTH_UI_ORIGIN?: string;
 }
 
 interface WorkerLegacyFetchOptions {
@@ -17,10 +19,7 @@ interface WorkerLegacyFetchOptions {
 
 export interface CreateWorkerLegacyFetchHandlerDeps<TEnv extends WorkerRequestRuntimeEnv> {
   getRequestOrigin: (request: Request) => string | null;
-  getCachedAllowedOrigins: (
-    rawAllowedOrigins: string | undefined,
-    authUiOriginRaw?: string,
-  ) => string[];
+  getCachedAllowedOrigins: (rawAllowedOrigins: string | undefined) => string[];
   isMcpPath: (pathname: string) => boolean;
   buildWorkerRouteMetricKey: (method: string, pathname: string) => string;
   recordRouteLatency: (route: string, elapsedMs: number) => void;
@@ -29,9 +28,7 @@ export interface CreateWorkerLegacyFetchHandlerDeps<TEnv extends WorkerRequestRu
   workerDelegatedRouteDeps: WorkerDelegatedRouteDeps<TEnv>;
 }
 
-function withOptionalGatewayAuthBypass<
-  TDeps extends { mcpBoundaryPolicy: object },
->(
+function withOptionalGatewayAuthBypass<TDeps extends { mcpBoundaryPolicy: object }>(
   deps: TDeps,
   skipGatewayAuth: boolean,
 ): TDeps {
@@ -61,7 +58,7 @@ export function createWorkerLegacyFetchHandler<TEnv extends WorkerRequestRuntime
     const requestMethod = request.method;
     const pathname = url.pathname;
     const origin = deps.getRequestOrigin(request);
-    const allowedOrigins = deps.getCachedAllowedOrigins(env.MCP_ALLOWED_ORIGINS, env.MCP_AUTH_UI_ORIGIN);
+    const allowedOrigins = deps.getCachedAllowedOrigins(env.MCP_ALLOWED_ORIGINS);
     const mcpPath = deps.isMcpPath(pathname);
     const requestStartedAt = deps.now();
     const routeMetricKey = deps.buildWorkerRouteMetricKey(requestMethod, pathname);
@@ -79,7 +76,10 @@ export function createWorkerLegacyFetchHandler<TEnv extends WorkerRequestRuntime
     };
 
     try {
-      const coreRouteResponse = await handleWorkerCoreRoutes(routeContext, deps.workerCoreRouteDeps);
+      const coreRouteResponse = await handleWorkerCoreRoutes(
+        routeContext,
+        deps.workerCoreRouteDeps,
+      );
       if (coreRouteResponse) {
         return coreRouteResponse;
       }

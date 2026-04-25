@@ -21,8 +21,8 @@ const {
   GetFinancialDisclosureHandler,
   GetPartiesAndAttorneysHandler,
   ManageAlertsHandler,
-} = await import('../../dist/domains/miscellaneous/handlers.js');
-const { Logger } = await import('../../dist/infrastructure/logger.js');
+} = await import('../../src/domains/miscellaneous/handlers.ts');
+const { Logger } = await import('../../src/infrastructure/logger.ts');
 
 class SilentLogger extends Logger {
   constructor(component = 'MiscHandlersTest') {

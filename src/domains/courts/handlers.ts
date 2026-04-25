@@ -51,6 +51,75 @@ const getJudgeSchema = z.object({
   judge_id: z.union([z.string(), z.number()]).transform(String),
 });
 
+const getJudicialPositionsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  court: z.string().optional(),
+  position_type: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getJudicialPositionSchema = z.object({
+  position_id: z.union([z.string(), z.number()]).transform(String),
+});
+
+const getJudgeEducationsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  school: z.string().optional(),
+  degree_level: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getJudgePoliticalAffiliationsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  political_party: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getAbaRatingsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getRetentionEventsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  court: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getSchoolsSchema = z.object({
+  name: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+const getMembershipsSchema = z.object({
+  person: z.union([z.string(), z.number()]).transform(String).optional(),
+  organization: z.string().optional(),
+  page: z.number().min(1).optional().default(1),
+  page_size: z.number().min(1).max(100).optional().default(20),
+  cursor: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
 function buildJudgeQueryParams(input: z.infer<typeof getJudgesSchema>): Record<string, unknown> {
   const params: Record<string, unknown> = {};
 
@@ -69,6 +138,19 @@ function buildJudgeQueryParams(input: z.infer<typeof getJudgesSchema>): Record<s
   }
 
   return params;
+}
+
+function resolvePagination(input: {
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  page_size?: number | undefined;
+}): { page: number; pageSize: number } {
+  const { offset, limit: resolvedLimit } = resolveOffsetLimit(input);
+  return {
+    page: input.cursor ? Math.floor(offset / resolvedLimit) + 1 : (input.page ?? 1),
+    pageSize: input.cursor ? resolvedLimit : (input.page_size ?? 20),
+  };
 }
 
 /**
@@ -181,5 +263,287 @@ export class GetJudgeHandler extends TypedToolHandler<typeof getJudgeSchema> {
       `courtlistener://judge/${input.judge_id}`,
       response,
     );
+  }
+}
+
+export class GetJudicialPositionsHandler extends TypedToolHandler<
+  typeof getJudicialPositionsSchema
+> {
+  readonly name = 'get_judicial_positions';
+  readonly description = 'Get judicial positions and appointments for a person';
+  readonly category = 'courts';
+  protected readonly schema = getJudicialPositionsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getJudicialPositionsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting judicial positions', {
+      person: input.person,
+      court: input.court,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getJudicialPositions({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} judicial positions`,
+      positions: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetJudicialPositionHandler extends TypedToolHandler<typeof getJudicialPositionSchema> {
+  readonly name = 'get_judicial_position';
+  readonly description = 'Get detailed information about a specific judicial position';
+  readonly category = 'courts';
+  protected readonly schema = getJudicialPositionSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getJudicialPositionSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    context.logger.info('Getting judicial position', {
+      positionId: input.position_id,
+      requestId: context.requestId,
+    });
+
+    const response = await this.apiClient.getJudicialPosition(parseInt(input.position_id, 10));
+
+    return this.success({
+      summary: `Retrieved judicial position ${input.position_id}`,
+      position: response,
+    });
+  }
+}
+
+export class GetJudgeEducationsHandler extends TypedToolHandler<typeof getJudgeEducationsSchema> {
+  readonly name = 'get_judge_educations';
+  readonly description = 'Get education history for judges and judicial figures';
+  readonly category = 'courts';
+  protected readonly schema = getJudgeEducationsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getJudgeEducationsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting judge educations', {
+      person: input.person,
+      school: input.school,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getJudgeEducations({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} judge education records`,
+      educations: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetJudgePoliticalAffiliationsHandler extends TypedToolHandler<
+  typeof getJudgePoliticalAffiliationsSchema
+> {
+  readonly name = 'get_judge_political_affiliations';
+  readonly description = 'Get political affiliation records for judges';
+  readonly category = 'courts';
+  protected readonly schema = getJudgePoliticalAffiliationsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getJudgePoliticalAffiliationsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting judge political affiliations', {
+      person: input.person,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getJudgePoliticalAffiliations({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} political affiliation records`,
+      political_affiliations: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetAbaRatingsHandler extends TypedToolHandler<typeof getAbaRatingsSchema> {
+  readonly name = 'get_aba_ratings';
+  readonly description = 'Get ABA ratings for judges';
+  readonly category = 'courts';
+  protected readonly schema = getAbaRatingsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getAbaRatingsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting ABA ratings', {
+      person: input.person,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getABARatings({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} ABA ratings`,
+      ratings: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetRetentionEventsHandler extends TypedToolHandler<typeof getRetentionEventsSchema> {
+  readonly name = 'get_retention_events';
+  readonly description = 'Get judicial retention and re-election event records';
+  readonly category = 'courts';
+  protected readonly schema = getRetentionEventsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getRetentionEventsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting retention events', {
+      person: input.person,
+      court: input.court,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getRetentionEvents({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} retention events`,
+      retention_events: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetSchoolsHandler extends TypedToolHandler<typeof getSchoolsSchema> {
+  readonly name = 'get_schools';
+  readonly description = 'Get educational institutions referenced by CourtListener judicial data';
+  readonly category = 'courts';
+  protected readonly schema = getSchoolsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getSchoolsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting schools', {
+      name: input.name,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getSchools({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} schools`,
+      schools: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
+  }
+}
+
+export class GetMembershipsHandler extends TypedToolHandler<typeof getMembershipsSchema> {
+  readonly name = 'get_memberships';
+  readonly description = 'Get professional memberships for judges and judicial figures';
+  readonly category = 'courts';
+  protected readonly schema = getMembershipsSchema;
+
+  constructor(private apiClient: CourtListenerAPI) {
+    super();
+  }
+
+  @withDefaults({ cache: { ttl: 3600 } })
+  async execute(
+    input: z.infer<typeof getMembershipsSchema>,
+    context: ToolContext,
+  ): Promise<CallToolResult> {
+    const { page, pageSize } = resolvePagination(input);
+    context.logger.info('Getting memberships', {
+      person: input.person,
+      organization: input.organization,
+      requestId: context.requestId,
+    });
+
+    const response = (await this.apiClient.getMemberships({
+      ...input,
+      page,
+      page_size: pageSize,
+    })) as PaginatedApiResponse;
+
+    return this.success({
+      summary: `Retrieved ${response.results?.length || 0} memberships`,
+      memberships: response.results,
+      pagination: createPaginationInfo(response, page, pageSize),
+    });
   }
 }

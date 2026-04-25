@@ -1,24 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * ✅ Simple validation test to verify parameter filtering works correctly (TypeScript)
+ * ✅ Quick validation that search tool schemas keep their intended order_by contract.
  */
 
 import { spawn, type ChildProcess } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
+const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 interface MCPRequest {
   jsonrpc: string;
   id: number;
   method: string;
-  params?: {
-    name?: string;
-    arguments?: Record<string, unknown>;
-  };
+  params?: Record<string, unknown>;
 }
 
 interface MCPResponse {
@@ -39,106 +38,125 @@ interface MCPResponse {
   error?: unknown;
 }
 
-async function testParameterFiltering(): Promise<void> {
-  console.log('🧪 Testing parameter filtering for order_by...');
-
-  // Start the MCP server
-  const server: ChildProcess = spawn('node', [join(projectRoot, 'dist/index.js')], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  // Test just getting the tools list first
-  const toolsRequest: MCPRequest = {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'tools/list',
-  };
-
-  let toolsReceived = false;
+function createStdioClient(server: ChildProcess) {
+  let buffer = '';
+  const pending = new Map<number, (response: MCPResponse) => void>();
 
   server.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n').filter((line) => line.trim());
+    buffer += data.toString();
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
     for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+
       try {
-        const response = JSON.parse(line) as MCPResponse;
-        if (response.id === 1 && response.result) {
-          toolsReceived = true;
-          console.log('✅ Server is responding correctly');
-          console.log(
-            `✅ Found ${response.result.tools?.length || 0} tools available`
-          );
-
-          // Check that search_cases tool exists and has order_by parameter
-          const searchTool = response.result.tools?.find(
-            (t) => t.name === 'search_cases'
-          );
-          if (searchTool && searchTool.inputSchema?.properties?.order_by) {
-            console.log(
-              '✅ search_cases tool has order_by parameter (as expected)'
-            );
+        const response = JSON.parse(trimmed) as MCPResponse;
+        if (typeof response.id === 'number') {
+          const resolve = pending.get(response.id);
+          if (resolve) {
+            pending.delete(response.id);
+            resolve(response);
           }
-
-          // Check that advanced_search tool exists and has order_by parameter
-          const advancedTool = response.result.tools?.find(
-            (t) => t.name === 'advanced_search'
-          );
-          if (advancedTool && advancedTool.inputSchema?.properties?.order_by) {
-            console.log(
-              '✅ advanced_search tool has order_by parameter (as expected)'
-            );
-          }
-
-          // Now test that order_by is filtered out when calling the tool
-          const testRequest: MCPRequest = {
-            jsonrpc: '2.0',
-            id: 2,
-            method: 'tools/call',
-            params: {
-              name: 'search_cases',
-              arguments: {
-                court: 'scotus',
-                order_by: 'date_filed', // This should be filtered out
-                page_size: 5,
-              },
-            },
-          };
-
-          server.stdin?.write(JSON.stringify(testRequest) + '\n');
-
-          setTimeout(() => {
-            console.log('✅ Parameter filtering test completed');
-            server.kill();
-            process.exit(0);
-          }, 2000);
         }
-      } catch (error) {
-        // Ignore parse errors for non-JSON lines
+      } catch {
+        // Ignore non-JSON log lines.
       }
     }
   });
 
-  server.stderr?.on('data', (data: Buffer) => {
-    console.error('Server error:', data.toString());
+  return {
+    send(request: MCPRequest): Promise<MCPResponse> {
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pending.delete(request.id);
+          reject(new Error(`Timeout waiting for response to request id=${request.id}`));
+        }, 20000);
+
+        pending.set(request.id, (response) => {
+          clearTimeout(timeout);
+          resolve(response);
+        });
+
+        server.stdin?.write(JSON.stringify(request) + '\n');
+      });
+    },
+  };
+}
+
+async function testParameterFiltering(): Promise<void> {
+  console.log('🧪 Testing search tool schema order_by contracts...');
+
+  const server: ChildProcess = spawn(localServerRuntime.command, localServerRuntime.args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: projectRoot,
+  });
+  const client = createStdioClient(server);
+
+  server.stderr?.on('data', () => {
+    // Server logs to stderr; ignore them unless the request flow fails.
   });
 
-  server.on('close', () => {
-    if (!toolsReceived) {
-      console.error('❌ Failed to receive tools list');
-      process.exit(1);
-    }
-  });
+  const initializeRequest: MCPRequest = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2024-11-05',
+      capabilities: { tools: {} },
+      clientInfo: { name: 'quick-validation', version: '1.0.0' },
+    },
+  };
+  const toolsRequest: MCPRequest = {
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/list',
+  };
 
-  // Send tools/list request
-  server.stdin?.write(JSON.stringify(toolsRequest) + '\n');
-
-  // Timeout after 10 seconds
-  setTimeout(() => {
-    if (!toolsReceived) {
-      console.error('❌ Test timed out');
-      server.kill();
-      process.exit(1);
+  try {
+    const initializeResponse = await client.send(initializeRequest);
+    if (!initializeResponse.result) {
+      throw new Error('Initialize request did not return a result payload.');
     }
-  }, 10000);
+
+    const toolsResponse = await client.send(toolsRequest);
+    const tools = toolsResponse.result?.tools;
+    if (!tools || tools.length === 0) {
+      throw new Error('tools/list did not return any tools.');
+    }
+
+    console.log('✅ Server is responding correctly');
+    console.log(`✅ Found ${tools.length} tools available`);
+
+    const searchTool = tools.find((tool) => tool.name === 'search_cases');
+    if (!searchTool) {
+      throw new Error('search_cases tool is missing from tools/list.');
+    }
+    if (searchTool.inputSchema?.properties?.order_by) {
+      throw new Error('search_cases unexpectedly exposes order_by in the public schema.');
+    }
+    console.log('✅ search_cases hides order_by from the public schema');
+
+    const advancedTool = tools.find((tool) => tool.name === 'advanced_search');
+    if (!advancedTool) {
+      throw new Error('advanced_search tool is missing from tools/list.');
+    }
+    if (!advancedTool.inputSchema?.properties?.order_by) {
+      throw new Error('advanced_search is missing order_by from the public schema.');
+    }
+    console.log('✅ advanced_search still exposes order_by in the public schema');
+
+    console.log('✅ Quick validation completed');
+    server.kill();
+    process.exit(0);
+  } catch (error) {
+    console.error(`❌ Test failed: ${error instanceof Error ? error.message : String(error)}`);
+    server.kill();
+    process.exit(1);
+  }
 }
 
 testParameterFiltering().catch((error) => {

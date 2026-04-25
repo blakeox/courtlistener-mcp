@@ -8,6 +8,7 @@ import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToast } from '../components/Toast';
 import { Badge, Button, Card, StatusBanner } from '../components/ui';
+import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 
 function LoadingSkeleton(props: { label: string; message: string }): React.JSX.Element {
   return (
@@ -24,7 +25,7 @@ export function OnboardingPage(): React.JSX.Element {
   const { session, loading: sessionLoading, sessionReady, sessionError, refresh } = useAuth();
   const { token, clear } = useToken();
   const { toast } = useToast();
-  const authUiOrigin = 'https://auth.courtlistenermcp.blakeoxford.com';
+  const authStartHref = buildHostedAuthStartHref();
 
   const authed = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
@@ -93,13 +94,22 @@ export function OnboardingPage(): React.JSX.Element {
 
   return (
     <div className="stack">
-      <Card title="Operator Console" subtitle="Diagnostics for session state, local credential posture, protocol negotiation, and runtime readiness.">
+      <Card
+        title={authed ? 'Operator Console' : 'Sign in to continue'}
+        subtitle={authed
+          ? 'Diagnostics for session state, local credential posture, protocol negotiation, and runtime readiness.'
+          : 'Use the hosted auth flow first, then come back here for runtime diagnostics and MCP checks.'}
+      >
         <p className="muted">
-          Public user sign-in, browser-session bootstrap, and account usage now live in the separate auth UI.
-          Use this console for MCP diagnostics and runtime checks. ChatGPT and Codex should authenticate through OAuth, not through a manually loaded browser token.
-          {' '}
-          <a href={authUiOrigin} target="_blank" rel="noreferrer">Open auth UI</a>.
+          {authed
+            ? 'Your browser session is active. Use this console for MCP diagnostics, protocol checks, and local credential troubleshooting.'
+            : 'This control center is for diagnostics after sign-in. Start with the hosted auth flow first, then come back here for runtime checks.'}
         </p>
+        {!authed ? (
+          <div className="row">
+            <a href={authStartHref} className="btn">Sign in</a>
+          </div>
+        ) : null}
         <dl className="dl-grid">
           <dt>Session</dt>
           <dd>{sessionChecking ? '… Checking server session' : sessionError ? '⚠ Session check failed' : '✓ Session endpoint reachable'}</dd>
@@ -163,9 +173,9 @@ export function OnboardingPage(): React.JSX.Element {
 
       <Card title="Quick actions" subtitle="Shortcuts for operator workflow and runtime checks.">
         <div className="row">
+          {!authed ? <a href={authStartHref} className="btn">Sign in</a> : null}
           <Link to="/app/account" className="btn secondary">Open operator session</Link>
           <Link to="/app/playground" className="btn">Open playground</Link>
-          <a href={authUiOrigin} target="_blank" rel="noreferrer" className="btn secondary">Open auth UI</a>
           <Button variant="secondary" onClick={() => refresh()} disabled={sessionLoading}>
             {sessionLoading ? 'Refreshing...' : 'Refresh session'}
           </Button>

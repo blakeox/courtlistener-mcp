@@ -11,8 +11,8 @@ import { createServer, type Server } from 'node:http';
 import { URL } from 'node:url';
 
 // Import server components
-const { HealthServer } = await import('../../dist/http-server.js');
-const { LegalMCPServer } = await import('../../dist/index.js');
+const { HealthServer } = await import('../../src/http-server.ts');
+const { LegalMCPServer } = await import('../../src/index.ts');
 
 interface LogEntry {
   level: string;
@@ -55,7 +55,7 @@ class MockLogger {
     endpoint: string,
     duration: number,
     status: number,
-    meta?: unknown
+    meta?: unknown,
   ): void {
     this.logs.push({
       level: 'api',
@@ -182,7 +182,11 @@ class MockMetricsCollector {
     this.failures.push({ duration, error, timestamp: Date.now() });
   }
 
-  recordPerformance(operation: string, duration: number, metadata: Record<string, unknown> = {}): void {
+  recordPerformance(
+    operation: string,
+    duration: number,
+    metadata: Record<string, unknown> = {},
+  ): void {
     this.performanceData.push({ operation, duration, metadata, timestamp: Date.now() });
   }
 
@@ -211,8 +215,7 @@ class MockMetricsCollector {
     total_failures: number;
   } {
     const stats = this.getStats();
-    const failureRate =
-      stats.totalRequests > 0 ? stats.totalFailures / stats.totalRequests : 0;
+    const failureRate = stats.totalRequests > 0 ? stats.totalFailures / stats.totalRequests : 0;
 
     let status = 'healthy';
     if (failureRate > 0.1) status = 'critical';
@@ -255,7 +258,7 @@ class MockMetricsCollector {
           acc[p.operation] = (acc[p.operation] || 0) + 1;
           return acc;
         },
-        {} as Record<string, number>
+        {} as Record<string, number>,
       ),
     };
   }
@@ -294,16 +297,20 @@ class HTTPClient {
       method?: string;
       headers?: Record<string, string>;
       body?: unknown;
-    } = {}
+    } = {},
   ): Promise<{
     status: number;
     headers: Record<string, string>;
     data: unknown;
     ok: boolean;
   }> {
-    const response = await fetch(url, {
+    const requestUrl = url.replace('://localhost:', '://127.0.0.1:');
+    const response = await fetch(requestUrl, {
       method: options.method || 'GET',
-      headers: options.headers || {},
+      headers: {
+        Connection: 'close',
+        ...(options.headers || {}),
+      },
       body: options.body ? JSON.stringify(options.body) : undefined,
       ...options,
     });
@@ -351,7 +358,7 @@ describe('🏢 Server Integration Testing', () => {
       mockLogger as unknown,
       mockMetrics as unknown,
       mockCache as unknown,
-      mockCircuitBreaker as unknown
+      mockCircuitBreaker as unknown,
     );
 
     // Start the server
@@ -370,19 +377,15 @@ describe('🏢 Server Integration Testing', () => {
 
       assert.strictEqual(response.status, 200);
       assert.ok(
-        typeof response.data === 'object' &&
-          response.data !== null &&
-          'status' in response.data
+        typeof response.data === 'object' && response.data !== null && 'status' in response.data,
       );
       assert.ok(
         typeof response.data === 'object' &&
           response.data !== null &&
-          'cache_stats' in response.data
+          'cache_stats' in response.data,
       );
       assert.ok(
-        typeof response.data === 'object' &&
-          response.data !== null &&
-          'timestamp' in response.data
+        typeof response.data === 'object' && response.data !== null && 'timestamp' in response.data,
       );
 
       // Should include health status
@@ -402,7 +405,9 @@ describe('🏢 Server Integration Testing', () => {
 
       assert.strictEqual(response.status, 200);
       const data = response.data as {
-        metrics?: { requests?: { totalRequests?: number; totalFailures?: number; cacheHits?: number } };
+        metrics?: {
+          requests?: { totalRequests?: number; totalFailures?: number; cacheHits?: number };
+        };
         performance?: unknown;
         cache_stats?: unknown;
         timestamp?: unknown;
@@ -456,9 +461,7 @@ describe('🏢 Server Integration Testing', () => {
     });
 
     it('should respond to circuit breakers endpoint', async () => {
-      const response = await HTTPClient.request(
-        `http://localhost:${serverPort}/circuit-breakers`
-      );
+      const response = await HTTPClient.request(`http://localhost:${serverPort}/circuit-breakers`);
 
       assert.strictEqual(response.status, 200);
       const data = response.data as {
@@ -612,7 +615,7 @@ describe('🏢 Server Integration Testing', () => {
 
       // Should have at least one log entry
       const hasServerLog = logs.some(
-        (log) => log.level === 'info' && log.msg?.includes('Health server started')
+        (log) => log.level === 'info' && log.msg?.includes('Health server started'),
       );
       assert.ok(hasServerLog, 'Should log server startup');
 
@@ -649,9 +652,7 @@ describe('🏢 Server Integration Testing', () => {
       assert.strictEqual(health.total_failures, 1);
       assert.ok(health.failure_rate && health.failure_rate > 0.1); // Should be 0.2 (20%)
 
-      console.log(
-        '✓ Health status correctly identifies critical state with high failure rate'
-      );
+      console.log('✓ Health status correctly identifies critical state with high failure rate');
     });
 
     it('should provide detailed performance metrics', async () => {
@@ -680,9 +681,7 @@ describe('🏢 Server Integration Testing', () => {
     });
 
     it('should monitor circuit breaker health', async () => {
-      const response = await HTTPClient.request(
-        `http://localhost:${serverPort}/circuit-breakers`
-      );
+      const response = await HTTPClient.request(`http://localhost:${serverPort}/circuit-breakers`);
 
       assert.strictEqual(response.status, 200);
       const data = response.data as {
@@ -739,7 +738,7 @@ describe('🏢 Server Integration Testing', () => {
     it('should handle concurrent requests properly', async () => {
       // Make multiple concurrent requests
       const requests = Array.from({ length: 5 }, () =>
-        HTTPClient.request(`http://localhost:${serverPort}/health`)
+        HTTPClient.request(`http://localhost:${serverPort}/health`),
       );
 
       const responses = await Promise.all(requests);
@@ -757,4 +756,3 @@ describe('🏢 Server Integration Testing', () => {
 });
 
 console.log('✅ Server Integration tests completed');
-

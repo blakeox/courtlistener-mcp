@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TokenProvider } from '../lib/token-context';
 import { ToastProvider } from '../components/Toast';
+import { createTestQueryClient, stubBrowserStorage } from './test-utils';
 
 // Mock the API module to avoid real fetches
 vi.mock('../lib/api', () => ({
@@ -18,18 +19,18 @@ vi.mock('../lib/api', () => ({
     byRoute: {},
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
-  login: vi.fn().mockResolvedValue({ message: 'ok' }),
-  loginByAccessToken: vi.fn().mockResolvedValue({ message: 'ok' }),
   logout: vi.fn().mockResolvedValue(undefined),
-  signup: vi.fn().mockResolvedValue({ message: 'ok' }),
-  requestPasswordReset: vi.fn().mockResolvedValue({ message: 'ok' }),
-  resetPassword: vi.fn().mockResolvedValue({ message: 'ok' }),
   createKey: vi.fn().mockResolvedValue({ message: 'ok', api_key: { id: 'k1', label: 'test', created_at: '2024-01-01', expires_at: null, token: 'tok' } }),
   revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
   aiChat: vi.fn().mockResolvedValue({ test_mode: true, fallback_used: false, mode: 'cheap', tool: 'search_cases', tool_reason: 'Default search', session_id: 'sid', ai_response: 'resp', mcp_result: {} }),
   aiPlain: vi.fn().mockResolvedValue({ ai_response: 'plain resp', mode: 'cheap' }),
   toErrorMessage: vi.fn().mockReturnValue('Error'),
+}));
+
+vi.mock('../lib/hosted-auth', () => ({
+  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Faccount'),
+  redirectToHostedAuth: vi.fn(),
 }));
 
 // Mock telemetry
@@ -52,118 +53,48 @@ vi.mock('../lib/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-function createStorageMock(): Storage {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => (key in store ? store[key] : null),
-    setItem: (key: string, value: string) => { store[key] = String(value); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
-    get length() { return Object.keys(store).length; },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  };
-}
-
 function Wrapper({ children }: { children: React.ReactNode }) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={createTestQueryClient()}>
       <MemoryRouter>
         <TokenProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <ToastProvider>{children}</ToastProvider>
         </TokenProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );
 }
 
-describe('LoginPage', () => {
+describe('HostedAuthRedirectPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
+    stubBrowserStorage();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('renders login form', async () => {
-    const { LoginPage } = await import('../pages/LoginPage');
-    render(<LoginPage />, { wrapper: Wrapper });
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
-  });
-
-  it('renders help card', async () => {
-    const { LoginPage } = await import('../pages/LoginPage');
-    render(<LoginPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/need help/i)).toBeInTheDocument();
-  });
-
-  it('shows rate-limit recovery guidance when login is throttled', async () => {
-    const api = await import('../lib/api');
-    vi.mocked(api.login).mockRejectedValueOnce({ status: 429, retry_after_seconds: 4, message: 'Too many requests' });
-    const { LoginPage } = await import('../pages/LoginPage');
-    render(<LoginPage />, { wrapper: Wrapper });
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Secret123!' } });
-    fireEvent.click(screen.getByRole('button', { name: /login/i }));
-
+  it('renders a hosted auth redirect fallback', async () => {
+    const hostedAuth = await import('../lib/hosted-auth');
+    const { HostedAuthRedirectPage } = await import('../pages/HostedAuthRedirectPage');
+    render(<HostedAuthRedirectPage />, { wrapper: Wrapper });
+    expect(screen.getByText('Redirecting to sign in')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
     await waitFor(() => {
-      expect(screen.getByText(/wait for the retry timer and try again/i)).toBeInTheDocument();
+      expect(hostedAuth.redirectToHostedAuth).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByRole('button', { name: /rate limited \(4s\)/i })).toBeInTheDocument();
-  });
-});
-
-describe('SignupPage', () => {
-  beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
-  it('renders signup form', async () => {
-    const { SignupPage } = await import('../pages/SignupPage');
-    render(<SignupPage />, { wrapper: Wrapper });
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument();
-  });
-
-  it('shows password requirements', async () => {
-    const { SignupPage } = await import('../pages/SignupPage');
-    render(<SignupPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/password requirements/i)).toBeInTheDocument();
-  });
-
-  it('shows rate-limit recovery guidance when signup is throttled', async () => {
-    const api = await import('../lib/api');
-    vi.mocked(api.signup).mockRejectedValueOnce({ status: 429, retry_after_seconds: 6, message: 'Too many requests' });
-    const { SignupPage } = await import('../pages/SignupPage');
-    render(<SignupPage />, { wrapper: Wrapper });
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'Secret123!' } });
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/wait for the retry timer and try again/i)).toBeInTheDocument();
-    });
-    expect(screen.getByRole('button', { name: /rate limited \(6s\)/i })).toBeInTheDocument();
+  it('explains that the route now redirects into hosted auth', async () => {
+    const { HostedAuthRedirectPage } = await import('../pages/HostedAuthRedirectPage');
+    render(<HostedAuthRedirectPage />, { wrapper: Wrapper });
+    expect(screen.getByText(/this app route has been retired in favor of the hosted auth flow/i)).toBeInTheDocument();
+    expect(screen.queryByText(/legacy/i)).not.toBeInTheDocument();
   });
 });
 
 describe('OnboardingPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
+    stubBrowserStorage();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -172,13 +103,13 @@ describe('OnboardingPage', () => {
   it('renders control center card', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Control Center')).toBeInTheDocument();
+    expect(screen.getByText('Operator Console')).toBeInTheDocument();
   });
 
   it('shows auth status', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/authenticated/i)).toBeInTheDocument();
+    expect(screen.getByText(/operator session active/i)).toBeInTheDocument();
   });
 
   it('shows loading skeleton while checking session posture', async () => {
@@ -279,9 +210,33 @@ describe('OnboardingPage', () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
 
-    expect(screen.getByText(/not authenticated \(token-only mode still supported\)/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /clear stored token/i })).toBeInTheDocument();
+    expect(screen.getByText(/no operator session/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute('href', '/auth/start?return_to=%2Fapp%2Faccount');
+    expect(screen.getByRole('button', { name: /clear local credential/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open account page/i })).toHaveAttribute('href', '/app/account');
+    expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
+  });
+
+  it('surfaces session endpoint failures and keeps recovery actions available', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: false, user: null, turnstile_site_key: '' },
+      loading: false,
+      sessionReady: true,
+      sessionError: 'Session service temporarily unavailable.',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
+    expect(screen.getByText(/session check failed/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
   });
 
   it('shows protocol mismatch recovery guidance', async () => {
@@ -318,8 +273,7 @@ describe('OnboardingPage', () => {
 
 describe('AccountPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
+    stubBrowserStorage();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -328,7 +282,7 @@ describe('AccountPage', () => {
   it('renders account heading', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Account')).toBeInTheDocument();
+    expect(screen.getByText('Operator Session')).toBeInTheDocument();
   });
 
   it('shows session info area', async () => {
@@ -402,53 +356,55 @@ describe('AccountPage', () => {
       expect(screen.getByRole('button', { name: /re-check protocol/i })).toBeInTheDocument();
     });
   });
-});
 
-describe('ResetPasswordPage', () => {
-  beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  it('surfaces server session failures without hiding the account diagnostics view', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: undefined,
+      loading: false,
+      sessionReady: true,
+      sessionError: 'Session service temporarily unavailable.',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
 
-  it('renders "Reset password" heading', async () => {
-    const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');
-    render(<ResetPasswordPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Reset password')).toBeInTheDocument();
-  });
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
 
-  it('shows password fields when recovery token exists', async () => {
-    window.location.hash = '#access_token=test-token&type=recovery';
-    const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');
-    render(<ResetPasswordPage />, { wrapper: Wrapper });
-    expect(screen.getByLabelText('New password')).toBeInTheDocument();
-    expect(screen.getByLabelText('Confirm password')).toBeInTheDocument();
-    window.location.hash = '';
+    expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
+    expect(screen.getByText(/⚠ Failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in to view usage metrics/i)).toBeInTheDocument();
   });
 
-  it('shows password fields when recovery token_hash exists', async () => {
-    window.history.replaceState({}, document.title, '/app/reset-password?type=recovery&token_hash=test-hash');
-    const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');
-    render(<ResetPasswordPage />, { wrapper: Wrapper });
-    expect(screen.getByLabelText('New password')).toBeInTheDocument();
-    expect(screen.getByLabelText('Confirm password')).toBeInTheDocument();
-    window.history.replaceState({}, document.title, '/');
-  });
+  it('preserves the local credential and surfaces the failure when account logout rejects', async () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'account-token');
+    const auth = await import('../lib/auth');
+    const logoutMock = vi.fn().mockRejectedValue(new Error('network failed'));
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: logoutMock,
+    });
 
-  it('shows warning when no recovery token', async () => {
-    window.location.hash = '';
-    const { ResetPasswordPage } = await import('../pages/ResetPasswordPage');
-    render(<ResetPasswordPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/missing or expired/i)).toBeInTheDocument();
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBe('account-token');
+      expect(screen.getByText('Logout failed — session is still active.')).toBeInTheDocument();
+    });
   });
 });
 
 describe('KeysPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
+    stubBrowserStorage();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -504,8 +460,7 @@ describe('PlaygroundPage', () => {
   }
 
   beforeEach(() => {
-    vi.stubGlobal('localStorage', createStorageMock());
-    vi.stubGlobal('sessionStorage', createStorageMock());
+    stubBrowserStorage();
     vi.clearAllMocks();
   });
   afterEach(() => {
@@ -597,8 +552,7 @@ describe('PlaygroundPage', () => {
   it('shows session badge', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
-    // SessionBadge shows session status
-    expect(screen.getByText(/session/i)).toBeInTheDocument();
+    expect(screen.getByText('No session')).toBeInTheDocument();
   });
 
   it('shows token missing warning when no token set', async () => {
@@ -760,7 +714,7 @@ describe('PlaygroundPage', () => {
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     const DeepLinkWrapper = ({ children }: { children: React.ReactNode }) => {
-      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const queryClient = createTestQueryClient();
       return (
         <QueryClientProvider client={queryClient}>
           <MemoryRouter initialEntries={['/app/playground?jobId=job-deep']}>

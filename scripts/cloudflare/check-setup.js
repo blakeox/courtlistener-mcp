@@ -65,6 +65,33 @@ function deriveBaseUrl(config) {
   return null;
 }
 
+function validateAuthUiOrigin(rawValue) {
+  if (!rawValue) {
+    return { ok: false, reason: 'missing' };
+  }
+  try {
+    const parsed = new URL(rawValue);
+    const hasExtraPath = parsed.pathname && parsed.pathname !== '/';
+    const hasExtraQuery = Boolean(parsed.search);
+    const hasExtraHash = Boolean(parsed.hash);
+    return {
+      ok: true,
+      normalized: parsed.origin,
+      hasExtraPath,
+      hasExtraQuery,
+      hasExtraHash,
+    };
+  } catch {
+    return { ok: false, reason: 'invalid' };
+  }
+}
+
+function parseBoolean(rawValue) {
+  if (!rawValue) return false;
+  const normalized = rawValue.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 async function checkEndpoint(baseUrl, path) {
   try {
     const res = await fetch(`${baseUrl}${path}`);
@@ -196,16 +223,45 @@ async function main() {
     const allowDevFallback = typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
       ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
       : '';
-    if (!authUiOrigin) {
-      warn('MCP_AUTH_UI_ORIGIN is not configured in wrangler vars. /authorize cannot redirect users to external login UI.');
+    const trustCfAccessJwt = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION);
+    const trustCfAccessHeaders = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS);
+    const trustCfAccessDeprecated = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS);
+    const trustCfAccessAcknowledged = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED);
+    const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
+      ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
+      : '';
+    if (authUiOrigin) {
+      const authUiOriginCheck = validateAuthUiOrigin(authUiOrigin);
+      if (!authUiOriginCheck.ok) {
+        warn(`MCP_AUTH_UI_ORIGIN is set but not a valid absolute URL: ${authUiOrigin}`);
+      } else {
+        warn(`MCP_AUTH_UI_ORIGIN is configured (${authUiOriginCheck.normalized}) but deprecated and ignored; hosted auth now starts on the Worker origin.`);
+        if (authUiOriginCheck.hasExtraPath || authUiOriginCheck.hasExtraQuery || authUiOriginCheck.hasExtraHash) {
+          warn(
+            'MCP_AUTH_UI_ORIGIN is deprecated; remove it instead of pointing it at an auth app or URL path.',
+          );
+        }
+      }
     } else {
-      ok(`Auth UI origin configured: ${authUiOrigin}`);
+      ok('MCP_AUTH_UI_ORIGIN is not configured; hosted auth will use Worker-owned same-origin routes.');
     }
     if (!allowDevFallback || allowDevFallback === 'false' || allowDevFallback === '0') {
       ok('MCP_ALLOW_DEV_FALLBACK is disabled.');
     } else {
       fail('MCP_ALLOW_DEV_FALLBACK is enabled. Disable this in production.');
       hasCriticalError = true;
+    }
+    if (trustCfAccessDeprecated) {
+      fail('MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and unsafe. Remove it and use the scoped trust flags only when an explicit trusted edge boundary exists.');
+      hasCriticalError = true;
+    }
+    if ((trustCfAccessJwt || trustCfAccessHeaders) && !trustCfAccessAcknowledged) {
+      fail(
+        'Cloudflare Access trust flags are enabled without MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true. This deploy gate requires an explicit acknowledgement before trusting Access JWT assertions or identity headers.',
+      );
+      hasCriticalError = true;
+    } else if (trustCfAccessJwt || trustCfAccessHeaders) {
+      ok('Cloudflare Access trust flags are explicitly acknowledged for deployment.');
     }
   }
 
@@ -236,29 +292,30 @@ async function main() {
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
   const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
   const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
-  const authUiOriginConfigured =
-    Boolean(config?.vars && typeof config.vars.MCP_AUTH_UI_ORIGIN === 'string' && config.vars.MCP_AUTH_UI_ORIGIN.trim());
-
+  const hasDedicatedRegistrationTokenSecret = secretNames.includes('MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
   if (!hasUiSessionSecret) {
     const message = 'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
-    if (authUiOriginConfigured) {
-      fail(message);
-      hasCriticalError = true;
-    } else {
-      warn(message);
-    }
+    warn(message);
   }
 
-  if (authUiOriginConfigured && !hasOidcAuth) {
-    warn('OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification will be unavailable.');
-  } else if (hasOidcAuth) {
+  if (hasDedicatedRegistrationTokenSecret) {
+    ok('MCP_OAUTH_REGISTRATION_TOKEN_SECRET is configured for dedicated DCR management-token signing.');
+  } else {
+    warn(
+      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens will fall back to MCP_UI_SESSION_SECRET or COURTLISTENER_API_KEY, coupling rotation across unrelated trust boundaries.',
+    );
+  }
+
+  if (hasOidcAuth) {
     ok('OIDC_ISSUER is configured.');
+  } else {
+    warn('OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification and hosted upstream auth will be unavailable.');
   }
 
-  if (authUiOriginConfigured && !hasOidcAudience) {
-    warn('OIDC_AUDIENCE is not set. Strongly recommended for Clerk token-template validation.');
-  } else if (hasOidcAudience) {
+  if (hasOidcAudience) {
     ok('OIDC_AUDIENCE is configured.');
+  } else {
+    warn('OIDC_AUDIENCE is missing. Resource-bound upstream bearer validation and hosted auth may be incomplete.');
   }
 
   if (!hasStaticAuth && !hasOidcAuth) {
@@ -274,6 +331,25 @@ async function main() {
   }
 
   if (config) {
+    const configuredVars = config.vars && typeof config.vars === 'object' ? config.vars : {};
+    const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
+      ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
+      : '';
+    if (!registrationTokenTtlRaw) {
+      warn('MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS is not set. Registration management tokens will default to 86400 seconds (24h). Set it explicitly so rollout intent is visible in config.');
+    } else {
+      const ttlSeconds = Number.parseInt(registrationTokenTtlRaw, 10);
+      if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+        fail('MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS must be a positive integer when set.');
+        hasCriticalError = true;
+      } else {
+        ok(`MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS is set to ${ttlSeconds} seconds.`);
+        if (ttlSeconds > 7 * 24 * 60 * 60) {
+          warn('MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS exceeds 7 days. Long-lived DCR management tokens increase credential leak blast radius.');
+        }
+      }
+    }
+
     const baseUrl = deriveBaseUrl(config);
     if (!baseUrl) {
       warn('Could not derive deployment URL from wrangler config.');
@@ -308,7 +384,10 @@ async function main() {
   console.log('  wrangler secret put MCP_UI_SESSION_SECRET');
   console.log('  wrangler secret put OIDC_ISSUER');
   console.log('  wrangler secret put OIDC_AUDIENCE');
+  console.log('  wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
   console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
+  console.log('  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)');
+  console.log('  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions');
   console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
   console.log('  pnpm run cloudflare:deploy');
 

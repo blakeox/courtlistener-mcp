@@ -12,6 +12,9 @@ jobs:
   label:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/heads/${{ github.event.pull_request.base.ref }}
       - uses: actions/labeler@v5
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}

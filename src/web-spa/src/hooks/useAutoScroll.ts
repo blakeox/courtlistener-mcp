@@ -9,7 +9,6 @@ export function useAutoScroll<T extends HTMLElement>(deps: unknown[]): React.Ref
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return ref;
