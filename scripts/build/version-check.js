@@ -115,6 +115,18 @@ console.log('\n🔗 Checking MCP dependencies...');
 const packageInfo = versions.get('package.json');
 
 if (packageInfo) {
+  const githubRefName = process.env.GITHUB_REF_NAME;
+  if (githubRefName?.startsWith('v')) {
+    const tagVersion = githubRefName.slice(1);
+    if (tagVersion !== packageInfo.version) {
+      errors.push(
+        `git tag version (${tagVersion}) does not match package.json version (${packageInfo.version})`,
+      );
+    } else {
+      console.log(`   ✅ git tag version matches package.json: ${tagVersion}`);
+    }
+  }
+
   const mcpDeps = Object.entries(packageInfo.dependencies)
     .filter(([name]) => name.includes('modelcontextprotocol'))
     .concat(Object.entries(packageInfo.devDependencies)

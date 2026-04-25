@@ -35,7 +35,13 @@ describe('GitHub workflow hardening', () => {
     assert.match(releaseWorkflow, /publish-docker:/);
     assert.match(releaseWorkflow, /github-release:/);
     assert.match(releaseWorkflow, /needs: \[validate-release, docker-test\]/);
-    assert.match(releaseWorkflow, /if: github\.event_name == 'push'/);
+    assert.match(releaseWorkflow, /workflow_dispatch:/);
+    assert.match(releaseWorkflow, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+    assert.match(releaseWorkflow, /Validate npm publish token/);
+    assert.match(
+      releaseWorkflow,
+      /NPM_TOKEN GitHub secret is required to publish courtlistener-mcp to npm/,
+    );
   });
 
   it('makes the default test script include the SPA auth suites', () => {

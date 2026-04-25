@@ -5,6 +5,9 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const packageJson = JSON.parse(
+  await fs.readFile(path.resolve(__dirname, '../package.json'), 'utf8'),
+) as { version: string };
 
 async function generate() {
   console.log('Generating MCP Manifest...');
@@ -25,7 +28,7 @@ async function generate() {
     const manifest = {
       server: {
         name: "courtlistener-mcp",
-        version: "0.1.0",
+        version: packageJson.version,
         description: "Legal research MCP server providing comprehensive access to CourtListener legal database"
       },
       capabilities: {

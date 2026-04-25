@@ -39,6 +39,7 @@ import { runWithPrincipalContext } from './infrastructure/principal-context.js';
 import {
   PREFERRED_MCP_PROTOCOL_VERSION,
   SERVER_CAPABILITIES,
+  SERVER_INFO,
   SUPPORTED_MCP_PROTOCOL_VERSIONS as SUPPORTED_MCP_PROTOCOL_VERSION_LIST,
 } from './infrastructure/protocol-constants.js';
 import type { Logger } from './infrastructure/logger.js';
@@ -144,7 +145,7 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
   };
 
   server = new McpServer(
-    { name: 'courtlistener-mcp', version: '0.1.0' },
+    { name: SERVER_INFO.name, version: SERVER_INFO.version },
     { capabilities: SERVER_CAPABILITIES },
   ) as unknown as InstanceType<typeof McpAgent>['server'];
 

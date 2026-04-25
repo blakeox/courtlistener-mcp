@@ -68,7 +68,7 @@ export class HealthCheckManager {
       status: overallStatus,
       timestamp,
       uptime,
-      version: process.env.npm_package_version || '0.1.0',
+      version: process.env.npm_package_version || '1.0.2',
       dependencies,
       metrics: healthMetrics,
     };
