@@ -132,6 +132,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(response.headers.get('x-hosted-auth-signal'), 'config_missing');
     assert.equal(response.headers.get('x-hosted-auth-failure'), 'true');
     assert.equal(response.headers.get('x-hosted-auth-terminal'), 'true');
+    assert.match(
+      String(response.headers.get('x-hosted-auth-correlation-id')),
+      /^[A-Za-z0-9_-]{8,}$/,
+    );
   });
 
   it('surfaces partial Worker-native OIDC config instead of silently falling back', async () => {
