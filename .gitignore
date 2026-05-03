@@ -70,6 +70,7 @@ coverage/
 junit.xml
 test-results/
 playwright-report/
+.playwright-mcp/
 
 # Enhanced MCP Inspector test artifacts
 test-output/
@@ -95,6 +96,7 @@ wrangler.toml.backup
 *.tmp
 *.temp
 .cache/
+.copilot-home-*.png
 
 # IDE/Editor files with potential secrets
 .vscode/settings.json
