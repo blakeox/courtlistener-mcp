@@ -3,6 +3,34 @@ import { describe, it } from 'node:test';
 
 import { handleWorkerUiShellRoutes } from '../../src/server/worker-ui-shell-routes.js';
 
+function createDeps() {
+  return {
+    spaJs: '',
+    spaCss: '',
+    spaBuildId: 'build-1',
+    jsonError: (message: string, status: number, errorCode: string) =>
+      Response.json({ error: message, error_code: errorCode }, { status }),
+    spaAssetResponse: (content: string, contentType?: string) =>
+      new Response(content, {
+        status: 200,
+        ...(contentType ? { headers: { 'content-type': contentType } } : {}),
+      }),
+    generateCspNonce: () => 'nonce',
+    getOrCreateCsrfCookieHeader: () => 'csrf=1',
+    htmlResponse: (html: string, _nonce?: string, extraHeaders?: HeadersInit) => {
+      const headers = new Headers(extraHeaders);
+      return new Response(html, { status: 200, headers });
+    },
+    renderSpaShellHtml: (buildId?: string) =>
+      buildId ? `<html><body>landing ${buildId}</body></html>` : '<html></html>',
+    redirectResponse: (location: string, status?: number, extraHeaders?: HeadersInit) => {
+      const headers = new Headers(extraHeaders);
+      headers.set('Location', location);
+      return new Response(null, { status, headers });
+    },
+  };
+}
+
 describe('handleWorkerUiShellRoutes', () => {
   it('serves bundled SPA assets', async () => {
     const response = await handleWorkerUiShellRoutes({
@@ -10,22 +38,11 @@ describe('handleWorkerUiShellRoutes', () => {
       url: new URL('https://example.com/app/assets/spa.js'),
       env: {},
       deps: {
+        ...createDeps(),
         spaJs: 'console.log("ok")',
         spaCss: 'body{}',
-        spaBuildId: 'build-1',
-        jsonError: (message, status, errorCode) =>
-          Response.json({ error: message, error_code: errorCode }, { status }),
-        spaAssetResponse: (content, contentType) =>
-          new Response(content, { status: 200, headers: { 'content-type': contentType } }),
-        generateCspNonce: () => 'nonce',
         getOrCreateCsrfCookieHeader: () => null,
-        htmlResponse: (html) => new Response(html, { status: 200 }),
-        renderSpaShellHtml: () => '<html></html>',
-        redirectResponse: (location, status, extraHeaders) =>
-          new Response(null, {
-            status,
-            headers: { Location: location, ...(extraHeaders as Record<string, string>) },
-          }),
+        htmlResponse: (html: string) => new Response(html, { status: 200 }),
       },
     });
 
@@ -38,30 +55,11 @@ describe('handleWorkerUiShellRoutes', () => {
       request: new Request('https://example.com/', { method: 'GET' }),
       url: new URL('https://example.com/'),
       env: {},
-      deps: {
-        spaJs: '',
-        spaCss: '',
-        spaBuildId: 'build-1',
-        jsonError: (message, status, errorCode) =>
-          Response.json({ error: message, error_code: errorCode }, { status }),
-        spaAssetResponse: (content) => new Response(content, { status: 200 }),
-        generateCspNonce: () => 'nonce',
-        getOrCreateCsrfCookieHeader: () => 'csrf=1',
-        htmlResponse: (html, _nonce, extraHeaders) => {
-          const headers = new Headers(extraHeaders);
-          return new Response(html, { status: 200, headers });
-        },
-        renderSpaShellHtml: () => '<html><body>landing</body></html>',
-        redirectResponse: (location, status, extraHeaders) => {
-          const headers = new Headers(extraHeaders);
-          headers.set('Location', location);
-          return new Response(null, { status, headers });
-        },
-      },
+      deps: createDeps(),
     });
 
     assert.equal(response?.status, 200);
-    assert.equal(await response?.text(), '<html><body>landing</body></html>');
+    assert.equal(await response?.text(), '<html><body>landing build-1</body></html>');
     assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
   });
 
@@ -71,21 +69,9 @@ describe('handleWorkerUiShellRoutes', () => {
       url: new URL('https://example.com/login'),
       env: {},
       deps: {
-        spaJs: '',
-        spaCss: '',
-        spaBuildId: 'build-1',
-        jsonError: (message, status, errorCode) =>
-          Response.json({ error: message, error_code: errorCode }, { status }),
-        spaAssetResponse: (content) => new Response(content, { status: 200 }),
-        generateCspNonce: () => 'nonce',
-        getOrCreateCsrfCookieHeader: () => 'csrf=1',
-        htmlResponse: (html) => new Response(html, { status: 200 }),
+        ...createDeps(),
+        htmlResponse: (html: string) => new Response(html, { status: 200 }),
         renderSpaShellHtml: () => '<html></html>',
-        redirectResponse: (location, status, extraHeaders) => {
-          const headers = new Headers(extraHeaders);
-          headers.set('Location', location);
-          return new Response(null, { status, headers });
-        },
       },
     });
 
@@ -93,4 +79,26 @@ describe('handleWorkerUiShellRoutes', () => {
     assert.equal(response?.headers.get('Location'), 'https://example.com/app/login');
     assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
   });
+
+  for (const alias of ['/oidc', '/oidc/', '/signin', '/sign-in']) {
+    it(`redirects ${alias} to the hosted auth start flow`, async () => {
+      const response = await handleWorkerUiShellRoutes({
+        request: new Request(`https://example.com${alias}`, { method: 'GET' }),
+        url: new URL(`https://example.com${alias}`),
+        env: {},
+        deps: {
+          ...createDeps(),
+          htmlResponse: (html: string) => new Response(html, { status: 200 }),
+          renderSpaShellHtml: () => '<html></html>',
+        },
+      });
+
+      assert.equal(response?.status, 302);
+      assert.equal(
+        response?.headers.get('Location'),
+        'https://example.com/auth/start?return_to=%2Fapp%2Faccount',
+      );
+      assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
+    });
+  }
 });

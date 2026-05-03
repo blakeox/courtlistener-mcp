@@ -4,7 +4,7 @@ export const HOSTED_MCP_OAUTH_CONTRACT = {
     authorizationServerMetadata: '/.well-known/oauth-authorization-server',
     openIdConfiguration: '/.well-known/openid-configuration',
     protectedResourceMetadata: '/.well-known/oauth-protected-resource',
-    authorize: '/authorize',
+    authorize: '/oauth/authorize',
     token: '/token',
     register: '/register',
   },
@@ -16,7 +16,40 @@ export const HOSTED_MCP_OAUTH_CONTRACT = {
   scopesSupported: ['legal:read', 'legal:search', 'legal:analyze'],
 } as const;
 
+export const HOSTED_MCP_BROWSER_AUTH_CONTRACT = {
+  paths: {
+    approve: '/oauth/approve',
+    logout: '/oauth/logout',
+  },
+  legacyPaths: {
+    authorize: '/authorize',
+    approve: '/auth/approve',
+    logout: '/auth/logout',
+  },
+} as const;
+
 export const HOSTED_MCP_OAUTH_DEFAULT_SCOPE = HOSTED_MCP_OAUTH_CONTRACT.scopesSupported.join(' ');
+
+export function isHostedAuthorizePath(pathname: string): boolean {
+  return (
+    pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorize ||
+    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.authorize
+  );
+}
+
+export function isHostedApprovalPath(pathname: string): boolean {
+  return (
+    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve ||
+    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.approve
+  );
+}
+
+export function isHostedLogoutPath(pathname: string): boolean {
+  return (
+    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.logout ||
+    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.logout
+  );
+}
 
 export function buildHostedMcpAuthorizationServerMetadata(origin: string) {
   const issuer = origin;

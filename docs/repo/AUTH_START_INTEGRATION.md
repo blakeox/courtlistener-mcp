@@ -5,27 +5,31 @@ on the same origin.
 
 ## Flow
 
-1. MCP client hits `/authorize` on this worker.
+1. MCP client hits `/oauth/authorize` on this worker.
 2. If identity is missing and Worker-native hosted auth is configured, the
    worker redirects to same-origin `/auth/start?return_to=<authorize_url>`.
-3. The Worker-native path redirects to the upstream OIDC provider, exchanges the
-   callback code, sets `clmcp_ui`, and for `/authorize` return targets stops on
-   a same-site approval screen before completing OAuth.
+3. If `/oauth/authorize` is instead protected by Cloudflare Access and
+   `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true`, the Worker can bootstrap
+   its own UI session from trusted Access identity headers on `/oauth/approve`
+   and continue to the same approval step without any upstream OIDC client pair.
+4. The Worker-native path redirects to the upstream OIDC provider, exchanges the
+   callback code, sets `clmcp_ui`, and for `/oauth/authorize` return targets
+   stops on a same-site approval screen before completing OAuth.
+
+Legacy `/authorize`, `/auth/approve`, and `/auth/logout` aliases are still
+recognized by the Worker, but the published browser-auth contract is now the
+`/oauth/*` path set.
 
 ## Worker env required
 
 - `OIDC_ISSUER=<issuer for provider access tokens>`
 - `OIDC_AUDIENCE=<audience/resource expected by the worker>`
 - `OIDC_JWKS_URL=<jwks url>` (optional)
-- `MCP_AUTH_OIDC_CLIENT_ID=<upstream OIDC client id>` (preferred for same-origin
+- `MCP_AUTH_OIDC_CLIENT_ID=<upstream OIDC client id>` (required for same-origin
   Worker auth)
-- `MCP_AUTH_OIDC_CLIENT_SECRET=<upstream OIDC client secret>` (preferred for
+- `MCP_AUTH_OIDC_CLIENT_SECRET=<upstream OIDC client secret>` (required for
   same-origin Worker auth)
 - `MCP_AUTH_OIDC_SCOPES=<optional scopes; defaults to openid profile email>`
-- `LOGTO_APP_ID=<traditional app id>` and
-  `LOGTO_APP_SECRET=<traditional app secret>` remain supported only as a
-  migration fallback when the Worker-native `MCP_AUTH_OIDC_CLIENT_*` pair is
-  entirely absent
 - `MCP_UI_SESSION_SECRET=<strong random secret>` (required; hosted auth is not
   considered healthy without it)
 - `MCP_ALLOW_DEV_FALLBACK=false` (recommended in production; enabling it with
@@ -39,6 +43,9 @@ on the same origin.
 - `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true` only when intentionally
   enabling one of the scoped Cloudflare Access trust flags for a trusted edge
   deployment
+- `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` only when `/authorize` and
+  `/auth/approve` are actually protected by Cloudflare Access or another edge
+  that strips spoofed `cf-access-authenticated-user-*` headers
 - Optional bootstrap throttles:
   - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
   - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
@@ -51,11 +58,13 @@ on the same origin.
   - `/auth/callback`
   - `/auth/approve`
   - `/auth/logout`
-- Readiness now requires all of: `OIDC_ISSUER`, one complete upstream client
-  pair (`MCP_AUTH_OIDC_CLIENT_*` preferred, otherwise `LOGTO_APP_*`), and
-  `MCP_UI_SESSION_SECRET`.
-- Partial Worker-native credentials do not fall back to `LOGTO_APP_*`; they fail
-  closed until the generic pair is completed or removed.
+- Readiness now requires all of: `OIDC_ISSUER`, the complete upstream client
+  pair (`MCP_AUTH_OIDC_CLIENT_*`), and `MCP_UI_SESSION_SECRET`.
+- In Cloudflare Access browser-auth mode, `/auth/approve` can bootstrap the
+  Worker UI session directly from trusted Access identity headers, but
+  `/auth/start` is still only the Worker-native upstream-OIDC handoff surface.
+- Partial Worker-native credentials fail closed until the pair is completed or
+  removed.
 - `MCP_AUTH_UI_ORIGIN` is deprecated and ignored; hosted auth always starts on
   the Worker origin.
 - DCR management tokens should use `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`;
@@ -97,16 +106,19 @@ on the same origin.
 ## Verification checklist
 
 1. Open MCP OAuth flow from ChatGPT/Codex.
-2. Confirm redirect to `https://<worker>/auth/start?return_to=...`.
-3. Sign in via the configured provider.
-4. Confirm the Worker shows an approval screen before completing browser-session
+2. In Worker-native mode, confirm redirect to
+   `https://<worker>/auth/start?return_to=...`.
+3. In Cloudflare Access mode, confirm `/authorize` first redirects to the Access
+   login boundary for the protected route.
+4. Sign in via the configured provider or Access login boundary.
+5. Confirm the Worker shows an approval screen before completing browser-session
    `/authorize` requests.
-5. Confirm a direct probe of `https://<worker>/auth/start?continue=1` returns
+6. Confirm a direct probe of `https://<worker>/auth/start?continue=1` returns
    `302` only when hosted auth is fully ready and a non-redirect with setup
    guidance when it is not.
-6. Confirm `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` is set so DCR management token
+7. Confirm `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` is set so DCR management token
    rotation is decoupled from UI session rotation.
-7. If Cloudflare Access trust is enabled, confirm
+8. If Cloudflare Access trust is enabled, confirm
    `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true` is present in deploy config
    and intentional.
-8. Confirm `GET /api/usage` returns user counters after MCP calls.
+9. Confirm `GET /api/usage` returns user counters after MCP calls.

@@ -4,8 +4,6 @@ export interface WorkerUpstreamOidcClientEnv {
   MCP_AUTH_OIDC_CLIENT_ID?: string;
   MCP_AUTH_OIDC_CLIENT_SECRET?: string;
   MCP_AUTH_OIDC_SCOPES?: string;
-  LOGTO_APP_ID?: string;
-  LOGTO_APP_SECRET?: string;
 }
 
 export interface WorkerHostedAuthEnv extends WorkerUpstreamOidcClientEnv {
@@ -18,7 +16,7 @@ export interface WorkerUpstreamOidcClientConfig {
   clientId: string;
   clientSecret: string;
   scopes: string[];
-  credentialSource: 'worker_native' | 'logto_legacy';
+  credentialSource: 'worker_native';
 }
 
 export interface WorkerHostedAuthConfig {
@@ -33,8 +31,6 @@ export interface WorkerHostedAuthConfigDiagnostics {
   sessionSecretConfigured: boolean;
   workerNativeClientIdConfigured: boolean;
   workerNativeClientSecretConfigured: boolean;
-  legacyClientIdConfigured: boolean;
-  legacyClientSecretConfigured: boolean;
   credentialSource: WorkerUpstreamOidcClientConfig['credentialSource'] | null;
   errors: string[];
 }
@@ -72,27 +68,7 @@ export function resolveWorkerUpstreamOidcClientConfig(
       credentialSource: 'worker_native',
     };
   }
-
-  if (hasWorkerNativeClientId || hasWorkerNativeClientSecret) {
-    return null;
-  }
-
-  const hasLegacyClientId = hasValue(env.LOGTO_APP_ID);
-  const hasLegacyClientSecret = hasValue(env.LOGTO_APP_SECRET);
-  if (!hasLegacyClientId || !hasLegacyClientSecret) {
-    return null;
-  }
-
-  const clientId = env.LOGTO_APP_ID?.trim() || '';
-  const clientSecret = env.LOGTO_APP_SECRET?.trim() || '';
-  return {
-    issuer,
-    audience: env.OIDC_AUDIENCE?.trim() || null,
-    clientId,
-    clientSecret,
-    scopes: parseScopes(env.MCP_AUTH_OIDC_SCOPES),
-    credentialSource: 'logto_legacy',
-  };
+  return null;
 }
 
 export function hasWorkerUpstreamOidcClientConfig(env: WorkerUpstreamOidcClientEnv): boolean {
@@ -125,40 +101,25 @@ export function evaluateWorkerHostedAuthConfig(
   const sessionSecretConfigured = hasValue(env.MCP_UI_SESSION_SECRET);
   const workerNativeClientIdConfigured = hasValue(env.MCP_AUTH_OIDC_CLIENT_ID);
   const workerNativeClientSecretConfigured = hasValue(env.MCP_AUTH_OIDC_CLIENT_SECRET);
-  const legacyClientIdConfigured = hasValue(env.LOGTO_APP_ID);
-  const legacyClientSecretConfigured = hasValue(env.LOGTO_APP_SECRET);
   const relevantEnvPresent =
     issuerConfigured ||
     sessionSecretConfigured ||
     workerNativeClientIdConfigured ||
-    workerNativeClientSecretConfigured ||
-    legacyClientIdConfigured ||
-    legacyClientSecretConfigured;
+    workerNativeClientSecretConfigured;
 
   const errors: string[] = [];
   const hasCompleteWorkerNativePair =
     workerNativeClientIdConfigured && workerNativeClientSecretConfigured;
-  const hasCompleteLegacyPair = legacyClientIdConfigured && legacyClientSecretConfigured;
 
   if (workerNativeClientIdConfigured !== workerNativeClientSecretConfigured) {
     errors.push(
-      'Hosted auth Worker-native OIDC config is incomplete: set both MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET, or remove both before falling back to LOGTO_APP_ID and LOGTO_APP_SECRET.',
-    );
-  }
-
-  if (
-    !workerNativeClientIdConfigured &&
-    !workerNativeClientSecretConfigured &&
-    legacyClientIdConfigured !== legacyClientSecretConfigured
-  ) {
-    errors.push(
-      'Hosted auth legacy OIDC config is incomplete: set both LOGTO_APP_ID and LOGTO_APP_SECRET, or remove both.',
+      'Hosted auth upstream OIDC config is incomplete: set both MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET, or remove both.',
     );
   }
 
   const upstream = resolveWorkerUpstreamOidcClientConfig(env);
 
-  if (!issuerConfigured && (hasCompleteWorkerNativePair || hasCompleteLegacyPair)) {
+  if (!issuerConfigured && hasCompleteWorkerNativePair) {
     errors.push(
       'Hosted auth upstream OIDC client credentials are configured but OIDC_ISSUER is missing.',
     );
@@ -177,8 +138,6 @@ export function evaluateWorkerHostedAuthConfig(
     sessionSecretConfigured,
     workerNativeClientIdConfigured,
     workerNativeClientSecretConfigured,
-    legacyClientIdConfigured,
-    legacyClientSecretConfigured,
     credentialSource: upstream?.credentialSource ?? null,
     errors,
   };

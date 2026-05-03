@@ -185,7 +185,7 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
         return;
       }
 
-      if (url.pathname === '/authorize') {
+      if (url.pathname === '/oauth/authorize' || url.pathname === '/authorize') {
         const authorizeResponse = await handleWorkerOAuthAuthorizeRoute(request, env, {
           jsonError,
           redirectResponse,

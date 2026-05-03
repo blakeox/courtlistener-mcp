@@ -125,7 +125,7 @@ describe('oauth diagnostics', () => {
 
   it('classifies hosted auth signals for alerting-friendly metadata', () => {
     const summary = summarizeHostedAuthSignal({
-      pathname: '/auth/approve',
+      pathname: '/oauth/approve',
       ready: false,
       status: 'ready',
       outcome: 'rejected',

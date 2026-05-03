@@ -44,8 +44,6 @@ export interface Env {
   MCP_AUTH_OIDC_CLIENT_ID?: string;
   MCP_AUTH_OIDC_CLIENT_SECRET?: string;
   MCP_AUTH_OIDC_SCOPES?: string;
-  LOGTO_APP_ID?: string;
-  LOGTO_APP_SECRET?: string;
   MCP_SESSION_SHARD_COUNT?: string;
   MCP_SESSION_IDLE_TTL_SECONDS?: string;
   MCP_SESSION_ABSOLUTE_TTL_SECONDS?: string;

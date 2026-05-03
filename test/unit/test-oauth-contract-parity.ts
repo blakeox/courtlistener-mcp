@@ -8,6 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/server/auth/router.js';
 
 import {
+  HOSTED_MCP_BROWSER_AUTH_CONTRACT,
   HOSTED_MCP_OAUTH_CONTRACT,
   buildHostedMcpAuthorizationServerMetadata,
   buildHostedMcpOpenIdConfiguration,
@@ -34,17 +35,25 @@ describe('hosted OAuth contract parity', () => {
       'codex',
       'vscode-copilot',
     ]);
-    assert.equal(
-      new URL(nodeMetadata.authorization_endpoint).pathname,
-      HOSTED_MCP_OAUTH_CONTRACT.paths.authorize,
-    );
+    assert.equal(new URL(nodeMetadata.authorization_endpoint).pathname, '/authorize');
     assert.equal(
       new URL(nodeMetadata.token_endpoint).pathname,
       HOSTED_MCP_OAUTH_CONTRACT.paths.token,
     );
 
     assert.equal(workerMetadata.issuer, issuerUrl.origin);
-    assert.equal(workerMetadata.authorization_endpoint, nodeMetadata.authorization_endpoint);
+    assert.equal(
+      workerMetadata.authorization_endpoint,
+      `${issuerUrl.origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.authorize}`,
+    );
+    assert.equal(
+      new URL(workerMetadata.authorization_endpoint).pathname,
+      HOSTED_MCP_OAUTH_CONTRACT.paths.authorize,
+    );
+    assert.equal(
+      new URL(nodeMetadata.authorization_endpoint).pathname,
+      HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.authorize,
+    );
     assert.equal(workerMetadata.token_endpoint, nodeMetadata.token_endpoint);
     assert.deepEqual(
       workerMetadata.response_types_supported,

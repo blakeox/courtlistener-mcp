@@ -69,7 +69,7 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
   // matchEndpoint() to compare hostnames, which can fail when the request
   // arrives on an unexpected origin.
   const options = {
-    authorizeEndpoint: '/authorize',
+    authorizeEndpoint: HOSTED_MCP_OAUTH_CONTRACT.paths.authorize,
     tokenEndpoint: '/token',
     clientRegistrationEndpoint: '/register',
     resourceMetadata: {

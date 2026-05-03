@@ -397,16 +397,14 @@ describe('Configuration Management (TypeScript)', () => {
       );
     });
 
-    it('should fail fast on partial Worker-native hosted auth config even when legacy fallback exists', async () => {
+    it('should fail fast on partial Worker-native hosted auth config', async () => {
       process.env.OIDC_ISSUER = 'https://issuer.example.com';
       process.env.MCP_AUTH_OIDC_CLIENT_ID = 'worker-client-id';
-      process.env.LOGTO_APP_ID = 'legacy-app-id';
-      process.env.LOGTO_APP_SECRET = 'legacy-app-secret';
       process.env.MCP_UI_SESSION_SECRET = 'session-secret';
 
       const { getConfig, getStartupDiagnostics } = await importConfigFresh();
 
-      assert.throws(() => getConfig(), /Hosted auth Worker-native OIDC config is incomplete/);
+      assert.throws(() => getConfig(), /Hosted auth upstream OIDC config is incomplete/);
 
       const diagnostics = getStartupDiagnostics() as {
         hostedAuth?: { ready?: boolean; credentialSource?: string | null; errors?: string[] };

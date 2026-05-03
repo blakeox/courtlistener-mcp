@@ -1,4 +1,10 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
+import {
+  HOSTED_MCP_BROWSER_AUTH_CONTRACT,
+  isHostedApprovalPath,
+  isHostedAuthorizePath,
+  isHostedLogoutPath,
+} from '../auth/oauth-contract.js';
 import { verifyAccessToken, type OAuthVerificationMetadata } from '../security/oidc.js';
 import type { HostedOAuthCompletionSource } from '../auth/oauth-authorization-completion.js';
 import {
@@ -87,7 +93,7 @@ const AUTH_PAGE_STYLES = `
   }
 
   .auth-card {
-    width: min(100%, 760px);
+    width: min(100%, 920px);
     border: 1px solid var(--auth-line);
     background: var(--auth-surface);
     backdrop-filter: blur(14px);
@@ -100,6 +106,78 @@ const AUTH_PAGE_STYLES = `
     display: grid;
     gap: 24px;
     padding: 28px;
+  }
+
+  .auth-card-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .auth-card-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--auth-ink);
+  }
+
+  .auth-card-brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(55, 104, 255, 0.16), rgba(55, 104, 255, 0.04));
+    border: 1px solid rgba(55, 104, 255, 0.18);
+    color: #2551d8;
+    font-size: 0.85rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .auth-card-brand-copy {
+    display: grid;
+    gap: 2px;
+  }
+
+  .auth-card-brand-copy strong {
+    font-size: 1.05rem;
+    line-height: 1.1;
+  }
+
+  .auth-card-brand-copy span {
+    color: var(--auth-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .auth-card-surface-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--auth-line);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--auth-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .auth-card-surface-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #34c77b;
+    box-shadow: 0 0 0 5px rgba(52, 199, 123, 0.12);
   }
 
   .auth-eyebrow {
@@ -132,9 +210,11 @@ const AUTH_PAGE_STYLES = `
 
   .auth-panel {
     border: 1px solid var(--auth-line);
-    border-radius: 18px;
-    background: var(--auth-panel);
-    padding: 20px;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 38%),
+      var(--auth-panel);
+    padding: 22px;
   }
 
   .auth-copy {
@@ -155,6 +235,7 @@ const AUTH_PAGE_STYLES = `
     flex-wrap: wrap;
     gap: 12px;
     align-items: center;
+    padding-top: 4px;
   }
 
   .auth-inline-form {
@@ -266,6 +347,18 @@ const AUTH_PAGE_STYLES = `
     gap: 10px;
     padding-top: 4px;
     border-top: 1px solid var(--auth-line);
+  }
+
+  @media (max-width: 760px) {
+    .auth-card-topbar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .auth-card-surface-badge {
+      min-height: 38px;
+      padding: 0 14px;
+    }
   }
 
   .auth-status {
@@ -897,7 +990,7 @@ function getHostedAuthSetupMessages(
 
   return [
     'This Worker can serve the hosted auth handoff directly, but hosted auth is not fully configured because the upstream OIDC client configuration is missing.',
-    'Configure OIDC_ISSUER plus MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET. During migration, LOGTO_APP_ID and LOGTO_APP_SECRET still work as the fallback pair when the generic Worker-native pair is absent.',
+    'Configure OIDC_ISSUER plus MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.',
     'MCP_UI_SESSION_SECRET is also required so the Worker can sign UI session and auth-state cookies.',
   ];
 }
@@ -1214,7 +1307,7 @@ interface HostedAuthResponseSignal {
   outcome: HostedAuthSignalOutcome;
   correlationId?: string | null;
   authError?: string | null;
-  credentialSource?: 'worker_native' | 'logto_legacy' | null;
+  credentialSource?: 'worker_native' | null;
   configErrorCount?: number;
   totalDurationMs?: number;
   upstreamDiscoveryDurationMs?: number;
@@ -1399,6 +1492,19 @@ function renderHostedAuthDocument(params: {
     <main class="auth-shell">
       <section class="auth-card">
         <div class="auth-card-inner">
+          <div class="auth-card-topbar">
+            <a class="auth-card-brand" href="/">
+              <span class="auth-card-brand-mark" aria-hidden="true">CL</span>
+              <span class="auth-card-brand-copy">
+                <strong>CourtListener MCP</strong>
+                <span>Hosted auth</span>
+              </span>
+            </a>
+            <div class="auth-card-surface-badge">
+              <span>Secure worker surface</span>
+              <span class="auth-card-surface-dot" aria-hidden="true"></span>
+            </div>
+          </div>
           <header class="auth-header">
             <p class="auth-eyebrow">CourtListener MCP hosted auth</p>
             <h1>${escapeHtml(params.title)}</h1>
@@ -1444,7 +1550,7 @@ function renderAuthStartLandingPage(params: {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Complete the Clerk handoff</title>
+    <title>Complete secure sign-in</title>
     <style nonce="${escapeHtml(params.nonce)}">${AUTH_PAGE_STYLES}</style>
   </head>
   <body>
@@ -1467,9 +1573,9 @@ function renderAuthStartLandingPage(params: {
         <section class="auth-home-grid" aria-label="Hosted auth handoff">
           <article class="auth-home-card auth-home-hero">
             <p class="auth-home-kicker">Authorization start</p>
-            <h1 class="auth-home-title">Complete the Clerk handoff</h1>
+            <h1 class="auth-home-title">Complete secure sign-in</h1>
             <p class="auth-home-subtitle">
-              You're about to sign in and securely hand off to CourtListener MCP. This page keeps the authentication flow simple and secure.
+              You're about to sign in and securely hand off to CourtListener MCP. This page keeps the hosted auth flow simple and secure.
             </p>
 
             <ul class="auth-home-chip-list" aria-label="Handoff state">
@@ -1482,14 +1588,14 @@ function renderAuthStartLandingPage(params: {
                 <div class="auth-home-feature-icon" aria-hidden="true">ID</div>
                 <div class="auth-home-feature-copy">
                   <h2>Secure and trusted</h2>
-                  <p>Clerk verifies your identity and securely returns you to CourtListener MCP.</p>
+                  <p>Your identity provider verifies your sign-in and securely returns you to CourtListener MCP.</p>
                 </div>
               </div>
               <div class="auth-home-feature">
                 <div class="auth-home-feature-icon" aria-hidden="true">2X</div>
                 <div class="auth-home-feature-copy">
-                  <h2>Two completion paths</h2>
-                  <p>Complete OAuth directly with Clerk or authorize via your worker session.</p>
+                  <h2>One worker-owned flow</h2>
+                  <p>Complete sign-in with the configured identity provider and finish authorization on this worker.</p>
                 </div>
               </div>
               <div class="auth-home-feature">
@@ -1504,11 +1610,7 @@ function renderAuthStartLandingPage(params: {
             <div class="auth-home-actions">
               <a class="auth-home-button auth-home-button--primary" href="${escapeHtml(params.continueHref)}">
                 <span class="auth-home-button-icon" aria-hidden="true">IN</span>
-                <span>Sign in with Clerk</span>
-              </a>
-              <a class="auth-home-button auth-home-button--secondary" href="${escapeHtml(params.continueHref)}">
-                <span class="auth-home-button-icon" aria-hidden="true">UP</span>
-                <span>Create account</span>
+                <span>Continue to sign in</span>
               </a>
               <a class="auth-home-button auth-home-button--tertiary" href="#worker-metadata">
                 <span class="auth-home-button-icon" aria-hidden="true">MD</span>
@@ -1516,7 +1618,7 @@ function renderAuthStartLandingPage(params: {
               </a>
             </div>
             <p class="auth-home-actions-note">
-              We only use the template token to complete this handoff and return you to the CourtListener worker or MCP client.
+              We only request the identity data needed to complete this handoff and return you to the CourtListener worker or MCP client.
             </p>
           </article>
 
@@ -1532,8 +1634,8 @@ function renderAuthStartLandingPage(params: {
 
             <div class="auth-home-status-stack">
               <section class="auth-home-status-card" data-step="ST">
-                <h3>Clerk state</h3>
-                <p>Loaded and waiting for a user session.</p>
+                <h3>Provider state</h3>
+                <p>Configured and waiting for sign-in.</p>
               </section>
               <section class="auth-home-status-card" data-step="WK">
                 <h3>Worker handoff mode</h3>
@@ -1541,7 +1643,7 @@ function renderAuthStartLandingPage(params: {
               </section>
               <section class="auth-home-status-card" data-step="NX">
                 <h3>Next action</h3>
-                <p>Authenticate with Clerk to continue.</p>
+                <p>Authenticate with your provider to continue.</p>
               </section>
             </div>
 
@@ -1570,14 +1672,14 @@ function renderAuthStartLandingPage(params: {
             <div class="auth-home-note-icon" aria-hidden="true">HW</div>
             <div>
               <h3>How this handoff works</h3>
-              <p>The page keeps the auth decision simple even though it supports two worker completion paths.</p>
+              <p>The page keeps the sign-in decision simple while the worker finishes either an OAuth return or a worker session return.</p>
             </div>
           </article>
           <article class="auth-home-card auth-home-note">
             <div class="auth-home-note-icon" aria-hidden="true">TS</div>
             <div>
               <h3>Trusted handoff notes</h3>
-              <p>Keep the Clerk portal and worker on the same trust chain so the redirect can finish cleanly.</p>
+              <p>Keep your identity provider and worker on the same trust chain so the redirect can finish cleanly.</p>
             </div>
           </article>
         </section>
@@ -1626,7 +1728,7 @@ function renderLogoutPage(params: {
     ].join(''),
     actionsHtml: `
       <div class="auth-form-actions">
-        <form class="auth-inline-form" method="post" action="/auth/logout">
+        <form class="auth-inline-form" method="post" action="${HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.logout}">
           <input type="hidden" name="csrf_token" value="${escapeHtml(params.csrfToken)}" />
           ${params.returnTo ? `<input type="hidden" name="return_to" value="${escapeHtml(params.returnTo)}" />` : ''}
           <button class="auth-button auth-button-danger" type="submit">Sign out</button>
@@ -1675,7 +1777,7 @@ function renderAuthApprovalPage(params: {
     `,
     actionsHtml: `
       <div class="auth-form-actions">
-        <form class="auth-inline-form" method="post" action="/auth/approve">
+        <form class="auth-inline-form" method="post" action="${HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve}">
           <input type="hidden" name="csrf_token" value="${escapeHtml(params.csrfToken)}" />
           <button class="auth-button auth-button-primary" type="submit">Approve and continue</button>
         </form>
@@ -1718,14 +1820,14 @@ function resolveAuthStartReturnTarget(
 function isDirectOauthReturnTarget(request: Request, returnTo: string): boolean {
   try {
     const target = new URL(returnTo);
-    return target.origin === new URL(request.url).origin && target.pathname === '/authorize';
+    return target.origin === new URL(request.url).origin && isHostedAuthorizePath(target.pathname);
   } catch {
     return false;
   }
 }
 
 function buildAuthApprovalUrl(request: Request, returnTo: string): string {
-  const approvalUrl = new URL('/auth/approve', request.url);
+  const approvalUrl = new URL(HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve, request.url);
   approvalUrl.searchParams.set('return_to', returnTo);
   return approvalUrl.toString();
 }
@@ -1755,7 +1857,7 @@ function buildAuthContinueUrl(request: Request, returnTo: string | null): string
 }
 
 function buildLogoutUrl(request: Request, returnTo: string | null): string {
-  const logoutUrl = new URL('/auth/logout', request.url);
+  const logoutUrl = new URL(HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.logout, request.url);
   if (returnTo?.trim()) {
     logoutUrl.searchParams.set('return_to', returnTo.trim());
   }
@@ -1968,7 +2070,7 @@ async function exchangeAuthorizationCode(
   code: string,
   codeVerifier: string,
   cfg: WorkerUpstreamOidcClientConfig,
-): Promise<{ accessToken: string }> {
+): Promise<{ accessToken: string; idToken?: string }> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     client_id: cfg.clientId,
@@ -2007,14 +2109,19 @@ async function exchangeAuthorizationCode(
       `OIDC token exchange failed (${response.status}).`,
     );
   }
-  const json = (await response.json()) as { access_token?: string };
+  const json = (await response.json()) as { access_token?: string; id_token?: string };
   if (!json.access_token) {
     throw createHostedAuthUpstreamError(
       'upstream_token_failed',
       'OIDC token exchange did not return an access token.',
     );
   }
-  return { accessToken: json.access_token };
+  return {
+    accessToken: json.access_token,
+    ...(typeof json.id_token === 'string' && json.id_token.trim()
+      ? { idToken: json.id_token.trim() }
+      : {}),
+  };
 }
 
 function buildRedirectResponse(location: string, headers?: Headers): Response {
@@ -2092,7 +2199,7 @@ export async function handleWorkerAuthHandoffRoutes<
       ? 'auth-start'
       : url.pathname === '/auth/callback'
         ? 'auth-callback'
-        : url.pathname === '/auth/approve'
+        : isHostedApprovalPath(url.pathname)
           ? 'auth-approve'
           : null;
 
@@ -2108,7 +2215,7 @@ export async function handleWorkerAuthHandoffRoutes<
     }
   }
 
-  if (url.pathname === '/auth/logout' && request.method === 'GET') {
+  if (isHostedLogoutPath(url.pathname) && request.method === 'GET') {
     const correlation = requestCorrelation.correlationId
       ? requestCorrelation
       : await resolveHostedAuthCorrelationId(request, env, deps, [createHostedAuthCorrelationId()]);
@@ -2189,7 +2296,7 @@ export async function handleWorkerAuthHandoffRoutes<
     return attachHostedAuthHeaders(response, signal);
   }
 
-  if (url.pathname === '/auth/logout' && request.method === 'POST') {
+  if (isHostedLogoutPath(url.pathname) && request.method === 'POST') {
     const secure = getSecureCookieSetting(request, env, deps);
     const correlation = requestCorrelation.correlationId
       ? requestCorrelation
@@ -2646,9 +2753,14 @@ export async function handleWorkerAuthHandoffRoutes<
       );
       const tokenExchangeDurationMs = getElapsedDurationMs(tokenExchangeStartedAtMs);
       const tokenVerificationStartedAtMs = Date.now();
-      const verified = await verifyAccessToken(exchanged.accessToken, {
+      const tokenForIdentity = exchanged.idToken?.trim() || exchanged.accessToken;
+      const verified = await verifyAccessToken(tokenForIdentity, {
         issuer: authConfig.issuer,
-        ...(authConfig.audience ? { audience: authConfig.audience } : {}),
+        ...(exchanged.idToken?.trim()
+          ? { audience: authConfig.clientId }
+          : authConfig.audience
+            ? { audience: authConfig.audience }
+            : {}),
       });
       tokenVerificationDurationMs =
         verified.metadata.verificationDurationMs ||
@@ -2795,7 +2907,7 @@ export async function handleWorkerAuthHandoffRoutes<
     }
   }
 
-  if (url.pathname === '/auth/approve' && request.method === 'GET') {
+  if (isHostedApprovalPath(url.pathname) && request.method === 'GET') {
     const approveCorrelation = requestCorrelation.correlationId
       ? requestCorrelation
       : await resolveHostedAuthCorrelationId(request, env, deps, [createHostedAuthCorrelationId()]);
@@ -2841,6 +2953,56 @@ export async function handleWorkerAuthHandoffRoutes<
 
     const sessionState = await deps.workerUiSessionRuntime.resolveUiSession(request, env);
     if (sessionState.kind !== 'authenticated') {
+      const trustedIdentity = await deps.workerUiSessionRuntime.resolveCloudflareOAuthIdentity(
+        request,
+        env,
+      );
+      if (
+        trustedIdentity.kind === 'authenticated' &&
+        trustedIdentity.authSource === 'cloudflare_access'
+      ) {
+        const sessionSecret = deps.workerUiSessionRuntime.getUiSessionSecret(env);
+        if (sessionSecret) {
+          const bootstrappedSession = await deps.workerUiSessionRuntime.createUiSessionState(
+            request,
+            env,
+            trustedIdentity.userId,
+            sessionSecret,
+          );
+          if (bootstrappedSession) {
+            const headers = new Headers(bootstrappedSession.headers);
+            if (approveCorrelation.setCookieHeader) {
+              headers.append('Set-Cookie', approveCorrelation.setCookieHeader);
+            }
+            const response = buildRedirectResponse(
+              buildAuthApprovalUrl(request, resolvedReturnTo.value),
+              headers,
+            );
+            const signal = withHostedAuthRequestDuration(
+              {
+                ...signalBase,
+                ready: true,
+                status: 'ready' as const,
+                outcome: 'redirect' as const,
+                correlationId: approveCorrelation.correlationId,
+              },
+              requestStartedAtMs,
+            );
+            emitHostedAuthEvent(
+              env,
+              request,
+              'hosted_auth.approve.redirect_start',
+              {
+                return_to: resolvedReturnTo.value,
+                auth_source: trustedIdentity.authSource,
+                bootstrapped_session: true,
+              },
+              signal,
+            );
+            return attachHostedAuthHeaders(response, signal);
+          }
+        }
+      }
       const headers = new Headers();
       if (approveCorrelation.setCookieHeader) {
         headers.append('Set-Cookie', approveCorrelation.setCookieHeader);
@@ -2872,13 +3034,14 @@ export async function handleWorkerAuthHandoffRoutes<
     }
 
     try {
-      if (!hostedAuth?.sessionSecret) {
+      const sessionSecret = deps.workerUiSessionRuntime.getUiSessionSecret(env);
+      if (!sessionSecret) {
         throw new Error('Hosted auth approval requires configuration.');
       }
       const response = await buildApprovalPageResponse(
         request,
         env,
-        hostedAuth.sessionSecret,
+        sessionSecret,
         resolvedReturnTo.value,
         approveCorrelation.correlationId ?? createHostedAuthCorrelationId(),
         deps,
@@ -2946,8 +3109,8 @@ export async function handleWorkerAuthHandoffRoutes<
     }
   }
 
-  if (url.pathname === '/auth/approve' && request.method === 'POST') {
-    const sessionSecret = hostedAuth?.sessionSecret || null;
+  if (isHostedApprovalPath(url.pathname) && request.method === 'POST') {
+    const sessionSecret = deps.workerUiSessionRuntime.getUiSessionSecret(env);
     const secure = getSecureCookieSetting(request, env, deps);
     const initialApproveCorrelation = requestCorrelation.correlationId
       ? requestCorrelation

@@ -12,7 +12,7 @@ export interface HandleWorkerUiShellRoutesDeps<TEnv> {
   generateCspNonce: () => string;
   getOrCreateCsrfCookieHeader: (request: Request, env: TEnv) => string | null;
   htmlResponse: (html: string, nonce: string, extraHeaders?: HeadersInit) => Response;
-  renderSpaShellHtml: () => string;
+  renderSpaShellHtml: (buildId: string) => string;
   redirectResponse: (location: string, status?: number, extraHeaders?: HeadersInit) => Response;
 }
 
@@ -28,6 +28,7 @@ export async function handleWorkerUiShellRoutes<TEnv>(
 ): Promise<Response | null> {
   const { request, url, env, deps } = params;
   const publicSpaPaths = new Set(['/', '/get-started', '/account']);
+  const hostedAuthRedirectPath = `/auth/start?${new URLSearchParams({ return_to: '/app/account' }).toString()}`;
 
   if (request.method === 'GET' && url.pathname === '/app/assets/spa.js') {
     return deps.spaAssetResponse(
@@ -57,7 +58,7 @@ export async function handleWorkerUiShellRoutes<TEnv>(
     const nonce = deps.generateCspNonce();
     const csrfCookieHeader = deps.getOrCreateCsrfCookieHeader(request, env);
     return deps.htmlResponse(
-      deps.renderSpaShellHtml(),
+      deps.renderSpaShellHtml(deps.spaBuildId),
       nonce,
       csrfCookieHeader ? { 'Set-Cookie': csrfCookieHeader } : undefined,
     );
@@ -67,6 +68,10 @@ export async function handleWorkerUiShellRoutes<TEnv>(
     const previousUiPathMap: Record<string, string> = {
       '/signup': '/app/signup',
       '/login': '/app/login',
+      '/signin': hostedAuthRedirectPath,
+      '/sign-in': hostedAuthRedirectPath,
+      '/oidc': hostedAuthRedirectPath,
+      '/oidc/': hostedAuthRedirectPath,
       '/reset-password': '/app/reset-password',
       '/keys': '/app/keys',
       '/chat': '/app/console',

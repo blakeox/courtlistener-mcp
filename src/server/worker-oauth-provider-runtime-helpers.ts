@@ -1,4 +1,4 @@
-import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
+import { HOSTED_MCP_OAUTH_CONTRACT, isHostedAuthorizePath } from '../auth/oauth-contract.js';
 import { verifyAccessToken, type OAuthConfig } from '../security/oidc.js';
 import { mergeHostedAiClientOrigins } from './oauth-client-origins.js';
 import { getPrevalidatedOAuthIdentity } from './prevalidated-oauth-context.js';
@@ -100,7 +100,7 @@ export function handleOAuthProviderDefaultRequest<TEnv extends OAuthRuntimeEnv>(
   deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'handleAuthorizeRoute' | 'handleLegacyWorkerFetch'>,
 ): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === '/authorize' && env.OAUTH_PROVIDER) {
+  if (isHostedAuthorizePath(url.pathname) && env.OAUTH_PROVIDER) {
     return deps.handleAuthorizeRoute(request, env);
   }
   return deps.handleLegacyWorkerFetch(request, env, ctx);

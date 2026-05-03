@@ -1,3 +1,8 @@
+import {
+  isHostedApprovalPath,
+  isHostedAuthorizePath,
+  isHostedLogoutPath,
+} from '../auth/oauth-contract.js';
 import { redactSecretsInText } from '../infrastructure/secret-redaction.js';
 import type { WorkerHostedAuthConfigDiagnostics } from './worker-upstream-oidc-config.js';
 
@@ -92,7 +97,7 @@ function parseBooleanFlag(value?: string): boolean {
 }
 
 function routeKindFromPath(pathname: string): OAuthRouteKind {
-  if (pathname === '/authorize') return 'authorize';
+  if (isHostedAuthorizePath(pathname)) return 'authorize';
   if (pathname === '/token') return 'token';
   if (pathname === '/register') return 'register';
   if (
@@ -122,8 +127,8 @@ function routeKindFromPath(pathname: string): OAuthRouteKind {
 function hostedAuthRouteKindFromPath(pathname: string): HostedAuthRouteKind {
   if (pathname === '/auth/start') return 'auth-start';
   if (pathname === '/auth/callback') return 'auth-callback';
-  if (pathname === '/auth/approve') return 'auth-approve';
-  if (pathname === '/auth/logout') return 'auth-logout';
+  if (isHostedApprovalPath(pathname)) return 'auth-approve';
+  if (isHostedLogoutPath(pathname)) return 'auth-logout';
   return 'other';
 }
 
@@ -456,8 +461,6 @@ export function summarizeHostedAuthReadiness(
     session_secret_configured: diagnostics.sessionSecretConfigured,
     worker_native_client_id_configured: diagnostics.workerNativeClientIdConfigured,
     worker_native_client_secret_configured: diagnostics.workerNativeClientSecretConfigured,
-    legacy_client_id_configured: diagnostics.legacyClientIdConfigured,
-    legacy_client_secret_configured: diagnostics.legacyClientSecretConfigured,
     credential_source: diagnostics.credentialSource,
     config_error_count: diagnostics.errors.length,
     config_errors: diagnostics.errors,

@@ -1,3 +1,4 @@
+import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
 import { buildWorkerHealthPayload } from './worker-health-runtime.js';
 import type { WorkerDurableRuntime, WorkerDurableRuntimeEnv } from './worker-durable-runtime.js';
 import { resolveWorkerUsage } from './worker-usage-runtime.js';
@@ -82,7 +83,7 @@ export async function handleWorkerCoreRoutes<
         'Allow: /.well-known/',
         'Allow: /register',
         'Allow: /mcp',
-        'Allow: /authorize',
+        `Allow: ${HOSTED_MCP_OAUTH_CONTRACT.paths.authorize}`,
         'Allow: /token',
         '',
         'User-agent: GPTBot',

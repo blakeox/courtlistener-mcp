@@ -9,8 +9,6 @@ interface TestEnv {
   OIDC_ISSUER?: string;
   MCP_AUTH_OIDC_CLIENT_ID?: string;
   MCP_AUTH_OIDC_CLIENT_SECRET?: string;
-  LOGTO_APP_ID?: string;
-  LOGTO_APP_SECRET?: string;
   MCP_UI_SESSION_SECRET?: string;
   MCP_OAUTH_DIAGNOSTICS?: string;
   OAUTH_PROVIDER: {
@@ -101,44 +99,11 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(redirect.searchParams.get('return_to'), request.url);
   });
 
-  it('falls back to the same-origin auth handoff when only legacy Logto credentials are configured', async () => {
-    const env: TestEnv = {
-      OIDC_ISSUER: 'https://issuer.example',
-      LOGTO_APP_ID: 'legacy-logto-app-id',
-      LOGTO_APP_SECRET: 'legacy-logto-app-secret',
-      MCP_UI_SESSION_SECRET: 'session-secret',
-      OAUTH_PROVIDER: {
-        parseAuthRequest: async () => ({ scope: ['legal:read'] }),
-        completeAuthorization: async () => ({
-          redirectTo: 'https://client.example/callback?code=abc',
-        }),
-      },
-    };
-    const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
-    );
-
-    const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
-      jsonError,
-      redirectResponse,
-      resolveCloudflareOAuthIdentity: async () => ({ kind: 'missing' }),
-    });
-
-    assert.equal(response.status, 302);
-    const location = response.headers.get('Location');
-    assert.ok(location);
-    const redirect = new URL(String(location));
-    assert.equal(redirect.origin, 'https://worker.example');
-    assert.equal(redirect.pathname, '/auth/start');
-    assert.equal(redirect.searchParams.get('return_to'), request.url);
-  });
-
-  it('redirects partial Worker-native credential mixes into the same-origin auth handoff', async () => {
+  it('redirects incomplete hosted-auth config to the same-origin auth handoff', async () => {
     const env: TestEnv = {
       OIDC_ISSUER: 'https://issuer.example',
       MCP_AUTH_OIDC_CLIENT_ID: 'same-origin-client',
-      LOGTO_APP_ID: 'legacy-logto-app-id',
-      LOGTO_APP_SECRET: 'legacy-logto-app-secret',
+      MCP_UI_SESSION_SECRET: 'session-secret',
       OAUTH_PROVIDER: {
         parseAuthRequest: async () => ({ scope: ['legal:read'] }),
         completeAuthorization: async () => ({
@@ -246,7 +211,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(response.status, 302);
     assert.equal(
       response.headers.get('Location'),
-      `https://worker.example/auth/approve?return_to=${encodeURIComponent(request.url)}`,
+      `https://worker.example/oauth/approve?return_to=${encodeURIComponent(request.url)}`,
     );
   });
 
@@ -276,7 +241,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(response.status, 302);
     assert.equal(
       response.headers.get('Location'),
-      `https://worker.example/auth/approve?return_to=${encodeURIComponent(request.url)}`,
+      `https://worker.example/oauth/approve?return_to=${encodeURIComponent(request.url)}`,
     );
   });
 
@@ -306,7 +271,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(response.status, 302);
     assert.equal(
       response.headers.get('Location'),
-      `https://worker.example/auth/approve?return_to=${encodeURIComponent(request.url)}`,
+      `https://worker.example/oauth/approve?return_to=${encodeURIComponent(request.url)}`,
     );
   });
 
@@ -422,7 +387,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     assert.equal(completionInput.metadata.source, 'cloudflare_oauth');
     assert.equal(typeof completionInput.metadata.approved_at, 'string');
     assert.notEqual(response.headers.get('Location')?.includes('/auth/start'), true);
-    assert.notEqual(response.headers.get('Location')?.includes('/auth/approve'), true);
+    assert.notEqual(response.headers.get('Location')?.includes('/oauth/approve'), true);
   });
 
   it('returns a 503 when session revocation validation is unavailable', async () => {

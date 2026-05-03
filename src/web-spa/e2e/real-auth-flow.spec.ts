@@ -81,7 +81,7 @@ test.describe('SPA real auth flow', () => {
   }) => {
     await bootstrapSession(page);
 
-    const authorizeUrl = new URL('/authorize', server.baseUrl);
+    const authorizeUrl = new URL('/oauth/authorize', server.baseUrl);
     authorizeUrl.searchParams.set('response_type', 'code');
     authorizeUrl.searchParams.set('client_id', 'client-1');
     authorizeUrl.searchParams.set('redirect_uri', `${server.baseUrl}/client/callback`);

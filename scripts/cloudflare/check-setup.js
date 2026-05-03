@@ -92,19 +92,25 @@ function parseBoolean(rawValue) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-async function checkEndpoint(baseUrl, path) {
+function hasConfiguredValue(record, key) {
+  return typeof record?.[key] === 'string' && record[key].trim().length > 0;
+}
+
+async function checkEndpoint(baseUrl, path, init = {}) {
   try {
-    const res = await fetch(`${baseUrl}${path}`);
+    const res = await fetch(`${baseUrl}${path}`, init);
     const text = await res.text();
     return {
       ok: res.ok,
       status: res.status,
+      headers: res.headers,
       body: text,
     };
   } catch (error) {
     return {
       ok: false,
       status: 0,
+      headers: new Headers(),
       body: error instanceof Error ? error.message : String(error),
     };
   }
@@ -184,6 +190,15 @@ async function main() {
     fail(`Failed to parse wrangler config: ${error instanceof Error ? error.message : String(error)}`);
     hasCriticalError = true;
   }
+  const configuredVars = config?.vars && typeof config.vars === 'object' ? config.vars : {};
+  const trustCfAccessJwt = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION);
+  const trustCfAccessHeaders = parseBoolean(
+    configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS,
+  );
+  const trustCfAccessDeprecated = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS);
+  const trustCfAccessAcknowledged = parseBoolean(
+    configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED,
+  );
 
   if (config) {
     if (config.main !== 'src/worker.ts') {
@@ -216,17 +231,12 @@ async function main() {
       ok('Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
     }
 
-    const configuredVars = config.vars && typeof config.vars === 'object' ? config.vars : {};
     const authUiOrigin = typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
       ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
       : '';
     const allowDevFallback = typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
       ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
       : '';
-    const trustCfAccessJwt = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION);
-    const trustCfAccessHeaders = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS);
-    const trustCfAccessDeprecated = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS);
-    const trustCfAccessAcknowledged = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED);
     const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
       ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
       : '';
@@ -292,6 +302,16 @@ async function main() {
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
   const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
   const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
+  const hasOidcClientId =
+    secretNames.includes('MCP_AUTH_OIDC_CLIENT_ID') ||
+    hasConfiguredValue(configuredVars, 'MCP_AUTH_OIDC_CLIENT_ID');
+  const hasOidcClientSecret =
+    secretNames.includes('MCP_AUTH_OIDC_CLIENT_SECRET') ||
+    hasConfiguredValue(configuredVars, 'MCP_AUTH_OIDC_CLIENT_SECRET');
+  const hasLegacyLogtoId =
+    secretNames.includes('LOGTO_APP_ID') || hasConfiguredValue(configuredVars, 'LOGTO_APP_ID');
+  const hasLegacyLogtoSecret =
+    secretNames.includes('LOGTO_APP_SECRET') || hasConfiguredValue(configuredVars, 'LOGTO_APP_SECRET');
   const hasDedicatedRegistrationTokenSecret = secretNames.includes('MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
   if (!hasUiSessionSecret) {
     const message = 'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
@@ -310,6 +330,39 @@ async function main() {
     ok('OIDC_ISSUER is configured.');
   } else {
     warn('OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification and hosted upstream auth will be unavailable.');
+  }
+
+  if (hasLegacyLogtoId || hasLegacyLogtoSecret) {
+    fail('Legacy LOGTO_APP_ID / LOGTO_APP_SECRET config is no longer supported. Remove both and use MCP_AUTH_OIDC_CLIENT_ID plus MCP_AUTH_OIDC_CLIENT_SECRET.');
+    hasCriticalError = true;
+  }
+
+  const accessHostedAuthReadyByConfig =
+    hasUiSessionSecret && trustCfAccessHeaders && trustCfAccessAcknowledged;
+  const upstreamHostedAuthReadyByConfig =
+    hasOidcAuth && hasUiSessionSecret && hasOidcClientId && hasOidcClientSecret;
+  const hostedAuthReadyByConfig =
+    upstreamHostedAuthReadyByConfig || accessHostedAuthReadyByConfig;
+  const hostedAuthSignals =
+    hasUiSessionSecret ||
+    hasOidcClientId ||
+    hasOidcClientSecret ||
+    trustCfAccessHeaders ||
+    trustCfAccessJwt;
+  if (hostedAuthSignals && !hasUiSessionSecret) {
+    fail('Hosted auth configuration is incomplete: MCP_UI_SESSION_SECRET is required.');
+    hasCriticalError = true;
+  }
+  if ((hasOidcClientId && !hasOidcClientSecret) || (!hasOidcClientId && hasOidcClientSecret)) {
+    fail('Hosted auth upstream OIDC config is incomplete: set both MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.');
+    hasCriticalError = true;
+  } else if (!accessHostedAuthReadyByConfig && hostedAuthSignals && !hasOidcClientId) {
+    fail('Hosted auth requires MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.');
+    hasCriticalError = true;
+  }
+  if (!accessHostedAuthReadyByConfig && hostedAuthSignals && !hasOidcAuth) {
+    fail('Hosted auth requires OIDC_ISSUER.');
+    hasCriticalError = true;
   }
 
   if (hasOidcAudience) {
@@ -331,7 +384,6 @@ async function main() {
   }
 
   if (config) {
-    const configuredVars = config.vars && typeof config.vars === 'object' ? config.vars : {};
     const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
       ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
       : '';
@@ -376,6 +428,55 @@ async function main() {
           warn(`/sse initialize also failed (HTTP ${sse.status}).`);
         }
       }
+
+      const hostedAuth = await checkEndpoint(baseUrl, '/auth/start?continue=1', {
+        redirect: 'manual',
+      });
+      const hostedAuthReadyHeader = hostedAuth.headers.get('x-hosted-auth-ready');
+      const hostedAuthStatus = hostedAuth.headers.get('x-hosted-auth-status');
+      const hostedAuthLocation = hostedAuth.headers.get('location');
+      const hostedAuthRedirectReady =
+        hostedAuth.status >= 300 &&
+        hostedAuth.status < 400 &&
+        hostedAuthReadyHeader === 'true' &&
+        Boolean(hostedAuthLocation);
+
+      if (upstreamHostedAuthReadyByConfig) {
+        if (hostedAuthRedirectReady) {
+          ok('/auth/start readiness probe is redirect-ready.');
+        } else {
+          fail(
+            `/auth/start readiness probe is not redirect-ready (HTTP ${hostedAuth.status}, status=${String(hostedAuthStatus)}).`,
+          );
+          hasCriticalError = true;
+        }
+      } else if (accessHostedAuthReadyByConfig) {
+        const authorizeAccessProbe = await checkEndpoint(
+          baseUrl,
+          '/oauth/authorize?client_id=cloudflare-check&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&response_type=code&state=cloudflare-check&scope=legal%3Aread&code_challenge=challenge&code_challenge_method=S256',
+          {
+            redirect: 'manual',
+          },
+        );
+        const authorizeLocation = authorizeAccessProbe.headers.get('location') || '';
+        const accessRedirectReady =
+          authorizeAccessProbe.status >= 300 &&
+          authorizeAccessProbe.status < 400 &&
+          (authorizeLocation.includes('/cdn-cgi/access/login') ||
+            authorizeLocation.includes('.cloudflareaccess.com'));
+        if (accessRedirectReady) {
+          ok('/oauth/authorize is protected by Cloudflare Access for browser auth.');
+        } else {
+          fail(
+            `/oauth/authorize is not protected by Cloudflare Access as expected (HTTP ${authorizeAccessProbe.status}, location=${authorizeLocation || 'none'}).`,
+          );
+          hasCriticalError = true;
+        }
+      } else if (hostedAuth.status > 0) {
+        warn(
+          `/auth/start readiness probe is fail-closed as expected for incomplete config (HTTP ${hostedAuth.status}, status=${String(hostedAuthStatus)}).`,
+        );
+      }
     }
   }
 
@@ -384,9 +485,12 @@ async function main() {
   console.log('  wrangler secret put MCP_UI_SESSION_SECRET');
   console.log('  wrangler secret put OIDC_ISSUER');
   console.log('  wrangler secret put OIDC_AUDIENCE');
+  console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_ID');
+  console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_SECRET');
   console.log('  wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
   console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
   console.log('  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)');
+  console.log('  # set MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true to trust Cloudflare Access browser identity headers');
   console.log('  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions');
   console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
   console.log('  pnpm run cloudflare:deploy');

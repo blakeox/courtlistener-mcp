@@ -1,4 +1,4 @@
-import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
+import { HOSTED_MCP_OAUTH_CONTRACT, isHostedAuthorizePath } from '../auth/oauth-contract.js';
 import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-limit.js';
 import { getOAuthFrontdoorRateLimitedResponse } from './worker-oauth-frontdoor-rate-limit.js';
 
@@ -22,6 +22,7 @@ export interface HandleWorkerOAuthEntrypointDeps<TEnv extends OAuthEntrypointEnv
 
 export function shouldInspectOAuthRoute(pathname: string): boolean {
   return (
+    isHostedAuthorizePath(pathname) ||
     pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.token ||
     pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorizationServerMetadata ||
     pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.openIdConfiguration ||
@@ -65,14 +66,13 @@ export async function handleWorkerOAuthEntrypoint<TEnv extends OAuthEntrypointEn
   deps: HandleWorkerOAuthEntrypointDeps<TEnv>,
 ): Promise<Response> {
   const pathname = new URL(request.url).pathname;
-  const rateLimitKey =
-    pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorize
-      ? 'authorize'
-      : pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.token
-        ? 'token'
-        : pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.register
-          ? 'register'
-          : null;
+  const rateLimitKey = isHostedAuthorizePath(pathname)
+    ? 'authorize'
+    : pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.token
+      ? 'token'
+      : pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.register
+        ? 'register'
+        : null;
   if (rateLimitKey) {
     const rateLimited = await getOAuthFrontdoorRateLimitedResponse(
       request,

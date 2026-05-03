@@ -2,6 +2,7 @@ import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 import { buildHostedOAuthCompletionDetails } from '../auth/oauth-authorization-completion.js';
 import { resolveGrantedScopes } from '../auth/oauth-scope-resolver.js';
+import { HOSTED_MCP_BROWSER_AUTH_CONTRACT } from '../auth/oauth-contract.js';
 import {
   emitOAuthDiagnostic,
   summarizeOAuthRequest,
@@ -98,7 +99,7 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
   }
 
   if (identity.authSource !== 'oidc_bearer') {
-    const approvalUrl = new URL('/auth/approve', request.url);
+    const approvalUrl = new URL(HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve, request.url);
     approvalUrl.searchParams.set('return_to', request.url);
     const response = deps.redirectResponse(approvalUrl.toString(), 302);
     emitOAuthDiagnostic(env, 'oauth.authorize.redirect_auth_ui', {

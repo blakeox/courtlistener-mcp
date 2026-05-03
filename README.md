@@ -49,8 +49,10 @@ Best for privacy, local development, and bring-your-own-auth setups. The npm
 package is not currently published, so the local `stdio` server should be run
 from this repository checkout:
 
-- Download ZIP: https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.zip
-- Download tar.gz: https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.tar.gz
+- Download ZIP:
+  https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.zip
+- Download tar.gz:
+  https://github.com/blakeox/courtlistener-mcp/archive/refs/heads/main.tar.gz
 
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
@@ -92,15 +94,15 @@ docker compose -f docker-compose.prod.yml up -d
 
 ## Publishing to npm
 
-This repository is configured to publish from `.github/workflows/release.yml` when you push a
-version tag such as `v1.0.5`.
+This repository is configured to publish from `.github/workflows/release.yml`
+when you push a version tag such as `v1.0.5`.
 
 You have two supported auth paths:
 
-1. **Repository secret**: create an npm publish token and store it as the GitHub Actions secret
-   `NPM_TOKEN`.
-2. **Trusted publishing**: connect the npm package to this GitHub repository and let npm trust
-   GitHub Actions OIDC, with no token stored in GitHub.
+1. **Repository secret**: create an npm publish token and store it as the GitHub
+   Actions secret `NPM_TOKEN`.
+2. **Trusted publishing**: connect the npm package to this GitHub repository and
+   let npm trust GitHub Actions OIDC, with no token stored in GitHub.
 
 Once one of those is configured, publish with:
 
@@ -128,10 +130,13 @@ git push origin v1.0.5
 ### 3. Hosted remote mode
 
 - Use the CourtListener Cloudflare Worker as the remote MCP endpoint
-- The Worker is the MCP OAuth server and exposes `/mcp`, `/authorize`, `/token`,
-  `/register`, and discovery metadata
+- The Worker is the MCP OAuth server and exposes `/mcp`, `/oauth/authorize`,
+  `/token`, `/register`, and discovery metadata
 - The Worker also owns the browser auth handoff routes on the same origin
-  (`/auth/start`, `/auth/callback`, `/auth/approve`, `/auth/logout`)
+  (`/auth/start`, `/auth/callback`, `/oauth/approve`, `/oauth/logout`)
+- Legacy `/authorize`, `/auth/approve`, and `/auth/logout` aliases remain in the
+  runtime for compatibility, but production now publishes the `/oauth/*`
+  endpoints as canonical
 - Keep Logto as the current upstream hosted identity provider if you want a
   managed OIDC tenant; the Worker-facing contract stays generic OIDC
 - Best for ChatGPT, Claude, Codex, and browser-native remote clients
@@ -346,12 +351,15 @@ Cloudflare OAuth is the primary hosted auth path for remote MCP routes.
     the logout)
   - Worker-native hosted auth expects `OIDC_ISSUER`, `MCP_UI_SESSION_SECRET`,
     and a complete upstream OIDC client pair
-  - Preferred Worker-native pair: `MCP_AUTH_OIDC_CLIENT_ID` +
+  - Required upstream pair: `MCP_AUTH_OIDC_CLIENT_ID` +
     `MCP_AUTH_OIDC_CLIENT_SECRET`
-  - Migration fallback pair: `LOGTO_APP_ID` + `LOGTO_APP_SECRET` when the
-    Worker-native pair is entirely absent
-  - Partial `MCP_AUTH_OIDC_CLIENT_*` config fails closed and does not fall back
-    to `LOGTO_APP_*`
+  - As an alternative browser-auth boundary, protect `/authorize` and
+    `/auth/approve` with Cloudflare Access and enable
+    `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` plus
+    `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`; the Worker will bootstrap
+    its own same-origin UI session from trusted Access identity headers before
+    rendering the approval step
+  - Partial `MCP_AUTH_OIDC_CLIENT_*` config fails closed
   - Dynamic client-registration management tokens should use a dedicated
     `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`; otherwise they fall back to
     `MCP_UI_SESSION_SECRET` or `COURTLISTENER_API_KEY`

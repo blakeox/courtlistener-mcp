@@ -22,11 +22,15 @@
 5. Confirm runtime parity inputs:
    - `MCP_ALLOWED_ORIGINS` aligned with expected browser clients
    - session secret configured (`MCP_UI_SESSION_SECRET`)
-   - if hosted auth is enabled, verify `OIDC_ISSUER` plus one complete upstream
-     client pair (`MCP_AUTH_OIDC_CLIENT_*` preferred; `LOGTO_APP_*` only when
-     the generic pair is entirely absent)
+   - if Worker-native hosted auth is enabled, verify `OIDC_ISSUER` plus the
+     complete upstream client pair (`MCP_AUTH_OIDC_CLIENT_*`)
+   - if browser auth is delegated to Cloudflare Access, verify
+     `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true`,
+     `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`, and Access protection on
+     `/oauth/authorize` plus `/oauth/approve`
    - block deploy on partial hosted-auth env drift (for example only one of
      `MCP_AUTH_OIDC_CLIENT_ID` / `MCP_AUTH_OIDC_CLIENT_SECRET`)
+   - block deploy if `LOGTO_APP_ID` or `LOGTO_APP_SECRET` is present
    - set `MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS` explicitly instead of
      relying on the 24h default
    - if `MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION` or
@@ -42,9 +46,12 @@
 3. CORS check from expected origin succeeds.
 4. Authentication path expected for current mode (static/OIDC).
 5. Hosted browser auth probe and approval journey:
-   - `GET /auth/start?continue=1` redirects only when hosted auth is fully ready
-   - a real `/authorize` browser flow reaches `/auth/approve` before completing
-     OAuth
+   - Worker-native mode: `GET /auth/start?continue=1` redirects only when hosted
+     auth is fully ready
+   - Cloudflare Access mode: `GET /oauth/authorize?...` redirects to the Access
+     login boundary before the Worker sees the request
+   - a real `/oauth/authorize` browser flow reaches `/oauth/approve` before
+     completing OAuth
 6. Registration management token policy:
    - dedicated `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` configured
    - explicit `MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS` value recorded for the

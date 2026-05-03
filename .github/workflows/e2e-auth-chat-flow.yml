@@ -9,11 +9,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-auth-chat-flow-${{ github.ref }}
+  group: hosted-oauth-handshake-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e-auth-chat-flow:
+  hosted-oauth-handshake:
     name: End-to-End Hosted OAuth Handshake
     runs-on: ubuntu-latest
 

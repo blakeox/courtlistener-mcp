@@ -208,7 +208,7 @@ export function assertHostedAuthReadinessContract(probe) {
     );
     if (probe.hostedAuthCredentialSource) {
       assert(
-        probe.hostedAuthCredentialSource === 'worker_native' || probe.hostedAuthCredentialSource === 'logto_legacy',
+        probe.hostedAuthCredentialSource === 'worker_native',
         `Unexpected X-Hosted-Auth-Credential-Source: ${String(probe.hostedAuthCredentialSource)}`,
       );
     }
@@ -239,7 +239,7 @@ export function assertHostedAuthReadinessContract(probe) {
 
 export function assertAuthPortalHandoffContent(html, { readinessProbeReady }) {
   const handoffPage =
-    html.includes('Complete the Clerk handoff') ||
+    html.includes('Complete secure sign-in') ||
     html.includes('Loading auth handoff');
   if (handoffPage) {
     return;
