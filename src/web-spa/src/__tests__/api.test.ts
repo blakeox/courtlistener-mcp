@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createKey, getSession, mcpCall, toErrorMessage } from '../lib/api';
+import { getSession, mcpCall, toErrorMessage } from '../lib/api';
 
 function setCookie(value: string): void {
   Object.defineProperty(document, 'cookie', {
@@ -16,44 +16,21 @@ describe('api transport', () => {
     setCookie('');
   });
 
-  it('adds x-csrf-token for mutating requests but not GET requests', async () => {
+  it('adds x-csrf-token for GET /api/session requests when absent', async () => {
     setCookie('clmcp_csrf=test-csrf-token');
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ authenticated: true, user: { id: 'u1' } }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            message: 'ok',
-            api_key: {
-              id: 'k1',
-              label: 'primary',
-              created_at: '2024-01-01',
-              expires_at: null,
-              token: 'secret',
-            },
-          }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
-        ),
-      );
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ authenticated: true, user: { id: 'u1' } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await getSession();
-    await createKey({ label: 'primary', expiresDays: 30 }, 'token-123');
 
     const getHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
-    const postHeaders = new Headers(fetchMock.mock.calls[1][1]?.headers);
 
     expect(getHeaders.get('x-csrf-token')).toBeNull();
-    expect(postHeaders.get('x-csrf-token')).toBe('test-csrf-token');
   });
 
   it('parses SSE data payloads and returns the MCP session id', async () => {

@@ -2,18 +2,10 @@
  * Mock API layer — in-memory fakes for UI development without a backend.
  * Activate via `?mock=true` query param.
  */
-import type {
-  ApiKeyCreateResponse,
-  ApiKeyRecord,
-  ApiKeysListResponse,
-  AuthSessionResponse,
-} from './types';
+import type { AuthSessionResponse } from './types';
 
 let mockAuthenticated = false;
 const mockUserId = 'mock-user-001';
-let nextKeyNum = 1;
-
-const mockKeys: Array<ApiKeyRecord & { token?: string }> = [];
 
 function delay(ms = 300): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms + Math.random() * 200));
@@ -31,53 +23,6 @@ export async function getSession(): Promise<AuthSessionResponse> {
 export async function logout(): Promise<void> {
   await delay(100);
   mockAuthenticated = false;
-}
-
-export async function listKeys(_token?: string): Promise<ApiKeysListResponse> {
-  await delay();
-  return {
-    user_id: mockUserId,
-    keys: mockKeys.map(({ token: _t, ...rest }) => rest),
-  };
-}
-
-export async function createKey(
-  args: { label: string; expiresDays: number },
-  _token?: string,
-): Promise<ApiKeyCreateResponse> {
-  await delay();
-  const id = `mock-key-${String(nextKeyNum++).padStart(3, '0')}`;
-  const token = `clmcp_mock_${id}_${Date.now()}`;
-  const expiresAt = new Date(Date.now() + args.expiresDays * 86400000).toISOString();
-  const record: ApiKeyRecord & { token?: string } = {
-    id,
-    label: args.label,
-    is_active: true,
-    revoked_at: null,
-    expires_at: expiresAt,
-    created_at: new Date().toISOString(),
-    token,
-  };
-  mockKeys.push(record);
-  return {
-    message: 'Mock: Key created.',
-    api_key: {
-      id,
-      label: args.label,
-      created_at: record.created_at,
-      expires_at: expiresAt,
-      token,
-    },
-  };
-}
-
-export async function revokeKey(keyId: string, _token?: string): Promise<void> {
-  await delay();
-  const key = mockKeys.find((k) => k.id === keyId);
-  if (key) {
-    key.is_active = false;
-    key.revoked_at = new Date().toISOString();
-  }
 }
 
 export async function mcpCall<T>(

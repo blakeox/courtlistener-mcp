@@ -12,8 +12,35 @@ import { useElapsedTimer } from '../hooks/useElapsedTimer';
 import { useRateLimitBackoff } from '../hooks/useRateLimitBackoff';
 import { PlaygroundProvider, usePlayground } from '../lib/playground-context';
 import type { TranscriptItem } from '../lib/playground-context';
-import { consumeOperationalStatus, rememberOperationalStatus, shouldCarryOperationalStatus, withRecoveryHint } from '../lib/operational-status';
-import { Button, Card, FormField, Input, StatusBanner } from '../components/ui';
+import {
+  consumeOperationalStatus,
+  rememberOperationalStatus,
+  shouldCarryOperationalStatus,
+  withRecoveryHint,
+} from '../lib/operational-status';
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  Checkbox,
+  CheckboxField,
+  ComparisonCard,
+  CodeSurface,
+  ConnectionBadge,
+  EmptyState,
+  FormField,
+  IconButton,
+  InlineGroup,
+  Input,
+  MetaNote,
+  Select,
+  StatusBanner,
+  StatusPill,
+  TabButton,
+  Textarea,
+  TextLink,
+} from '../components/ui';
 
 /** Extract a human-readable message from any rejection reason (Error, ApiError, or unknown). */
 function reasonMessage(reason: unknown): string {
@@ -52,45 +79,205 @@ interface SchemaField {
 
 const TOOL_CATALOG: ToolInfo[] = [
   // Search
-  { name: 'search_cases', description: 'Search for court cases by query, citation, judge, or date', category: 'Search', argHint: 'query' },
-  { name: 'search_opinions', description: 'Search for judicial opinions by topic or keyword', category: 'Search', argHint: 'query' },
-  { name: 'advanced_search', description: 'Advanced multi-field search across all data', category: 'Search', argHint: 'query' },
+  {
+    name: 'search_cases',
+    description: 'Search for court cases by query, citation, judge, or date',
+    category: 'Search',
+    argHint: 'query',
+  },
+  {
+    name: 'search_opinions',
+    description: 'Search for judicial opinions by topic or keyword',
+    category: 'Search',
+    argHint: 'query',
+  },
+  {
+    name: 'advanced_search',
+    description: 'Advanced multi-field search across all data',
+    category: 'Search',
+    argHint: 'query',
+  },
   // Cases
-  { name: 'get_case_details', description: 'Get full details for a specific case by cluster ID', category: 'Cases', argHint: 'cluster_id' },
-  { name: 'get_related_cases', description: 'Find cases related to a given case', category: 'Cases', argHint: 'cluster_id' },
-  { name: 'analyze_case_authorities', description: 'Analyze citing and cited authorities for a case', category: 'Cases', argHint: 'cluster_id' },
+  {
+    name: 'get_case_details',
+    description: 'Get full details for a specific case by cluster ID',
+    category: 'Cases',
+    argHint: 'cluster_id',
+  },
+  {
+    name: 'get_related_cases',
+    description: 'Find cases related to a given case',
+    category: 'Cases',
+    argHint: 'cluster_id',
+  },
+  {
+    name: 'analyze_case_authorities',
+    description: 'Analyze citing and cited authorities for a case',
+    category: 'Cases',
+    argHint: 'cluster_id',
+  },
   // Opinions
-  { name: 'get_opinion_text', description: 'Retrieve the full text of an opinion', category: 'Opinions', argHint: 'opinion_id' },
-  { name: 'analyze_legal_argument', description: 'Analyze legal arguments and find supporting precedents', category: 'Opinions', argHint: 'argument' },
-  { name: 'get_citation_network', description: 'Map how an opinion influenced later decisions', category: 'Opinions', argHint: 'opinion_id' },
-  { name: 'lookup_citation', description: 'Look up a case by its legal citation (e.g., 410 U.S. 113)', category: 'Opinions', argHint: 'citation' },
+  {
+    name: 'get_opinion_text',
+    description: 'Retrieve the full text of an opinion',
+    category: 'Opinions',
+    argHint: 'opinion_id',
+  },
+  {
+    name: 'analyze_legal_argument',
+    description: 'Analyze legal arguments and find supporting precedents',
+    category: 'Opinions',
+    argHint: 'argument',
+  },
+  {
+    name: 'get_citation_network',
+    description: 'Map how an opinion influenced later decisions',
+    category: 'Opinions',
+    argHint: 'opinion_id',
+  },
+  {
+    name: 'lookup_citation',
+    description: 'Look up a case by its legal citation (e.g., 410 U.S. 113)',
+    category: 'Opinions',
+    argHint: 'citation',
+  },
   // Courts
-  { name: 'list_courts', description: 'List all courts with optional jurisdiction filter', category: 'Courts', argHint: '' },
-  { name: 'get_judges', description: 'Search for judges by name or court', category: 'Courts', argHint: 'query' },
-  { name: 'get_judge', description: 'Get details for a specific judge by ID', category: 'Courts', argHint: 'judge_id' },
+  {
+    name: 'list_courts',
+    description: 'List all courts with optional jurisdiction filter',
+    category: 'Courts',
+    argHint: '',
+  },
+  {
+    name: 'get_judges',
+    description: 'Search for judges by name or court',
+    category: 'Courts',
+    argHint: 'query',
+  },
+  {
+    name: 'get_judge',
+    description: 'Get details for a specific judge by ID',
+    category: 'Courts',
+    argHint: 'judge_id',
+  },
   // Dockets
-  { name: 'get_dockets', description: 'Search for dockets by case name or number', category: 'Dockets', argHint: 'query' },
-  { name: 'get_docket', description: 'Get a specific docket by ID', category: 'Dockets', argHint: 'docket_id' },
-  { name: 'get_docket_entries', description: 'Get filings/entries for a docket', category: 'Dockets', argHint: 'docket_id' },
-  { name: 'get_recap_documents', description: 'Search RECAP documents by docket', category: 'Dockets', argHint: 'docket_id' },
-  { name: 'get_recap_document', description: 'Get a specific RECAP document', category: 'Dockets', argHint: 'document_id' },
+  {
+    name: 'get_dockets',
+    description: 'Search for dockets by case name or number',
+    category: 'Dockets',
+    argHint: 'query',
+  },
+  {
+    name: 'get_docket',
+    description: 'Get a specific docket by ID',
+    category: 'Dockets',
+    argHint: 'docket_id',
+  },
+  {
+    name: 'get_docket_entries',
+    description: 'Get filings/entries for a docket',
+    category: 'Dockets',
+    argHint: 'docket_id',
+  },
+  {
+    name: 'get_recap_documents',
+    description: 'Search RECAP documents by docket',
+    category: 'Dockets',
+    argHint: 'docket_id',
+  },
+  {
+    name: 'get_recap_document',
+    description: 'Get a specific RECAP document',
+    category: 'Dockets',
+    argHint: 'document_id',
+  },
   // Enhanced
-  { name: 'get_comprehensive_judge_profile', description: 'Full profile with rulings, disclosures, and patterns', category: 'Enhanced', argHint: 'judge_id' },
-  { name: 'get_comprehensive_case_analysis', description: 'Complete case intelligence with citations and analysis', category: 'Enhanced', argHint: 'cluster_id' },
-  { name: 'get_financial_disclosure_details', description: 'Judge financial disclosures (investments, gifts)', category: 'Enhanced', argHint: 'judge_id' },
-  { name: 'get_enhanced_recap_data', description: 'Enhanced PACER/RECAP document retrieval', category: 'Enhanced', argHint: 'document_id' },
-  { name: 'get_visualization_data', description: 'Citation visualization data for graphing', category: 'Enhanced', argHint: 'cluster_id' },
-  { name: 'get_bulk_data', description: 'Bulk data downloads from CourtListener', category: 'Enhanced', argHint: 'type' },
-  { name: 'get_bankruptcy_data', description: 'Bankruptcy-specific court data', category: 'Enhanced', argHint: 'query' },
+  {
+    name: 'get_comprehensive_judge_profile',
+    description: 'Full profile with rulings, disclosures, and patterns',
+    category: 'Enhanced',
+    argHint: 'judge_id',
+  },
+  {
+    name: 'get_comprehensive_case_analysis',
+    description: 'Complete case intelligence with citations and analysis',
+    category: 'Enhanced',
+    argHint: 'cluster_id',
+  },
+  {
+    name: 'get_financial_disclosure_details',
+    description: 'Judge financial disclosures (investments, gifts)',
+    category: 'Enhanced',
+    argHint: 'judge_id',
+  },
+  {
+    name: 'get_enhanced_recap_data',
+    description: 'Enhanced PACER/RECAP document retrieval',
+    category: 'Enhanced',
+    argHint: 'document_id',
+  },
+  {
+    name: 'get_visualization_data',
+    description: 'Citation visualization data for graphing',
+    category: 'Enhanced',
+    argHint: 'cluster_id',
+  },
+  {
+    name: 'get_bulk_data',
+    description: 'Bulk data downloads from CourtListener',
+    category: 'Enhanced',
+    argHint: 'type',
+  },
+  {
+    name: 'get_bankruptcy_data',
+    description: 'Bankruptcy-specific court data',
+    category: 'Enhanced',
+    argHint: 'query',
+  },
   // Miscellaneous
-  { name: 'validate_citations', description: 'Check if citations in text are valid', category: 'Misc', argHint: 'text' },
-  { name: 'get_financial_disclosures', description: 'Search financial disclosures', category: 'Misc', argHint: 'judge_id' },
-  { name: 'get_financial_disclosure', description: 'Get a specific financial disclosure', category: 'Misc', argHint: 'disclosure_id' },
-  { name: 'get_parties_and_attorneys', description: 'Get parties and attorneys for a docket', category: 'Misc', argHint: 'docket_id' },
-  { name: 'manage_alerts', description: 'Create and manage case alerts', category: 'Misc', argHint: 'action' },
+  {
+    name: 'validate_citations',
+    description: 'Check if citations in text are valid',
+    category: 'Misc',
+    argHint: 'text',
+  },
+  {
+    name: 'get_financial_disclosures',
+    description: 'Search financial disclosures',
+    category: 'Misc',
+    argHint: 'judge_id',
+  },
+  {
+    name: 'get_financial_disclosure',
+    description: 'Get a specific financial disclosure',
+    category: 'Misc',
+    argHint: 'disclosure_id',
+  },
+  {
+    name: 'get_parties_and_attorneys',
+    description: 'Get parties and attorneys for a docket',
+    category: 'Misc',
+    argHint: 'docket_id',
+  },
+  {
+    name: 'manage_alerts',
+    description: 'Create and manage case alerts',
+    category: 'Misc',
+    argHint: 'action',
+  },
   // Oral Arguments
-  { name: 'get_oral_arguments', description: 'Search oral arguments by case or date', category: 'Oral Args', argHint: 'query' },
-  { name: 'get_oral_argument', description: 'Get a specific oral argument by ID', category: 'Oral Args', argHint: 'argument_id' },
+  {
+    name: 'get_oral_arguments',
+    description: 'Search oral arguments by case or date',
+    category: 'Oral Args',
+    argHint: 'query',
+  },
+  {
+    name: 'get_oral_argument',
+    description: 'Get a specific oral argument by ID',
+    category: 'Oral Args',
+    argHint: 'argument_id',
+  },
 ];
 
 const TOOL_CATALOG_BY_NAME = new Map(TOOL_CATALOG.map((tool) => [tool.name, tool]));
@@ -145,7 +332,10 @@ interface AsyncEnvelopePayload {
   deduplicated?: boolean;
 }
 
-const ASYNC_STATUS_META: Record<AsyncJobStatus, { label: string; summary: string; tone: 'ok' | 'error' | 'info' }> = {
+const ASYNC_STATUS_META: Record<
+  AsyncJobStatus,
+  { label: string; summary: string; tone: 'ok' | 'error' | 'info' }
+> = {
   queued: { label: 'Queued', summary: 'Waiting for execution slot.', tone: 'info' },
   running: { label: 'Running', summary: 'Actively executing now.', tone: 'info' },
   succeeded: { label: 'Succeeded', summary: 'Completed successfully.', tone: 'ok' },
@@ -155,11 +345,8 @@ const ASYNC_STATUS_META: Record<AsyncJobStatus, { label: string; summary: string
 
 const TERMINAL_ASYNC_STATUSES = new Set<AsyncJobStatus>(['succeeded', 'failed', 'expired']);
 
-function asyncStatusToneClass(status: AsyncJobStatus): string {
-  const tone = ASYNC_STATUS_META[status].tone;
-  if (tone === 'ok') return 'async-job-status-pill tone-ok';
-  if (tone === 'error') return 'async-job-status-pill tone-error';
-  return 'async-job-status-pill tone-info';
+function asyncStatusTone(status: AsyncJobStatus): 'ok' | 'error' | 'info' {
+  return ASYNC_STATUS_META[status].tone;
 }
 
 function parseAsyncJobSnapshot(value: unknown): AsyncJobSnapshot | null {
@@ -195,7 +382,10 @@ function parseAsyncJobSnapshot(value: unknown): AsyncJobSnapshot | null {
       ? {
           error: {
             code: typeof record.error.code === 'string' ? record.error.code : 'execution_failed',
-            message: typeof record.error.message === 'string' ? record.error.message : 'Unknown async job error',
+            message:
+              typeof record.error.message === 'string'
+                ? record.error.message
+                : 'Unknown async job error',
             deadLetter: record.error.deadLetter === true,
             attempts: typeof record.error.attempts === 'number' ? record.error.attempts : 0,
             history: Array.isArray(record.error.history)
@@ -290,7 +480,9 @@ function restoreTrackedJobs(): Record<string, AsyncTrackedJob> {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function normalizeCategory(category: string): string {
@@ -305,9 +497,16 @@ function inferCategoryFromName(toolName: string, categories: string[]): string {
   if (lower.startsWith('search_') || lower.includes('search')) return 'Search';
   if (lower.includes('citation') || lower.includes('opinion')) return 'Opinions';
   if (lower.includes('court') || lower.includes('judge')) return 'Courts';
-  if (lower.includes('docket') || lower.includes('recap') || lower.includes('parties')) return 'Dockets';
+  if (lower.includes('docket') || lower.includes('recap') || lower.includes('parties'))
+    return 'Dockets';
   if (lower.includes('case')) return 'Cases';
-  if (lower.includes('enhanced') || lower.includes('comprehensive') || lower.includes('visualization') || lower.includes('bulk')) return 'Enhanced';
+  if (
+    lower.includes('enhanced') ||
+    lower.includes('comprehensive') ||
+    lower.includes('visualization') ||
+    lower.includes('bulk')
+  )
+    return 'Enhanced';
   const metadataCategory = categories.find((category) =>
     lower.includes(category.toLowerCase().replace(/\s+/g, '_')),
   );
@@ -318,27 +517,48 @@ function inferArgHint(inputSchema: unknown, fallback = ''): string {
   const schema = asRecord(inputSchema);
   if (!schema) return fallback;
   const required = Array.isArray(schema.required)
-    ? schema.required.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ? schema.required.filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      )
     : [];
   if (required.length > 0) return required[0]!;
   const properties = asRecord(schema.properties);
   if (!properties) return fallback;
   const propNames = Object.keys(properties);
   if (propNames.length === 0) return fallback;
-  const preferred = ['query', 'citation', 'text', 'argument', 'cluster_id', 'opinion_id', 'judge_id', 'docket_id', 'document_id', 'disclosure_id', 'argument_id']
-    .find((key) => propNames.includes(key));
+  const preferred = [
+    'query',
+    'citation',
+    'text',
+    'argument',
+    'cluster_id',
+    'opinion_id',
+    'judge_id',
+    'docket_id',
+    'document_id',
+    'disclosure_id',
+    'argument_id',
+  ].find((key) => propNames.includes(key));
   return preferred ?? propNames[0] ?? fallback;
 }
 
 function toSchemaType(property: Record<string, unknown>): SchemaValueType {
   const rawType = property.type;
-  const normalized = typeof rawType === 'string'
-    ? rawType
-    : Array.isArray(rawType)
-      ? rawType.find((entry): entry is string => typeof entry === 'string')
-      : undefined;
+  const normalized =
+    typeof rawType === 'string'
+      ? rawType
+      : Array.isArray(rawType)
+        ? rawType.find((entry): entry is string => typeof entry === 'string')
+        : undefined;
   if (!normalized) return 'unknown';
-  if (normalized === 'string' || normalized === 'number' || normalized === 'integer' || normalized === 'boolean' || normalized === 'array' || normalized === 'object') {
+  if (
+    normalized === 'string' ||
+    normalized === 'number' ||
+    normalized === 'integer' ||
+    normalized === 'boolean' ||
+    normalized === 'array' ||
+    normalized === 'object'
+  ) {
     return normalized;
   }
   return 'unknown';
@@ -366,7 +586,10 @@ function schemaFieldsForTool(tool: ToolInfo | undefined): SchemaField[] {
     .sort((a, b) => Number(b.required) - Number(a.required) || a.name.localeCompare(b.name));
 }
 
-function initialSchemaValues(tool: ToolInfo | undefined, fields: SchemaField[]): Record<string, string | boolean> {
+function initialSchemaValues(
+  tool: ToolInfo | undefined,
+  fields: SchemaField[],
+): Record<string, string | boolean> {
   const schema = asRecord(tool?.inputSchema);
   const properties = asRecord(schema?.properties);
   if (!properties) return {};
@@ -427,7 +650,10 @@ function buildArgumentsFromSchema(
       const parsed = JSON.parse(String(raw));
       if (field.type === 'array' && !Array.isArray(parsed)) {
         errors[field.name] = `${field.name} must be a JSON array.`;
-      } else if (field.type === 'object' && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
+      } else if (
+        field.type === 'object' &&
+        (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      ) {
         errors[field.name] = `${field.name} must be a JSON object.`;
       } else {
         args[field.name] = parsed;
@@ -461,9 +687,10 @@ function normalizeDiscoveredTools(body: unknown): ToolInfo[] {
       (typeof tool?.category === 'string' && normalizeCategory(tool.category)) ||
       fallback?.category ||
       inferCategoryFromName(name, metadataCategories);
-    const description = typeof tool?.description === 'string' && tool.description.trim()
-      ? tool.description
-      : (fallback?.description ?? 'No description available.');
+    const description =
+      typeof tool?.description === 'string' && tool.description.trim()
+        ? tool.description
+        : (fallback?.description ?? 'No description available.');
     discovered.set(name, {
       name,
       description,
@@ -482,12 +709,22 @@ function groupToolsByCategory(tools: ToolInfo[]): ToolCategoryGroup[] {
     if (existing) existing.push(tool);
     else grouped.set(tool.category, [tool]);
   }
-  return Array.from(grouped.entries()).map(([category, categoryTools]) => ({ category, tools: categoryTools }));
+  return Array.from(grouped.entries()).map(([category, categoryTools]) => ({
+    category,
+    tools: categoryTools,
+  }));
 }
 
 // ─── Tool Select Dropdown (shared) ──────────────────────────────
 
-const ToolSelect = React.memo(function ToolSelect({ value, onChange, includeAuto, tools }: {
+const ToolSelect = React.memo(function ToolSelect({
+  id,
+  value,
+  onChange,
+  includeAuto,
+  tools,
+}: {
+  id?: string;
   value: string;
   onChange: (v: string) => void;
   includeAuto?: boolean;
@@ -495,7 +732,7 @@ const ToolSelect = React.memo(function ToolSelect({ value, onChange, includeAuto
 }): React.JSX.Element {
   const groupedTools = React.useMemo(() => groupToolsByCategory(tools), [tools]);
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
       {includeAuto && <option value="auto">🤖 auto (AI selects best tool)</option>}
       {groupedTools.map((group) => (
         <optgroup key={group.category} label={group.category}>
@@ -506,7 +743,7 @@ const ToolSelect = React.memo(function ToolSelect({ value, onChange, includeAuto
           ))}
         </optgroup>
       ))}
-    </select>
+    </Select>
   );
 });
 
@@ -521,7 +758,9 @@ function renderMarkdown(text: string): React.JSX.Element {
     if (listItems.length > 0) {
       elements.push(
         <ul key={`list-${elements.length}`}>
-          {listItems.map((li, i) => <li key={i}>{inlineFormat(li)}</li>)}
+          {listItems.map((li, i) => (
+            <li key={i}>{inlineFormat(li)}</li>
+          ))}
         </ul>,
       );
       listItems = [];
@@ -542,13 +781,25 @@ function renderMarkdown(text: string): React.JSX.Element {
     const line = lines[i]!;
     if (line.startsWith('### ')) {
       flushList();
-      elements.push(<h4 key={i} className="md-heading md-heading-sm">{inlineFormat(line.slice(4))}</h4>);
+      elements.push(
+        <h4 key={i} className="md-heading md-heading-sm">
+          {inlineFormat(line.slice(4))}
+        </h4>,
+      );
     } else if (line.startsWith('## ')) {
       flushList();
-      elements.push(<h3 key={i} className="md-heading md-heading-md">{inlineFormat(line.slice(3))}</h3>);
+      elements.push(
+        <h3 key={i} className="md-heading md-heading-md">
+          {inlineFormat(line.slice(3))}
+        </h3>,
+      );
     } else if (line.startsWith('# ')) {
       flushList();
-      elements.push(<h2 key={i} className="md-heading md-heading-lg">{inlineFormat(line.slice(2))}</h2>);
+      elements.push(
+        <h2 key={i} className="md-heading md-heading-lg">
+          {inlineFormat(line.slice(2))}
+        </h2>,
+      );
     } else if (/^[-*]\s/.test(line)) {
       listItems.push(line.slice(2));
     } else if (/^\d+\.\s/.test(line)) {
@@ -556,7 +807,11 @@ function renderMarkdown(text: string): React.JSX.Element {
     } else {
       flushList();
       if (line.trim()) {
-        elements.push(<p key={i} className="md-paragraph">{inlineFormat(line)}</p>);
+        elements.push(
+          <p key={i} className="md-paragraph">
+            {inlineFormat(line)}
+          </p>,
+        );
       }
     }
   }
@@ -574,22 +829,57 @@ interface Preset {
 }
 
 const AI_PRESETS: Preset[] = [
-  { label: 'Case Search', icon: '🔍', toolName: 'search_cases', prompt: 'Find appellate cases discussing qualified immunity for police and summarize key trends.' },
+  {
+    label: 'Case Search',
+    icon: '🔍',
+    toolName: 'search_cases',
+    prompt:
+      'Find appellate cases discussing qualified immunity for police and summarize key trends.',
+  },
   { label: 'Citation Lookup', icon: '📖', toolName: 'lookup_citation', prompt: '410 U.S. 113' },
-  { label: 'Opinion Analysis', icon: '⚖️', toolName: 'search_opinions', prompt: 'Recent appellate opinions about Fourth Amendment digital privacy protections' },
-  { label: 'Legal Argument', icon: '📝', toolName: 'analyze_legal_argument', prompt: 'The First Amendment protects student speech in public schools unless it causes substantial disruption' },
-  { label: 'Court Explorer', icon: '🏛️', toolName: 'list_courts', prompt: 'List all federal courts' },
-  { label: 'Citation Validator', icon: '✓', toolName: 'validate_citations', prompt: 'The court in Roe v. Wade, 410 U.S. 113 (1973), held that Miranda v. Arizona, 384 U.S. 436 (1966) applies.' },
+  {
+    label: 'Opinion Analysis',
+    icon: '⚖️',
+    toolName: 'search_opinions',
+    prompt: 'Recent appellate opinions about Fourth Amendment digital privacy protections',
+  },
+  {
+    label: 'Legal Argument',
+    icon: '📝',
+    toolName: 'analyze_legal_argument',
+    prompt:
+      'The First Amendment protects student speech in public schools unless it causes substantial disruption',
+  },
+  {
+    label: 'Court Explorer',
+    icon: '🏛️',
+    toolName: 'list_courts',
+    prompt: 'List all federal courts',
+  },
+  {
+    label: 'Citation Validator',
+    icon: '✓',
+    toolName: 'validate_citations',
+    prompt:
+      'The court in Roe v. Wade, 410 U.S. 113 (1973), held that Miranda v. Arizona, 384 U.S. 436 (1966) applies.',
+  },
 ];
 const RECENT_PROMPTS_KEY = 'clmcp_recent_ai_prompts';
 
 // ─── Tool Catalog Panel ─────────────────────────────────────────
 
-const ToolCatalogPanel = React.memo(function ToolCatalogPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
+const ToolCatalogPanel = React.memo(function ToolCatalogPanel({
+  tools,
+}: {
+  tools: ToolInfo[];
+}): React.JSX.Element {
   const [expanded, setExpanded] = React.useState(false);
   const groupedTools = React.useMemo(() => groupToolsByCategory(tools), [tools]);
   return (
-    <Card title={`Available MCP Tools (${tools.length})`} subtitle="All tools accessible through the Model Context Protocol.">
+    <Card
+      title={`Available MCP Tools (${tools.length})`}
+      subtitle="All tools accessible through the Model Context Protocol."
+    >
       <Button variant="secondary" onClick={() => setExpanded(!expanded)}>
         {expanded ? 'Hide catalog' : 'Show all tools'}
       </Button>
@@ -615,24 +905,11 @@ const ToolCatalogPanel = React.memo(function ToolCatalogPanel({ tools }: { tools
   );
 });
 
-// ─── Session Badge ──────────────────────────────────────────────
-
-function SessionBadge({ toolCount }: { toolCount: number }): React.JSX.Element {
-  const { mcpSessionId } = usePlayground();
-  const connected = mcpSessionId.length > 0;
-  return (
-    <div className={`session-badge ${connected ? 'connected' : ''}`.trim()}>
-      <span className="session-badge-dot" />
-      {connected ? `Session: ${mcpSessionId.slice(0, 8)}…` : 'No session'}
-      {connected && <span className="session-badge-tools">| {toolCount} tools</span>}
-    </div>
-  );
-}
-
 // ─── Raw MCP Panel ───────────────────────────────────────────────
 
 function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, setMcpSessionId, append, addProtocolEntry } = usePlayground();
+  const { token, tokenMissing, mcpSessionId, setMcpSessionId, append, addProtocolEntry } =
+    usePlayground();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [toolName, setToolName] = React.useState(() => tools[0]?.name ?? '');
@@ -641,7 +918,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const [schemaErrors, setSchemaErrors] = React.useState<Record<string, string>>({});
   const [rawArguments, setRawArguments] = React.useState('{}');
   const [runAsAsyncJob, setRunAsAsyncJob] = React.useState(false);
-  const [trackedJobs, setTrackedJobs] = React.useState<Record<string, AsyncTrackedJob>>(() => restoreTrackedJobs());
+  const [trackedJobs, setTrackedJobs] = React.useState<Record<string, AsyncTrackedJob>>(() =>
+    restoreTrackedJobs(),
+  );
   const initialDeepLinkJobId = searchParams.get('jobId')?.trim() ?? '';
   const [selectedJobId, setSelectedJobId] = React.useState(initialDeepLinkJobId);
   const [jobLookupId, setJobLookupId] = React.useState(initialDeepLinkJobId);
@@ -654,7 +933,14 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const [sending, setSending] = React.useState(false);
   const elapsed = useElapsedTimer(sending);
   const cancelledRef = React.useRef(false);
-  const selectedTool = React.useMemo(() => tools.find((tool) => tool.name === toolName), [toolName, tools]);
+  const argsModeTabRefs = React.useRef<Record<'schema' | 'json', HTMLButtonElement | null>>({
+    schema: null,
+    json: null,
+  });
+  const selectedTool = React.useMemo(
+    () => tools.find((tool) => tool.name === toolName),
+    [toolName, tools],
+  );
   const schemaFields = React.useMemo(() => schemaFieldsForTool(selectedTool), [selectedTool]);
   const hasSchemaFields = schemaFields.length > 0;
   const selectedTrackedJob = selectedJobId ? trackedJobs[selectedJobId] : undefined;
@@ -666,9 +952,15 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       ),
     [trackedJobs],
   );
+  const schemaArgsTabId = 'raw-args-schema-tab';
+  const jsonArgsTabId = 'raw-args-json-tab';
+  const schemaArgsPanelId = 'raw-args-schema-panel';
+  const jsonArgsPanelId = 'raw-args-json-panel';
 
   React.useEffect(() => {
-    return () => { cancelledRef.current = true; };
+    return () => {
+      cancelledRef.current = true;
+    };
   }, []);
 
   React.useEffect(() => {
@@ -708,6 +1000,37 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     }
   }, [hasSchemaFields, schemaFields, selectedTool]);
 
+  function setArgsModeWithPreview(nextMode: 'schema' | 'json'): void {
+    if (nextMode === 'json' && hasSchemaFields) {
+      const preview = buildArgumentsFromSchema(schemaFields, schemaValues, false).arguments;
+      setRawArguments(JSON.stringify(preview, null, 2));
+    }
+    setArgsMode(nextMode);
+  }
+
+  function handleArgsModeTabKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentMode: 'schema' | 'json',
+  ): void {
+    const enabledModes: Array<'schema' | 'json'> = hasSchemaFields ? ['schema', 'json'] : ['json'];
+    const currentIndex = enabledModes.indexOf(currentMode);
+    if (currentIndex < 0 || enabledModes.length < 2) return;
+    let nextMode: 'schema' | 'json' | null = null;
+    if (event.key === 'ArrowRight') {
+      nextMode = enabledModes[(currentIndex + 1) % enabledModes.length]!;
+    } else if (event.key === 'ArrowLeft') {
+      nextMode = enabledModes[(currentIndex - 1 + enabledModes.length) % enabledModes.length]!;
+    } else if (event.key === 'Home') {
+      nextMode = enabledModes[0]!;
+    } else if (event.key === 'End') {
+      nextMode = enabledModes[enabledModes.length - 1]!;
+    }
+    if (!nextMode) return;
+    event.preventDefault();
+    setArgsModeWithPreview(nextMode);
+    argsModeTabRefs.current[nextMode]?.focus();
+  }
+
   function setDeepLinkedJob(jobId: string | null): void {
     const next = new URLSearchParams(searchParams);
     if (jobId && jobId.trim()) {
@@ -736,9 +1059,25 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       const previous = existing[snapshot.id];
       const next: AsyncTrackedJob = {
         job: snapshot,
-        ...(options.replay ? { replay: options.replay } : previous?.replay ? { replay: previous.replay } : {}),
-        ...(options.clearResult ? {} : 'latestResult' in options ? { latestResult: options.latestResult } : previous && 'latestResult' in previous ? { latestResult: previous.latestResult } : {}),
-        ...(options.clearError ? {} : typeof options.latestError === 'string' ? { latestError: options.latestError } : previous?.latestError ? { latestError: previous.latestError } : {}),
+        ...(options.replay
+          ? { replay: options.replay }
+          : previous?.replay
+            ? { replay: previous.replay }
+            : {}),
+        ...(options.clearResult
+          ? {}
+          : 'latestResult' in options
+            ? { latestResult: options.latestResult }
+            : previous && 'latestResult' in previous
+              ? { latestResult: previous.latestResult }
+              : {}),
+        ...(options.clearError
+          ? {}
+          : typeof options.latestError === 'string'
+            ? { latestError: options.latestError }
+            : previous?.latestError
+              ? { latestError: previous.latestError }
+              : {}),
       };
       return { ...existing, [snapshot.id]: next };
     });
@@ -787,20 +1126,27 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     try {
       const payload = await callAsyncControl(ASYNC_CONTROL_TOOLS.status, jobId);
       if (!payload?.job) {
-        if (!silent) operatorStatus.setError('Job status payload was not returned by the MCP server. Retry status or reconnect session.');
+        if (!silent)
+          operatorStatus.setError(
+            'Job status payload was not returned by the MCP server. Retry status or reconnect session.',
+          );
         return;
       }
       const latestError = payload.error ?? payload.job.error?.message;
       upsertTrackedJob(payload.job, {
         latestError,
-        ...(payload.job.status === 'queued' || payload.job.status === 'running' || payload.job.status === 'succeeded'
+        ...(payload.job.status === 'queued' ||
+        payload.job.status === 'running' ||
+        payload.job.status === 'succeeded'
           ? { clearError: true }
           : {}),
       });
       if (!silent) {
         const stateMessage = `Job ${payload.job.id} is ${payload.job.status}.`;
         if (payload.job.status === 'failed' || payload.job.status === 'expired') {
-          operatorStatus.setError(latestError ?? `${stateMessage} Review error details and retry if needed.`);
+          operatorStatus.setError(
+            latestError ?? `${stateMessage} Review error details and retry if needed.`,
+          );
         } else if (payload.job.status === 'succeeded') {
           operatorStatus.setOk(stateMessage);
         } else {
@@ -818,7 +1164,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     try {
       const payload = await callAsyncControl(ASYNC_CONTROL_TOOLS.result, jobId);
       if (!payload?.job) {
-        operatorStatus.setError('Result payload was not returned by the MCP server. Refresh status, then retry result retrieval.');
+        operatorStatus.setError(
+          'Result payload was not returned by the MCP server. Refresh status, then retry result retrieval.',
+        );
         return;
       }
       upsertTrackedJob(payload.job, {
@@ -829,7 +1177,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       if (payload.success) {
         operatorStatus.setOk(`Result retrieved for ${payload.job.id}.`);
       } else {
-        operatorStatus.setError(payload.error ?? payload.job.error?.message ?? 'Async result request failed.');
+        operatorStatus.setError(
+          payload.error ?? payload.job.error?.message ?? 'Async result request failed.',
+        );
       }
     } catch (error) {
       if (cancelledRef.current) return;
@@ -842,14 +1192,21 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     try {
       const payload = await callAsyncControl(ASYNC_CONTROL_TOOLS.cancel, jobId);
       if (!payload?.job) {
-        operatorStatus.setError('Cancel payload was not returned by the MCP server. Retry cancellation or refresh status.');
+        operatorStatus.setError(
+          'Cancel payload was not returned by the MCP server. Retry cancellation or refresh status.',
+        );
         return;
       }
       upsertTrackedJob(payload.job, {
         latestError: payload.error ?? payload.job.error?.message,
       });
       if (payload.success) operatorStatus.setOk(`Cancellation processed for ${payload.job.id}.`);
-      else operatorStatus.setError(payload.error ?? payload.job.error?.message ?? `Cancellation failed for ${payload.job.id}.`);
+      else
+        operatorStatus.setError(
+          payload.error ??
+            payload.job.error?.message ??
+            `Cancellation failed for ${payload.job.id}.`,
+        );
     } catch (error) {
       if (cancelledRef.current) return;
       reportOperatorError(error, toErrorMessage(error));
@@ -859,7 +1216,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   async function retryAsyncJob(jobId: string): Promise<void> {
     const replay = trackedJobs[jobId]?.replay;
     if (!replay) {
-      operatorStatus.setError('Retry is unavailable for this job (original request not cached in this browser).');
+      operatorStatus.setError(
+        'Retry is unavailable for this job (original request not cached in this browser).',
+      );
       return;
     }
     if (!mcpSessionId) {
@@ -924,11 +1283,17 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     return () => clearInterval(poller);
   }, [selectedTrackedJob]);
 
-  useKeyboardShortcut('Enter', () => { void sendRaw(); }, { disabled: sending || tokenMissing });
+  useKeyboardShortcut(
+    'Enter',
+    () => {
+      void sendRaw();
+    },
+    { disabled: sending || tokenMissing },
+  );
 
   async function connect(): Promise<void> {
     if (!token.trim()) {
-      connectStatus.setError('Load a local MCP credential first (Operator Session page).');
+      connectStatus.setError('Load a local MCP credential first (Session page).');
       return;
     }
     setConnecting(true);
@@ -969,8 +1334,14 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   async function sendRaw(): Promise<void> {
-    if (!mcpSessionId) { chatStatus.setError('Connect MCP session first.'); return; }
-    if (!toolName) { chatStatus.setError('No tool available.'); return; }
+    if (!mcpSessionId) {
+      chatStatus.setError('Connect MCP session first.');
+      return;
+    }
+    if (!toolName) {
+      chatStatus.setError('No tool available.');
+      return;
+    }
 
     let args: Record<string, unknown>;
     if (argsMode === 'json' || !hasSchemaFields) {
@@ -1046,7 +1417,10 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         chatStatus.setOk(`Response received in ${latencyMs}ms.`);
       }
       const duration = markFirstMcpSuccess();
-      trackEvent('mcp_tool_call_succeeded', { latency_ms: latencyMs, signup_to_first_ms: duration ?? 0 });
+      trackEvent('mcp_tool_call_succeeded', {
+        latency_ms: latencyMs,
+        signup_to_first_ms: duration ?? 0,
+      });
     } catch (error) {
       if (cancelledRef.current) return;
       const message = withRecoveryHint(error, toErrorMessage(error));
@@ -1065,42 +1439,70 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     <div className="stack">
       <div className="two-col">
         <Card title="Connect MCP session" subtitle="Step 1: initialize a session on /mcp.">
-          <div className="row">
+          <InlineGroup>
             <Button id="connectBtn" disabled={connecting || tokenMissing} onClick={connect}>
               {connecting ? 'Connecting...' : 'Connect MCP Session'}
             </Button>
-          </div>
-          <StatusBanner id="connectStatus" message={connectStatus.status} type={connectStatus.statusType} />
+          </InlineGroup>
+          <StatusBanner
+            id="connectStatus"
+            message={connectStatus.status}
+            type={connectStatus.statusType}
+          />
         </Card>
         <Card title="Tool call" subtitle="Step 2: call a tool inside the active session.">
-          <form onSubmit={(e) => { e.preventDefault(); void sendRaw(); }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void sendRaw();
+            }}
+          >
             <FormField id="toolName" label="Tool">
               <ToolSelect value={toolName} onChange={setToolName} tools={tools} />
             </FormField>
-            <FormField id="argsMode" label="Arguments mode" hint={hasSchemaFields ? 'Schema form uses tool inputSchema with validation.' : 'Schema unavailable for this tool.'}>
-              <div className="row">
-                <Button
-                  type="button"
-                  variant={argsMode === 'schema' ? 'primary' : 'secondary'}
+            <FormField
+              id="argsMode"
+              label="Arguments mode"
+              hint={
+                hasSchemaFields
+                  ? 'Schema form uses tool inputSchema with validation.'
+                  : 'Schema unavailable for this tool.'
+              }
+            >
+              <div className="tabs" role="tablist" aria-label="Arguments mode">
+                <TabButton
+                  id={schemaArgsTabId}
+                  ref={(node) => {
+                    argsModeTabRefs.current.schema = node;
+                  }}
+                  controls={schemaArgsPanelId}
+                  selected={argsMode === 'schema'}
                   disabled={!hasSchemaFields}
-                  onClick={() => setArgsMode('schema')}
+                  onClick={() => setArgsModeWithPreview('schema')}
+                  onKeyDown={(event) => handleArgsModeTabKeyDown(event, 'schema')}
                 >
                   Schema form
-                </Button>
-                <Button
-                  type="button"
-                  variant={argsMode === 'json' ? 'primary' : 'secondary'}
-                  onClick={() => {
-                    const preview = buildArgumentsFromSchema(schemaFields, schemaValues, false).arguments;
-                    setRawArguments(JSON.stringify(preview, null, 2));
-                    setArgsMode('json');
+                </TabButton>
+                <TabButton
+                  id={jsonArgsTabId}
+                  ref={(node) => {
+                    argsModeTabRefs.current.json = node;
                   }}
+                  controls={jsonArgsPanelId}
+                  selected={argsMode === 'json'}
+                  onClick={() => setArgsModeWithPreview('json')}
+                  onKeyDown={(event) => handleArgsModeTabKeyDown(event, 'json')}
                 >
                   Raw JSON
-                </Button>
+                </TabButton>
               </div>
             </FormField>
-            {argsMode === 'schema' && hasSchemaFields ? (
+            <div
+              id={schemaArgsPanelId}
+              role="tabpanel"
+              aria-labelledby={schemaArgsTabId}
+              hidden={argsMode !== 'schema' || !hasSchemaFields}
+            >
               <div className="grid-compact">
                 {schemaFields.map((field) => (
                   <FormField
@@ -1111,9 +1513,8 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                     error={schemaErrors[field.name]}
                   >
                     {field.type === 'boolean' ? (
-                      <input
+                      <Checkbox
                         id={`arg-${field.name}`}
-                        type="checkbox"
                         checked={Boolean(schemaValues[field.name])}
                         onChange={(event) => {
                           const checked = event.target.checked;
@@ -1121,11 +1522,15 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                         }}
                       />
                     ) : field.type === 'array' || field.type === 'object' ? (
-                      <textarea
+                      <Textarea
                         id={`arg-${field.name}`}
                         className="mono"
                         rows={3}
-                        value={typeof schemaValues[field.name] === 'string' ? schemaValues[field.name] : ''}
+                        value={
+                          typeof schemaValues[field.name] === 'string'
+                            ? schemaValues[field.name]
+                            : ''
+                        }
                         placeholder={field.type === 'array' ? '[]' : '{}'}
                         onChange={(event) => {
                           const next = event.target.value;
@@ -1135,8 +1540,14 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                     ) : (
                       <Input
                         id={`arg-${field.name}`}
-                        type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'}
-                        value={typeof schemaValues[field.name] === 'string' ? schemaValues[field.name] : ''}
+                        type={
+                          field.type === 'number' || field.type === 'integer' ? 'number' : 'text'
+                        }
+                        value={
+                          typeof schemaValues[field.name] === 'string'
+                            ? schemaValues[field.name]
+                            : ''
+                        }
                         placeholder={field.description || `Enter ${field.name}`}
                         onChange={(event) => {
                           const next = event.target.value;
@@ -1147,9 +1558,19 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   </FormField>
                 ))}
               </div>
-            ) : (
-              <FormField id="chatArguments" label="Arguments JSON" hint="Advanced mode: provide a raw JSON object for tool arguments.">
-                <textarea
+            </div>
+            <div
+              id={jsonArgsPanelId}
+              role="tabpanel"
+              aria-labelledby={jsonArgsTabId}
+              hidden={argsMode !== 'json'}
+            >
+              <FormField
+                id="chatArguments"
+                label="Arguments JSON"
+                hint="Advanced mode: provide a raw JSON object for tool arguments."
+              >
+                <Textarea
                   id="chatArguments"
                   className="mono"
                   rows={8}
@@ -1157,27 +1578,29 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   onChange={(event) => setRawArguments(event.target.value)}
                 />
               </FormField>
-            )}
+            </div>
             <FormField
               id="asyncToggle"
               label="Execution mode"
               hint="Async mode adds __mcp_async and queues the call in the operator workspace."
             >
-              <label className="inline-control">
-                <input
-                  id="asyncToggle"
-                  type="checkbox"
-                  checked={runAsAsyncJob}
-                  onChange={(event) => setRunAsAsyncJob(event.target.checked)}
-                />
+              <CheckboxField
+                id="asyncToggle"
+                checked={runAsAsyncJob}
+                onChange={(event) => setRunAsAsyncJob(event.target.checked)}
+              >
                 Run as async job
-              </label>
+              </CheckboxField>
             </FormField>
             <Button id="sendBtn" type="submit" disabled={sending || tokenMissing}>
               {sending ? `Sending... (${elapsed}s)` : 'Send'}
             </Button>
             <span className="hint hint-inline">⌘/Ctrl+Enter</span>
-            <StatusBanner id="chatStatus" message={chatStatus.status} type={chatStatus.statusType} />
+            <StatusBanner
+              id="chatStatus"
+              message={chatStatus.status}
+              type={chatStatus.statusType}
+            />
           </form>
         </Card>
       </div>
@@ -1191,7 +1614,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           label="Deep-linkable job detail"
           hint="Paste a job ID, or share /app/playground?jobId=<id>."
         >
-          <div className="row">
+          <InlineGroup>
             <Input
               id="asyncJobLookup"
               value={jobLookupId}
@@ -1219,40 +1642,49 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                 Clear detail
               </Button>
             )}
-          </div>
+          </InlineGroup>
         </FormField>
         {selectedJobId ? (
           <p className="hint hint-tight">
             Deep link: <code>/app/playground?jobId={selectedJobId}</code>
           </p>
         ) : null}
-        <StatusBanner id="asyncOperatorStatus" message={operatorStatus.status} type={operatorStatus.statusType} />
+        <StatusBanner
+          id="asyncOperatorStatus"
+          message={operatorStatus.status}
+          type={operatorStatus.statusType}
+        />
         {operatorBackoff.blocked ? (
           <p className="hint" role="status">
-            Rate limited ({operatorBackoff.secondsLeft}s). Wait for the timer, then retry status/cancel/result actions.
+            Rate limited ({operatorBackoff.secondsLeft}s). Wait for the timer, then retry
+            status/cancel/result actions.
           </p>
         ) : null}
 
         <div className="async-job-list">
           {trackedJobList.length === 0 ? (
-            <p className="empty-state">No async jobs tracked yet. Enable async mode and send a tool call.</p>
+            <EmptyState message="No async jobs tracked yet. Enable async mode and send a tool call." />
           ) : (
             trackedJobList.map((entry) => {
               const meta = ASYNC_STATUS_META[entry.job.status];
               return (
-                <button
+                <Button
                   key={entry.job.id}
-                  type="button"
+                  variant="secondary"
+                  size="compact"
                   aria-pressed={selectedJobId === entry.job.id}
                   onClick={() => setDeepLinkedJob(entry.job.id)}
                   className={`async-job-item ${selectedJobId === entry.job.id ? 'active' : ''}`.trim()}
                 >
                   <div className="async-job-item-header">
                     <strong>{entry.job.id}</strong>
-                    <span className="async-job-status-label">{meta.label}</span>
+                    <StatusPill tone={asyncStatusTone(entry.job.status)}>{meta.label}</StatusPill>
                   </div>
-                  <div className="hint">{entry.job.toolName} • attempts {entry.job.attempts.current}/{entry.job.attempts.max}</div>
-                </button>
+                  <div className="hint">
+                    {entry.job.toolName} • attempts {entry.job.attempts.current}/
+                    {entry.job.attempts.max}
+                  </div>
+                </Button>
               );
             })
           )}
@@ -1263,17 +1695,22 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             <h4 className="async-job-heading">Job detail: {selectedJobId}</h4>
             {selectedTrackedJob ? (
               <>
-                <div className="async-job-meta">
-                  <span className={asyncStatusToneClass(selectedTrackedJob.job.status)}>
+                <InlineGroup className="async-job-meta">
+                  <StatusPill tone={asyncStatusTone(selectedTrackedJob.job.status)}>
                     {ASYNC_STATUS_META[selectedTrackedJob.job.status].label}
+                  </StatusPill>
+                  <span className="hint">
+                    {ASYNC_STATUS_META[selectedTrackedJob.job.status].summary}
                   </span>
-                  <span className="hint">{ASYNC_STATUS_META[selectedTrackedJob.job.status].summary}</span>
-                  {selectedTrackedJob.job.cancellationRequested ? <span className="hint">Cancellation requested.</span> : null}
-                </div>
+                  {selectedTrackedJob.job.cancellationRequested ? (
+                    <span className="hint">Cancellation requested.</span>
+                  ) : null}
+                </InlineGroup>
                 <p className="hint">
-                  Created {selectedTrackedJob.job.createdAt} • Updated {selectedTrackedJob.job.updatedAt} • Expires {selectedTrackedJob.job.expiresAt}
+                  Created {selectedTrackedJob.job.createdAt} • Updated{' '}
+                  {selectedTrackedJob.job.updatedAt} • Expires {selectedTrackedJob.job.expiresAt}
                 </p>
-                <div className="row">
+                <InlineGroup>
                   <Button
                     type="button"
                     variant="secondary"
@@ -1314,20 +1751,22 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   >
                     Retry
                   </Button>
-                </div>
-                {(selectedTrackedJob.latestError || selectedTrackedJob.job.error?.message) ? (
-                  <pre className="raw-response mono async-job-result">
-                    {selectedTrackedJob.latestError ?? selectedTrackedJob.job.error?.message}
-                  </pre>
+                </InlineGroup>
+                {selectedTrackedJob.latestError || selectedTrackedJob.job.error?.message ? (
+                  <CodeSurface
+                    code={selectedTrackedJob.latestError ?? selectedTrackedJob.job.error?.message ?? ''}
+                    className="mono async-job-result"
+                  />
                 ) : null}
                 {'latestResult' in selectedTrackedJob ? (
-                  <pre className="raw-response mono async-job-result">
-                    {JSON.stringify(selectedTrackedJob.latestResult, null, 2)}
-                  </pre>
+                  <CodeSurface
+                    code={JSON.stringify(selectedTrackedJob.latestResult, null, 2)}
+                    className="mono async-job-result"
+                  />
                 ) : null}
               </>
             ) : (
-              <div className="row">
+              <InlineGroup>
                 <p className="hint">No local snapshot yet for this job ID.</p>
                 <Button
                   type="button"
@@ -1337,7 +1776,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                 >
                   Load status
                 </Button>
-              </div>
+              </InlineGroup>
             )}
           </div>
         ) : null}
@@ -1371,12 +1810,16 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const [step, setStep] = React.useState<string | null>(null);
   const elapsed = useElapsedTimer(aiRunning);
   const cancelledRef = React.useRef(false);
-  const [chatHistory, setChatHistory] = React.useState<Array<{ role: string; content: string }>>([]);
+  const [chatHistory, setChatHistory] = React.useState<Array<{ role: string; content: string }>>(
+    [],
+  );
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [recentPrompts, setRecentPrompts] = React.useState<string[]>(() => {
     try {
       const parsed = JSON.parse(localStorage.getItem(RECENT_PROMPTS_KEY) || '[]');
-      return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string').slice(0, 6) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((entry): entry is string => typeof entry === 'string').slice(0, 6)
+        : [];
     } catch {
       return [];
     }
@@ -1384,7 +1827,9 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const [msgId, setMsgId] = React.useState(0);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    return () => { cancelledRef.current = true; };
+    return () => {
+      cancelledRef.current = true;
+    };
   }, []);
   React.useEffect(() => {
     if (typeof chatEndRef.current?.scrollIntoView === 'function') {
@@ -1396,7 +1841,13 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       setAiToolName('auto');
     }
   }, [aiToolName, tools]);
-  useKeyboardShortcut('Enter', () => { void sendAiChat(); }, { disabled: aiRunning });
+  useKeyboardShortcut(
+    'Enter',
+    () => {
+      void sendAiChat();
+    },
+    { disabled: aiRunning },
+  );
 
   function applyPreset(preset: Preset): void {
     setAiToolName(preset.toolName);
@@ -1420,7 +1871,10 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   async function sendAiChat(): Promise<void> {
-    if (!aiPrompt.trim()) { aiStatus.setError('Enter a prompt.'); return; }
+    if (!aiPrompt.trim()) {
+      aiStatus.setError('Enter a prompt.');
+      return;
+    }
     const currentPrompt = aiPrompt.trim();
     const currentId = msgId;
     setMsgId((v) => v + 2);
@@ -1447,11 +1901,19 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       if (cancelledRef.current) return;
       const latencyMs = Math.round(performance.now() - started);
 
-      const mcpText = mcpResult.status === 'fulfilled' ? mcpResult.value.ai_response : `Error: ${reasonMessage(mcpResult.reason)}`;
-      const plainText = plainResult.status === 'fulfilled' ? plainResult.value.ai_response : `Error: ${reasonMessage(plainResult.reason)}`;
+      const mcpText =
+        mcpResult.status === 'fulfilled'
+          ? mcpResult.value.ai_response
+          : `Error: ${reasonMessage(mcpResult.reason)}`;
+      const plainText =
+        plainResult.status === 'fulfilled'
+          ? plainResult.value.ai_response
+          : `Error: ${reasonMessage(plainResult.reason)}`;
       const mcpTool = mcpResult.status === 'fulfilled' ? mcpResult.value.tool : undefined;
-      const mcpToolReason = mcpResult.status === 'fulfilled' ? mcpResult.value.tool_reason : undefined;
-      const mcpFallback = mcpResult.status === 'fulfilled' ? mcpResult.value.fallback_used : undefined;
+      const mcpToolReason =
+        mcpResult.status === 'fulfilled' ? mcpResult.value.tool_reason : undefined;
+      const mcpFallback =
+        mcpResult.status === 'fulfilled' ? mcpResult.value.fallback_used : undefined;
 
       if (mcpResult.status === 'fulfilled') {
         if (mcpResult.value.session_id) setMcpSessionId(mcpResult.value.session_id);
@@ -1459,16 +1921,19 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       }
 
       // Add comparison message
-      setMessages((prev) => [...prev, {
-        id: currentId + 1,
-        role: 'comparison',
-        mcpResponse: mcpText,
-        plainResponse: plainText,
-        mcpTool,
-        mcpToolReason,
-        mcpFallback,
-        latencyMs,
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: currentId + 1,
+          role: 'comparison',
+          mcpResponse: mcpText,
+          plainResponse: plainText,
+          mcpTool,
+          mcpToolReason,
+          mcpFallback,
+          latencyMs,
+        },
+      ]);
 
       // Track conversation for multi-turn
       setChatHistory((prev) => [
@@ -1498,29 +1963,33 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   return (
     <div className="stack">
       {/* Presets */}
-      <Card title="AI Chat — MCP vs Plain AI" subtitle="Every message is sent to both the MCP-powered AI and a plain LLM side-by-side. Multi-turn conversation supported.">
-        <div className="row-tight">
+      <Card
+        title="AI Chat — MCP vs Plain AI"
+        subtitle="Every message is sent to both the MCP-powered AI and a plain LLM side-by-side. Multi-turn conversation supported."
+      >
+        <InlineGroup gap="tight">
           {AI_PRESETS.map((p) => (
-            <Button key={p.label} variant="secondary" onClick={() => applyPreset(p)} className="btn-compact">
+            <Button key={p.label} variant="secondary" size="compact" onClick={() => applyPreset(p)}>
               {p.icon} {p.label}
             </Button>
           ))}
-        </div>
+        </InlineGroup>
         {recentPrompts.length > 0 && (
           <div className="recent-prompts">
             <div className="hint">Recent prompts</div>
-            <div className="row-tight">
+            <InlineGroup gap="tight">
               {recentPrompts.map((prompt) => (
                 <Button
                   key={prompt}
                   variant="secondary"
+                  size="tiny"
                   onClick={() => setAiPrompt(prompt)}
-                  className="btn-tiny"
                 >
-                  ↺ {prompt.slice(0, 60)}{prompt.length > 60 ? '…' : ''}
+                  ↺ {prompt.slice(0, 60)}
+                  {prompt.length > 60 ? '…' : ''}
                 </Button>
               ))}
-            </div>
+            </InlineGroup>
           </div>
         )}
       </Card>
@@ -1528,69 +1997,70 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       {/* Chat thread */}
       <div className="chat-stream">
         {messages.length === 0 && (
-          <p className="empty-state chat-empty-state">
-            <span className="chat-empty-icon">💬</span><br />
-            Start a conversation! Ask a legal question and see how MCP-powered AI compares to a plain LLM.
-            <br /><span className="chat-empty-hint">Try a preset above or type your own question below.</span>
-          </p>
+          <EmptyState
+            className="chat-empty-state"
+            icon="💬"
+            message="Start a conversation! Ask a legal question and see how MCP-powered AI compares to a plain LLM."
+            hint="Try a preset above or type your own question below."
+          />
         )}
         {messages.map((msg) => {
           if (msg.role === 'user') {
             return (
               <div key={msg.id} className="chat-user-row">
-                <div className="chat-user-bubble">
-                  {msg.prompt}
-                </div>
+                <div className="chat-user-bubble">{msg.prompt}</div>
               </div>
             );
           }
           if (msg.role === 'error') {
             return (
-              <div key={msg.id} className="chat-error-banner">
-                🔴 {msg.text}
-              </div>
+              <StatusBanner key={msg.id} role="alert" message={msg.text} type="error" />
             );
           }
           if (msg.role === 'comparison') {
             return (
-              <div key={msg.id} className="chat-comparison-item">
-                <div className="comparison-grid">
-                  {/* MCP side */}
-                  <div className="comparison-card comparison-card-mcp">
-                    <div className="comparison-card-header">
-                      <span className="comparison-icon">🔌</span>
-                      <strong className="comparison-card-title">With MCP Tools</strong>
-                      <span className="comparison-pill comparison-pill-mcp">LIVE DATA</span>
-                    </div>
-                    {msg.mcpTool && (
-                      <div className="comparison-tool-meta">
-                        🔧 <strong>{msg.mcpTool}</strong>
-                        {msg.mcpToolReason ? <span className="comparison-tool-reason"> — {msg.mcpToolReason}</span> : null}
-                        {msg.mcpFallback ? <span className="comparison-tool-warning"> ⚠️ fallback</span> : null}
-                      </div>
-                    )}
-                    <div className="comparison-card-body">
+                <div key={msg.id} className="chat-comparison-item">
+                  <div className="comparison-grid">
+                    <ComparisonCard
+                      icon="🔌"
+                      title="With MCP Tools"
+                      tone="mcp"
+                      badge={
+                        <StatusPill tone="mcp" variant="solid">
+                          LIVE DATA
+                        </StatusPill>
+                      }
+                      meta={
+                        msg.mcpTool ? (
+                          <MetaNote>
+                            <span aria-hidden="true">🔧</span>
+                            <strong>{msg.mcpTool}</strong>
+                            {msg.mcpToolReason ? (
+                              <span className="meta-note-detail">{msg.mcpToolReason}</span>
+                            ) : null}
+                            {msg.mcpFallback ? <Badge tone="warn">Fallback</Badge> : null}
+                          </MetaNote>
+                        ) : null
+                      }
+                    >
                       {renderMarkdown(msg.mcpResponse || '')}
-                    </div>
-                  </div>
-                  {/* Plain AI side */}
-                  <div className="comparison-card comparison-card-plain">
-                    <div className="comparison-card-header">
-                      <span className="comparison-icon">🧠</span>
-                      <strong className="comparison-card-title">Without MCP</strong>
-                      <span className="comparison-pill comparison-pill-plain">TRAINING ONLY</span>
-                    </div>
-                    <div className="comparison-card-body">
+                    </ComparisonCard>
+                    <ComparisonCard
+                      icon="🧠"
+                      title="Without MCP"
+                      badge={
+                        <StatusPill tone="plain" variant="solid">
+                          TRAINING ONLY
+                        </StatusPill>
+                      }
+                    >
                       {renderMarkdown(msg.plainResponse || '')}
-                    </div>
+                    </ComparisonCard>
                   </div>
+                  {msg.latencyMs != null && (
+                    <div className="comparison-latency">⏱ {msg.latencyMs}ms</div>
+                  )}
                 </div>
-                {msg.latencyMs != null && (
-                  <div className="comparison-latency">
-                    ⏱ {msg.latencyMs}ms
-                  </div>
-                )}
-              </div>
             );
           }
           return null;
@@ -1600,45 +2070,58 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
       {/* Input area */}
       <Card>
-        <form onSubmit={(e) => { e.preventDefault(); void sendAiChat(); }}>
-          <div className="chat-controls-row">
-            <div className="chat-control-grow">
-              <label className="field-label-compact">MCP Tool</label>
-              <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto tools={tools} />
-            </div>
-            <div className="chat-control-fixed">
-              <label className="field-label-compact">Cost mode</label>
-              <select value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendAiChat();
+          }}
+        >
+          <InlineGroup className="chat-controls-row">
+            <FormField id="ai-chat-tool" label="MCP Tool" compact className="chat-control-grow">
+              <ToolSelect
+                id="ai-chat-tool"
+                value={aiToolName}
+                onChange={setAiToolName}
+                includeAuto
+                tools={tools}
+              />
+            </FormField>
+            <FormField id="ai-chat-mode" label="Cost mode" compact className="chat-control-fixed">
+              <Select
+                id="ai-chat-mode"
+                value={aiMode}
+                onChange={(e) => setAiMode(e.target.value as typeof aiMode)}
+              >
                 <option value="cheap">cheap</option>
                 <option value="balanced">balanced</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
             {chatHistory.length > 0 && (
               <div className="chat-control-action">
-                <Button variant="secondary" onClick={clearConversation} className="btn-tiny">
+                <Button variant="secondary" size="tiny" onClick={clearConversation}>
                   🗑 Clear ({chatHistory.length / 2} turn{chatHistory.length > 2 ? 's' : ''})
                 </Button>
               </div>
             )}
-          </div>
+          </InlineGroup>
           <div className="chat-input-row">
-            <textarea
+            <Textarea
               id="aiChatPrompt"
               rows={2}
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder={chatHistory.length > 0 ? 'Ask a follow-up question...' : 'Ask a legal research question...'}
+              placeholder={
+                chatHistory.length > 0
+                  ? 'Ask a follow-up question...'
+                  : 'Ask a legal research question...'
+              }
               className="chat-input-textarea"
             />
             <Button type="submit" disabled={aiRunning} className="chat-send-btn">
               {aiRunning ? `${elapsed}s...` : 'Send'}
             </Button>
           </div>
-          {step && (
-            <div className="chat-step-banner">
-              {step}
-            </div>
-          )}
+          {step ? <StatusBanner message={step} type="info" /> : null}
           <StatusBanner message={aiStatus.status} type={aiStatus.statusType} />
         </form>
       </Card>
@@ -1660,14 +2143,20 @@ interface CompareResult {
 
 function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { token, tokenMissing, mcpSessionId, setMcpSessionId } = usePlayground();
-  const [prompt, setPrompt] = React.useState('What are the leading Supreme Court cases about free speech in schools?');
+  const [prompt, setPrompt] = React.useState(
+    'What are the leading Supreme Court cases about free speech in schools?',
+  );
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
   const [aiToolName, setAiToolName] = React.useState('auto');
   const [running, setRunning] = React.useState(false);
   const [results, setResults] = React.useState<CompareResult[]>([]);
   const elapsed = useElapsedTimer(running);
   const cancelledRef = React.useRef(false);
-  React.useEffect(() => { return () => { cancelledRef.current = true; }; }, []);
+  React.useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
   React.useEffect(() => {
     if (aiToolName !== 'auto' && !tools.some((tool) => tool.name === aiToolName)) {
       setAiToolName('auto');
@@ -1748,26 +2237,44 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
   return (
     <div className="stack">
-      <Card title="Side-by-Side Comparison" subtitle="Send the same prompt with and without MCP tools to see the difference real-time legal data makes.">
-        <div className="row-tight compare-presets">
+      <Card
+        title="Side-by-Side Comparison"
+        subtitle="Send the same prompt with and without MCP tools to see the difference real-time legal data makes."
+      >
+        <InlineGroup gap="tight" className="compare-presets">
           {AI_PRESETS.slice(0, 4).map((p) => (
-            <Button key={p.label} variant="secondary" onClick={() => applyPreset(p)} className="btn-compact">
+            <Button key={p.label} variant="secondary" size="compact" onClick={() => applyPreset(p)}>
               {p.icon} {p.label}
             </Button>
           ))}
-        </div>
-        <form onSubmit={(e) => { e.preventDefault(); void runComparison(); }}>
+        </InlineGroup>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void runComparison();
+          }}
+        >
           <FormField id="compareToolName" label="MCP Tool (for MCP side)">
             <ToolSelect value={aiToolName} onChange={setAiToolName} includeAuto tools={tools} />
           </FormField>
           <FormField id="compareMode" label="Cost mode">
-            <select id="compareMode" value={aiMode} onChange={(e) => setAiMode(e.target.value as typeof aiMode)}>
+            <Select
+              id="compareMode"
+              value={aiMode}
+              onChange={(e) => setAiMode(e.target.value as typeof aiMode)}
+            >
               <option value="cheap">cheap (recommended)</option>
               <option value="balanced">balanced</option>
-            </select>
+            </Select>
           </FormField>
           <FormField id="comparePrompt" label="Prompt (sent to both)">
-            <textarea id="comparePrompt" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter a legal research question..." />
+            <Textarea
+              id="comparePrompt"
+              rows={3}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Enter a legal research question..."
+            />
           </FormField>
           <Button type="submit" disabled={running}>
             {running ? `Comparing... (${elapsed}s)` : '⚡ Run Comparison'}
@@ -1778,21 +2285,32 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       {results.length === 2 && (
         <div className="comparison-grid comparison-grid-wide">
           {results.map((r) => (
-            <div key={r.label} className={`comparison-card comparison-card-lg ${r.hasMcp ? 'comparison-card-mcp' : 'comparison-card-plain'}`.trim()}>
-              <div className="comparison-card-header comparison-card-header-lg">
-                <span className="comparison-icon comparison-icon-lg">{r.hasMcp ? '🔌' : '🧠'}</span>
-                <strong className="comparison-card-title comparison-card-title-lg">{r.label}</strong>
-                {r.hasMcp && <span className="comparison-pill comparison-pill-mcp">MCP</span>}
-              </div>
-              {r.tool && (
-                <div className="comparison-tool-meta comparison-tool-meta-lg">
-                  🔧 <strong>{r.tool}</strong>{r.toolReason ? ` — ${r.toolReason}` : ''}
-                </div>
-              )}
-              <div className="comparison-card-body">
-                {renderMarkdown(r.response)}
-              </div>
-            </div>
+            <ComparisonCard
+              key={r.label}
+              className={r.hasMcp ? undefined : ''}
+              size="large"
+              tone={r.hasMcp ? 'mcp' : 'default'}
+              icon={r.hasMcp ? '🔌' : '🧠'}
+              title={r.label}
+              badge={
+                r.hasMcp ? (
+                  <StatusPill tone="mcp" variant="solid">
+                    MCP
+                  </StatusPill>
+                ) : undefined
+              }
+              meta={
+                r.tool ? (
+                  <MetaNote size="large">
+                    <span aria-hidden="true">🔧</span>
+                    <strong>{r.tool}</strong>
+                    {r.toolReason ? <span className="meta-note-detail">{r.toolReason}</span> : null}
+                  </MetaNote>
+                ) : undefined
+              }
+            >
+              {renderMarkdown(r.response)}
+            </ComparisonCard>
           ))}
         </div>
       )}
@@ -1800,11 +2318,16 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       {results.length === 2 && (
         <Card title="What this shows">
           <p className="comparison-summary">
-            <strong>With MCP:</strong> The AI queried CourtListener&apos;s live database via the Model Context Protocol, retrieving real case data, citations, and metadata before generating its response.
+            <strong>With MCP:</strong> The AI queried CourtListener&apos;s live database via the
+            Model Context Protocol, retrieving real case data, citations, and metadata before
+            generating its response.
             <br />
-            <strong>Without MCP:</strong> The same AI model answered using only its training data — no live data access, no tool calls, no real-time verification.
-            <br /><br />
-            This demonstrates how MCP bridges AI models with authoritative legal data sources, producing responses grounded in real, up-to-date information.
+            <strong>Without MCP:</strong> The same AI model answered using only its training data —
+            no live data access, no tool calls, no real-time verification.
+            <br />
+            <br />
+            This demonstrates how MCP bridges AI models with authoritative legal data sources,
+            producing responses grounded in real, up-to-date information.
           </p>
         </Card>
       )}
@@ -1814,62 +2337,66 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
 // ─── Transcript Entry ────────────────────────────────────────────
 
-const ROLE_STYLES: Record<string, { icon: string; color: string }> = {
-  user: { icon: '🟢', color: 'var(--color-text)' },
-  assistant: { icon: '🤖', color: 'var(--color-primary, #3b82f6)' },
-  system: { icon: '⚙️', color: 'var(--color-muted, #888)' },
-  error: { icon: '🔴', color: 'var(--color-error, #ef4444)' },
+const ROLE_STYLES: Record<string, { icon: string }> = {
+  user: { icon: '🟢' },
+  assistant: { icon: '🤖' },
+  system: { icon: '⚙️' },
+  error: { icon: '🔴' },
 };
 
-const TranscriptEntry = React.memo(function TranscriptEntry({ item, onRetry }: { item: TranscriptItem; onRetry?: () => void }): React.JSX.Element {
-  const [copied, setCopied] = React.useState(false);
-  const style = ROLE_STYLES[item.role] || ROLE_STYLES.system!;
+const TranscriptEntry = React.memo(
+  function TranscriptEntry({
+    item,
+    onRetry,
+  }: {
+    item: TranscriptItem;
+    onRetry?: () => void;
+  }): React.JSX.Element {
+    const [copied, setCopied] = React.useState(false);
+    const style = ROLE_STYLES[item.role] || ROLE_STYLES.system!;
+    const roleClassName = ROLE_STYLES[item.role] ? item.role : 'system';
 
-  function copyText(): void {
-    void navigator.clipboard.writeText(item.text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
+    function copyText(): void {
+      void navigator.clipboard.writeText(item.text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    }
 
-  const isAssistant = item.role === 'assistant';
-  const isLongText = item.text.length > 200;
-  const bodyContent = React.useMemo(
-    () => (isAssistant && isLongText ? renderMarkdown(item.text) : item.text),
-    [isAssistant, isLongText, item.text],
-  );
+    const isAssistant = item.role === 'assistant';
+    const isLongText = item.text.length > 200;
+    const bodyContent = React.useMemo(
+      () => (isAssistant && isLongText ? renderMarkdown(item.text) : item.text),
+      [isAssistant, isLongText, item.text],
+    );
 
-  return (
-    <div className={`line ${item.role}`} style={{ borderLeft: `3px solid ${style.color}`, paddingLeft: '10px', marginBottom: '8px', position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-        <span>{style.icon}</span>
-        <strong style={{ color: style.color, fontSize: '0.8rem', textTransform: 'uppercase' }}>{item.role}</strong>
-        <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{item.at.split('T')[1]?.split('.')[0]}</span>
-        <button
-          type="button"
-          onClick={copyText}
-          title="Copy to clipboard"
-          style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', opacity: 0.6, padding: '2px 4px' }}
-        >
-          {copied ? '✓' : '📋'}
-        </button>
-        {item.role === 'error' && onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            title="Retry"
-            style={{ background: 'none', border: '1px solid var(--color-error)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', color: 'var(--color-error)', padding: '1px 6px' }}
+    return (
+      <div className={`line transcript-entry ${roleClassName}`.trim()}>
+        <InlineGroup gap="tight" className="transcript-entry-header">
+          <span>{style.icon}</span>
+          <strong className="transcript-entry-role">{item.role}</strong>
+          <span className="transcript-entry-time">{item.at.split('T')[1]?.split('.')[0]}</span>
+          <IconButton
+            chrome="inline"
+            className="transcript-entry-action"
+            onClick={copyText}
+            title="Copy to clipboard"
+            aria-label="Copy to clipboard"
           >
-            Retry
-          </button>
-        )}
+            {copied ? '✓' : '📋'}
+          </IconButton>
+          {item.role === 'error' && onRetry && (
+            <Button type="button" variant="danger" size="tiny" onClick={onRetry} title="Retry">
+              Retry
+            </Button>
+          )}
+        </InlineGroup>
+        <div className="transcript-entry-body">{bodyContent}</div>
       </div>
-      <div style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
-        {bodyContent}
-      </div>
-    </div>
-  );
-}, (previous, next) => previous.item === next.item && previous.onRetry === next.onRetry);
+    );
+  },
+  (previous, next) => previous.item === next.item && previous.onRetry === next.onRetry,
+);
 
 // ─── Protocol Inspector ─────────────────────────────────────────
 
@@ -1880,19 +2407,25 @@ function ProtocolInspector(): React.JSX.Element {
   if (protocolLog.length === 0) return <></>;
 
   return (
-    <Card title="Protocol Inspector" subtitle="Raw JSON-RPC messages exchanged with the MCP server.">
-      <div className="row">
+    <Card
+      title="Protocol Inspector"
+      subtitle="Raw JSON-RPC messages exchanged with the MCP server."
+    >
+      <InlineGroup>
         <Button variant="secondary" onClick={() => setExpanded(!expanded)}>
           {expanded ? 'Hide' : `Show ${protocolLog.length} messages`}
         </Button>
-        <Button variant="secondary" onClick={clearProtocol}>Clear</Button>
-      </div>
+        <Button variant="secondary" onClick={clearProtocol}>
+          Clear
+        </Button>
+      </InlineGroup>
       {expanded && (
         <div className="protocol-log">
           {protocolLog.map((entry, i) => (
             <div key={i} className={`protocol-entry ${entry.direction}`.trim()}>
               <div className={`protocol-entry-heading ${entry.direction}`.trim()}>
-                {entry.direction === 'request' ? '→ REQUEST' : '← RESPONSE'} <span className="protocol-entry-time">{entry.at.split('T')[1]?.split('.')[0]}</span>
+                {entry.direction === 'request' ? '→ REQUEST' : '← RESPONSE'}{' '}
+                <span className="protocol-entry-time">{entry.at.split('T')[1]?.split('.')[0]}</span>
               </div>
               <pre className="mono protocol-entry-payload">
                 {JSON.stringify(entry.payload, null, 2)}
@@ -1919,7 +2452,15 @@ export function PlaygroundPage(): React.JSX.Element {
 }
 
 function PlaygroundContent(): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, transcript, clearTranscript, lastRawMcp, protocolLog } = usePlayground();
+  const {
+    token,
+    tokenMissing,
+    mcpSessionId,
+    transcript,
+    clearTranscript,
+    lastRawMcp,
+    protocolLog,
+  } = usePlayground();
   const [searchParams] = useSearchParams();
   const deepLinkedJobId = searchParams.get('jobId')?.trim() ?? '';
   const [carriedStatus] = React.useState(() => consumeOperationalStatus());
@@ -1947,7 +2488,10 @@ function PlaygroundContent(): React.JSX.Element {
     raw: null,
   });
 
-  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, currentTab: PlaygroundTab): void {
+  function handleTabKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentTab: PlaygroundTab,
+  ): void {
     const currentIndex = tabOrder.indexOf(currentTab);
     if (currentIndex < 0) return;
     let nextTab: PlaygroundTab | null = null;
@@ -1975,12 +2519,15 @@ function PlaygroundContent(): React.JSX.Element {
     let cancelled = false;
     async function discoverTools(): Promise<void> {
       try {
-        const result = await mcpCall<unknown>({
-          method: 'tools/list',
-          params: {},
-          sessionId: mcpSessionId || undefined,
-          id: discoveryRpcIdRef.current++,
-        }, token);
+        const result = await mcpCall<unknown>(
+          {
+            method: 'tools/list',
+            params: {},
+            sessionId: mcpSessionId || undefined,
+            id: discoveryRpcIdRef.current++,
+          },
+          token,
+        );
         if (cancelled) return;
         const discovered = normalizeDiscoveredTools(result.body);
         setToolCatalog(discovered.length > 0 ? discovered : TOOL_CATALOG);
@@ -1990,7 +2537,9 @@ function PlaygroundContent(): React.JSX.Element {
     }
 
     void discoverTools();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [mcpSessionId, token, tokenMissing]);
 
   React.useEffect(() => {
@@ -2016,95 +2565,108 @@ function PlaygroundContent(): React.JSX.Element {
 
   return (
     <div className="stack">
-      <div className="row row-spacious">
-        <SessionBadge toolCount={toolCatalog.length} />
-        <Button variant="secondary" onClick={() => setShowCatalog(!showCatalog)} className="btn-tiny">
+      <InlineGroup gap="spacious">
+        <ConnectionBadge
+          connected={mcpSessionId.length > 0}
+          connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
+          disconnectedLabel="No session"
+          meta={`| ${toolCatalog.length} tools`}
+        />
+        <Button variant="secondary" size="tiny" onClick={() => setShowCatalog(!showCatalog)}>
           {showCatalog ? 'Hide' : 'Show'} Tool Catalog ({toolCatalog.length})
         </Button>
-      </div>
+      </InlineGroup>
 
       {showCatalog && <ToolCatalogPanel tools={toolCatalog} />}
 
       {carriedStatus?.message ? (
-        <Card title="Recovery status" subtitle="Recovery UX carries recent auth/playground errors across pages for guided follow-up.">
+        <Card
+          title="Recovery status"
+          subtitle="Recovery UX carries recent auth/playground errors across pages for guided follow-up."
+        >
           <StatusBanner message={carriedStatus.message} type={carriedStatus.type} />
-          <div className="row">
-            <Link to="/app/account" className="btn secondary">Review session status</Link>
-            <Link to="/app/control-center" className="text-link">Open control center</Link>
-          </div>
+          <InlineGroup>
+            <ButtonLink to="/app/session" variant="secondary">
+              Review session status
+            </ButtonLink>
+            <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
+          </InlineGroup>
         </Card>
       ) : null}
 
       {tokenMissing && (
-        <StatusBanner role="alert" message="No local MCP credential set. Open Operator Session to load one for direct probes." type="error" />
+        <StatusBanner
+          role="alert"
+          message="No local MCP credential set. Open Session to load one for direct probes."
+          type="error"
+        />
       )}
 
-      <Card title="Quick workflow" subtitle="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging.">
-        <div className="row">
-          <Link to="/app/account" className="btn secondary">1) Set token</Link>
-          <Button variant="secondary" onClick={() => setActiveTab('ai')}>2) AI Chat</Button>
-          <Button variant="secondary" onClick={() => setActiveTab('compare')}>3) Compare</Button>
-          <Button variant="secondary" onClick={() => setActiveTab('raw')}>4) Raw Console</Button>
-        </div>
+      <Card
+        title="Quick workflow"
+        subtitle="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging."
+      >
+        <InlineGroup>
+          <ButtonLink to="/app/session" variant="secondary">
+            1) Set token
+          </ButtonLink>
+          <Button variant="secondary" onClick={() => setActiveTab('ai')}>
+            2) AI Chat
+          </Button>
+          <Button variant="secondary" onClick={() => setActiveTab('compare')}>
+            3) Compare
+          </Button>
+          <Button variant="secondary" onClick={() => setActiveTab('raw')}>
+            4) Raw Console
+          </Button>
+        </InlineGroup>
       </Card>
 
-      <div className="tabs" role="tablist" aria-label="Playground mode" aria-orientation="horizontal">
-        <button
-          type="button"
+      <div
+        className="tabs"
+        role="tablist"
+        aria-label="Playground mode"
+        aria-orientation="horizontal"
+      >
+        <TabButton
           id={aiTabId}
           ref={(node) => {
             tabRefs.current.ai = node;
           }}
-          role="tab"
-          aria-selected={activeTab === 'ai'}
-          aria-controls={aiPanelId}
-          tabIndex={activeTab === 'ai' ? 0 : -1}
-          className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+          controls={aiPanelId}
+          selected={activeTab === 'ai'}
           onClick={() => setActiveTab('ai')}
           onKeyDown={(event) => handleTabKeyDown(event, 'ai')}
         >
           💬 AI Chat
-        </button>
-        <button
-          type="button"
+        </TabButton>
+        <TabButton
           id={compareTabId}
           ref={(node) => {
             tabRefs.current.compare = node;
           }}
-          role="tab"
-          aria-selected={activeTab === 'compare'}
-          aria-controls={comparePanelId}
-          tabIndex={activeTab === 'compare' ? 0 : -1}
-          className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
+          controls={comparePanelId}
+          selected={activeTab === 'compare'}
           onClick={() => setActiveTab('compare')}
           onKeyDown={(event) => handleTabKeyDown(event, 'compare')}
         >
           ⚡ Compare
-        </button>
-        <button
-          type="button"
+        </TabButton>
+        <TabButton
           id={rawTabId}
           ref={(node) => {
             tabRefs.current.raw = node;
           }}
-          role="tab"
-          aria-selected={activeTab === 'raw'}
-          aria-controls={rawPanelId}
-          tabIndex={activeTab === 'raw' ? 0 : -1}
-          className={`tab-btn ${activeTab === 'raw' ? 'active' : ''}`}
+          controls={rawPanelId}
+          selected={activeTab === 'raw'}
           onClick={() => setActiveTab('raw')}
           onKeyDown={(event) => handleTabKeyDown(event, 'raw')}
         >
           🔧 Raw MCP Console
-        </button>
+        </TabButton>
       </div>
 
-      <div
-        id={aiPanelId}
-        role="tabpanel"
-        aria-labelledby={aiTabId}
-        hidden={activeTab !== 'ai'}
-      >
+      <div id={aiPanelId} role="tabpanel" aria-labelledby={aiTabId} hidden={activeTab !== 'ai'}>
         {activeTab === 'ai' && <AiChatPanel tools={toolCatalog} />}
       </div>
 
@@ -2117,12 +2679,7 @@ function PlaygroundContent(): React.JSX.Element {
         {activeTab === 'compare' && <ComparePanel tools={toolCatalog} />}
       </div>
 
-      <div
-        id={rawPanelId}
-        role="tabpanel"
-        aria-labelledby={rawTabId}
-        hidden={activeTab !== 'raw'}
-      >
+      <div id={rawPanelId} role="tabpanel" aria-labelledby={rawTabId} hidden={activeTab !== 'raw'}>
         {activeTab === 'raw' && <RawMcpPanel tools={toolCatalog} />}
       </div>
 
@@ -2130,25 +2687,34 @@ function PlaygroundContent(): React.JSX.Element {
       {activeTab === 'raw' && (
         <Card title="Transcript">
           <div className="transcript mono" ref={transcriptRef}>
-            {transcript.length === 0 ? <p className="empty-state"><span className="empty-icon">📋</span><br />No messages yet. Connect and call a tool above.</p> : null}
+            {transcript.length === 0 ? (
+              <EmptyState icon="📋" message="No messages yet. Connect and call a tool above." />
+            ) : null}
             {transcript.map((item, i) => (
               <TranscriptEntry key={`${item.at}-${i}`} item={item} />
             ))}
           </div>
-          <div className="row">
-            <Button variant="secondary" onClick={clearTranscript}>Clear transcript</Button>
+          <InlineGroup>
+            <Button variant="secondary" onClick={clearTranscript}>
+              Clear transcript
+            </Button>
             {transcript.length > 0 && (
-              <Button variant="secondary" onClick={handleExport}>Export JSON</Button>
+              <Button variant="secondary" onClick={handleExport}>
+                Export JSON
+              </Button>
             )}
-          </div>
+          </InlineGroup>
         </Card>
       )}
 
       {activeTab === 'raw' && protocolLog.length > 0 && <ProtocolInspector />}
 
       {activeTab === 'ai' && lastRawMcp ? (
-        <Card title="Raw MCP Response" subtitle="Debug: what the MCP tool returned before AI processing.">
-          <pre className="raw-response mono">{lastRawMcp}</pre>
+        <Card
+          title="Raw MCP Response"
+          subtitle="Debug: what the MCP tool returned before AI processing."
+        >
+          <CodeSurface code={lastRawMcp} className="mono" />
         </Card>
       ) : null}
     </div>

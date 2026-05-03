@@ -1,14 +1,40 @@
 import React from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useToken } from '../lib/token-context';
-import { Button, Stepper } from './ui';
+import { buildHostedAuthStartHref } from '../lib/hosted-auth';
+import {
+  BadgeLink,
+  Button,
+  ButtonLink,
+  Eyebrow,
+  InlineGroup,
+  LoadingState,
+  NavCardLink,
+  Panel,
+  PillButton,
+  PillLink,
+  SkipLink,
+  StatusBanner,
+  TextLink,
+} from './ui';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useSessionHeartbeat } from '../hooks/useSessionHeartbeat';
 import { useToast } from './Toast';
+import { WORKSPACE_DOCS_URL, WORKSPACE_NAV_GROUPS, getWorkspaceMeta } from '../lib/workspace-shell';
 
-export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: string; complete: boolean; active?: boolean; to?: string; disabled?: boolean }> }>): React.JSX.Element {
+export function Shell(
+  props: React.PropsWithChildren<{
+    steps?: Array<{
+      label: string;
+      complete: boolean;
+      active?: boolean;
+      to?: string;
+      disabled?: boolean;
+    }>;
+  }>,
+): React.JSX.Element {
   const { session, loading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,22 +47,8 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
   const authed = Boolean(session?.authenticated);
   const hasLocalToken = Boolean(token.trim());
   const { toast } = useToast();
-  const navGroups: Array<{ label: string; items: Array<{ label: string; to: string; requiresAuth?: boolean }> }> = [
-    {
-      label: 'Operations',
-      items: [{ label: 'Operator Console', to: '/app/control-center' }],
-    },
-    {
-      label: 'Runtime',
-      items: [
-        { label: 'MCP Playground', to: '/app/playground' },
-      ],
-    },
-    {
-      label: 'Diagnostics',
-      items: [{ label: 'Operator Session', to: '/app/account' }],
-    },
-  ];
+  const authStartHref = buildHostedAuthStartHref();
+  const currentWorkspace = getWorkspaceMeta(location.pathname);
 
   useSessionHeartbeat(5 * 60 * 1000, {
     enabled: authed,
@@ -57,17 +69,19 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
 
   return (
     <div className="app-shell">
-      <a href="#main-content" className="skip-link">Skip to content</a>
+      <SkipLink href="#main-content">Skip to content</SkipLink>
       {!online && (
-        <div className="network-banner" role="status" aria-live="polite">
-          You're offline — changes may not save.
-        </div>
+        <StatusBanner message="You're offline — changes may not save." type="warn" />
       )}
       {!loading && !authed && hasLocalToken ? (
-        <div className="status info" role="status" aria-live="polite">
-          <strong>Session recovery:</strong> A local MCP credential is stored, but this browser session is signed out.
-          <div className="row status-actions">
-            <Link to="/app/account" className="btn secondary">Review session status</Link>
+        <StatusBanner
+          title="Session recovery:"
+          message="A local MCP credential is stored, but this browser session is signed out."
+        >
+          <InlineGroup>
+            <ButtonLink to="/app/account" variant="secondary">
+              Review session status
+            </ButtonLink>
             <Button
               variant="secondary"
               onClick={() => {
@@ -77,50 +91,14 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
             >
               Clear local credential
             </Button>
-          </div>
-        </div>
+          </InlineGroup>
+        </StatusBanner>
       ) : null}
-      <header className="topbar">
-        <Link to="/app/control-center" className="brand">
-          CourtListener MCP
-          <small>Operator Console</small>
-        </Link>
-        <nav className="top-actions" aria-label="Global navigation">
-          <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${scheme === 'light' ? 'dark' : 'light'} mode`}>
-            {scheme === 'light' ? '🌙' : '☀️'}
-          </button>
-          {!loading && authed ? (
-            <>
-              <NavLink to="/app/account" className="pill primary">
-                Operator Session
-              </NavLink>
-              <span className={`token-badge ${hasLocalToken ? 'set' : 'unset'}`}>
-                {hasLocalToken ? '🔑 Local credential set' : '🔑 No local credential'}
-              </span>
-              <button
-                type="button"
-                id="logoutBtn"
-                className="pill"
-                onClick={async () => {
-                  try {
-                    await logout();
-                    clear();
-                    navigate('/app/control-center');
-                  } catch {
-                    toast('Logout failed — session is still active.', 'error');
-                  }
-                }}
-              >
-                Log out
-              </button>
-            </>
-          ) : null}
-        </nav>
-      </header>
 
       <div className="main-layout">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="compact"
           className="mobile-menu-btn"
           onClick={() => setSidebarOpen((v) => !v)}
           aria-label="Toggle navigation menu"
@@ -128,44 +106,115 @@ export function Shell(props: React.PropsWithChildren<{ steps: Array<{ label: str
           aria-controls="primary-navigation"
         >
           ☰ Menu
-        </button>
+        </Button>
         <aside id="primary-navigation" className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <h1>Operator Console</h1>
-          <Stepper steps={props.steps} />
+          <Link to="/app" className="brand">
+            CourtListener MCP
+            <small>Legal-agent console</small>
+          </Link>
+          <p className="sidebar-intro">
+            Install MCP, connect clients, test tools, and inspect research runs.
+          </p>
           <div className="menu">
-            {navGroups.map((group) => (
+            {WORKSPACE_NAV_GROUPS.map((group) => (
               <div key={group.label} className="menu-group">
                 <p className="menu-group-label">{group.label}</p>
                 {group.items.map((item) => {
-                  const disabled = Boolean(item.requiresAuth && !authed);
+                  if (item.external) {
+                    return (
+                      <NavCardLink
+                        key={item.to}
+                        href={item.to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {item.label}
+                      </NavCardLink>
+                    );
+                  }
                   return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) => `${isActive ? 'active' : ''} ${disabled ? 'disabled' : ''}`.trim()}
-                      {...(disabled
-                        ? { 'aria-disabled': 'true', tabIndex: -1, onClick: (e: React.MouseEvent) => e.preventDefault() }
-                        : {})}
-                    >
+                    <NavCardLink key={item.to} to={item.to}>
                       {item.label}
-                    </NavLink>
+                    </NavCardLink>
                   );
                 })}
               </div>
             ))}
           </div>
-          {authed ? (
-            <div className="sidebar-shortcuts">
-              <Link to="/app/playground" className="btn secondary">Open MCP Playground</Link>
-              <Link to="/app/account" className="btn">Open Operator Session</Link>
-            </div>
-          ) : null}
+          <div className="sidebar-meta">
+            <Panel tone="inverse">
+              <Eyebrow>Current Workspace</Eyebrow>
+              <strong>{currentWorkspace.label}</strong>
+              <p>{currentWorkspace.description}</p>
+            </Panel>
+            <Panel tone="inverse">
+              <Eyebrow>User Profile</Eyebrow>
+              <strong>{authed ? 'Research operator' : 'Guest operator'}</strong>
+              <p>{session?.user?.id ?? 'Sign in to persist session context.'}</p>
+            </Panel>
+          </div>
         </aside>
-        <main id="main-content" ref={mainRef} tabIndex={-1} className="content">{props.children}</main>
+        <div className="shell-main-column">
+          <header className="topbar">
+            <div className="topbar-heading">
+              <Eyebrow>Current page</Eyebrow>
+              <strong className="workspace-topbar-title">{currentWorkspace.label}</strong>
+            </div>
+            <nav aria-label="Global navigation">
+              <InlineGroup className="top-actions">
+                <PillLink to="/app/session" primary={authed}>
+                  Session: {loading ? 'Checking' : authed ? 'Active' : 'Sign in'}
+                </PillLink>
+                <BadgeLink to="/app/credentials" tone={hasLocalToken ? 'ok' : 'neutral'}>
+                  Browser credential: {hasLocalToken ? 'Loaded' : 'Not Loaded'}
+                </BadgeLink>
+                <PillLink href={WORKSPACE_DOCS_URL} target="_blank" rel="noopener noreferrer">
+                  Docs
+                </PillLink>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  className="theme-toggle"
+                  onClick={toggleTheme}
+                  aria-label={`Switch to ${scheme === 'light' ? 'dark' : 'light'} mode`}
+                >
+                  Theme: {scheme === 'light' ? 'Dark' : 'Light'}
+                </Button>
+                {!loading && authed ? (
+                  <PillButton
+                    id="logoutBtn"
+                    onClick={async () => {
+                      try {
+                        await logout();
+                        clear();
+                        navigate('/app');
+                      } catch {
+                        toast('Logout failed — session is still active.', 'error');
+                      }
+                    }}
+                  >
+                    Log out
+                  </PillButton>
+                ) : (
+                  <PillLink href={authStartHref} primary>
+                    Sign in
+                  </PillLink>
+                )}
+              </InlineGroup>
+            </nav>
+          </header>
+          <main id="main-content" ref={mainRef} tabIndex={-1} className="content">
+            {props.children}
+          </main>
+        </div>
       </div>
 
       <footer>
-        Operator console for MCP diagnostics. Public sign-in flows through the separate auth portal handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> | <a href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">CourtListener</a>
+        Legal-agent workspace for CourtListener MCP. Public sign-in flows through the separate auth
+        portal handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> |{' '}
+        <TextLink href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">
+          CourtListener
+        </TextLink>
       </footer>
     </div>
   );
@@ -182,12 +231,7 @@ export function AuthRequired(props: React.PropsWithChildren): React.JSX.Element 
   }, [loading, navigate, session?.authenticated]);
 
   if (loading || !session?.authenticated) {
-    return (
-      <div className="loading" role="status" aria-busy="true" aria-label="Loading">
-        <div className="skeleton skeleton-line"></div>
-        <div className="skeleton skeleton-line short"></div>
-      </div>
-    );
+    return <LoadingState label="Loading" />;
   }
 
   return <>{props.children}</>;

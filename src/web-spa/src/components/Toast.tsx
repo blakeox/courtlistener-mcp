@@ -1,16 +1,12 @@
 import React from 'react';
+import { IconButton } from './ui';
+import { ToastContext } from './toast-context';
 
 interface ToastItem {
   id: number;
   message: string;
   type: 'ok' | 'error' | 'info';
 }
-
-interface ToastContextValue {
-  toast: (message: string, type?: 'ok' | 'error' | 'info') => void;
-}
-
-const ToastContext = React.createContext<ToastContextValue | null>(null);
 
 let nextId = 1;
 
@@ -44,25 +40,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
         {items.map((item) => (
           <div key={item.id} className={`toast toast-${item.type}`}>
             <span>{item.message}</span>
-            <button
-              type="button"
+            <IconButton
+              chrome="inline"
               className="toast-dismiss"
               onClick={() => setItems((prev) => prev.filter((t) => t.id !== item.id))}
               aria-label="Dismiss notification"
             >
               ✕
-            </button>
+            </IconButton>
           </div>
         ))}
       </div>
     </ToastContext.Provider>
   );
 }
-
-export function useToast(): ToastContextValue {
-  const value = React.useContext(ToastContext);
-  if (!value) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return value;
-}
+export { useToast } from './toast-context';

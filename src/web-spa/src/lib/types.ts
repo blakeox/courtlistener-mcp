@@ -4,31 +4,6 @@ export interface AuthSessionResponse {
   turnstile_site_key?: string;
 }
 
-export interface ApiKeyRecord {
-  id: string;
-  label: string;
-  is_active: boolean;
-  revoked_at: string | null;
-  expires_at: string | null;
-  created_at: string;
-}
-
-export interface ApiKeysListResponse {
-  user_id: string;
-  keys: ApiKeyRecord[];
-}
-
-export interface ApiKeyCreateResponse {
-  message?: string;
-  api_key?: {
-    id: string;
-    label: string;
-    created_at: string;
-    expires_at: string | null;
-    token: string;
-  };
-}
-
 export interface ApiError {
   status: number;
   error?: string;

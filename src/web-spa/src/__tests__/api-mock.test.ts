@@ -19,27 +19,6 @@ describe('api-mock', () => {
     expect(session.authenticated).toBe(false);
   });
 
-  it('createKey adds key to list', async () => {
-    const mock = await import('../lib/api-mock');
-    const result = await mock.createKey({ label: 'test-key', expiresDays: 30 });
-    expect(result.api_key).toBeDefined();
-    expect(result.api_key?.token).toBeTruthy();
-    const keys = await mock.listKeys();
-    expect(keys.keys.length).toBeGreaterThanOrEqual(1);
-    expect(keys.keys.some((k) => k.label === 'test-key')).toBe(true);
-  });
-
-  it('revokeKey marks key as inactive', async () => {
-    const mock = await import('../lib/api-mock');
-    const created = await mock.createKey({ label: 'revoke-me', expiresDays: 7 });
-    const keyId = created.api_key!.id;
-    await mock.revokeKey(keyId);
-    const keys = await mock.listKeys();
-    const revoked = keys.keys.find((k) => k.id === keyId);
-    expect(revoked?.is_active).toBe(false);
-    expect(revoked?.revoked_at).toBeTruthy();
-  });
-
   it('does not export removed browser-form auth helpers', async () => {
     const mock = await import('../lib/api-mock');
     expect('login' in mock).toBe(false);
@@ -47,6 +26,9 @@ describe('api-mock', () => {
     expect('signup' in mock).toBe(false);
     expect('requestPasswordReset' in mock).toBe(false);
     expect('resetPassword' in mock).toBe(false);
+    expect('listKeys' in mock).toBe(false);
+    expect('createKey' in mock).toBe(false);
+    expect('revokeKey' in mock).toBe(false);
   });
 
   it('mcpCall returns mock response', async () => {

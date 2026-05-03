@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button, ButtonLink, Card, InlineGroup, StatusBanner } from './ui';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -29,28 +30,25 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     return (
-      <div className="stack error-boundary-shell">
-        <section className="ui-card">
-          <h2>Something went wrong</h2>
-          <p className="muted">
-            An unexpected error occurred. You can try again or return to the control center.
-          </p>
-          <div className="status error" role="alert">
-            {this.state.error?.message || 'An unknown error occurred.'}
-          </div>
-          <div className="row error-boundary-actions">
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => this.setState({ hasError: false, error: null })}
-            >
+      <div className="stack">
+        <Card
+          title="Something went wrong"
+          subtitle="An unexpected error occurred. You can try again or return to the workspace home."
+        >
+          <StatusBanner
+            role="alert"
+            message={this.state.error?.message || 'An unknown error occurred.'}
+            type="error"
+          />
+          <InlineGroup>
+            <Button onClick={() => this.setState({ hasError: false, error: null })}>
               Try again
-            </button>
-            <a href="/app/control-center" className="btn secondary">
-              Go to Control Center
-            </a>
-          </div>
-        </section>
+            </Button>
+            <ButtonLink href="/app" variant="secondary">
+              Go to Workspace Home
+            </ButtonLink>
+          </InlineGroup>
+        </Card>
       </div>
     );
   }

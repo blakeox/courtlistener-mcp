@@ -117,10 +117,10 @@ describe('App auth routing', () => {
     });
   });
 
-  it('redirects /app/keys to the operator session page', async () => {
+  it('redirects /app/keys to the credentials page', async () => {
     renderApp('/app/keys');
     expect(
-      await screen.findByRole('heading', { name: 'Operator Session', level: 2 }),
+      await screen.findByRole('heading', { name: 'Credentials & Providers', level: 2 }),
     ).toBeInTheDocument();
   });
 
@@ -136,13 +136,17 @@ describe('App auth routing', () => {
       'href',
       '/app/account',
     );
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
     expect(screen.queryByText(/operator console/i)).not.toBeInTheDocument();
   });
 
   it('redirects /account to the operator session route', async () => {
     renderApp('/account');
     expect(
-      await screen.findByRole('heading', { name: 'Operator Session', level: 2 }),
+      await screen.findByRole('heading', { name: 'Session', level: 2 }),
     ).toBeInTheDocument();
   });
 
@@ -160,7 +164,7 @@ describe('App auth routing', () => {
     renderApp('/app/control-center');
 
     expect(
-      await screen.findByRole('heading', { name: 'Sign in to continue', level: 2 }),
+      await screen.findByRole('heading', { name: /Agent Workspace/i, level: 2 }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
@@ -184,15 +188,15 @@ describe('App auth routing', () => {
 
     expect(await screen.findByLabelText('Loading page')).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Operator Session', level: 2 }),
+      screen.queryByRole('heading', { name: 'Session', level: 2 }),
     ).not.toBeInTheDocument();
   });
 
-  it('sends authenticated unknown routes to /app/account before diagnostics', async () => {
+  it('sends authenticated unknown routes to /app/session before diagnostics', async () => {
     renderApp('/app/unknown');
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'Operator Session', level: 2 }),
+        screen.getByRole('heading', { name: 'Session', level: 2 }),
       ).toBeInTheDocument();
     });
   });

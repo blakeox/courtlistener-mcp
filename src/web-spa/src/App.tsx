@@ -9,19 +9,13 @@ import { PlaygroundPage } from './pages/PlaygroundPage';
 import { AccountPage } from './pages/AccountPage';
 import { HostedAuthRedirectPage } from './pages/HostedAuthRedirectPage';
 import { LandingPage } from './pages/LandingPage';
+import { WorkspaceDashboardPage } from './pages/WorkspaceDashboardPage';
+import { WorkspaceSectionPage } from './pages/WorkspaceSectionPage';
 import { useAuth } from './lib/auth';
 import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
 import { verifyMcpRuntimeReadiness } from './lib/mcp-runtime-readiness';
-
-function PageLoader(): React.JSX.Element {
-  return (
-    <div className="loading" role="status" aria-busy="true" aria-label="Loading page">
-      <div className="skeleton skeleton-line"></div>
-      <div className="skeleton skeleton-line short"></div>
-    </div>
-  );
-}
+import { LoadingState } from './components/ui';
 
 export function App(): React.JSX.Element {
   return (
@@ -53,32 +47,9 @@ function AppContent(): React.JSX.Element {
     mcpReadinessQuery.data.protocolVersion !== expectedProtocolVersion,
   );
   const hasMcpSuccess = Boolean(mcpReadinessQuery.data?.ready) && !hasProtocolMismatch;
-  const isPath = (paths: string[]): boolean => paths.includes(location.pathname);
-
-  const steps = [
-    {
-      label: 'Operator session',
-      complete: hasVerifiedAndLoggedIn,
-      active: isPath(['/app/account']),
-      to: '/app/account',
-    },
-    {
-      label: 'Local MCP credential loaded',
-      complete: hasToken,
-      active: isPath(['/app/control-center']),
-      to: '/app/control-center',
-    },
-    {
-      label: 'Runtime ready',
-      complete: hasMcpSuccess,
-      active: isPath(['/app/playground', '/app/control-center', '/app']),
-      to: '/app/playground',
-      disabled: !hasToken,
-    },
-  ];
   const smartRedirectElement =
     sessionLoading || !sessionReady ? (
-      <PageLoader />
+      <LoadingState label="Loading page" />
     ) : (
       <SmartRedirect
         hasVerifiedAndLoggedIn={hasVerifiedAndLoggedIn}
@@ -91,11 +62,25 @@ function AppContent(): React.JSX.Element {
   if (!isAppRoute) {
     return (
       <ErrorBoundary>
-        <React.Suspense fallback={<PageLoader />}>
+        <React.Suspense fallback={<LoadingState label="Loading page" />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/get-started" element={<LandingPage initialSectionId="setup" />} />
-            <Route path="/account" element={<Navigate to="/app/account" replace />} />
+            <Route path="/account" element={<Navigate to="/app/session" replace />} />
+            <Route path="/download" element={<Navigate to="/app/download" replace />} />
+            <Route path="/connect" element={<Navigate to="/app/connect" replace />} />
+            <Route path="/playground" element={<Navigate to="/app/playground" replace />} />
+            <Route path="/tools" element={<Navigate to="/app/tools" replace />} />
+            <Route path="/workflows" element={<Navigate to="/app/workflows" replace />} />
+            <Route path="/sessions" element={<Navigate to="/app/sessions" replace />} />
+            <Route path="/review" element={<Navigate to="/app/review" replace />} />
+            <Route path="/observability" element={<Navigate to="/app/observability" replace />} />
+            <Route path="/usage" element={<Navigate to="/app/usage" replace />} />
+            <Route path="/diagnostics" element={<Navigate to="/app/diagnostics" replace />} />
+            <Route path="/readiness" element={<Navigate to="/app/readiness" replace />} />
+            <Route path="/credentials" element={<Navigate to="/app/credentials" replace />} />
+            <Route path="/session" element={<Navigate to="/app/session" replace />} />
+            <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </React.Suspense>
@@ -104,19 +89,44 @@ function AppContent(): React.JSX.Element {
   }
 
   return (
-    <Shell steps={steps}>
+    <Shell>
       <ErrorBoundary>
-        <React.Suspense fallback={<PageLoader />}>
+        <React.Suspense fallback={<LoadingState label="Loading page" />}>
           <Routes>
-            <Route path="/app" element={<Navigate to="/app/control-center" replace />} />
-            <Route path="/app/control-center" element={<OnboardingPage />} />
+            <Route path="/app" element={<WorkspaceDashboardPage />} />
+            <Route path="/app/control-center" element={<WorkspaceDashboardPage />} />
             <Route path="/app/signup" element={<HostedAuthRedirectPage />} />
             <Route path="/app/login" element={<HostedAuthRedirectPage />} />
             <Route path="/app/reset-password" element={<HostedAuthRedirectPage />} />
-            <Route path="/app/onboarding" element={<Navigate to="/app/control-center" replace />} />
-            <Route path="/app/keys" element={<Navigate to="/app/account" replace />} />
+            <Route path="/app/onboarding" element={<Navigate to="/app" replace />} />
+            <Route path="/app/download" element={<WorkspaceSectionPage sectionKey="download" />} />
+            <Route path="/app/connect" element={<WorkspaceSectionPage sectionKey="connect" />} />
             <Route path="/app/playground" element={<PlaygroundPage />} />
+            <Route path="/app/sessions" element={<WorkspaceSectionPage sectionKey="sessions" />} />
+            <Route
+              path="/app/workflows"
+              element={<WorkspaceSectionPage sectionKey="workflows" />}
+            />
+            <Route path="/app/tools" element={<WorkspaceSectionPage sectionKey="tools" />} />
+            <Route path="/app/review" element={<WorkspaceSectionPage sectionKey="review" />} />
+            <Route path="/app/usage" element={<WorkspaceSectionPage sectionKey="usage" />} />
+            <Route
+              path="/app/observability"
+              element={<WorkspaceSectionPage sectionKey="observability" />}
+            />
+            <Route path="/app/diagnostics" element={<OnboardingPage />} />
+            <Route
+              path="/app/readiness"
+              element={<WorkspaceSectionPage sectionKey="readiness" />}
+            />
+            <Route
+              path="/app/credentials"
+              element={<WorkspaceSectionPage sectionKey="credentials" />}
+            />
+            <Route path="/app/session" element={<AccountPage />} />
             <Route path="/app/account" element={<AccountPage />} />
+            <Route path="/app/keys" element={<Navigate to="/app/credentials" replace />} />
+            <Route path="/app/docs" element={<WorkspaceSectionPage sectionKey="docs" />} />
             <Route path="*" element={smartRedirectElement} />
           </Routes>
         </React.Suspense>
@@ -131,10 +141,10 @@ function SmartRedirect(props: {
   hasMcpSuccess: boolean;
   hasProtocolMismatch: boolean;
 }): React.JSX.Element {
-  let target = '/app/control-center';
-  if (props.hasMcpSuccess) target = '/app/control-center';
+  let target = '/app';
+  if (props.hasMcpSuccess) target = '/app';
   else if (props.hasProtocolMismatch) target = '/app/control-center';
   else if (props.hasToken) target = '/app/playground';
-  else if (props.hasVerifiedAndLoggedIn) target = '/app/account';
+  else if (props.hasVerifiedAndLoggedIn) target = '/app/session';
   return <Navigate to={target} replace />;
 }

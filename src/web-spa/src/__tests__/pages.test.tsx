@@ -129,10 +129,10 @@ describe('OnboardingPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders control center card', async () => {
+  it('renders runtime diagnostics card', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Operator Console')).toBeInTheDocument();
+    expect(screen.getByText('Runtime Diagnostics')).toBeInTheDocument();
   });
 
   it('shows auth status', async () => {
@@ -264,9 +264,9 @@ describe('OnboardingPage', () => {
       '/auth/start?return_to=%2Fapp%2Faccount',
     );
     expect(screen.getByRole('button', { name: /clear local credential/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open account page/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /open session page/i })).toHaveAttribute(
       'href',
-      '/app/account',
+      '/app/session',
     );
     expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
   });
@@ -361,11 +361,29 @@ describe('LandingPage', () => {
         /secure, structured access to u\.s\. federal court data via the model context protocol/i,
       ),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
+      'href',
+      '/auth/start?return_to=%2Fapp%2Faccount',
+    );
     expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute(
       'href',
       '/get-started',
     );
     expect(screen.getByText(/search opinions/i)).toBeInTheDocument();
+  });
+
+  it('switches setup guidance through the shared landing tabs', async () => {
+    const { LandingPage } = await import('../pages/LandingPage');
+    render(<LandingPage />, { wrapper: Wrapper });
+
+    const tablist = screen.getByRole('tablist', { name: /supported mcp clients/i });
+    expect(tablist).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: /claude desktop/i })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('tab', { name: /cursor/i }));
+
+    expect(screen.getByRole('tabpanel', { name: /cursor/i })).toBeVisible();
+    expect(screen.getByText(/wire the server into cursor/i)).toBeInTheDocument();
   });
 });
 
@@ -380,7 +398,7 @@ describe('AccountPage', () => {
   it('renders account heading', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Operator Session')).toBeInTheDocument();
+    expect(screen.getByText('Session')).toBeInTheDocument();
   });
 
   it('shows session info area', async () => {
@@ -516,27 +534,6 @@ describe('AccountPage', () => {
       expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBe('account-token');
       expect(screen.getByText('Logout failed — session is still active.')).toBeInTheDocument();
     });
-  });
-});
-
-describe('KeysPage', () => {
-  beforeEach(() => {
-    stubBrowserStorage();
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('renders "Local MCP credential" heading', async () => {
-    const { KeysPage } = await import('../pages/KeysPage');
-    render(<KeysPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Local MCP credential')).toBeInTheDocument();
-  });
-
-  it('shows create key button', async () => {
-    const { KeysPage } = await import('../pages/KeysPage');
-    render(<KeysPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('button', { name: /create key/i })).toBeInTheDocument();
   });
 });
 

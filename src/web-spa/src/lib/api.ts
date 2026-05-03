@@ -1,11 +1,5 @@
 import { z } from 'zod';
-import type {
-  ApiError,
-  ApiKeyCreateResponse,
-  ApiKeysListResponse,
-  AuthSessionResponse,
-  UsageSnapshotResponse,
-} from './types';
+import type { ApiError, AuthSessionResponse, UsageSnapshotResponse } from './types';
 
 export const sessionSchema = z.object({
   authenticated: z.boolean(),
@@ -15,33 +9,6 @@ export const sessionSchema = z.object({
     })
     .nullable(),
   turnstile_site_key: z.string().optional(),
-});
-
-const keysSchema = z.object({
-  user_id: z.string(),
-  keys: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string().default(''),
-      is_active: z.boolean(),
-      revoked_at: z.string().nullable().optional().default(null),
-      expires_at: z.string().nullable().optional().default(null),
-      created_at: z.string(),
-    }),
-  ),
-});
-
-const keyCreateSchema = z.object({
-  message: z.string().optional(),
-  api_key: z
-    .object({
-      id: z.string(),
-      label: z.string(),
-      created_at: z.string(),
-      expires_at: z.string().nullable(),
-      token: z.string(),
-    })
-    .optional(),
 });
 
 const aiChatSchema = z.object({
@@ -147,33 +114,6 @@ export async function getUsage(): Promise<UsageSnapshotResponse> {
 
 export async function logout(): Promise<void> {
   await request('/api/logout', { method: 'POST' });
-}
-
-export async function listKeys(token?: string): Promise<ApiKeysListResponse> {
-  const payload = await request<unknown>('/api/keys', {
-    headers: withAuth({}, token),
-  });
-  return keysSchema.parse(payload);
-}
-
-export async function createKey(
-  args: { label: string; expiresDays: number },
-  token?: string,
-): Promise<ApiKeyCreateResponse> {
-  const payload = await request<unknown>('/api/keys', {
-    method: 'POST',
-    headers: withAuth({ 'content-type': 'application/json' }, token),
-    body: JSON.stringify(args),
-  });
-  return keyCreateSchema.parse(payload);
-}
-
-export async function revokeKey(keyId: string, token?: string): Promise<void> {
-  await request('/api/keys/revoke', {
-    method: 'POST',
-    headers: withAuth({ 'content-type': 'application/json' }, token),
-    body: JSON.stringify({ keyId }),
-  });
 }
 
 export async function mcpCall<T>(

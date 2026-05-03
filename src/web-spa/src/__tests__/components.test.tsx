@@ -1,7 +1,44 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { Badge, Card, Button, StatusBanner, FormField, Input, Stepper, formatDate } from '../components/ui';
+import { ToastProvider } from '../components/Toast';
+import {
+  Badge,
+  BadgeLink,
+  Card,
+  Button,
+  ButtonLink,
+  CodeSurface,
+  Checkbox,
+  CheckboxField,
+  ComparisonCard,
+  ConnectionBadge,
+  DefinitionList,
+  EmptyState,
+  Eyebrow,
+  FeatureCard,
+  IconButton,
+  InlineGroup,
+  LoadingState,
+  NavCardLink,
+  Panel,
+  SectionHeading,
+  PillLink,
+  SkipLink,
+  StatCard,
+  StatusPill,
+  StatusBanner,
+  FormField,
+  Input,
+  MetricCard,
+  MetaNote,
+  Select,
+  Stepper,
+  TabButton,
+  Textarea,
+  TextLink,
+  formatDate,
+} from '../components/ui';
 
 describe('Card', () => {
   it('renders children', () => {
@@ -10,7 +47,11 @@ describe('Card', () => {
   });
 
   it('renders title and subtitle', () => {
-    render(<Card title="My Title" subtitle="Sub">Content</Card>);
+    render(
+      <Card title="My Title" subtitle="Sub">
+        Content
+      </Card>,
+    );
     expect(screen.getByText('My Title')).toBeInTheDocument();
     expect(screen.getByText('Sub')).toBeInTheDocument();
   });
@@ -20,10 +61,173 @@ describe('Card', () => {
     expect(container.querySelector('section.ui-card')).toBeInTheDocument();
   });
 
+  it('supports shared tone variants', () => {
+    const { container } = render(<Card tone="spotlight">Highlight</Card>);
+    expect(container.querySelector('section.ui-card.card-spotlight')).toBeInTheDocument();
+  });
+
   it('omits title and subtitle when not provided', () => {
     const { container } = render(<Card>Content</Card>);
     expect(container.querySelector('h2')).toBeNull();
     expect(container.querySelector('.muted')).toBeNull();
+  });
+});
+
+describe('Panel', () => {
+  it('renders shared inset panel styling with tone variants', () => {
+    const { rerender } = render(<Panel>Info</Panel>);
+    expect(screen.getByText('Info')).toHaveClass('panel-card');
+    rerender(<Panel tone="inverse">Dark</Panel>);
+    expect(screen.getByText('Dark')).toHaveClass('panel-card', 'inverse');
+  });
+});
+
+describe('SectionHeading', () => {
+  it('renders the shared eyebrow/title/description shell with optional trailing content', () => {
+    render(
+      <SectionHeading
+        eyebrow="Capabilities"
+        eyebrowClassName="landing-section-label"
+        title="Powerful legal data tools"
+        description="Structured legal research for AI workflows."
+        className="landing-section-heading"
+      >
+        <ButtonLink href="https://example.com">Learn more</ButtonLink>
+      </SectionHeading>,
+    );
+    expect(screen.getByText('Capabilities')).toHaveClass('landing-section-label');
+    expect(screen.getByText('Powerful legal data tools')).toBeInTheDocument();
+    expect(screen.getByText('Structured legal research for AI workflows.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Learn more' })).toBeInTheDocument();
+  });
+});
+
+describe('FeatureCard', () => {
+  it('renders the shared icon/title/description card shell', () => {
+    render(
+      <FeatureCard
+        icon="⚖️"
+        iconClassName="landing-icon-wrap"
+        title="Search Opinions"
+        description="Find federal court opinions by query and citation."
+        className="landing-card"
+      />,
+    );
+    expect(screen.getByText('Search Opinions')).toBeInTheDocument();
+    expect(screen.getByText('Find federal court opinions by query and citation.')).toBeInTheDocument();
+    expect(screen.getByText('⚖️')).toHaveClass('landing-icon-wrap');
+  });
+});
+
+describe('StatCard', () => {
+  it('renders the shared label/value card shell', () => {
+    render(
+      <StatCard
+        label="License"
+        labelClassName="landing-stat-label"
+        value="MIT"
+        className="landing-card"
+      />,
+    );
+    expect(screen.getByText('License')).toHaveClass('landing-stat-label');
+    expect(screen.getByText('MIT')).toBeInTheDocument();
+  });
+});
+
+describe('SkipLink', () => {
+  it('renders shared skip-link tones', () => {
+    const { rerender } = render(<SkipLink href="#main">Skip</SkipLink>);
+    expect(screen.getByText('Skip')).toHaveClass('skip-link');
+    rerender(
+      <SkipLink href="#main" tone="landing">
+        Skip
+      </SkipLink>,
+    );
+    expect(screen.getByText('Skip')).toHaveClass('skip-link', 'skip-link-landing');
+  });
+});
+
+describe('InlineGroup', () => {
+  it('renders shared row variants', () => {
+    const { rerender } = render(<InlineGroup>Items</InlineGroup>);
+    expect(screen.getByText('Items')).toHaveClass('row');
+    rerender(
+      <InlineGroup justify="between" gap="spacious">
+        Items
+      </InlineGroup>,
+    );
+    expect(screen.getByText('Items')).toHaveClass('row', 'between', 'row-spacious');
+  });
+});
+
+describe('DefinitionList', () => {
+  it('renders shared term/value rows with optional detail classes', () => {
+    render(
+      <DefinitionList
+        entries={[
+          { term: 'User ID', description: 'abc123', descriptionClassName: 'mono' },
+          { term: 'Status', description: 'Ready' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('User ID')).toBeInTheDocument();
+    expect(screen.getByText('abc123')).toHaveClass('mono');
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+  });
+});
+
+describe('MetricCard', () => {
+  it('renders the shared metric tile structure', () => {
+    render(
+      <MetricCard label="Latency" value="812ms" accent="24h average">
+        <p>Used by compare view</p>
+      </MetricCard>,
+    );
+    expect(screen.getByText('Latency')).toHaveClass('workspace-card-label');
+    expect(screen.getByText('812ms')).toBeInTheDocument();
+    expect(screen.getByText('24h average')).toHaveClass('metric-card-accent');
+    expect(screen.getByText('Used by compare view')).toBeInTheDocument();
+  });
+
+  it('renders supporting content below the accent line', () => {
+    render(
+      <MetricCard label="Sessions" value="12 active" accent="4 awaiting review">
+        <p>Needs operator action</p>
+      </MetricCard>,
+    );
+    expect(screen.getByText('4 awaiting review')).toHaveClass('metric-card-accent');
+    expect(screen.getByText('Needs operator action')).toBeInTheDocument();
+  });
+});
+
+describe('ComparisonCard', () => {
+  it('renders shared comparison shell with optional badge and meta', () => {
+    render(
+      <ComparisonCard
+        icon="🔌"
+        title="With MCP"
+        tone="mcp"
+        size="large"
+        badge={<Badge>MCP</Badge>}
+        meta={<MetaNote>Tool selected</MetaNote>}
+      >
+        Result body
+      </ComparisonCard>,
+    );
+    expect(screen.getByText('With MCP')).toHaveClass(
+      'comparison-card-title',
+      'comparison-card-title-lg',
+    );
+    expect(screen.getByText('🔌')).toHaveClass('comparison-icon', 'comparison-icon-lg');
+    expect(screen.getByText('Tool selected')).toBeInTheDocument();
+    expect(screen.getByText('Result body')).toBeInTheDocument();
+  });
+});
+
+describe('Eyebrow', () => {
+  it('renders the shared workspace label style', () => {
+    render(<Eyebrow>Status</Eyebrow>);
+    expect(screen.getByText('Status')).toHaveClass('workspace-card-label');
   });
 });
 
@@ -50,6 +254,165 @@ describe('Button', () => {
     render(<Button disabled>Disabled</Button>);
     expect(screen.getByRole('button')).toBeDisabled();
   });
+
+  it('supports compact size via component props', () => {
+    render(<Button size="compact">Compact</Button>);
+    expect(screen.getByRole('button')).toHaveClass('btn-compact');
+  });
+});
+
+describe('IconButton', () => {
+  it('supports inline chrome for lightweight icon actions', () => {
+    render(<IconButton chrome="inline">X</IconButton>);
+    expect(screen.getByRole('button')).toHaveClass('icon-btn', 'inline');
+  });
+});
+
+describe('MetaNote', () => {
+  it('renders the shared inline metadata treatment', () => {
+    render(<MetaNote size="large">Tool metadata</MetaNote>);
+    expect(screen.getByText('Tool metadata')).toHaveClass('meta-note', 'meta-note-lg');
+  });
+});
+
+describe('Select', () => {
+  it('renders a shared select control', () => {
+    render(
+      <Select defaultValue="b">
+        <option value="a">Alpha</option>
+        <option value="b">Beta</option>
+      </Select>,
+    );
+    expect(screen.getByRole('combobox')).toHaveValue('b');
+    expect(screen.getByRole('combobox')).toHaveClass('select-control');
+  });
+});
+
+describe('Checkbox', () => {
+  it('renders a shared checkbox control', () => {
+    render(<Checkbox aria-label="Enable feature" defaultChecked />);
+    expect(screen.getByRole('checkbox', { name: 'Enable feature' })).toBeChecked();
+  });
+});
+
+describe('CheckboxField', () => {
+  it('renders the shared checkbox row wrapper', () => {
+    render(<CheckboxField defaultChecked>Run as async job</CheckboxField>);
+    expect(screen.getByRole('checkbox', { name: 'Run as async job' })).toBeChecked();
+    expect(screen.getByText('Run as async job').closest('label')).toHaveClass('checkbox-field');
+  });
+});
+
+describe('Textarea', () => {
+  it('renders a shared textarea control', () => {
+    render(<Textarea defaultValue="notes" aria-label="Notes" />);
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('notes');
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveClass('textarea-control');
+  });
+});
+
+describe('ButtonLink', () => {
+  it('renders an internal router link with button classes', () => {
+    render(
+      <MemoryRouter>
+        <ButtonLink to="/app/tools" variant="secondary">
+          Open tools
+        </ButtonLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Open tools' });
+    expect(link).toHaveAttribute('href', '/app/tools');
+    expect(link.className).toContain('secondary');
+  });
+
+  it('renders an anchor link when href is provided', () => {
+    render(<ButtonLink href="https://example.com">Docs</ButtonLink>);
+    const link = screen.getByRole('link', { name: 'Docs' });
+    expect(link).toHaveAttribute('href', 'https://example.com');
+    expect(link.className).toContain('primary');
+  });
+
+  it('supports landing tone without the default button classes', () => {
+    render(
+      <MemoryRouter>
+        <ButtonLink to="/get-started" variant="secondary" tone="landing">
+          Get Started
+        </ButtonLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Get Started' });
+    expect(link).toHaveClass('landing-button', 'landing-button-secondary');
+    expect(link.className).not.toContain('btn');
+  });
+});
+
+describe('TextLink', () => {
+  it('renders an internal router link with shared text-link styling', () => {
+    render(
+      <MemoryRouter>
+        <TextLink to="/app/readiness">Readiness</TextLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Readiness' });
+    expect(link).toHaveAttribute('href', '/app/readiness');
+    expect(link).toHaveClass('text-link');
+  });
+
+  it('supports landing tone for public-site links', () => {
+    render(
+      <MemoryRouter>
+        <TextLink to="/app/account" tone="landing">
+          Account
+        </TextLink>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Account' })).toHaveClass('landing-text-link');
+  });
+});
+
+describe('NavCardLink', () => {
+  it('renders active shared workspace nav links', () => {
+    render(
+      <MemoryRouter initialEntries={['/app/readiness']}>
+        <NavCardLink to="/app/readiness">Readiness</NavCardLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Readiness' });
+    expect(link).toHaveAttribute('href', '/app/readiness');
+    expect(link).toHaveClass('nav-card-link', 'active');
+  });
+});
+
+describe('PillLink', () => {
+  it('renders an internal pill link', () => {
+    render(
+      <MemoryRouter>
+        <PillLink to="/app/session" primary>
+          Session
+        </PillLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Session' });
+    expect(link).toHaveAttribute('href', '/app/session');
+    expect(link.className).toContain('pill');
+    expect(link.className).toContain('primary');
+  });
+});
+
+describe('BadgeLink', () => {
+  it('renders an internal badge link with tone classes', () => {
+    render(
+      <MemoryRouter>
+        <BadgeLink to="/app/credentials" tone="ok">
+          Credential loaded
+        </BadgeLink>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Credential loaded' });
+    expect(link).toHaveAttribute('href', '/app/credentials');
+    expect(link.className).toContain('chip');
+    expect(link.className).toContain('active');
+  });
 });
 
 describe('StatusBanner', () => {
@@ -71,9 +434,25 @@ describe('StatusBanner', () => {
     expect(el.className).toContain('error');
   });
 
+  it('renders with warn type', () => {
+    render(<StatusBanner message="Warning!" type="warn" />);
+    const el = screen.getByRole('status');
+    expect(el.className).toContain('warn');
+  });
+
   it('renders with alert role', () => {
     render(<StatusBanner message="Alert!" role="alert" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Alert!');
+  });
+
+  it('renders title and actions when provided', () => {
+    render(
+      <StatusBanner title="Heads up:" message="Something needs review.">
+        <button type="button">Review</button>
+      </StatusBanner>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Heads up: Something needs review.');
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument();
   });
 });
 
@@ -94,7 +473,7 @@ describe('FormField', () => {
     render(
       <FormField id="test" label="Name">
         <input id="test" />
-      </FormField>
+      </FormField>,
     );
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
@@ -103,7 +482,7 @@ describe('FormField', () => {
     render(
       <FormField id="test" label="Name" hint="Enter your name">
         <input id="test" />
-      </FormField>
+      </FormField>,
     );
     expect(screen.getByText('Enter your name')).toBeInTheDocument();
   });
@@ -112,9 +491,18 @@ describe('FormField', () => {
     render(
       <FormField id="test" label="Name" error="Required">
         <input id="test" />
-      </FormField>
+      </FormField>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Required');
+  });
+
+  it('supports compact field styling', () => {
+    const { container } = render(
+      <FormField id="test" label="Mode" compact>
+        <input id="test" />
+      </FormField>,
+    );
+    expect(container.firstChild).toHaveClass('field', 'compact');
   });
 });
 
@@ -122,6 +510,86 @@ describe('Input', () => {
   it('renders an input element', () => {
     render(<Input type="text" placeholder="Enter" />);
     expect(screen.getByPlaceholderText('Enter')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter')).toHaveClass('input-control');
+  });
+});
+
+describe('LoadingState', () => {
+  it('renders a busy status with optional message', () => {
+    render(<LoadingState label="Loading page" message="Fetching data" />);
+    expect(screen.getByRole('status', { name: 'Loading page' })).toHaveTextContent('Fetching data');
+  });
+});
+
+describe('CodeSurface', () => {
+  it('renders shared raw code blocks with optional copy action', () => {
+    render(
+      <ToastProvider>
+        <CodeSurface title="Snippet" code="pnpm test" copyable />
+      </ToastProvider>,
+    );
+    expect(screen.getByText('Snippet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(screen.getByText('pnpm test')).toBeInTheDocument();
+  });
+
+  it('supports rich title and syntax-highlighted code children', () => {
+    render(
+      <ToastProvider>
+        <CodeSurface
+          title={
+            <span>
+              <span>Config</span>
+              <Badge>JSON</Badge>
+            </span>
+          }
+          code='{"ok":true}'
+        >
+          <span className="token-key">"ok"</span>
+        </CodeSurface>
+      </ToastProvider>,
+    );
+    expect(screen.getByText('Config')).toBeInTheDocument();
+    expect(screen.getByText('JSON')).toBeInTheDocument();
+    expect(screen.getByText('"ok"')).toHaveClass('token-key');
+  });
+});
+
+describe('EmptyState', () => {
+  it('renders message, icon, and hint when provided', () => {
+    render(<EmptyState icon="💬" message="Nothing here yet" hint="Try again later" />);
+    expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
+    expect(screen.getByText('💬')).toBeInTheDocument();
+    expect(screen.getByText('Try again later')).toBeInTheDocument();
+  });
+});
+
+describe('ConnectionBadge', () => {
+  it('renders connected state with metadata', () => {
+    render(
+      <ConnectionBadge
+        connected={true}
+        connectedLabel="Session: abc123"
+        disconnectedLabel="No session"
+        meta="| 20 tools"
+      />,
+    );
+    expect(screen.getByText('Session: abc123')).toBeInTheDocument();
+    expect(screen.getByText('| 20 tools')).toBeInTheDocument();
+  });
+});
+
+describe('StatusPill', () => {
+  it('renders solid and soft tone variants', () => {
+    const { rerender } = render(
+      <StatusPill tone="mcp" variant="solid">
+        LIVE DATA
+      </StatusPill>,
+    );
+    expect(screen.getByText('LIVE DATA')).toHaveClass('status-pill', 'solid', 'tone-mcp');
+
+    rerender(<StatusPill tone="ok">Succeeded</StatusPill>);
+    expect(screen.getByText('Succeeded')).toHaveClass('status-pill', 'soft', 'tone-ok');
   });
 });
 
@@ -135,7 +603,7 @@ describe('Stepper', () => {
     render(
       <MemoryRouter>
         <Stepper steps={steps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const items = screen.getAllByRole('listitem');
     expect(items).toHaveLength(3);
@@ -145,15 +613,39 @@ describe('Stepper', () => {
   });
 
   it('renders links for non-disabled steps', () => {
+    const steps = [{ label: 'Step 1', complete: false, to: '/step1' }];
+    render(
+      <MemoryRouter>
+        <Stepper steps={steps} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /Step 1/ })).toBeInTheDocument();
+  });
+
+  it('renders trailing actions when provided', () => {
     const steps = [
-      { label: 'Step 1', complete: false, to: '/step1' },
+      { label: 'Step 1', complete: true, action: <Badge tone="ok">Done</Badge> },
     ];
     render(
       <MemoryRouter>
         <Stepper steps={steps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole('link', { name: /Step 1/ })).toBeInTheDocument();
+    expect(screen.getByText('Done')).toBeInTheDocument();
+  });
+});
+
+describe('TabButton', () => {
+  it('renders a tab trigger with selected state', () => {
+    render(
+      <TabButton controls="panel-a" selected={true}>
+        Tab A
+      </TabButton>,
+    );
+    const tab = screen.getByRole('tab', { name: 'Tab A' });
+    expect(tab).toHaveAttribute('aria-controls', 'panel-a');
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(tab).toHaveClass('active');
   });
 });
 
