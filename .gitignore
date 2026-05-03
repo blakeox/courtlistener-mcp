@@ -71,6 +71,7 @@ junit.xml
 test-results/
 playwright-report/
 .playwright-mcp/
+.spa-dist/
 
 # Enhanced MCP Inspector test artifacts
 test-output/
