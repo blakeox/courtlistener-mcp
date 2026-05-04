@@ -193,8 +193,14 @@
     "node": ">=18.0.0"
   },
   "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "pnpm exec eslint --max-warnings=0 --no-warn-ignored"
+    ],
     "**/*.{ts,tsx,js,mjs,cjs}": [
       "pnpm exec eslint --max-warnings=0 --no-warn-ignored"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "pnpm exec prettier --check"
     ],
     "**/*.{json,md,yml,yaml}": [
       "pnpm exec prettier --check"
