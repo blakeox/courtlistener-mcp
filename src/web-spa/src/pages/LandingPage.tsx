@@ -1,12 +1,13 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import {
   Badge,
+  BrandLink,
   Button,
   ButtonLink,
   CodeSurface,
   Eyebrow,
   FeatureCard,
+  InfoBlock,
   InlineGroup,
   SectionHeading,
   SkipLink,
@@ -163,15 +164,14 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
       </SkipLink>
       <header className="landing-header">
         <div className="landing-container landing-header-inner">
-          <Link to="/" className="landing-brand" aria-label="CourtListener MCP home">
-            <span className="landing-brand-mark" aria-hidden="true">
-              <ScaleLogoIcon />
-            </span>
-            <span className="landing-brand-copy">
-              <span className="landing-brand-name">CourtListener MCP</span>
-              <Badge className="landing-brand-badge">Beta</Badge>
-            </span>
-          </Link>
+          <BrandLink
+            to="/"
+            tone="landing"
+            aria-label="CourtListener MCP home"
+            label="CourtListener MCP"
+            icon={<ScaleLogoIcon />}
+            badge={<Badge className="brand-link-badge">Beta</Badge>}
+          />
 
           <Button
             variant="secondary"
@@ -250,13 +250,12 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
               <CodePreviewCard />
               <div className="landing-hero-note">
                 <ShieldCheckIcon />
-                <div>
-                  <strong>Structured and defensible</strong>
-                  <span>
-                    Built for developer workflows, AI clients, and responsible legal research
-                    support.
-                  </span>
-                </div>
+                <InfoBlock
+                  title="Structured and defensible"
+                  titleAs="strong"
+                  description="Built for developer workflows, AI clients, and responsible legal research support."
+                  descriptionClassName="landing-hero-note-description"
+                />
               </div>
             </div>
           </div>
@@ -324,18 +323,22 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                 {setupClients.map((client) => (
                   <div
                     key={client.id}
-                    id={setupPanelId(client.id)}
-                    role="tabpanel"
-                    aria-labelledby={setupTabId(client.id)}
-                    hidden={activeSetup !== client.id}
-                    className="landing-setup-copy"
-                  >
-                    <Eyebrow className="landing-section-label">{client.eyebrow}</Eyebrow>
-                    <h3>{client.label}</h3>
-                    <p>{client.description}</p>
-                    <ol className="landing-numbered-list">
-                      {client.steps.map((step) => (
-                        <li key={step}>{step}</li>
+                  id={setupPanelId(client.id)}
+                  role="tabpanel"
+                  aria-labelledby={setupTabId(client.id)}
+                  hidden={activeSetup !== client.id}
+                  className="landing-setup-copy"
+                >
+                  <InfoBlock
+                    eyebrow={client.eyebrow}
+                    eyebrowClassName="landing-section-label"
+                    title={client.label}
+                    titleAs="h3"
+                    description={client.description}
+                  />
+                  <ol className="landing-numbered-list">
+                    {client.steps.map((step) => (
+                      <li key={step}>{step}</li>
                       ))}
                     </ol>
                   </div>
@@ -345,12 +348,14 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
               <div className="landing-card landing-setup-code">
                 <InlineGroup justify="between" gap="spacious" className="landing-command-row">
                   <div>
-                    <Eyebrow className="landing-section-label">Install command</Eyebrow>
-                    <h3>{INSTALL_COMMAND}</h3>
-                    <p className="landing-command-caption">
-                      The npm package is not published yet, so local stdio setup currently runs from
-                      a repository checkout.
-                    </p>
+                    <InfoBlock
+                      eyebrow="Install command"
+                      eyebrowClassName="landing-section-label"
+                      title={INSTALL_COMMAND}
+                      titleAs="h3"
+                      description="The npm package is not published yet, so local stdio setup currently runs from a repository checkout."
+                      descriptionClassName="landing-command-caption"
+                    />
                     <InlineGroup gap="spacious" className="landing-inline-links">
                       <TextLink href={DOWNLOAD_ZIP_URL} target="_blank" rel="noreferrer" tone="landing">
                         Download ZIP

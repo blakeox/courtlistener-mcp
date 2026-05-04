@@ -5,7 +5,7 @@ import {
   ButtonLink,
   Card,
   DefinitionList,
-  Eyebrow,
+  InfoBlock,
   InlineGroup,
   MetricCard,
   Panel,
@@ -165,9 +165,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
                 ['Storage Mode', 'Encrypted storage', 'Encrypted at rest.', 'Manage providers'],
               ].map(([label, name, detail, status]) => (
                 <Panel key={name}>
-                  <Eyebrow>{label}</Eyebrow>
-                  <strong>{name}</strong>
-                  <p className="muted">{detail}</p>
+                  <InfoBlock eyebrow={label} title={name} titleAs="strong" description={detail} />
                   {status === 'Manage providers' ? (
                     <TextLink to="/app/credentials">{status}</TextLink>
                   ) : (

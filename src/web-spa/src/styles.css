@@ -102,22 +102,53 @@ a {
   backdrop-filter: blur(18px);
 }
 
-.brand {
+.brand-link {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.brand-link-copy {
   display: inline-flex;
   flex-direction: column;
-  gap: 2px;
+}
+
+.brand-link-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.brand-link-name {
   font-weight: 800;
-  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+.brand-link-default {
+  display: inline-flex;
+  font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
 }
 
-.brand small {
-  display: block;
+.brand-link-default .brand-link-copy {
+  gap: 2px;
+}
+
+.brand-link-subtitle {
   font-size: 0.72rem;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.info-block {
+  display: grid;
+  gap: 4px;
+}
+
+.info-block p {
+  margin: 0;
 }
 
 .main-layout {
@@ -1793,13 +1824,13 @@ footer a {
   gap: 24px;
 }
 
-.landing-brand {
+.brand-link-landing {
   display: inline-flex;
   align-items: center;
   gap: 14px;
 }
 
-.landing-brand-mark {
+.brand-link-landing .brand-link-mark {
   width: 40px;
   height: 40px;
   border-radius: 10px;
@@ -1811,19 +1842,11 @@ footer a {
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
 }
 
-.landing-brand-copy {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+.brand-link-landing .brand-link-copy {
+  gap: 0;
 }
 
-.landing-brand-name {
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.landing-brand-badge,
+.brand-link-badge,
 .landing-page .landing-pill,
 .landing-page .landing-section-label,
 .landing-page .landing-stat-label,
@@ -1834,7 +1857,7 @@ footer a {
   text-transform: uppercase;
 }
 
-.landing-brand-badge {
+.brand-link-badge {
   color: var(--landing-color-blue-600);
   background: rgba(37, 99, 235, 0.08);
   border: 1px solid rgba(37, 99, 235, 0.18);
@@ -2117,7 +2140,7 @@ footer a {
   margin-bottom: 0.25rem;
 }
 
-.landing-hero-note span {
+.landing-hero-note-description {
   color: var(--landing-color-text-inverse-muted);
   line-height: 1.6;
 }

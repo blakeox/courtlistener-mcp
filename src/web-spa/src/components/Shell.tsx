@@ -1,13 +1,14 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useToken } from '../lib/token-context';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import {
   BadgeLink,
+  BrandLink,
   Button,
   ButtonLink,
-  Eyebrow,
+  InfoBlock,
   InlineGroup,
   LoadingState,
   NavCardLink,
@@ -108,10 +109,7 @@ export function Shell(
           ☰ Menu
         </Button>
         <aside id="primary-navigation" className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <Link to="/app" className="brand">
-            CourtListener MCP
-            <small>Legal-agent console</small>
-          </Link>
+          <BrandLink to="/app" label="CourtListener MCP" subtitle="Legal-agent console" />
           <p className="sidebar-intro">
             Install MCP, connect clients, test tools, and inspect research runs.
           </p>
@@ -143,23 +141,32 @@ export function Shell(
           </div>
           <div className="sidebar-meta">
             <Panel tone="inverse">
-              <Eyebrow>Current Workspace</Eyebrow>
-              <strong>{currentWorkspace.label}</strong>
-              <p>{currentWorkspace.description}</p>
+              <InfoBlock
+                eyebrow="Current Workspace"
+                title={currentWorkspace.label}
+                titleAs="strong"
+                description={currentWorkspace.description}
+              />
             </Panel>
             <Panel tone="inverse">
-              <Eyebrow>User Profile</Eyebrow>
-              <strong>{authed ? 'Research operator' : 'Guest operator'}</strong>
-              <p>{session?.user?.id ?? 'Sign in to persist session context.'}</p>
+              <InfoBlock
+                eyebrow="User Profile"
+                title={authed ? 'Research operator' : 'Guest operator'}
+                titleAs="strong"
+                description={session?.user?.id ?? 'Sign in to persist session context.'}
+              />
             </Panel>
           </div>
         </aside>
         <div className="shell-main-column">
           <header className="topbar">
-            <div className="topbar-heading">
-              <Eyebrow>Current page</Eyebrow>
-              <strong className="workspace-topbar-title">{currentWorkspace.label}</strong>
-            </div>
+            <InfoBlock
+              eyebrow="Current page"
+              title={currentWorkspace.label}
+              titleAs="strong"
+              className="topbar-heading"
+              titleClassName="workspace-topbar-title"
+            />
             <nav aria-label="Global navigation">
               <InlineGroup className="top-actions">
                 <PillLink to="/app/session" primary={authed}>

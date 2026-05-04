@@ -57,6 +57,31 @@ export function SectionHeading(
   );
 }
 
+export function InfoBlock(
+  props: React.PropsWithChildren<{
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    eyebrow?: React.ReactNode;
+    className?: string;
+    eyebrowClassName?: string;
+    titleClassName?: string;
+    descriptionClassName?: string;
+    titleAs?: 'strong' | 'h2' | 'h3';
+  }>,
+): React.JSX.Element {
+  const TitleTag = props.titleAs ?? 'strong';
+  return (
+    <div className={['info-block', props.className ?? ''].join(' ').trim()}>
+      {props.eyebrow ? (
+        <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
+      ) : null}
+      <TitleTag className={props.titleClassName}>{props.title}</TitleTag>
+      {props.description ? <p className={props.descriptionClassName}>{props.description}</p> : null}
+      {props.children}
+    </div>
+  );
+}
+
 export function FeatureCard(
   props: React.PropsWithChildren<{
     icon: React.ReactNode;
@@ -257,6 +282,27 @@ type AnchorButtonLinkProps = ButtonLinkBaseProps &
     to?: never;
   };
 
+type BrandLinkBaseProps = {
+  label: React.ReactNode;
+  subtitle?: React.ReactNode;
+  badge?: React.ReactNode;
+  icon?: React.ReactNode;
+  tone?: 'default' | 'landing';
+  className?: string;
+};
+
+type RouterBrandLinkProps = BrandLinkBaseProps &
+  Omit<LinkProps, 'className' | 'children' | 'to'> & {
+    to: LinkProps['to'];
+    href?: never;
+  };
+
+type AnchorBrandLinkProps = BrandLinkBaseProps &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'className' | 'children' | 'href'> & {
+    href: string;
+    to?: never;
+  };
+
 type NavCardLinkBaseProps = {
   className?: string;
   children: React.ReactNode;
@@ -356,6 +402,63 @@ export function ButtonLink(
   return (
     <Link {...linkProps} to={to} className={className}>
       {children}
+    </Link>
+  );
+}
+
+export function BrandLink(props: RouterBrandLinkProps | AnchorBrandLinkProps): React.JSX.Element {
+  const tone = props.tone ?? 'default';
+  const className = ['brand-link', tone === 'landing' ? 'brand-link-landing' : 'brand-link-default', props.className ?? '']
+    .join(' ')
+    .trim();
+  const content = (
+    <>
+      {props.icon ? (
+        <span className="brand-link-mark" aria-hidden="true">
+          {props.icon}
+        </span>
+      ) : null}
+      <span className="brand-link-copy">
+        <span className="brand-link-title-row">
+          <span className="brand-link-name">{props.label}</span>
+          {props.badge}
+        </span>
+        {props.subtitle ? <span className="brand-link-subtitle">{props.subtitle}</span> : null}
+      </span>
+    </>
+  );
+
+  if ('href' in props) {
+    const {
+      label: _label,
+      subtitle: _subtitle,
+      badge: _badge,
+      icon: _icon,
+      tone: _tone,
+      className: _className,
+      href,
+      ...anchorProps
+    } = props;
+    return (
+      <a {...anchorProps} href={href} className={className}>
+        {content}
+      </a>
+    );
+  }
+
+  const {
+    label: _label,
+    subtitle: _subtitle,
+    badge: _badge,
+    icon: _icon,
+    tone: _tone,
+    className: _className,
+    to,
+    ...linkProps
+  } = props;
+  return (
+    <Link {...linkProps} to={to} className={className}>
+      {content}
     </Link>
   );
 }

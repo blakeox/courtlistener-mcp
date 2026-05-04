@@ -5,6 +5,7 @@ import { ToastProvider } from '../components/Toast';
 import {
   Badge,
   BadgeLink,
+  BrandLink,
   Card,
   Button,
   ButtonLink,
@@ -17,6 +18,7 @@ import {
   EmptyState,
   Eyebrow,
   FeatureCard,
+  InfoBlock,
   IconButton,
   InlineGroup,
   LoadingState,
@@ -99,6 +101,61 @@ describe('SectionHeading', () => {
     expect(screen.getByText('Powerful legal data tools')).toBeInTheDocument();
     expect(screen.getByText('Structured legal research for AI workflows.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Learn more' })).toBeInTheDocument();
+  });
+});
+
+describe('BrandLink', () => {
+  it('renders the shared shell brand treatment with subtitle text', () => {
+    render(
+      <MemoryRouter>
+        <BrandLink to="/app" label="CourtListener MCP" subtitle="Legal-agent console" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /courtlistener mcp/i })).toHaveClass(
+      'brand-link',
+      'brand-link-default',
+    );
+    expect(screen.getByText('Legal-agent console')).toHaveClass('brand-link-subtitle');
+  });
+
+  it('renders the shared landing brand treatment with icon and badge content', () => {
+    render(
+      <MemoryRouter>
+        <BrandLink
+          to="/"
+          tone="landing"
+          label="CourtListener MCP"
+          icon="⚖️"
+          badge={<Badge className="brand-link-badge">Beta</Badge>}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /courtlistener mcp/i })).toHaveClass(
+      'brand-link',
+      'brand-link-landing',
+    );
+    expect(screen.getByText('⚖️')).toHaveClass('brand-link-mark');
+    expect(screen.getByText('Beta')).toHaveClass('brand-link-badge');
+  });
+});
+
+describe('InfoBlock', () => {
+  it('renders the shared eyebrow/title/description stack with configurable title tags', () => {
+    render(
+      <InfoBlock
+        eyebrow="Current page"
+        title="Agent Workspace"
+        titleAs="h3"
+        description="Workspace state for operators."
+        className="topbar-heading"
+        titleClassName="workspace-topbar-title"
+      />,
+    );
+    expect(screen.getByText('Current page')).toHaveClass('workspace-card-label');
+    expect(screen.getByRole('heading', { level: 3, name: 'Agent Workspace' })).toHaveClass(
+      'workspace-topbar-title',
+    );
+    expect(screen.getByText('Workspace state for operators.')).toBeInTheDocument();
   });
 });
 
