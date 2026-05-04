@@ -85,7 +85,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "clean": "rm -rf dist",
+    "clean": "node scripts/build/clean-dist.mjs",
     "health": "curl -f http://localhost:3001/health || exit 1",
     "enterprise:setup": "./scripts/build/setup-enterprise.sh",
     "enterprise:demo": "npx tsx enterprise-demo.ts",
