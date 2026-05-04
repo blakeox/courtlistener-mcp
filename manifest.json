@@ -14,59 +14,25 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "query": {
-                "type": "string"
-              },
-              "q": {
-                "type": "string"
-              },
-              "court": {
-                "type": "string"
-              },
-              "judge": {
-                "type": "string"
-              },
-              "dateAfter": {
-                "type": "string"
-              },
-              "dateBefore": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "orderBy": {
-                "type": "string"
-              },
-              "order_by": {
-                "type": "string"
-              },
+              "query": { "type": "string" },
+              "q": { "type": "string" },
+              "court": { "type": "string" },
+              "judge": { "type": "string" },
+              "dateAfter": { "type": "string" },
+              "dateBefore": { "type": "string" },
+              "date_filed_after": { "type": "string" },
+              "date_filed_before": { "type": "string" },
+              "orderBy": { "type": "string" },
+              "order_by": { "type": "string" },
               "page": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "pageSize": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "cursor": { "type": "string" },
+              "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -75,9 +41,7 @@
             "title": "Search Opinions"
           },
           "title": "Search Opinions",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Search Opinions",
@@ -96,56 +60,24 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "query": {
-                "type": "string"
-              },
-              "q": {
-                "type": "string"
-              },
-              "court": {
-                "type": "string"
-              },
-              "judge": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "citation": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "precedential_status": {
-                "type": "string"
-              },
+              "query": { "type": "string" },
+              "q": { "type": "string" },
+              "court": { "type": "string" },
+              "judge": { "type": "string" },
+              "case_name": { "type": "string" },
+              "citation": { "type": "string" },
+              "date_filed_after": { "type": "string" },
+              "date_filed_before": { "type": "string" },
+              "precedential_status": { "type": "string" },
               "page": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "page_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "pageSize": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "cursor": { "type": "string" },
+              "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -154,9 +86,7 @@
             "title": "Search Cases"
           },
           "title": "Search Cases",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Search Cases",
@@ -180,49 +110,20 @@
                 "type": "string",
                 "enum": ["o", "r", "p", "oa"]
               },
-              "query": {
-                "type": "string",
-                "minLength": 1
-              },
-              "court": {
-                "type": "string"
-              },
-              "judge": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "citation": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "precedential_status": {
-                "type": "string"
-              },
-              "cited_lt": {
-                "type": "number"
-              },
-              "cited_gt": {
-                "type": "number"
-              },
-              "status": {
-                "type": "string"
-              },
-              "nature_of_suit": {
-                "type": "string"
-              },
-              "order_by": {
-                "type": "string"
-              },
+              "query": { "type": "string", "minLength": 1 },
+              "court": { "type": "string" },
+              "judge": { "type": "string" },
+              "case_name": { "type": "string" },
+              "citation": { "type": "string" },
+              "docket_number": { "type": "string" },
+              "date_filed_after": { "type": "string" },
+              "date_filed_before": { "type": "string" },
+              "precedential_status": { "type": "string" },
+              "cited_lt": { "type": "number" },
+              "cited_gt": { "type": "number" },
+              "status": { "type": "string" },
+              "nature_of_suit": { "type": "string" },
+              "order_by": { "type": "string" },
               "page": {
                 "type": "integer",
                 "minimum": 1,
@@ -234,14 +135,8 @@
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -250,9 +145,7 @@
             "title": "Advanced Search"
           },
           "title": "Advanced Search",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Advanced Search",
@@ -278,9 +171,7 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  {
-                    "type": "string"
-                  }
+                  { "type": "string" }
                 ]
               },
               "id": {
@@ -290,9 +181,7 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  {
-                    "type": "string"
-                  }
+                  { "type": "string" }
                 ]
               }
             }
@@ -303,9 +192,7 @@
             "title": "Get Case Details"
           },
           "title": "Get Case Details",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Case Details",
@@ -325,34 +212,13 @@
             "type": "object",
             "properties": {
               "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
               "cluster_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
               "case_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
               "limit": {
                 "default": 10,
@@ -368,9 +234,7 @@
             "title": "Get Related Cases"
           },
           "title": "Get Related Cases",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Related Cases",
@@ -390,19 +254,9 @@
             "type": "object",
             "properties": {
               "case_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "include_citations": {
-                "default": true,
-                "type": "boolean"
-              },
+              "include_citations": { "default": true, "type": "boolean" },
               "depth": {
                 "default": 1,
                 "type": "number",
@@ -418,9 +272,7 @@
             "title": "Analyze Case Authorities"
           },
           "title": "Analyze Case Authorities",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Analyze Case Authorities",
@@ -446,9 +298,7 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
-                  {
-                    "type": "string"
-                  }
+                  { "type": "string" }
                 ]
               },
               "format": {
@@ -465,9 +315,7 @@
             "title": "Get Opinion Text"
           },
           "title": "Get Opinion Text",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Opinion Text",
@@ -486,23 +334,11 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "argument": {
-                "type": "string",
-                "minLength": 1
-              },
-              "search_query": {
-                "type": "string",
-                "minLength": 1
-              },
-              "jurisdiction": {
-                "type": "string"
-              },
-              "date_range_start": {
-                "type": "string"
-              },
-              "date_range_end": {
-                "type": "string"
-              }
+              "argument": { "type": "string", "minLength": 1 },
+              "search_query": { "type": "string", "minLength": 1 },
+              "jurisdiction": { "type": "string" },
+              "date_range_start": { "type": "string" },
+              "date_range_end": { "type": "string" }
             },
             "required": ["argument", "search_query"]
           },
@@ -512,9 +348,7 @@
             "title": "Analyze Legal Argument"
           },
           "title": "Analyze Legal Argument",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Analyze Legal Argument",
@@ -534,14 +368,7 @@
             "type": "object",
             "properties": {
               "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
               "depth": {
                 "default": 2,
@@ -569,9 +396,7 @@
             "title": "Get Citation Network"
           },
           "title": "Get Citation Network",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Citation Network",
@@ -590,18 +415,9 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "citation": {
-                "type": "string",
-                "minLength": 1
-              },
-              "normalize": {
-                "default": true,
-                "type": "boolean"
-              },
-              "include_alternatives": {
-                "default": false,
-                "type": "boolean"
-              }
+              "citation": { "type": "string", "minLength": 1 },
+              "normalize": { "default": true, "type": "boolean" },
+              "include_alternatives": { "default": false, "type": "boolean" }
             },
             "required": ["citation"]
           },
@@ -611,9 +427,7 @@
             "title": "Lookup Citation"
           },
           "title": "Lookup Citation",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Lookup Citation",
@@ -633,14 +447,7 @@
             "type": "object",
             "properties": {
               "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["opinion_id"]
@@ -651,9 +458,7 @@
             "title": "Get Opinion Citations"
           },
           "title": "Get Opinion Citations",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Opinion Citations",
@@ -673,14 +478,7 @@
             "type": "object",
             "properties": {
               "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["opinion_id"]
@@ -691,9 +489,7 @@
             "title": "Get Authorities"
           },
           "title": "Get Authorities",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Authorities",
@@ -712,18 +508,12 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "jurisdiction": {
-                "type": "string"
-              },
+              "jurisdiction": { "type": "string" },
               "court_type": {
                 "type": "string",
                 "enum": ["federal", "state", "appellate", "district", "supreme"]
               },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
@@ -748,9 +538,7 @@
             "title": "List Courts"
           },
           "title": "List Courts",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "List Courts",
@@ -769,20 +557,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "active": {
-                "type": "boolean"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "court": { "type": "string" },
+              "name": { "type": "string" },
+              "active": { "type": "boolean" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
@@ -807,9 +585,7 @@
             "title": "Get Judges"
           },
           "title": "Get Judges",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judges",
@@ -829,14 +605,7 @@
             "type": "object",
             "properties": {
               "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["judge_id"]
@@ -847,9 +616,7 @@
             "title": "Get Judge"
           },
           "title": "Get Judge",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judge",
@@ -869,40 +636,19 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "court": {
-                "type": "string"
-              },
-              "position_type": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "court": { "type": "string" },
+              "position_type": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -911,9 +657,7 @@
             "title": "Get Judicial Positions"
           },
           "title": "Get Judicial Positions",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judicial Positions",
@@ -933,14 +677,7 @@
             "type": "object",
             "properties": {
               "position_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["position_id"]
@@ -951,9 +688,7 @@
             "title": "Get Judicial Position"
           },
           "title": "Get Judicial Position",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judicial Position",
@@ -973,40 +708,19 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "school": {
-                "type": "string"
-              },
-              "degree_level": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "school": { "type": "string" },
+              "degree_level": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1015,9 +729,7 @@
             "title": "Get Judge Educations"
           },
           "title": "Get Judge Educations",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judge Educations",
@@ -1037,37 +749,18 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "political_party": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "political_party": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1076,9 +769,7 @@
             "title": "Get Judge Political Affiliations"
           },
           "title": "Get Judge Political Affiliations",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Judge Political Affiliations",
@@ -1098,34 +789,17 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1134,9 +808,7 @@
             "title": "Get Aba Ratings"
           },
           "title": "Get Aba Ratings",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Aba Ratings",
@@ -1156,37 +828,18 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "court": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "court": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1195,9 +848,7 @@
             "title": "Get Retention Events"
           },
           "title": "Get Retention Events",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Retention Events",
@@ -1216,34 +867,18 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              },
-              "city": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "name": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1252,9 +887,7 @@
             "title": "Get Schools"
           },
           "title": "Get Schools",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Schools",
@@ -1274,37 +907,18 @@
             "type": "object",
             "properties": {
               "person": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "organization": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "organization": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1313,9 +927,7 @@
             "title": "Get Memberships"
           },
           "title": "Get Memberships",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Memberships",
@@ -1334,37 +946,19 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "court": { "type": "string" },
+              "case_name": { "type": "string" },
+              "docket_number": { "type": "string" },
+              "date_filed": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1373,9 +967,7 @@
             "title": "Get Dockets"
           },
           "title": "Get Dockets",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Dockets",
@@ -1395,19 +987,9 @@
             "type": "object",
             "properties": {
               "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "include_entries": {
-                "default": true,
-                "type": "boolean"
-              }
+              "include_entries": { "default": true, "type": "boolean" }
             },
             "required": ["docket_id"]
           },
@@ -1417,9 +999,7 @@
             "title": "Get Docket"
           },
           "title": "Get Docket",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Docket",
@@ -1439,50 +1019,22 @@
             "type": "object",
             "properties": {
               "docket": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
               "entry_number": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "date_filed_after": { "type": "string" },
+              "date_filed_before": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             },
             "required": ["docket"]
           },
@@ -1492,9 +1044,7 @@
             "title": "Get Docket Entries"
           },
           "title": "Get Docket Entries",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Docket Entries",
@@ -1514,14 +1064,7 @@
             "type": "object",
             "properties": {
               "entry_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["entry_id"]
@@ -1532,9 +1075,7 @@
             "title": "Get Docket Entry"
           },
           "title": "Get Docket Entry",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Docket Entry",
@@ -1554,23 +1095,10 @@
             "type": "object",
             "properties": {
               "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "document_type": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "document_type": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
@@ -1586,9 +1114,7 @@
             "title": "Get Recap Documents"
           },
           "title": "Get Recap Documents",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Recap Documents",
@@ -1608,19 +1134,9 @@
             "type": "object",
             "properties": {
               "document_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "include_content": {
-                "default": false,
-                "type": "boolean"
-              }
+              "include_content": { "default": false, "type": "boolean" }
             },
             "required": ["document_id"]
           },
@@ -1630,9 +1146,7 @@
             "title": "Get Recap Document"
           },
           "title": "Get Recap Document",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Recap Document",
@@ -1652,37 +1166,18 @@
             "type": "object",
             "properties": {
               "docket": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "court": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "court": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1691,9 +1186,7 @@
             "title": "Get Originating Court Info"
           },
           "title": "Get Originating Court Info",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Originating Court Info",
@@ -1712,28 +1205,16 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "name": { "type": "string" },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1742,9 +1223,7 @@
             "title": "Get Tags"
           },
           "title": "Get Tags",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Tags",
@@ -1764,34 +1243,17 @@
             "type": "object",
             "properties": {
               "docket": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
                 "minimum": 1,
                 "maximum": 100
               },
-              "cursor": {
-                "type": "string"
-              },
-              "limit": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "cursor": { "type": "string" },
+              "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1800,9 +1262,7 @@
             "title": "Get Docket Alerts"
           },
           "title": "Get Docket Alerts",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Docket Alerts",
@@ -1822,24 +1282,11 @@
             "type": "object",
             "properties": {
               "docket": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "frequency": {
-                "type": "string"
-              },
-              "alert_type": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              }
+              "frequency": { "type": "string" },
+              "alert_type": { "type": "string" },
+              "email": { "type": "string" }
             },
             "required": ["docket"]
           },
@@ -1849,9 +1296,7 @@
             "title": "Create Docket Alert"
           },
           "title": "Create Docket Alert",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Create Docket Alert",
@@ -1871,25 +1316,10 @@
             "type": "object",
             "properties": {
               "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "year": {
-                "type": "number",
-                "minimum": 1990,
-                "maximum": 2026
-              },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "year": { "type": "number", "minimum": 1990, "maximum": 2026 },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
@@ -1904,9 +1334,7 @@
             "title": "Get Financial Disclosures"
           },
           "title": "Get Financial Disclosures",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Financial Disclosures",
@@ -1926,14 +1354,7 @@
             "type": "object",
             "properties": {
               "disclosure_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["disclosure_id"]
@@ -1944,9 +1365,7 @@
             "title": "Get Financial Disclosure"
           },
           "title": "Get Financial Disclosure",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Financial Disclosure",
@@ -1966,23 +1385,10 @@
             "type": "object",
             "properties": {
               "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "include_attorneys": {
-                "default": true,
-                "type": "boolean"
-              },
-              "include_parties": {
-                "default": true,
-                "type": "boolean"
-              }
+              "include_attorneys": { "default": true, "type": "boolean" },
+              "include_parties": { "default": true, "type": "boolean" }
             },
             "required": ["docket_id"]
           },
@@ -1992,9 +1398,7 @@
             "title": "Get Parties And Attorneys"
           },
           "title": "Get Parties And Attorneys",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Parties And Attorneys",
@@ -2018,18 +1422,9 @@
                 "enum": ["create", "list", "update", "delete"]
               },
               "alert_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "query": {
-                "type": "string"
-              },
+              "query": { "type": "string" },
               "frequency": {
                 "type": "string",
                 "enum": ["daily", "weekly", "monthly"]
@@ -2047,9 +1442,7 @@
             "title": "Manage Alerts"
           },
           "title": "Manage Alerts",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Manage Alerts",
@@ -2068,30 +1461,13 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "date_argued": {
-                "type": "string"
-              },
+              "court": { "type": "string" },
+              "case_name": { "type": "string" },
+              "date_argued": { "type": "string" },
               "docket_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "page": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1
-              },
+              "page": { "default": 1, "type": "number", "minimum": 1 },
               "page_size": {
                 "default": 20,
                 "type": "number",
@@ -2106,9 +1482,7 @@
             "title": "Get Oral Arguments"
           },
           "title": "Get Oral Arguments",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Oral Arguments",
@@ -2128,23 +1502,10 @@
             "type": "object",
             "properties": {
               "oral_argument_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "include_transcript": {
-                "default": false,
-                "type": "boolean"
-              },
-              "include_audio_url": {
-                "default": true,
-                "type": "boolean"
-              }
+              "include_transcript": { "default": false, "type": "boolean" },
+              "include_audio_url": { "default": true, "type": "boolean" }
             },
             "required": ["oral_argument_id"]
           },
@@ -2154,9 +1515,7 @@
             "title": "Get Oral Argument"
           },
           "title": "Get Oral Argument",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Oral Argument",
@@ -2185,34 +1544,13 @@
                 ]
               },
               "opinion_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "depth": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 5
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 200
-              },
-              "start_date": {
-                "type": "string"
-              },
-              "end_date": {
-                "type": "string"
-              },
-              "court_id": {
-                "type": "string"
-              }
+              "depth": { "type": "integer", "minimum": 1, "maximum": 5 },
+              "limit": { "type": "integer", "minimum": 1, "maximum": 200 },
+              "start_date": { "type": "string" },
+              "end_date": { "type": "string" },
+              "court_id": { "type": "string" }
             },
             "required": ["data_type"]
           },
@@ -2222,9 +1560,7 @@
             "title": "Get Visualization Data"
           },
           "title": "Get Visualization Data",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Visualization Data",
@@ -2243,15 +1579,8 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "data_type": {
-                "type": "string",
-                "minLength": 1
-              },
-              "sample_size": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 50
-              }
+              "data_type": { "type": "string", "minLength": 1 },
+              "sample_size": { "type": "integer", "minimum": 1, "maximum": 50 }
             },
             "required": ["data_type"]
           },
@@ -2261,9 +1590,7 @@
             "title": "Get Bulk Data"
           },
           "title": "Get Bulk Data",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Bulk Data",
@@ -2282,21 +1609,11 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "court": {
-                "type": "string"
-              },
-              "case_name": {
-                "type": "string"
-              },
-              "docket_number": {
-                "type": "string"
-              },
-              "date_filed_after": {
-                "type": "string"
-              },
-              "date_filed_before": {
-                "type": "string"
-              },
+              "court": { "type": "string" },
+              "case_name": { "type": "string" },
+              "docket_number": { "type": "string" },
+              "date_filed_after": { "type": "string" },
+              "date_filed_before": { "type": "string" },
               "page": {
                 "default": 1,
                 "type": "integer",
@@ -2317,9 +1634,7 @@
             "title": "Get Bankruptcy Data"
           },
           "title": "Get Bankruptcy Data",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Bankruptcy Data",
@@ -2339,14 +1654,7 @@
             "type": "object",
             "properties": {
               "judge_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["judge_id"]
@@ -2357,9 +1665,7 @@
             "title": "Get Comprehensive Judge Profile"
           },
           "title": "Get Comprehensive Judge Profile",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Comprehensive Judge Profile",
@@ -2379,14 +1685,7 @@
             "type": "object",
             "properties": {
               "cluster_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               }
             },
             "required": ["cluster_id"]
@@ -2397,9 +1696,7 @@
             "title": "Get Comprehensive Case Analysis"
           },
           "title": "Get Comprehensive Case Analysis",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Comprehensive Case Analysis",
@@ -2432,20 +1729,9 @@
                 ]
               },
               "judge": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ]
+                "anyOf": [{ "type": "string" }, { "type": "number" }]
               },
-              "year": {
-                "type": "integer",
-                "minimum": 1900,
-                "maximum": 2026
-              },
+              "year": { "type": "integer", "minimum": 1900, "maximum": 2026 },
               "page": {
                 "default": 1,
                 "type": "integer",
@@ -2468,9 +1754,7 @@
             "title": "Get Financial Disclosure Details"
           },
           "title": "Get Financial Disclosure Details",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Financial Disclosure Details",
@@ -2488,12 +1772,7 @@
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-              "text": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
+            "properties": { "text": { "type": "string", "minLength": 1 } },
             "required": ["text"]
           },
           "annotations": {
@@ -2502,9 +1781,7 @@
             "title": "Validate Citations"
           },
           "title": "Validate Citations",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Validate Citations",
@@ -2537,9 +1814,7 @@
             "title": "Get Enhanced Recap Data"
           },
           "title": "Get Enhanced Recap Data",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Enhanced Recap Data",
@@ -2558,12 +1833,8 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "category": {
-                "type": "string"
-              },
-              "court_id": {
-                "type": "string"
-              },
+              "category": { "type": "string" },
+              "court_id": { "type": "string" },
               "page": {
                 "default": 1,
                 "type": "integer",
@@ -2584,9 +1855,7 @@
             "title": "Get Visualization Metadata"
           },
           "title": "Get Visualization Metadata",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Get Visualization Metadata",
@@ -2625,9 +1894,7 @@
             "title": "Smart Search"
           },
           "title": "Smart Search",
-          "execution": {
-            "taskSupport": "optional"
-          },
+          "execution": { "taskSupport": "optional" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Smart Search",
@@ -2653,9 +1920,7 @@
             },
             "required": ["jobId"]
           },
-          "execution": {
-            "taskSupport": "forbidden"
-          },
+          "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Async Job Status",
@@ -2681,9 +1946,7 @@
             },
             "required": ["jobId"]
           },
-          "execution": {
-            "taskSupport": "forbidden"
-          },
+          "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Async Job Result",
@@ -2709,9 +1972,7 @@
             },
             "required": ["jobId"]
           },
-          "execution": {
-            "taskSupport": "forbidden"
-          },
+          "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
               "title": "Async Job Cancel",
@@ -2979,10 +2240,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": []
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": [] }
             }
           }
         },
@@ -3227,9 +2485,7 @@
               "examples": [
                 {
                   "description": "Run citation_analysis with starter arguments",
-                  "arguments": {
-                    "case_citation": "<case_citation>"
-                  }
+                  "arguments": { "case_citation": "<case_citation>" }
                 }
               ],
               "descriptors": {
@@ -3291,9 +2547,7 @@
               "examples": [
                 {
                   "description": "Run case_brief with starter arguments",
-                  "arguments": {
-                    "opinion_id": "<opinion_id>"
-                  }
+                  "arguments": { "opinion_id": "<opinion_id>" }
                 }
               ],
               "descriptors": {
@@ -3355,9 +2609,7 @@
               "examples": [
                 {
                   "description": "Run judicial_due_diligence with starter arguments",
-                  "arguments": {
-                    "judge_name": "<judge_name>"
-                  }
+                  "arguments": { "judge_name": "<judge_name>" }
                 }
               ],
               "descriptors": {
