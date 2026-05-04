@@ -41,8 +41,10 @@ async function generate() {
     };
 
     const outputPath = path.resolve(__dirname, '../manifest.json');
+    const prettierConfig = (await prettier.resolveConfig(outputPath)) ?? {};
     const formattedManifest = await prettier.format(JSON.stringify(manifest), {
-      parser: 'json',
+      ...prettierConfig,
+      filepath: outputPath,
     });
     await fs.writeFile(outputPath, formattedManifest);
 

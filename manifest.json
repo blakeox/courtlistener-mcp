@@ -24,11 +24,7 @@
               "date_filed_before": { "type": "string" },
               "orderBy": { "type": "string" },
               "order_by": { "type": "string" },
-              "page": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 9007199254740991
-              },
+              "page": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
               "page_size": { "type": "integer", "minimum": 1, "maximum": 100 },
               "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
@@ -69,22 +65,14 @@
               "date_filed_after": { "type": "string" },
               "date_filed_before": { "type": "string" },
               "precedential_status": { "type": "string" },
-              "page": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 9007199254740991
-              },
+              "page": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
               "page_size": { "type": "integer", "minimum": 1, "maximum": 100 },
               "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Search Cases"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Search Cases" },
           "title": "Search Cases",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -105,11 +93,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "type": {
-                "default": "o",
-                "type": "string",
-                "enum": ["o", "r", "p", "oa"]
-              },
+              "type": { "default": "o", "type": "string", "enum": ["o", "r", "p", "oa"] },
               "query": { "type": "string", "minLength": 1 },
               "court": { "type": "string" },
               "judge": { "type": "string" },
@@ -124,17 +108,8 @@
               "status": { "type": "string" },
               "nature_of_suit": { "type": "string" },
               "order_by": { "type": "string" },
-              "page": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 9007199254740991
-              },
-              "page_size": {
-                "default": 20,
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+              "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
@@ -166,21 +141,13 @@
             "properties": {
               "cluster_id": {
                 "anyOf": [
-                  {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
+                  { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                   { "type": "string" }
                 ]
               },
               "id": {
                 "anyOf": [
-                  {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
+                  { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                   { "type": "string" }
                 ]
               }
@@ -211,21 +178,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
-              "cluster_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
-              "case_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
-              "limit": {
-                "default": 10,
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "opinion_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "cluster_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "case_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "limit": { "default": 10, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -253,16 +209,9 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "case_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "case_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "include_citations": { "default": true, "type": "boolean" },
-              "depth": {
-                "default": 1,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 3
-              }
+              "depth": { "default": 1, "type": "number", "minimum": 1, "maximum": 3 }
             },
             "required": ["case_id"]
           },
@@ -293,19 +242,11 @@
             "properties": {
               "opinion_id": {
                 "anyOf": [
-                  {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
+                  { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
                   { "type": "string" }
                 ]
               },
-              "format": {
-                "default": "text",
-                "type": "string",
-                "enum": ["text", "html", "pdf"]
-              }
+              "format": { "default": "text", "type": "string", "enum": ["text", "html", "pdf"] }
             },
             "required": ["opinion_id"]
           },
@@ -367,26 +308,14 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
-              "depth": {
-                "default": 2,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 3
-              },
+              "opinion_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "depth": { "default": 2, "type": "number", "minimum": 1, "maximum": 3 },
               "direction": {
                 "default": "both",
                 "type": "string",
                 "enum": ["cited_by", "cites", "both"]
               },
-              "limit": {
-                "default": 50,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "limit": { "default": 50, "type": "number", "minimum": 1, "maximum": 100 }
             },
             "required": ["opinion_id"]
           },
@@ -446,9 +375,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
+              "opinion_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
             },
             "required": ["opinion_id"]
           },
@@ -477,9 +404,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "opinion_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
+              "opinion_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
             },
             "required": ["opinion_id"]
           },
@@ -514,12 +439,7 @@
                 "enum": ["federal", "state", "appellate", "district", "supreme"]
               },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": {
                 "description": "Pagination cursor from previous response (alternative to page/page_size)",
                 "type": "string"
@@ -532,11 +452,7 @@
               }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "List Courts"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "List Courts" },
           "title": "List Courts",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -561,12 +477,7 @@
               "name": { "type": "string" },
               "active": { "type": "boolean" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": {
                 "description": "Pagination cursor from previous response (alternative to page/page_size)",
                 "type": "string"
@@ -579,11 +490,7 @@
               }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Judges"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Judges" },
           "title": "Get Judges",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -603,18 +510,10 @@
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-              "judge_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
-            },
+            "properties": { "judge_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["judge_id"]
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Judge"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Judge" },
           "title": "Get Judge",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -635,18 +534,11 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "court": { "type": "string" },
               "position_type": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -676,9 +568,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "position_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
+              "position_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
             },
             "required": ["position_id"]
           },
@@ -707,18 +597,11 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "school": { "type": "string" },
               "degree_level": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -748,17 +631,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "political_party": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -788,16 +664,9 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -827,17 +696,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "court": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -871,21 +733,12 @@
               "city": { "type": "string" },
               "state": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Schools"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Schools" },
           "title": "Get Schools",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -906,17 +759,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "person": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "person": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "organization": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -951,21 +797,12 @@
               "docket_number": { "type": "string" },
               "date_filed": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Dockets"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Dockets" },
           "title": "Get Dockets",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -986,18 +823,12 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "include_entries": { "default": true, "type": "boolean" }
             },
             "required": ["docket_id"]
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Docket"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Docket" },
           "title": "Get Docket",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -1018,21 +849,12 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
-              "entry_number": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "entry_number": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "date_filed_after": { "type": "string" },
               "date_filed_before": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             },
@@ -1062,11 +884,7 @@
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-              "entry_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
-            },
+            "properties": { "entry_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["entry_id"]
           },
           "annotations": {
@@ -1094,17 +912,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "document_type": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 }
             },
             "required": ["docket_id"]
           },
@@ -1133,9 +944,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "document_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "document_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "include_content": { "default": false, "type": "boolean" }
             },
             "required": ["document_id"]
@@ -1165,17 +974,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "court": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -1207,21 +1009,12 @@
             "properties": {
               "name": { "type": "string" },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Tags"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Tags" },
           "title": "Get Tags",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -1242,16 +1035,9 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 },
               "cursor": { "type": "string" },
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
@@ -1281,9 +1067,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "frequency": { "type": "string" },
               "alert_type": { "type": "string" },
               "email": { "type": "string" }
@@ -1315,17 +1099,10 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "judge_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "judge_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "year": { "type": "number", "minimum": 1990, "maximum": 2026 },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1353,9 +1130,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "disclosure_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
+              "disclosure_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
             },
             "required": ["disclosure_id"]
           },
@@ -1384,9 +1159,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "docket_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "include_attorneys": { "default": true, "type": "boolean" },
               "include_parties": { "default": true, "type": "boolean" }
             },
@@ -1417,30 +1190,15 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "action": {
-                "type": "string",
-                "enum": ["create", "list", "update", "delete"]
-              },
-              "alert_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "action": { "type": "string", "enum": ["create", "list", "update", "delete"] },
+              "alert_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "query": { "type": "string" },
-              "frequency": {
-                "type": "string",
-                "enum": ["daily", "weekly", "monthly"]
-              },
-              "alert_type": {
-                "type": "string",
-                "enum": ["case", "opinion", "docket"]
-              }
+              "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+              "alert_type": { "type": "string", "enum": ["case", "opinion", "docket"] }
             },
             "required": ["action"]
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Manage Alerts"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Manage Alerts" },
           "title": "Manage Alerts",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -1464,16 +1222,9 @@
               "court": { "type": "string" },
               "case_name": { "type": "string" },
               "date_argued": { "type": "string" },
-              "docket_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "docket_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "page": { "default": 1, "type": "number", "minimum": 1 },
-              "page_size": {
-                "default": 20,
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1501,9 +1252,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "oral_argument_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "oral_argument_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "include_transcript": { "default": false, "type": "boolean" },
               "include_audio_url": { "default": true, "type": "boolean" }
             },
@@ -1543,9 +1292,7 @@
                   "judge_statistics"
                 ]
               },
-              "opinion_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "opinion_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "depth": { "type": "integer", "minimum": 1, "maximum": 5 },
               "limit": { "type": "integer", "minimum": 1, "maximum": 200 },
               "start_date": { "type": "string" },
@@ -1584,11 +1331,7 @@
             },
             "required": ["data_type"]
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Get Bulk Data"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Bulk Data" },
           "title": "Get Bulk Data",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -1620,12 +1363,7 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "page_size": {
-                "default": 20,
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1652,11 +1390,7 @@
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-              "judge_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
-            },
+            "properties": { "judge_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["judge_id"]
           },
           "annotations": {
@@ -1684,9 +1418,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
-              "cluster_id": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              }
+              "cluster_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
             },
             "required": ["cluster_id"]
           },
@@ -1728,9 +1460,7 @@
                   "non_investment_incomes"
                 ]
               },
-              "judge": {
-                "anyOf": [{ "type": "string" }, { "type": "number" }]
-              },
+              "judge": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "year": { "type": "integer", "minimum": 1900, "maximum": 2026 },
               "page": {
                 "default": 1,
@@ -1738,12 +1468,7 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "page_size": {
-                "default": 20,
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 }
             },
             "required": ["disclosure_type"],
             "additionalProperties": {}
@@ -1799,12 +1524,7 @@
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "enum": ["fetch", "query", "email"]
-              }
-            },
+            "properties": { "action": { "type": "string", "enum": ["fetch", "query", "email"] } },
             "required": ["action"],
             "additionalProperties": {}
           },
@@ -1841,12 +1561,7 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "page_size": {
-                "default": 20,
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              }
+              "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
           "annotations": {
@@ -1888,11 +1603,7 @@
             },
             "required": ["query"]
           },
-          "annotations": {
-            "readOnlyHint": true,
-            "openWorldHint": true,
-            "title": "Smart Search"
-          },
+          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Smart Search" },
           "title": "Smart Search",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -2014,10 +1725,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "opinion"],
               "examples": ["courtlistener://opinion/123456"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://opinion/{id}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://opinion/{id}", "dynamic": true }
             }
           }
         },
@@ -2031,10 +1739,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "courtlistener", "schemas"],
               "examples": ["courtlistener://schema/opinion"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://schema/{type}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://schema/{type}", "dynamic": true }
             }
           }
         },
@@ -2048,10 +1753,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "courtlistener", "schemas"],
               "examples": ["courtlistener://schema/docket"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://schema/{type}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://schema/{type}", "dynamic": true }
             }
           }
         },
@@ -2065,10 +1767,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "courtlistener", "schemas"],
               "examples": ["courtlistener://schema/court"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://schema/{type}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://schema/{type}", "dynamic": true }
             }
           }
         },
@@ -2082,10 +1781,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "courtlistener", "schemas"],
               "examples": ["courtlistener://schema/judge"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://schema/{type}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://schema/{type}", "dynamic": true }
             }
           }
         },
@@ -2099,10 +1795,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "courtlistener", "schemas"],
               "examples": ["courtlistener://schema/search-params"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://schema/{type}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://schema/{type}", "dynamic": true }
             }
           }
         },
@@ -2116,10 +1809,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "case"],
               "examples": ["courtlistener://case/123456"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://case/{id}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://case/{id}", "dynamic": true }
             }
           }
         },
@@ -2133,10 +1823,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "docket"],
               "examples": ["courtlistener://docket/123456"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://docket/{id}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://docket/{id}", "dynamic": true }
             }
           }
         },
@@ -2150,10 +1837,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "court"],
               "examples": ["courtlistener://court/scotus"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://court/{id}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://court/{id}", "dynamic": true }
             }
           }
         },
@@ -2167,10 +1851,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "judge"],
               "examples": ["courtlistener://judge/123456"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://judge/{id}",
-                "dynamic": true
-              }
+              "descriptors": { "uriTemplate": "courtlistener://judge/{id}", "dynamic": true }
             }
           }
         },
@@ -2184,10 +1865,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "recent", "opinions"],
               "examples": ["courtlistener://search/recent"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://search/recent",
-                "dynamic": false
-              }
+              "descriptors": { "uriTemplate": "courtlistener://search/recent", "dynamic": false }
             }
           }
         },
@@ -2201,10 +1879,7 @@
             "courtlistener/discoverability": {
               "tags": ["resource", "api", "status"],
               "examples": ["courtlistener://api/status"],
-              "descriptors": {
-                "uriTemplate": "courtlistener://api/status",
-                "dynamic": false
-              }
+              "descriptors": { "uriTemplate": "courtlistener://api/status", "dynamic": false }
             }
           }
         }
@@ -2234,10 +1909,7 @@
               "examples": [
                 {
                   "description": "Run legal_assistant with starter arguments",
-                  "arguments": {
-                    "focus_area": "<focus_area>",
-                    "jurisdiction": "<jurisdiction>"
-                  }
+                  "arguments": { "focus_area": "<focus_area>", "jurisdiction": "<jurisdiction>" }
                 }
               ],
               "descriptors": { "argumentCount": 2, "requiredArguments": [] }
@@ -2272,10 +1944,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["statute_text"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["statute_text"] }
             }
           }
         },
@@ -2307,10 +1976,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["case_citations"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["case_citations"] }
             }
           }
         },
@@ -2342,10 +2008,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["case_citation"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["case_citation"] }
             }
           }
         },
@@ -2408,11 +2071,7 @@
               "description": "Description of the factual scenario",
               "required": true
             },
-            {
-              "name": "jurisdiction",
-              "description": "Applicable jurisdiction",
-              "required": false
-            }
+            { "name": "jurisdiction", "description": "Applicable jurisdiction", "required": false }
           ],
           "_meta": {
             "courtlistener/discoverability": {
@@ -2426,10 +2085,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["fact_pattern"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["fact_pattern"] }
             }
           }
         },
@@ -2455,16 +2111,10 @@
               "examples": [
                 {
                   "description": "Run legal_research_workflow with starter arguments",
-                  "arguments": {
-                    "topic": "<topic>",
-                    "jurisdiction": "<jurisdiction>"
-                  }
+                  "arguments": { "topic": "<topic>", "jurisdiction": "<jurisdiction>" }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["topic"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["topic"] }
             }
           }
         },
@@ -2488,10 +2138,7 @@
                   "arguments": { "case_citation": "<case_citation>" }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 1,
-                "requiredArguments": ["case_citation"]
-              }
+              "descriptors": { "argumentCount": 1, "requiredArguments": ["case_citation"] }
             }
           }
         },
@@ -2550,10 +2197,7 @@
                   "arguments": { "opinion_id": "<opinion_id>" }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 1,
-                "requiredArguments": ["opinion_id"]
-              }
+              "descriptors": { "argumentCount": 1, "requiredArguments": ["opinion_id"] }
             }
           }
         },
@@ -2585,10 +2229,7 @@
                   }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 2,
-                "requiredArguments": ["motion_type"]
-              }
+              "descriptors": { "argumentCount": 2, "requiredArguments": ["motion_type"] }
             }
           }
         },
@@ -2612,10 +2253,7 @@
                   "arguments": { "judge_name": "<judge_name>" }
                 }
               ],
-              "descriptors": {
-                "argumentCount": 1,
-                "requiredArguments": ["judge_name"]
-              }
+              "descriptors": { "argumentCount": 1, "requiredArguments": ["judge_name"] }
             }
           }
         }

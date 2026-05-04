@@ -58,18 +58,13 @@ describe('GitHub workflow hardening', () => {
       packageJson.scripts?.['test:all'],
       'npm run test:unit && npm run test:integration && npm run test:spa:auth && npm run test:spa:e2e:auth',
     );
-    assert.deepEqual(packageJson['lint-staged']?.['*.{ts,tsx,js,mjs,cjs}'], [
-      'pnpm exec eslint --max-warnings=0 --no-warn-ignored',
-    ]);
     assert.deepEqual(packageJson['lint-staged']?.['**/*.{ts,tsx,js,mjs,cjs}'], [
       'pnpm exec eslint --max-warnings=0 --no-warn-ignored',
-    ]);
-    assert.deepEqual(packageJson['lint-staged']?.['*.{json,md,yml,yaml}'], [
-      'pnpm exec prettier --check',
     ]);
     assert.deepEqual(packageJson['lint-staged']?.['**/*.{json,md,yml,yaml}'], [
       'pnpm exec prettier --check',
     ]);
+    assert.equal(fs.existsSync(new URL('../../.lintstagedrc.json', import.meta.url)), false);
   });
 
   it('uses the TypeScript inspector runners from CI and release workflows', () => {
