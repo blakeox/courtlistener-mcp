@@ -44,8 +44,8 @@ jobs:
       - name: Verify version consistency
         run: node scripts/build/version-check.js
 
-      - name: Build for production
-        run: pnpm run build
+      - name: Run shared local gate
+        run: pnpm run ci:local-gate
 
       - name: Install Chromium for auth browser validation
         run: pnpm exec playwright install --with-deps chromium
@@ -53,10 +53,11 @@ jobs:
       - name: Install MCP Inspector
         run: pnpm add -g @modelcontextprotocol/inspector
 
-      - name: Comprehensive test suite
+      - name: Browser + integration release suite
         run: |
-          echo "🧪 Running full test suite for release validation..."
-          pnpm test
+          echo "🧪 Running browser and integration release coverage..."
+          pnpm run test:integration
+          pnpm run test:spa:e2e:auth
 
       - name: Hosted OAuth release gate
         env:

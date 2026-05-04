@@ -2,9 +2,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev, test]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, dev, test]
 
 permissions:
   contents: read
@@ -144,21 +144,16 @@ jobs:
         run: pnpm run lint:src
         continue-on-error: true
 
-      - name: TypeScript compilation check
-        run: pnpm run typecheck
-
-      - name: Build project
-        run: pnpm run build
-
-      - name: Run unit tests
-        run: pnpm run test:unit
+      - name: Run shared local gate
+        run: |
+          if [ "${{ matrix.node-version }}" = "18" ]; then
+            pnpm run ci:local-gate -- --skip-spa-auth
+          else
+            pnpm run ci:local-gate
+          fi
 
       - name: Run integration tests
         run: pnpm run test:integration
-
-      - name: Run SPA auth tests
-        if: ${{ matrix.node-version != 18 }}
-        run: pnpm run test:spa:auth
 
       - name: Enforce coverage thresholds
         run: pnpm run coverage:check

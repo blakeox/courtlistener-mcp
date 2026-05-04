@@ -1,15 +1,11 @@
 pre-commit:
   commands:
+    repo-hygiene:
+      run: pnpm run ci:check:repo-hygiene:staged
     lint-staged:
       run: pnpm lint-staged
 
 pre-push:
   commands:
-    typecheck:
-      run: pnpm run typecheck
-    build:
-      run: pnpm run build
-    unit-tests:
-      run: pnpm run test:unit
-    spa-auth-tests:
-      run: pnpm run test:spa:auth
+    local-gate:
+      run: pnpm run ci:local-gate

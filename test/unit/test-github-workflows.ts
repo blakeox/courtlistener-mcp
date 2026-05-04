@@ -47,6 +47,7 @@ describe('GitHub workflow hardening', () => {
   it('makes the default test script include the SPA auth suites', () => {
     const packageJson = JSON.parse(read('../../package.json')) as {
       scripts?: Record<string, string>;
+      ['lint-staged']?: Record<string, string[]>;
     };
 
     assert.equal(
@@ -57,6 +58,12 @@ describe('GitHub workflow hardening', () => {
       packageJson.scripts?.['test:all'],
       'npm run test:unit && npm run test:integration && npm run test:spa:auth && npm run test:spa:e2e:auth',
     );
+    assert.deepEqual(packageJson['lint-staged']?.['**/*.{ts,tsx,js,mjs,cjs}'], [
+      'pnpm exec eslint --max-warnings=0 --no-warn-ignored',
+    ]);
+    assert.deepEqual(packageJson['lint-staged']?.['**/*.{json,md,yml,yaml}'], [
+      'pnpm exec prettier --check',
+    ]);
   });
 
   it('uses the TypeScript inspector runners from CI and release workflows', () => {
@@ -90,10 +97,20 @@ describe('GitHub workflow hardening', () => {
     const lefthook = read('../../lefthook.yml');
 
     assert.match(lefthook, /pre-push:/);
-    assert.match(lefthook, /run: pnpm run typecheck/);
-    assert.match(lefthook, /run: pnpm run build/);
-    assert.match(lefthook, /run: pnpm run test:unit/);
-    assert.match(lefthook, /run: pnpm run test:spa:auth/);
+    assert.match(lefthook, /pre-commit:/);
+    assert.match(lefthook, /run: pnpm run ci:check:repo-hygiene:staged/);
+    assert.match(lefthook, /run: pnpm lint-staged/);
+    assert.match(lefthook, /run: pnpm run ci:local-gate/);
+  });
+
+  it('keeps CI and release workflows aligned on the shared local gate', () => {
+    const ciWorkflow = read('../../.github/workflows/ci.yml');
+    const releaseWorkflow = read('../../.github/workflows/release.yml');
+
+    assert.match(ciWorkflow, /pnpm run ci:local-gate/);
+    assert.match(releaseWorkflow, /Run shared local gate/);
+    assert.match(releaseWorkflow, /pnpm run ci:local-gate/);
+    assert.match(releaseWorkflow, /pnpm run test:spa:e2e:auth/);
   });
 
   it('skips auto-assign reviewer requests when the only reviewer is the PR author', () => {

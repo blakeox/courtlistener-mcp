@@ -99,6 +99,10 @@
     "ci:test-inspector:enhanced:extended": "npx tsx test/runners/enhanced-ci-test-inspector.ts --extended",
     "ci:test-inspector:performance": "ENABLE_PERFORMANCE_TESTS=true npx tsx test/runners/enhanced-ci-test-inspector.ts",
     "ci:version-check": "node scripts/build/version-check.js",
+    "ci:check:repo-hygiene": "node scripts/reports/check-repo-hygiene.mjs",
+    "ci:check:repo-hygiene:staged": "node scripts/reports/check-repo-hygiene.mjs --staged",
+    "ci:check:generated": "node scripts/reports/check-generated-files-clean.mjs",
+    "ci:local-gate": "node scripts/reports/local-gate.mjs",
     "ci:analyze-performance": "node scripts/performance/analyze-performance.js",
     "ci:compare-performance": "node scripts/performance/compare-performance.js",
     "ci:perf-gate": "node scripts/performance/ci-perf-gate.js",
@@ -187,5 +191,13 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,mjs,cjs}": [
+      "pnpm exec eslint --max-warnings=0 --no-warn-ignored"
+    ],
+    "**/*.{json,md,yml,yaml}": [
+      "pnpm exec prettier --check"
+    ]
   }
 }
