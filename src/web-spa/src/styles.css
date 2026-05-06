@@ -39,6 +39,26 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --landing-color-navy-950: #071426;
+  --landing-color-navy-900: #0b1b33;
+  --landing-color-navy-850: #10233f;
+  --landing-color-blue-600: #2563eb;
+  --landing-color-blue-500: #3b82f6;
+  --landing-color-blue-400: #60a5fa;
+  --landing-color-white: #ffffff;
+  --landing-color-paper: #f8fafc;
+  --landing-color-text-primary: #0f172a;
+  --landing-color-text-secondary: #475569;
+  --landing-color-text-muted: #64748b;
+  --landing-color-text-inverse: #f8fafc;
+  --landing-color-text-inverse-muted: #cbd5e1;
+  --landing-color-border-light: #e2e8f0;
+  --landing-color-border-dark: rgba(255, 255, 255, 0.16);
+  --landing-radius-md: 8px;
+  --landing-radius-lg: 12px;
+  --landing-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --landing-shadow-hero-card: 0 24px 60px rgba(0, 0, 0, 0.35);
+  --landing-shadow-button: 0 8px 20px rgba(37, 99, 235, 0.28);
 }
 
 /* Screen reader only utility */
@@ -1283,6 +1303,235 @@ footer a {
   text-underline-offset: 2px;
 }
 
+.app-shell-landing {
+  background: transparent;
+}
+
+.app-shell-landing .mobile-menu-btn,
+.app-shell-landing .btn,
+.app-shell-landing .pill {
+  border-radius: var(--landing-radius-md);
+}
+
+.app-shell-landing .btn.primary,
+.app-shell-landing .pill.primary,
+.app-shell-landing .btn:not(.secondary):not(.danger) {
+  background: linear-gradient(
+    135deg,
+    var(--landing-color-blue-500),
+    var(--landing-color-blue-600)
+  );
+  border-color: rgba(37, 99, 235, 0.7);
+  box-shadow: var(--landing-shadow-button);
+}
+
+.app-shell-landing .btn.secondary,
+.app-shell-landing .pill,
+.app-shell-landing .mobile-menu-btn {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: var(--landing-color-border-light);
+  color: var(--landing-color-text-primary);
+}
+
+.app-shell-landing .btn.danger {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(185, 28, 28, 0.24);
+  color: #991b1b;
+}
+
+.app-main-layout-landing {
+  align-items: stretch;
+}
+
+.app-sidebar-landing {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.24), transparent 36%),
+    linear-gradient(
+      180deg,
+      var(--landing-color-navy-900) 0%,
+      var(--landing-color-navy-950) 100%
+    );
+  box-shadow: 0 30px 64px rgba(7, 20, 38, 0.24);
+}
+
+.app-shell-landing .nav-card-link {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--landing-color-text-inverse-muted);
+}
+
+.app-shell-landing .nav-card-link:hover {
+  color: var(--landing-color-text-inverse);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.app-shell-landing .nav-card-link.active {
+  background: linear-gradient(135deg, var(--landing-color-blue-500), var(--landing-color-blue-600));
+  border-color: rgba(96, 165, 250, 0.9);
+  color: var(--landing-color-white);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);
+}
+
+.app-sidebar-brand-block {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.app-sidebar-beta-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--landing-color-text-inverse);
+}
+
+.app-sidebar-intro {
+  color: var(--landing-color-text-inverse-muted);
+  margin-top: 18px;
+}
+
+.app-sidebar-panel {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-topbar-landing {
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--landing-shadow-card);
+}
+
+.app-content-landing {
+  gap: 24px;
+}
+
+.app-footer-landing {
+  color: var(--landing-color-text-secondary);
+  border-top: 1px solid rgba(226, 232, 240, 0.72);
+  padding: 18px 4px 0;
+}
+
+.card-app-landing {
+  border: 1px solid var(--landing-color-border-light);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94)),
+    var(--landing-color-white);
+  box-shadow: var(--landing-shadow-card);
+}
+
+.card-app-landing h2 {
+  color: var(--landing-color-text-primary);
+}
+
+.panel-app-landing {
+  border: 1px solid var(--landing-color-border-light);
+  border-radius: var(--landing-radius-lg);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 18px;
+}
+
+.account-page {
+  gap: 24px;
+}
+
+.account-hero-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.account-hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 180px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(96, 165, 250, 0.24), transparent 42%),
+    linear-gradient(
+      135deg,
+      rgba(7, 20, 38, 0.96) 0%,
+      rgba(11, 27, 51, 0.9) 52%,
+      rgba(16, 35, 63, 0.84) 100%
+    );
+  pointer-events: none;
+}
+
+.account-hero-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.account-hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.95fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.account-hero-copy {
+  padding: 4px 0 10px;
+}
+
+.account-page-title {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: var(--landing-color-text-inverse);
+}
+
+.account-hero-text {
+  max-width: 60ch;
+  margin: 16px 0 0;
+  color: var(--landing-color-text-inverse-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.account-hero-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.account-summary-panel {
+  border-color: rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
+    rgba(15, 23, 42, 0.16);
+  box-shadow: 0 18px 40px rgba(7, 20, 38, 0.22);
+}
+
+.account-summary-panel strong,
+.account-summary-panel p {
+  color: var(--landing-color-text-inverse);
+}
+
+.account-summary-panel p {
+  margin: 0;
+  color: var(--landing-color-text-inverse-muted);
+}
+
+.account-summary-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--landing-color-blue-400);
+}
+
+.account-action-row {
+  margin-top: 8px;
+}
+
+.account-layout {
+  align-items: start;
+}
+
+.account-status-banner {
+  margin-top: 10px;
+}
+
 .mobile-menu-btn {
   display: none;
 }
@@ -1341,6 +1590,9 @@ footer a {
     align-items: flex-start;
     gap: var(--space-2);
   }
+  .account-hero-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1387,6 +1639,9 @@ footer a {
   }
   .sidebar.open {
     display: block;
+  }
+  .app-sidebar-brand-block {
+    align-items: center;
   }
 }
 
@@ -1632,6 +1887,35 @@ footer a {
   color: var(--ink);
 }
 
+[data-theme='dark'] .app-shell-landing .btn.secondary,
+[data-theme='dark'] .app-shell-landing .pill,
+[data-theme='dark'] .app-shell-landing .mobile-menu-btn {
+  background: rgba(15, 23, 42, 0.84);
+  border-color: rgba(148, 163, 184, 0.24);
+  color: var(--landing-color-text-inverse);
+}
+
+[data-theme='dark'] .app-topbar-landing {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(51, 65, 85, 0.8);
+}
+
+[data-theme='dark'] .card-app-landing,
+[data-theme='dark'] .panel-app-landing {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.84));
+  border-color: rgba(51, 65, 85, 0.84);
+}
+
+[data-theme='dark'] .card-app-landing h2,
+[data-theme='dark'] .account-page-title {
+  color: var(--landing-color-text-inverse);
+}
+
+[data-theme='dark'] .app-footer-landing {
+  color: var(--landing-color-text-inverse-muted);
+  border-top-color: rgba(51, 65, 85, 0.84);
+}
+
 [data-theme='dark'] .skeleton {
   background: linear-gradient(90deg, #232838 25%, #2d3548 50%, #232838 75%);
   background-size: 200% 100%;
@@ -1739,26 +2023,6 @@ footer a {
 }
 
 .landing-page {
-  --landing-color-navy-950: #071426;
-  --landing-color-navy-900: #0b1b33;
-  --landing-color-navy-850: #10233f;
-  --landing-color-blue-600: #2563eb;
-  --landing-color-blue-500: #3b82f6;
-  --landing-color-blue-400: #60a5fa;
-  --landing-color-white: #ffffff;
-  --landing-color-paper: #f8fafc;
-  --landing-color-text-primary: #0f172a;
-  --landing-color-text-secondary: #475569;
-  --landing-color-text-muted: #64748b;
-  --landing-color-text-inverse: #f8fafc;
-  --landing-color-text-inverse-muted: #cbd5e1;
-  --landing-color-border-light: #e2e8f0;
-  --landing-color-border-dark: rgba(255, 255, 255, 0.16);
-  --landing-radius-md: 8px;
-  --landing-radius-lg: 12px;
-  --landing-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --landing-shadow-hero-card: 0 24px 60px rgba(0, 0, 0, 0.35);
-  --landing-shadow-button: 0 8px 20px rgba(37, 99, 235, 0.28);
   min-height: 100vh;
   background: var(--landing-color-paper);
   color: var(--landing-color-text-primary);
@@ -1847,8 +2111,8 @@ footer a {
 }
 
 .brand-link-badge,
+.landing-section-label,
 .landing-page .landing-pill,
-.landing-page .landing-section-label,
 .landing-page .landing-stat-label,
 .landing-command-chip {
   font-size: 0.78rem;

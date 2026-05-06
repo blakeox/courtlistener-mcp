@@ -124,7 +124,7 @@ test.describe('SPA operator console', () => {
 
     await page.goto('/app/account');
 
-    await expect(page.getByRole('heading', { name: 'Operator Session', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
     await expect(page.getByText('operator-1').first()).toBeVisible();
     await expect(page.getByText('yes (server)')).toBeVisible();
     await expect(page.getByText('2 tools · 1 resources · 1 prompts')).toBeVisible();

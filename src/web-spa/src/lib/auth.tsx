@@ -30,20 +30,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return 'Unable to verify session with server.';
   }, [sessionQuery.error, sessionQuery.isError]);
 
-  const value = React.useMemo<AuthContextValue>(() => ({
-    session: sessionQuery.data,
-    loading: sessionQuery.isLoading,
-    sessionReady: sessionQuery.status !== 'pending',
-    sessionError,
-    refresh: async () => {
-      await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
-    },
-    logout: async () => {
-      await logout();
-      clearToken();
-      await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
-    },
-  }), [queryClient, sessionError, sessionQuery.data, sessionQuery.isLoading, sessionQuery.status]);
+  const value = React.useMemo<AuthContextValue>(
+    () => ({
+      session: sessionQuery.data,
+      loading: sessionQuery.isLoading,
+      sessionReady: sessionQuery.status !== 'pending',
+      sessionError,
+      refresh: async () => {
+        await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+      },
+      logout: async () => {
+        await logout();
+        clearToken();
+        await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+      },
+    }),
+    [queryClient, sessionError, sessionQuery.data, sessionQuery.isLoading, sessionQuery.status],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

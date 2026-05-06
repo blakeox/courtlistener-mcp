@@ -36,14 +36,14 @@ export function WorkspaceSectionPage(props: {
       </Card>
 
       {section.metrics?.length ? (
-          <div className="two-up-grid">
-            {section.metrics.map((metric) => (
-              <MetricCard key={metric.label} label={metric.label} value={metric.value}>
-                {metric.detail ? <p className="muted">{metric.detail}</p> : null}
-              </MetricCard>
-            ))}
-          </div>
-        ) : null}
+        <div className="two-up-grid">
+          {section.metrics.map((metric) => (
+            <MetricCard key={metric.label} label={metric.label} value={metric.value}>
+              {metric.detail ? <p className="muted">{metric.detail}</p> : null}
+            </MetricCard>
+          ))}
+        </div>
+      ) : null}
 
       <div className="two-col">
         <div className="stack">
@@ -52,7 +52,7 @@ export function WorkspaceSectionPage(props: {
               {card.items?.length ? (
                 <ul className="ordered">
                   {card.items.map((item) => (
-                   <li key={item}>{item}</li>
+                    <li key={item}>{item}</li>
                   ))}
                 </ul>
               ) : null}

@@ -122,7 +122,10 @@ export function OnboardingPage(): React.JSX.Element {
                   ? '⚠ Session check failed'
                   : '✓ Session endpoint reachable',
             },
-            { term: 'Auth', description: authed ? '✓ Operator session active' : '⚠ No operator session' },
+            {
+              term: 'Auth',
+              description: authed ? '✓ Operator session active' : '⚠ No operator session',
+            },
             {
               term: 'Local MCP credential',
               description: hasToken
@@ -131,7 +134,10 @@ export function OnboardingPage(): React.JSX.Element {
             },
             { term: 'Protocol', description: protocolStatus },
             { term: 'Tool availability', description: toolAvailabilityStatus },
-            { term: 'MCP Runtime', description: hasMcpSuccess ? '✓ Ready' : '… Pending readiness checks' },
+            {
+              term: 'MCP Runtime',
+              description: hasMcpSuccess ? '✓ Ready' : '… Pending readiness checks',
+            },
           ]}
         />
       </Card>
@@ -216,7 +222,9 @@ export function OnboardingPage(): React.JSX.Element {
                   term: 'Capabilities',
                   description:
                     (readiness?.capabilities ?? []).length > 0
-                      ? readiness?.capabilities?.map((capability) => <Badge key={capability}>{capability}</Badge>)
+                      ? readiness?.capabilities?.map((capability) => (
+                          <Badge key={capability}>{capability}</Badge>
+                        ))
                       : 'none advertised',
                   descriptionClassName: 'row',
                 },

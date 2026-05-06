@@ -7,17 +7,14 @@ import { ToastProvider } from '../components/Toast';
 import { Shell } from '../components/Shell';
 import { createMatchMediaMock, stubBrowserStorage } from './test-utils';
 
-const {
-  getSessionMock,
-  useAuthMock,
-  useColorSchemeMock,
-  useNetworkStatusMock,
-} = vi.hoisted(() => ({
-  getSessionMock: vi.fn(),
-  useAuthMock: vi.fn(),
-  useColorSchemeMock: vi.fn(),
-  useNetworkStatusMock: vi.fn(),
-}));
+const { getSessionMock, useAuthMock, useColorSchemeMock, useNetworkStatusMock } = vi.hoisted(
+  () => ({
+    getSessionMock: vi.fn(),
+    useAuthMock: vi.fn(),
+    useColorSchemeMock: vi.fn(),
+    useNetworkStatusMock: vi.fn(),
+  }),
+);
 
 vi.mock('../lib/api', () => ({
   getSession: getSessionMock,
@@ -48,19 +45,23 @@ function renderShell(initialEntry = '/app/playground'): void {
           <Routes>
             <Route
               path="*"
-              element={(
+              element={
                 <>
                   <Shell
                     steps={[
                       { label: 'Operator session', complete: false, to: '/app/account' },
-                      { label: 'Local MCP credential loaded', complete: false, to: '/app/control-center' },
+                      {
+                        label: 'Local MCP credential loaded',
+                        complete: false,
+                        to: '/app/control-center',
+                      },
                     ]}
                   >
                     <div>Shell body</div>
                   </Shell>
                   <LocationProbe />
                 </>
-              )}
+              }
             />
           </Routes>
         </ToastProvider>

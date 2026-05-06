@@ -22,7 +22,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <div>Safe content</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText('Safe content')).toBeInTheDocument();
   });
@@ -31,7 +31,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     expect(screen.getByText('Test explosion')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
@@ -50,7 +50,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByRole('link', { name: /workspace home/i })).toHaveAttribute('href', '/app');
   });
@@ -59,7 +59,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Test explosion');
   });

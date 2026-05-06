@@ -94,14 +94,6 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 30_0
   return (body ?? {}) as T;
 }
 
-function withAuth(headers: HeadersInit, token?: string): HeadersInit {
-  if (!token?.trim()) return headers;
-  return {
-    ...headers,
-    authorization: `Bearer ${token.trim()}`,
-  };
-}
-
 export async function getSession(): Promise<AuthSessionResponse> {
   const payload = await request<unknown>('/api/session');
   return sessionSchema.parse(payload);

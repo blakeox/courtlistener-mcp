@@ -34,19 +34,33 @@ export function PlaygroundProvider({
   const [mcpSessionId, setMcpSessionId] = React.useState('');
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [lastRawMcp, setLastRawMcp] = React.useState('');
-  const [protocolLog, setProtocolLog] = React.useState<Array<{ direction: 'request' | 'response'; payload: unknown; at: string }>>([]);
+  const [protocolLog, setProtocolLog] = React.useState<
+    Array<{ direction: 'request' | 'response'; payload: unknown; at: string }>
+  >([]);
 
-  const append = React.useCallback((role: TranscriptItem['role'], text: string, meta?: Record<string, unknown>) => {
-    setTranscript((existing) => [...existing, { role, text, at: new Date().toISOString(), meta }]);
-  }, []);
+  const append = React.useCallback(
+    (role: TranscriptItem['role'], text: string, meta?: Record<string, unknown>) => {
+      setTranscript((existing) => [
+        ...existing,
+        { role, text, at: new Date().toISOString(), meta },
+      ]);
+    },
+    [],
+  );
 
   const clearTranscript = React.useCallback(() => {
     setTranscript([]);
   }, []);
 
-  const addProtocolEntry = React.useCallback((direction: 'request' | 'response', payload: unknown) => {
-    setProtocolLog((existing) => [...existing, { direction, payload, at: new Date().toISOString() }]);
-  }, []);
+  const addProtocolEntry = React.useCallback(
+    (direction: 'request' | 'response', payload: unknown) => {
+      setProtocolLog((existing) => [
+        ...existing,
+        { direction, payload, at: new Date().toISOString() },
+      ]);
+    },
+    [],
+  );
 
   const clearProtocol = React.useCallback(() => {
     setProtocolLog([]);
@@ -67,7 +81,17 @@ export function PlaygroundProvider({
       addProtocolEntry,
       clearProtocol,
     }),
-    [token, mcpSessionId, transcript, append, clearTranscript, lastRawMcp, protocolLog, addProtocolEntry, clearProtocol],
+    [
+      token,
+      mcpSessionId,
+      transcript,
+      append,
+      clearTranscript,
+      lastRawMcp,
+      protocolLog,
+      addProtocolEntry,
+      clearProtocol,
+    ],
   );
 
   return <PlaygroundContext.Provider value={value}>{children}</PlaygroundContext.Provider>;

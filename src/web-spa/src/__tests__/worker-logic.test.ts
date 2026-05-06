@@ -9,26 +9,57 @@ import { describe, it, expect } from 'vitest';
 
 function aiToolFromPrompt(message: string): { tool: string; reason: string } {
   const normalized = message.toLowerCase();
-  if (/\d+\s+(u\.?s\.?|s\.?\s*ct\.?|f\.\s*\d|f\.?\s*supp)/i.test(message) || normalized.includes('v.')) {
-    return { tool: 'lookup_citation', reason: 'Query contains a legal citation pattern (e.g., "v." or reporter reference).' };
+  if (
+    /\d+\s+(u\.?s\.?|s\.?\s*ct\.?|f\.\s*\d|f\.?\s*supp)/i.test(message) ||
+    normalized.includes('v.')
+  ) {
+    return {
+      tool: 'lookup_citation',
+      reason: 'Query contains a legal citation pattern (e.g., "v." or reporter reference).',
+    };
   }
-  if (normalized.includes('opinion') || normalized.includes('holding') || normalized.includes('ruling')) {
+  if (
+    normalized.includes('opinion') ||
+    normalized.includes('holding') ||
+    normalized.includes('ruling')
+  ) {
     return { tool: 'search_opinions', reason: 'Query mentions opinions, holdings, or rulings.' };
   }
-  if (normalized.includes('judge') && (normalized.includes('profile') || normalized.includes('background') || normalized.includes('record'))) {
-    return { tool: 'get_comprehensive_judge_profile', reason: 'Query asks for a judge profile or background.' };
+  if (
+    normalized.includes('judge') &&
+    (normalized.includes('profile') ||
+      normalized.includes('background') ||
+      normalized.includes('record'))
+  ) {
+    return {
+      tool: 'get_comprehensive_judge_profile',
+      reason: 'Query asks for a judge profile or background.',
+    };
   }
-  if (normalized.includes('court') && (normalized.includes('list') || normalized.includes('which') || normalized.includes('all'))) {
+  if (
+    normalized.includes('court') &&
+    (normalized.includes('list') || normalized.includes('which') || normalized.includes('all'))
+  ) {
     return { tool: 'list_courts', reason: 'Query asks to list or identify courts.' };
   }
   if (normalized.includes('docket') || normalized.includes('filing')) {
     return { tool: 'get_docket_entries', reason: 'Query mentions dockets or filings.' };
   }
-  if (normalized.includes('citation') && (normalized.includes('valid') || normalized.includes('check') || normalized.includes('verify'))) {
+  if (
+    normalized.includes('citation') &&
+    (normalized.includes('valid') || normalized.includes('check') || normalized.includes('verify'))
+  ) {
     return { tool: 'validate_citations', reason: 'Query asks to validate or check citations.' };
   }
-  if (normalized.includes('argument') || normalized.includes('precedent') || normalized.includes('legal analysis')) {
-    return { tool: 'analyze_legal_argument', reason: 'Query involves legal argument analysis or precedent research.' };
+  if (
+    normalized.includes('argument') ||
+    normalized.includes('precedent') ||
+    normalized.includes('legal analysis')
+  ) {
+    return {
+      tool: 'analyze_legal_argument',
+      reason: 'Query involves legal argument analysis or precedent research.',
+    };
   }
   return { tool: 'search_cases', reason: 'Default: general case search for broad legal queries.' };
 }
@@ -76,11 +107,7 @@ function aiToolArguments(toolName: string, prompt: string): Record<string, unkno
   };
 }
 
-function buildLowCostSummary(
-  message: string,
-  toolName: string,
-  mcpPayload: unknown,
-): string {
+function buildLowCostSummary(message: string, toolName: string, mcpPayload: unknown): string {
   try {
     const payload = mcpPayload as Record<string, unknown>;
     const result = payload?.result as Record<string, unknown> | undefined;
@@ -106,7 +133,9 @@ function buildLowCostSummary(
         }
       }
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   const payloadText = JSON.stringify(mcpPayload);
   const compact = payloadText.length > 1200 ? `${payloadText.slice(0, 1200)}...` : payloadText;
@@ -134,7 +163,10 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
           if (parsed && typeof parsed === 'object') {
             const formatted = formatMcpDataForLlm(toolName, parsed);
             if (formatted) {
-              const trimmed = formatted.length > maxLen ? `${formatted.slice(0, maxLen)}... [truncated]` : formatted;
+              const trimmed =
+                formatted.length > maxLen
+                  ? `${formatted.slice(0, maxLen)}... [truncated]`
+                  : formatted;
               return `Tool: ${toolName}\n\n${trimmed}`;
             }
           }
@@ -144,7 +176,8 @@ function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen: number
             .map((c) => c.text!)
             .join('\n\n');
           if (texts.length > 0) {
-            const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
+            const trimmed =
+              texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
             return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
           }
         }
@@ -176,7 +209,8 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
     if (nestedAnalysis && typeof nestedAnalysis === 'object') {
       if (nestedAnalysis.summary) lines.push(`Analysis: ${nestedAnalysis.summary}`);
       if (nestedAnalysis.query_used) lines.push(`Query: ${nestedAnalysis.query_used}`);
-      if (typeof nestedAnalysis.total_found === 'number') lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
+      if (typeof nestedAnalysis.total_found === 'number')
+        lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
 
       const topCases = nestedAnalysis.top_cases as unknown[] | undefined;
       if (Array.isArray(topCases) && topCases.length > 0) {
@@ -203,7 +237,8 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
       lines.push(`\n${judges.length} judges found:`);
       for (let i = 0; i < judges.length; i++) {
         const j = judges[i] as Record<string, unknown>;
-        const name = j.name_full || j.name || `${j.name_first || ''} ${j.name_last || ''}`.trim() || 'Unknown';
+        const name =
+          j.name_full || j.name || `${j.name_first || ''} ${j.name_last || ''}`.trim() || 'Unknown';
         const jCourt = j.court || '';
         const born = j.date_dob || '';
         const appointed = j.date_nominated || j.date_appointed || '';
@@ -220,7 +255,9 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
 
     const pag = innerPagination || pagination;
     if (pag) {
-      lines.push(`Total results: ${pag.totalResults ?? pag.total_results ?? 'unknown'}, Page ${pag.currentPage ?? pag.current_page ?? 1} of ${pag.totalPages ?? pag.total_pages ?? '?'}`);
+      lines.push(
+        `Total results: ${pag.totalResults ?? pag.total_results ?? 'unknown'}, Page ${pag.currentPage ?? pag.current_page ?? 1} of ${pag.totalPages ?? pag.total_pages ?? '?'}`,
+      );
     }
 
     if (Array.isArray(items) && items.length > 0) {
@@ -234,7 +271,9 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
 
   if (Array.isArray(results) && results.length > 0) {
     if (pagination) {
-      lines.push(`Total results: ${pagination.totalResults ?? pagination.total_results ?? 'unknown'}, Page ${pagination.currentPage ?? pagination.current_page ?? 1}`);
+      lines.push(
+        `Total results: ${pagination.totalResults ?? pagination.total_results ?? 'unknown'}, Page ${pagination.currentPage ?? pagination.current_page ?? 1}`,
+      );
     }
     lines.push(`\nTop ${results.length} results:`);
     for (let i = 0; i < results.length; i++) {
@@ -248,7 +287,8 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
     const analysis = data.analysis as Record<string, unknown>;
     if (analysis.summary) lines.push(`Analysis: ${analysis.summary}`);
     if (analysis.query_used) lines.push(`Query: ${analysis.query_used}`);
-    if (typeof analysis.total_found === 'number') lines.push(`Total opinions found: ${analysis.total_found}`);
+    if (typeof analysis.total_found === 'number')
+      lines.push(`Total opinions found: ${analysis.total_found}`);
 
     const topCases = analysis.top_cases as unknown[] | undefined;
     if (Array.isArray(topCases) && topCases.length > 0) {
@@ -257,7 +297,7 @@ function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): s
         const item = topCases[i] as Record<string, unknown>;
         lines.push(formatSearchResult(i + 1, item));
       }
-    } else if (!lines.some(l => l.startsWith('Top '))) {
+    } else if (!lines.some((l) => l.startsWith('Top '))) {
       lines.push(JSON.stringify(analysis, null, 2));
     }
   }
@@ -272,8 +312,12 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   const court = item.court || item.court_id || '';
   const dateFiled = item.date_filed || item.dateFiled || '';
   const citation =
-    item.federal_cite_one || item.state_cite_one || item.neutral_cite ||
-    item.citation || item.citation_string || '';
+    item.federal_cite_one ||
+    item.state_cite_one ||
+    item.neutral_cite ||
+    item.citation ||
+    item.citation_string ||
+    '';
   const citationCount = item.citation_count ?? item.citationCount;
   const status = item.precedential_status || item.status || '';
   const url = item.absolute_url || item.url || '';
@@ -283,11 +327,14 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   if (court) parts.push(`   Court: ${court}`);
   if (dateFiled) parts.push(`   Date: ${dateFiled}`);
   if (citation) parts.push(`   Citation: ${citation}`);
-  if (citationCount !== undefined && citationCount !== null) parts.push(`   Cited ${citationCount} times`);
+  if (citationCount !== undefined && citationCount !== null)
+    parts.push(`   Cited ${citationCount} times`);
   if (status) parts.push(`   Status: ${status}`);
   if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
   if (snippet) {
-    const cleanSnippet = String(snippet).replace(/<[^>]+>/g, '').slice(0, 300);
+    const cleanSnippet = String(snippet)
+      .replace(/<[^>]+>/g, '')
+      .slice(0, 300);
     parts.push(`   Snippet: ${cleanSnippet}`);
   }
 
@@ -327,65 +374,89 @@ function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): string {
     return [
       'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
       'You have been given REAL court data retrieved from CourtListener. Present this data clearly and completely.',
-      '', ...commonRules, '',
+      '',
+      ...commonRules,
+      '',
       'FORMAT your response with these sections:',
       '**Courts Overview**: A 1-2 sentence summary of what was found.',
       '**Court Listing**: Present ALL courts from the data in a clear, organized format grouped by jurisdiction type (Federal, State, etc.). Include court name, jurisdiction, and any other available details.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   if (toolName.includes('judge')) {
     return [
       'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
       'You have been given REAL judge data retrieved from CourtListener. Present this data clearly.',
-      '', ...commonRules, '',
+      '',
+      ...commonRules,
+      '',
       'FORMAT your response with these sections:',
       '**Judge Profile**: Present the judge information from the data.',
       '**Notable Details**: Any significant details from the data.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   if (toolName.includes('docket')) {
     return [
       'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
       'You have been given REAL docket data retrieved from CourtListener. Present this data clearly.',
-      '', ...commonRules, '',
+      '',
+      ...commonRules,
+      '',
       'FORMAT your response with these sections:',
       '**Docket Summary**: Summarize the docket.',
       '**Key Filings**: List the most important entries with dates and descriptions.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
-  if (toolName === 'lookup_citation' || toolName === 'validate_citations' || toolName === 'get_citation_network') {
+  if (
+    toolName === 'lookup_citation' ||
+    toolName === 'validate_citations' ||
+    toolName === 'get_citation_network'
+  ) {
     return [
       'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
       'You have been given REAL citation data retrieved from CourtListener.',
-      '', ...commonRules, '',
+      '',
+      ...commonRules,
+      '',
       'FORMAT your response with these sections:',
       '**Citation Details**: Present the citation information.',
       '**Significance**: Explain the importance of this case.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   return [
     'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database, via MCP tools.',
     'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data.',
-    '', ...commonRules, '',
+    '',
+    ...commonRules,
+    '',
     'FORMAT your response with these sections:',
-    '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question.',
+    "**Legal Analysis**: A substantive 3-5 sentence analysis answering the user's question.",
     '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates.',
     '**Legal Landscape**: 1-2 sentences on the broader legal landscape.',
     '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
     followUp,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -620,12 +691,25 @@ describe('buildLowCostSummary', () => {
   it('formats structured search results when available', () => {
     const payload = {
       result: {
-        content: [{ type: 'text', text: JSON.stringify({
-          success: true,
-          data: { summary: 'Found 5 results', results: [
-            { case_name: 'Roe v. Wade', court: 'scotus', date_filed: '1973-01-22', federal_cite_one: '410 U.S. 113' },
-          ] },
-        }) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              data: {
+                summary: 'Found 5 results',
+                results: [
+                  {
+                    case_name: 'Roe v. Wade',
+                    court: 'scotus',
+                    date_filed: '1973-01-22',
+                    federal_cite_one: '410 U.S. 113',
+                  },
+                ],
+              },
+            }),
+          },
+        ],
       },
     };
     const result = buildLowCostSummary('abortion rights', 'search_cases', payload);
@@ -644,17 +728,33 @@ describe('extractMcpContext', () => {
   it('formats structured search results from JSON content', () => {
     const payload = {
       result: {
-        content: [{ type: 'text', text: JSON.stringify({
-          success: true,
-          data: {
-            summary: 'Found 42 results',
-            results: [
-              { case_name: 'Roe v. Wade', court: 'scotus', date_filed: '1973-01-22', federal_cite_one: '410 U.S. 113', citation_count: 5000 },
-              { case_name: 'Griswold v. Connecticut', court: 'scotus', date_filed: '1965-06-07', federal_cite_one: '381 U.S. 479' },
-            ],
-            pagination: { totalResults: 42, currentPage: 1, totalPages: 9 },
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              data: {
+                summary: 'Found 42 results',
+                results: [
+                  {
+                    case_name: 'Roe v. Wade',
+                    court: 'scotus',
+                    date_filed: '1973-01-22',
+                    federal_cite_one: '410 U.S. 113',
+                    citation_count: 5000,
+                  },
+                  {
+                    case_name: 'Griswold v. Connecticut',
+                    court: 'scotus',
+                    date_filed: '1965-06-07',
+                    federal_cite_one: '381 U.S. 479',
+                  },
+                ],
+                pagination: { totalResults: 42, currentPage: 1, totalPages: 9 },
+              },
+            }),
           },
-        }) }],
+        ],
       },
     };
     const result = extractMcpContext('search_cases', payload, 5000);
@@ -669,9 +769,7 @@ describe('extractMcpContext', () => {
   it('falls back to raw text for non-JSON content', () => {
     const payload = {
       result: {
-        content: [
-          { type: 'text', text: 'Case: Roe v. Wade, 410 U.S. 113 (1973)' },
-        ],
+        content: [{ type: 'text', text: 'Case: Roe v. Wade, 410 U.S. 113 (1973)' }],
       },
     };
     const result = extractMcpContext('search_cases', payload, 5000);
@@ -734,7 +832,15 @@ describe('formatMcpDataForLlm', () => {
       data: {
         summary: 'Found 10 results',
         results: [
-          { case_name: 'Test v. Case', court: '3rd Cir.', date_filed: '2024-01-15', federal_cite_one: '100 F.3d 200', citation_count: 42, precedential_status: 'Published', absolute_url: '/opinion/12345/' },
+          {
+            case_name: 'Test v. Case',
+            court: '3rd Cir.',
+            date_filed: '2024-01-15',
+            federal_cite_one: '100 F.3d 200',
+            citation_count: 42,
+            precedential_status: 'Published',
+            absolute_url: '/opinion/12345/',
+          },
         ],
         search_parameters: { query: 'privacy' },
         pagination: { totalResults: 10, currentPage: 1, totalPages: 2 },
@@ -753,9 +859,7 @@ describe('formatMcpDataForLlm', () => {
   it('formats direct array results', () => {
     const data = {
       success: true,
-      data: [
-        { case_name: 'Direct Case', court: 'scotus' },
-      ],
+      data: [{ case_name: 'Direct Case', court: 'scotus' }],
       pagination: { totalResults: 1, currentPage: 1 },
     };
     const result = formatMcpDataForLlm('search_cases', data);
@@ -787,7 +891,13 @@ describe('formatMcpDataForLlm', () => {
       data: {
         analysis: {
           top_cases: [
-            { case_name: 'Tinker v. Des Moines', court: 'scotus', date_filed: '1969-02-24', citation: '393 U.S. 503', citation_count: 500 },
+            {
+              case_name: 'Tinker v. Des Moines',
+              court: 'scotus',
+              date_filed: '1969-02-24',
+              citation: '393 U.S. 503',
+              citation_count: 500,
+            },
           ],
           total_found: 150,
           query_used: 'student free speech',
@@ -810,9 +920,24 @@ describe('formatMcpDataForLlm', () => {
       data: {
         summary: 'Retrieved 3 courts',
         courts: [
-          { full_name: 'Supreme Court of the United States', id: 'scotus', jurisdiction: 'F', in_use: true },
-          { full_name: 'Court of Appeals for the First Circuit', id: 'ca1', jurisdiction: 'F', in_use: true },
-          { full_name: 'Court of Appeals for the Second Circuit', id: 'ca2', jurisdiction: 'F', in_use: true },
+          {
+            full_name: 'Supreme Court of the United States',
+            id: 'scotus',
+            jurisdiction: 'F',
+            in_use: true,
+          },
+          {
+            full_name: 'Court of Appeals for the First Circuit',
+            id: 'ca1',
+            jurisdiction: 'F',
+            in_use: true,
+          },
+          {
+            full_name: 'Court of Appeals for the Second Circuit',
+            id: 'ca2',
+            jurisdiction: 'F',
+            in_use: true,
+          },
         ],
       },
     };

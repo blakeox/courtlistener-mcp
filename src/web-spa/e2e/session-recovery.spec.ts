@@ -78,7 +78,7 @@ test.describe('SPA session recovery failures', () => {
     await page.getByRole('button', { name: 'Log out' }).click();
 
     await expect(page).toHaveURL(/\/app\/account$/);
-    await expect(page.getByRole('heading', { name: 'Operator Session', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
     await expect(page.getByText('Logout failed — session is still active.')).toBeVisible();
     await expect
       .poll(async () =>

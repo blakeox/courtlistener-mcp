@@ -11,14 +11,18 @@ export function Card(
   props: React.PropsWithChildren<{
     title?: string;
     subtitle?: string;
-    tone?: 'default' | 'spotlight';
+    tone?: 'default' | 'spotlight' | 'app-landing';
     className?: string;
   }>,
 ): React.JSX.Element {
+  const toneClassName =
+    props.tone === 'spotlight'
+      ? 'card-spotlight'
+      : props.tone === 'app-landing'
+        ? 'card-app-landing'
+        : '';
   return (
-    <section
-      className={`ui-card ${props.tone === 'spotlight' ? 'card-spotlight' : ''} ${props.className ?? ''}`.trim()}
-    >
+    <section className={`ui-card ${toneClassName} ${props.className ?? ''}`.trim()}>
       {props.title ? <h2>{props.title}</h2> : null}
       {props.subtitle ? <p className="muted">{props.subtitle}</p> : null}
       {props.children}
@@ -27,12 +31,15 @@ export function Card(
 }
 
 export function Panel(
-  props: React.PropsWithChildren<{ tone?: 'default' | 'inverse'; className?: string }>,
+  props: React.PropsWithChildren<{
+    tone?: 'default' | 'inverse' | 'app-landing';
+    className?: string;
+  }>,
 ): React.JSX.Element {
+  const toneClassName =
+    props.tone === 'inverse' ? 'inverse' : props.tone === 'app-landing' ? 'panel-app-landing' : '';
   return (
-    <section
-      className={`panel-card ${props.tone === 'inverse' ? 'inverse' : ''} ${props.className ?? ''}`.trim()}
-    >
+    <section className={`panel-card ${toneClassName} ${props.className ?? ''}`.trim()}>
       {props.children}
     </section>
   );
@@ -72,9 +79,7 @@ export function InfoBlock(
   const TitleTag = props.titleAs ?? 'strong';
   return (
     <div className={['info-block', props.className ?? ''].join(' ').trim()}>
-      {props.eyebrow ? (
-        <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
-      ) : null}
+      {props.eyebrow ? <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow> : null}
       <TitleTag className={props.titleClassName}>{props.title}</TitleTag>
       {props.description ? <p className={props.descriptionClassName}>{props.description}</p> : null}
       {props.children}
@@ -157,15 +162,14 @@ export function ComparisonCard(
 
   return (
     <div
-      className={[
-        'comparison-card',
-        toneClassName,
-        sizeClassName,
-        props.className ?? '',
-      ].join(' ').trim()}
+      className={['comparison-card', toneClassName, sizeClassName, props.className ?? '']
+        .join(' ')
+        .trim()}
     >
       <div className={['comparison-card-header', headerSizeClassName].join(' ').trim()}>
-        <span className={['comparison-icon', iconSizeClassName].join(' ').trim()}>{props.icon}</span>
+        <span className={['comparison-icon', iconSizeClassName].join(' ').trim()}>
+          {props.icon}
+        </span>
         <strong className={['comparison-card-title', titleSizeClassName].join(' ').trim()}>
           {props.title}
         </strong>
@@ -200,9 +204,12 @@ export function InlineGroup(
   }>,
 ): React.JSX.Element {
   const justifyClassName = props.justify === 'between' ? 'between' : '';
-  const gapClassName = props.gap === 'tight' ? 'row-tight' : props.gap === 'spacious' ? 'row-spacious' : '';
+  const gapClassName =
+    props.gap === 'tight' ? 'row-tight' : props.gap === 'spacious' ? 'row-spacious' : '';
   return (
-    <div className={['row', justifyClassName, gapClassName, props.className ?? ''].join(' ').trim()}>
+    <div
+      className={['row', justifyClassName, gapClassName, props.className ?? ''].join(' ').trim()}
+    >
       {props.children}
     </div>
   );
@@ -408,7 +415,11 @@ export function ButtonLink(
 
 export function BrandLink(props: RouterBrandLinkProps | AnchorBrandLinkProps): React.JSX.Element {
   const tone = props.tone ?? 'default';
-  const className = ['brand-link', tone === 'landing' ? 'brand-link-landing' : 'brand-link-default', props.className ?? '']
+  const className = [
+    'brand-link',
+    tone === 'landing' ? 'brand-link-landing' : 'brand-link-default',
+    props.className ?? '',
+  ]
     .join(' ')
     .trim();
   const content = (
@@ -546,6 +557,7 @@ export function StatusBanner(props: {
   type?: 'ok' | 'error' | 'info' | 'warn';
   id?: string;
   children?: React.ReactNode;
+  className?: string;
 }): React.JSX.Element | null {
   if (!props.message && !props.children) return null;
   const role = props.role ?? 'status';
@@ -554,7 +566,7 @@ export function StatusBanner(props: {
       id={props.id}
       role={role}
       aria-live={role === 'alert' ? 'assertive' : 'polite'}
-      className={`status ${props.type ?? 'info'}`}
+      className={`status ${props.type ?? 'info'} ${props.className ?? ''}`.trim()}
     >
       {props.title ? <strong>{props.title}</strong> : null}
       {props.message ? props.title ? <> {props.message}</> : props.message : null}
@@ -616,9 +628,13 @@ export function DefinitionList(props: {
   );
 }
 
-export function MetaNote(props: React.PropsWithChildren<{ size?: 'default' | 'large'; className?: string }>) {
+export function MetaNote(
+  props: React.PropsWithChildren<{ size?: 'default' | 'large'; className?: string }>,
+) {
   return (
-    <div className={`meta-note ${props.size === 'large' ? 'meta-note-lg' : ''} ${props.className ?? ''}`.trim()}>
+    <div
+      className={`meta-note ${props.size === 'large' ? 'meta-note-lg' : ''} ${props.className ?? ''}`.trim()}
+    >
       {props.children}
     </div>
   );
@@ -816,7 +832,13 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>): React
 export function Checkbox(
   props: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>,
 ): React.JSX.Element {
-  return <input type="checkbox" {...props} className={`checkbox-input ${props.className ?? ''}`.trim()} />;
+  return (
+    <input
+      type="checkbox"
+      {...props}
+      className={`checkbox-input ${props.className ?? ''}`.trim()}
+    />
+  );
 }
 
 export function CheckboxField(
@@ -866,20 +888,20 @@ export function CodeSurface(props: {
   }
 
   return (
-      <div className={`raw-response ${props.className ?? ''}`.trim()}>
-        {props.title || props.copyable ? (
-          <InlineGroup justify="between">
-            {props.title ? <strong>{props.title}</strong> : null}
-            {props.copyable ? (
-              <Button variant="secondary" size="compact" onClick={() => void onCopy()}>
-                {props.copyLabel ?? 'Copy'}
-              </Button>
-            ) : null}
-          </InlineGroup>
-        ) : null}
-        <pre className="raw-response-code">
-          <code>{props.children ?? props.code}</code>
-        </pre>
+    <div className={`raw-response ${props.className ?? ''}`.trim()}>
+      {props.title || props.copyable ? (
+        <InlineGroup justify="between">
+          {props.title ? <strong>{props.title}</strong> : null}
+          {props.copyable ? (
+            <Button variant="secondary" size="compact" onClick={() => void onCopy()}>
+              {props.copyLabel ?? 'Copy'}
+            </Button>
+          ) : null}
+        </InlineGroup>
+      ) : null}
+      <pre className="raw-response-code">
+        <code>{props.children ?? props.code}</code>
+      </pre>
     </div>
   );
 }

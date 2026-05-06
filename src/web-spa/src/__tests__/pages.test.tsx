@@ -22,32 +22,28 @@ vi.mock('../lib/api', () => ({
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
-  createKey: vi
-    .fn()
-    .mockResolvedValue({
-      message: 'ok',
-      api_key: {
-        id: 'k1',
-        label: 'test',
-        created_at: '2024-01-01',
-        expires_at: null,
-        token: 'tok',
-      },
-    }),
+  createKey: vi.fn().mockResolvedValue({
+    message: 'ok',
+    api_key: {
+      id: 'k1',
+      label: 'test',
+      created_at: '2024-01-01',
+      expires_at: null,
+      token: 'tok',
+    },
+  }),
   revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
-  aiChat: vi
-    .fn()
-    .mockResolvedValue({
-      test_mode: true,
-      fallback_used: false,
-      mode: 'cheap',
-      tool: 'search_cases',
-      tool_reason: 'Default search',
-      session_id: 'sid',
-      ai_response: 'resp',
-      mcp_result: {},
-    }),
+  aiChat: vi.fn().mockResolvedValue({
+    test_mode: true,
+    fallback_used: false,
+    mode: 'cheap',
+    tool: 'search_cases',
+    tool_reason: 'Default search',
+    session_id: 'sid',
+    ai_response: 'resp',
+    mcp_result: {},
+  }),
   aiPlain: vi.fn().mockResolvedValue({ ai_response: 'plain resp', mode: 'cheap' }),
   toErrorMessage: vi.fn().mockReturnValue('Error'),
 }));
@@ -398,13 +394,14 @@ describe('AccountPage', () => {
   it('renders account heading', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Session')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Control', level: 1 })).toBeInTheDocument();
   });
 
   it('shows session info area', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
     expect(screen.getByText('Authenticated')).toBeInTheDocument();
+    expect(screen.getByText('Session posture')).toBeInTheDocument();
   });
 
   it('surfaces protocol observability counts when token is available', async () => {

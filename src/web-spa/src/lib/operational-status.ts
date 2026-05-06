@@ -13,7 +13,10 @@ function canUseStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
 }
 
-export function rememberOperationalStatus(message: string, type: OperationalStatusType = 'info'): void {
+export function rememberOperationalStatus(
+  message: string,
+  type: OperationalStatusType = 'info',
+): void {
   if (!canUseStorage() || !message.trim()) return;
   try {
     window.sessionStorage.setItem(OPERATIONAL_STATUS_KEY, JSON.stringify({ message, type }));
@@ -30,7 +33,10 @@ export function consumeOperationalStatus(): OperationalStatusPayload | null {
     window.sessionStorage.removeItem(OPERATIONAL_STATUS_KEY);
     const parsed = JSON.parse(raw) as { message?: unknown; type?: unknown };
     if (typeof parsed.message !== 'string' || !parsed.message.trim()) return null;
-    const type = parsed.type === 'ok' || parsed.type === 'error' || parsed.type === 'info' ? parsed.type : 'info';
+    const type =
+      parsed.type === 'ok' || parsed.type === 'error' || parsed.type === 'info'
+        ? parsed.type
+        : 'info';
     return { message: parsed.message, type };
   } catch {
     return null;
@@ -57,5 +63,8 @@ export function shouldCarryOperationalStatus(error: unknown, message: string): b
   if (candidate?.status === 429) return true;
   if (typeof candidate?.status === 'number' && candidate.status >= 500) return true;
   const normalized = message.toLowerCase();
-  return normalized.includes('service incident') || (normalized.includes('wait') && normalized.includes('retry'));
+  return (
+    normalized.includes('service incident') ||
+    (normalized.includes('wait') && normalized.includes('retry'))
+  );
 }

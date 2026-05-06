@@ -32,9 +32,7 @@ export function stubBrowserStorage(): void {
 }
 
 export function createMatchMediaMock(
-  matches:
-    | boolean
-    | ((query: string) => boolean) = false,
+  matches: boolean | ((query: string) => boolean) = false,
 ): typeof window.matchMedia {
   return ((query: string) => ({
     matches: typeof matches === 'function' ? matches(query) : matches,

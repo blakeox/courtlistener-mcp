@@ -5,6 +5,7 @@ import { useToken } from '../lib/token-context';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import {
   BadgeLink,
+  Badge,
   BrandLink,
   Button,
   ButtonLink,
@@ -69,11 +70,9 @@ export function Shell(
   }, [location.pathname]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell app-shell-landing">
       <SkipLink href="#main-content">Skip to content</SkipLink>
-      {!online && (
-        <StatusBanner message="You're offline — changes may not save." type="warn" />
-      )}
+      {!online && <StatusBanner message="You're offline — changes may not save." type="warn" />}
       {!loading && !authed && hasLocalToken ? (
         <StatusBanner
           title="Session recovery:"
@@ -96,7 +95,7 @@ export function Shell(
         </StatusBanner>
       ) : null}
 
-      <div className="main-layout">
+      <div className="main-layout app-main-layout-landing">
         <Button
           variant="secondary"
           size="compact"
@@ -108,10 +107,22 @@ export function Shell(
         >
           ☰ Menu
         </Button>
-        <aside id="primary-navigation" className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <BrandLink to="/app" label="CourtListener MCP" subtitle="Legal-agent console" />
-          <p className="sidebar-intro">
-            Install MCP, connect clients, test tools, and inspect research runs.
+        <aside
+          id="primary-navigation"
+          className={`sidebar app-sidebar-landing ${sidebarOpen ? 'open' : ''}`.trim()}
+        >
+          <div className="app-sidebar-brand-block">
+            <BrandLink
+              to="/app"
+              label="CourtListener MCP"
+              subtitle="Operator workspace"
+              tone="landing"
+            />
+            <Badge className="app-sidebar-beta-badge">Workspace</Badge>
+          </div>
+          <p className="sidebar-intro app-sidebar-intro">
+            Operate the hosted MCP surface with the same design language as the public portal, while
+            keeping runtime controls visible.
           </p>
           <div className="menu">
             {WORKSPACE_NAV_GROUPS.map((group) => (
@@ -140,7 +151,7 @@ export function Shell(
             ))}
           </div>
           <div className="sidebar-meta">
-            <Panel tone="inverse">
+            <Panel tone="inverse" className="app-sidebar-panel">
               <InfoBlock
                 eyebrow="Current Workspace"
                 title={currentWorkspace.label}
@@ -148,7 +159,7 @@ export function Shell(
                 description={currentWorkspace.description}
               />
             </Panel>
-            <Panel tone="inverse">
+            <Panel tone="inverse" className="app-sidebar-panel">
               <InfoBlock
                 eyebrow="User Profile"
                 title={authed ? 'Research operator' : 'Guest operator'}
@@ -159,9 +170,9 @@ export function Shell(
           </div>
         </aside>
         <div className="shell-main-column">
-          <header className="topbar">
+          <header className="topbar app-topbar-landing">
             <InfoBlock
-              eyebrow="Current page"
+              eyebrow="Workspace"
               title={currentWorkspace.label}
               titleAs="strong"
               className="topbar-heading"
@@ -210,13 +221,18 @@ export function Shell(
               </InlineGroup>
             </nav>
           </header>
-          <main id="main-content" ref={mainRef} tabIndex={-1} className="content">
+          <main
+            id="main-content"
+            ref={mainRef}
+            tabIndex={-1}
+            className="content app-content-landing"
+          >
             {props.children}
           </main>
         </div>
       </div>
 
-      <footer>
+      <footer className="app-footer-landing">
         Legal-agent workspace for CourtListener MCP. Public sign-in flows through the separate auth
         portal handoff surface. MCP endpoint: <code>/mcp</code> | Health: <code>/health</code> |{' '}
         <TextLink href="https://www.courtlistener.com" target="_blank" rel="noopener noreferrer">

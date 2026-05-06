@@ -61,7 +61,9 @@ function extractToolCategories(payload: unknown): string[] {
   const metadata = asRecord(result?.metadata) ?? asRecord(root?.metadata);
   const categories = metadata?.categories;
   if (!Array.isArray(categories)) return [];
-  return categories.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+  return categories.filter(
+    (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0,
+  );
 }
 
 function extractCapabilities(payload: unknown): string[] {
@@ -103,12 +105,12 @@ function countConstrainedArguments(inputSchema: Record<string, unknown> | null):
     const schema = asRecord(propertySchema);
     if (!schema) return count;
     if (
-      'minimum' in schema
-      || 'maximum' in schema
-      || 'minLength' in schema
-      || 'maxLength' in schema
-      || 'enum' in schema
-      || 'pattern' in schema
+      'minimum' in schema ||
+      'maximum' in schema ||
+      'minLength' in schema ||
+      'maxLength' in schema ||
+      'enum' in schema ||
+      'pattern' in schema
     ) {
       return count + 1;
     }
@@ -177,12 +179,15 @@ async function listSurface(
   id: number,
 ): Promise<{ items: unknown[]; error: string }> {
   try {
-    const listed = await mcpCall<unknown>({
-      method,
-      params: {},
-      sessionId: sessionId || undefined,
-      id,
-    }, token);
+    const listed = await mcpCall<unknown>(
+      {
+        method,
+        params: {},
+        sessionId: sessionId || undefined,
+        id,
+      },
+      token,
+    );
     return {
       items: extractArray(listed.body, key),
       error: '',
@@ -206,7 +211,9 @@ function buildGuardrails(
     guardrails.push(`${requiredCount}/${tools.length} tools enforce required arguments.`);
   }
   if (constrainedCount > 0) {
-    guardrails.push(`${constrainedCount}/${tools.length} tools declare schema constraints (min/max/enum/pattern).`);
+    guardrails.push(
+      `${constrainedCount}/${tools.length} tools declare schema constraints (min/max/enum/pattern).`,
+    );
   }
   if (capabilities.length > 0) {
     guardrails.push(`Server advertises ${capabilities.length} capability surface(s).`);
@@ -218,29 +225,43 @@ function buildGuardrails(
     guardrails.push('Prompt catalog is empty or unavailable.');
   }
 
-  return guardrails.length > 0 ? guardrails : ['No explicit protocol guardrail metadata was discovered.'];
+  return guardrails.length > 0
+    ? guardrails
+    : ['No explicit protocol guardrail metadata was discovered.'];
 }
 
 export async function verifyMcpRuntimeReadiness(token: string): Promise<McpRuntimeReadinessResult> {
-  const initialized = await mcpCall<unknown>({
-    method: 'initialize',
-    params: {
-      protocolVersion: '2025-06-18',
-      capabilities: {},
-      clientInfo: { name: 'courtlistener-spa-onboarding', version: '1.0.0' },
+  const initialized = await mcpCall<unknown>(
+    {
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'courtlistener-spa-onboarding', version: '1.0.0' },
+      },
+      id: 90_001,
     },
-    id: 90_001,
-  }, token);
+    token,
+  );
 
-  const listedTools = await mcpCall<unknown>({
-    method: 'tools/list',
-    params: {},
-    sessionId: initialized.sessionId ?? undefined,
-    id: 90_002,
-  }, token);
+  const listedTools = await mcpCall<unknown>(
+    {
+      method: 'tools/list',
+      params: {},
+      sessionId: initialized.sessionId ?? undefined,
+      id: 90_002,
+    },
+    token,
+  );
 
   const sessionId = listedTools.sessionId ?? initialized.sessionId ?? '';
-  const resourcesResult = await listSurface(token, 'resources/list', 'resources', sessionId, 90_003);
+  const resourcesResult = await listSurface(
+    token,
+    'resources/list',
+    'resources',
+    sessionId,
+    90_003,
+  );
   const promptsResult = await listSurface(token, 'prompts/list', 'prompts', sessionId, 90_004);
   const tools = extractTools(listedTools.body);
   const resources = extractResources(resourcesResult.items);
@@ -249,7 +270,9 @@ export async function verifyMcpRuntimeReadiness(token: string): Promise<McpRunti
   const diagnostics = [
     resourcesResult.error ? `Resources discovery unavailable: ${resourcesResult.error}` : '',
     promptsResult.error ? `Prompts discovery unavailable: ${promptsResult.error}` : '',
-    sessionId ? '' : 'MCP transport did not return a session id; each call may renegotiate protocol state.',
+    sessionId
+      ? ''
+      : 'MCP transport did not return a session id; each call may renegotiate protocol state.',
   ].filter(Boolean);
   const serverInfo = extractServerInfo(initialized.body);
 

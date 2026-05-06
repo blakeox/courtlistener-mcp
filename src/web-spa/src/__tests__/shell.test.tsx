@@ -6,17 +6,13 @@ import { TokenProvider } from '../lib/token-context';
 import { ToastProvider } from '../components/Toast';
 import { stubBrowserStorage } from './test-utils';
 
-const {
-  useAuthMock,
-  useColorSchemeMock,
-  useNetworkStatusMock,
-  useSessionHeartbeatMock,
-} = vi.hoisted(() => ({
-  useAuthMock: vi.fn(),
-  useColorSchemeMock: vi.fn(),
-  useNetworkStatusMock: vi.fn(),
-  useSessionHeartbeatMock: vi.fn(),
-}));
+const { useAuthMock, useColorSchemeMock, useNetworkStatusMock, useSessionHeartbeatMock } =
+  vi.hoisted(() => ({
+    useAuthMock: vi.fn(),
+    useColorSchemeMock: vi.fn(),
+    useNetworkStatusMock: vi.fn(),
+    useSessionHeartbeatMock: vi.fn(),
+  }));
 
 vi.mock('../lib/auth', () => ({
   useAuth: useAuthMock,
@@ -49,19 +45,23 @@ function renderShell(initialEntry = '/app/control-center'): void {
           <Routes>
             <Route
               path="*"
-              element={(
+              element={
                 <>
                   <Shell
                     steps={[
                       { label: 'Operator session', complete: false, to: '/app/account' },
-                      { label: 'Local MCP credential loaded', complete: false, to: '/app/control-center' },
+                      {
+                        label: 'Local MCP credential loaded',
+                        complete: false,
+                        to: '/app/control-center',
+                      },
                     ]}
                   >
                     <div>Shell body</div>
                   </Shell>
                   <LocationProbe />
                 </>
-              )}
+              }
             />
           </Routes>
         </ToastProvider>
@@ -78,23 +78,23 @@ function renderAuthRequired(initialEntry = '/app/account'): void {
           <Routes>
             <Route
               path="/app/account"
-              element={(
+              element={
                 <>
                   <AuthRequired>
                     <div>Protected body</div>
                   </AuthRequired>
                   <LocationProbe />
                 </>
-              )}
+              }
             />
             <Route
               path="/app/control-center"
-              element={(
+              element={
                 <>
                   <div>Control center</div>
                   <LocationProbe />
                 </>
-              )}
+              }
             />
           </Routes>
         </ToastProvider>
@@ -141,9 +141,11 @@ describe('Shell', () => {
       loading: false,
       logout: vi.fn(),
     });
-    useSessionHeartbeatMock.mockImplementation((_interval: number, options: { enabled: boolean; onExpired: () => void }) => {
-      onExpired = options.onExpired;
-    });
+    useSessionHeartbeatMock.mockImplementation(
+      (_interval: number, options: { enabled: boolean; onExpired: () => void }) => {
+        onExpired = options.onExpired;
+      },
+    );
 
     renderShell('/app/playground');
 

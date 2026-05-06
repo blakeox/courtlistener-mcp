@@ -16,7 +16,9 @@ describe('useRateLimitBackoff integration', () => {
     const { result } = renderHook(() => useRateLimitBackoff());
     act(() => result.current.trigger({ retry_after_seconds: 5, status: 429 }));
     expect(result.current.secondsLeft).toBe(5);
-    act(() => { vi.advanceTimersByTime(2000); });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(result.current.secondsLeft).toBe(3);
     // Re-trigger with new value
     act(() => result.current.trigger({ retry_after_seconds: 10, status: 429 }));
@@ -47,7 +49,9 @@ describe('useSessionHeartbeat integration', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(0, { enabled: true, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(5000); });
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(mockGetSession).not.toHaveBeenCalled();
     vi.doUnmock('../lib/api');
   });
@@ -58,7 +62,9 @@ describe('useSessionHeartbeat integration', () => {
     const { useSessionHeartbeat } = await import('../hooks/useSessionHeartbeat');
     const onExpired = vi.fn();
     renderHook(() => useSessionHeartbeat(-1000, { enabled: true, onExpired }));
-    await act(async () => { vi.advanceTimersByTime(5000); });
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(mockGetSession).not.toHaveBeenCalled();
     vi.doUnmock('../lib/api');
   });

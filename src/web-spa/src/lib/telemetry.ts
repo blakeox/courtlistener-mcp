@@ -18,7 +18,10 @@ function saveEvents(events: TelemetryEvent[]): void {
   localStorage.setItem(EVENT_KEY, JSON.stringify(events.slice(-200)));
 }
 
-export function trackEvent(name: string, meta?: Record<string, string | number | boolean | null>): void {
+export function trackEvent(
+  name: string,
+  meta?: Record<string, string | number | boolean | null>,
+): void {
   const event: TelemetryEvent = { name, at: new Date().toISOString(), meta };
   const events = loadEvents();
   events.push(event);

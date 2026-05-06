@@ -146,7 +146,7 @@ describe('App auth routing', () => {
   it('redirects /account to the operator session route', async () => {
     renderApp('/account');
     expect(
-      await screen.findByRole('heading', { name: 'Session', level: 2 }),
+      await screen.findByRole('heading', { name: 'Session Control', level: 1 }),
     ).toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe('App auth routing', () => {
 
     expect(await screen.findByLabelText('Loading page')).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Session', level: 2 }),
+      screen.queryByRole('heading', { name: 'Session Control', level: 1 }),
     ).not.toBeInTheDocument();
   });
 
@@ -196,7 +196,7 @@ describe('App auth routing', () => {
     renderApp('/app/unknown');
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'Session', level: 2 }),
+        screen.getByRole('heading', { name: 'Session Control', level: 1 }),
       ).toBeInTheDocument();
     });
   });

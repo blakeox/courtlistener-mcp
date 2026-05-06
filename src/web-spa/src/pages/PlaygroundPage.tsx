@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { mcpCall, aiChat, aiPlain, toErrorMessage } from '../lib/api';
 import { markFirstMcpSuccess, trackEvent } from '../lib/telemetry';
 import { useToken } from '../lib/token-context';
@@ -521,7 +521,8 @@ function inferArgHint(inputSchema: unknown, fallback = ''): string {
         (value): value is string => typeof value === 'string' && value.trim().length > 0,
       )
     : [];
-  if (required.length > 0) return required[0]!;
+  const firstRequired = required[0];
+  if (firstRequired) return firstRequired;
   const properties = asRecord(schema.properties);
   if (!properties) return fallback;
   const propNames = Object.keys(properties);
@@ -778,7 +779,8 @@ function renderMarkdown(text: string): React.JSX.Element {
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
+    const line = lines[i];
+    if (line === undefined) continue;
     if (line.startsWith('### ')) {
       flushList();
       elements.push(
@@ -982,7 +984,10 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   React.useEffect(() => {
     if (tools.length === 0) return;
     if (!tools.some((tool) => tool.name === toolName)) {
-      setToolName(tools[0]!.name);
+      const firstTool = tools[0];
+      if (firstTool) {
+        setToolName(firstTool.name);
+      }
     }
   }, [toolName, tools]);
 
@@ -1017,13 +1022,14 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     if (currentIndex < 0 || enabledModes.length < 2) return;
     let nextMode: 'schema' | 'json' | null = null;
     if (event.key === 'ArrowRight') {
-      nextMode = enabledModes[(currentIndex + 1) % enabledModes.length]!;
+      nextMode = enabledModes[(currentIndex + 1) % enabledModes.length] ?? null;
     } else if (event.key === 'ArrowLeft') {
-      nextMode = enabledModes[(currentIndex - 1 + enabledModes.length) % enabledModes.length]!;
+      nextMode =
+        enabledModes[(currentIndex - 1 + enabledModes.length) % enabledModes.length] ?? null;
     } else if (event.key === 'Home') {
-      nextMode = enabledModes[0]!;
+      nextMode = enabledModes[0] ?? null;
     } else if (event.key === 'End') {
-      nextMode = enabledModes[enabledModes.length - 1]!;
+      nextMode = enabledModes[enabledModes.length - 1] ?? null;
     }
     if (!nextMode) return;
     event.preventDefault();
@@ -1754,7 +1760,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                 </InlineGroup>
                 {selectedTrackedJob.latestError || selectedTrackedJob.job.error?.message ? (
                   <CodeSurface
-                    code={selectedTrackedJob.latestError ?? selectedTrackedJob.job.error?.message ?? ''}
+                    code={
+                      selectedTrackedJob.latestError ?? selectedTrackedJob.job.error?.message ?? ''
+                    }
                     className="mono async-job-result"
                   />
                 ) : null}
@@ -1801,7 +1809,7 @@ interface ChatMessage {
 }
 
 function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
+  const { token, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
   const [aiToolName, setAiToolName] = React.useState('auto');
   const [aiPrompt, setAiPrompt] = React.useState('');
@@ -2013,54 +2021,52 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             );
           }
           if (msg.role === 'error') {
-            return (
-              <StatusBanner key={msg.id} role="alert" message={msg.text} type="error" />
-            );
+            return <StatusBanner key={msg.id} role="alert" message={msg.text} type="error" />;
           }
           if (msg.role === 'comparison') {
             return (
-                <div key={msg.id} className="chat-comparison-item">
-                  <div className="comparison-grid">
-                    <ComparisonCard
-                      icon="🔌"
-                      title="With MCP Tools"
-                      tone="mcp"
-                      badge={
-                        <StatusPill tone="mcp" variant="solid">
-                          LIVE DATA
-                        </StatusPill>
-                      }
-                      meta={
-                        msg.mcpTool ? (
-                          <MetaNote>
-                            <span aria-hidden="true">🔧</span>
-                            <strong>{msg.mcpTool}</strong>
-                            {msg.mcpToolReason ? (
-                              <span className="meta-note-detail">{msg.mcpToolReason}</span>
-                            ) : null}
-                            {msg.mcpFallback ? <Badge tone="warn">Fallback</Badge> : null}
-                          </MetaNote>
-                        ) : null
-                      }
-                    >
-                      {renderMarkdown(msg.mcpResponse || '')}
-                    </ComparisonCard>
-                    <ComparisonCard
-                      icon="🧠"
-                      title="Without MCP"
-                      badge={
-                        <StatusPill tone="plain" variant="solid">
-                          TRAINING ONLY
-                        </StatusPill>
-                      }
-                    >
-                      {renderMarkdown(msg.plainResponse || '')}
-                    </ComparisonCard>
-                  </div>
-                  {msg.latencyMs != null && (
-                    <div className="comparison-latency">⏱ {msg.latencyMs}ms</div>
-                  )}
+              <div key={msg.id} className="chat-comparison-item">
+                <div className="comparison-grid">
+                  <ComparisonCard
+                    icon="🔌"
+                    title="With MCP Tools"
+                    tone="mcp"
+                    badge={
+                      <StatusPill tone="mcp" variant="solid">
+                        LIVE DATA
+                      </StatusPill>
+                    }
+                    meta={
+                      msg.mcpTool ? (
+                        <MetaNote>
+                          <span aria-hidden="true">🔧</span>
+                          <strong>{msg.mcpTool}</strong>
+                          {msg.mcpToolReason ? (
+                            <span className="meta-note-detail">{msg.mcpToolReason}</span>
+                          ) : null}
+                          {msg.mcpFallback ? <Badge tone="warn">Fallback</Badge> : null}
+                        </MetaNote>
+                      ) : null
+                    }
+                  >
+                    {renderMarkdown(msg.mcpResponse || '')}
+                  </ComparisonCard>
+                  <ComparisonCard
+                    icon="🧠"
+                    title="Without MCP"
+                    badge={
+                      <StatusPill tone="plain" variant="solid">
+                        TRAINING ONLY
+                      </StatusPill>
+                    }
+                  >
+                    {renderMarkdown(msg.plainResponse || '')}
+                  </ComparisonCard>
                 </div>
+                {msg.latencyMs != null && (
+                  <div className="comparison-latency">⏱ {msg.latencyMs}ms</div>
+                )}
+              </div>
             );
           }
           return null;
@@ -2142,7 +2148,7 @@ interface CompareResult {
 }
 
 function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, setMcpSessionId } = usePlayground();
+  const { token, mcpSessionId, setMcpSessionId } = usePlayground();
   const [prompt, setPrompt] = React.useState(
     'What are the leading Supreme Court cases about free speech in schools?',
   );
@@ -2353,7 +2359,7 @@ const TranscriptEntry = React.memo(
     onRetry?: () => void;
   }): React.JSX.Element {
     const [copied, setCopied] = React.useState(false);
-    const style = ROLE_STYLES[item.role] || ROLE_STYLES.system!;
+    const style = ROLE_STYLES[item.role] || ROLE_STYLES.system;
     const roleClassName = ROLE_STYLES[item.role] ? item.role : 'system';
 
     function copyText(): void {
@@ -2496,13 +2502,13 @@ function PlaygroundContent(): React.JSX.Element {
     if (currentIndex < 0) return;
     let nextTab: PlaygroundTab | null = null;
     if (event.key === 'ArrowRight') {
-      nextTab = tabOrder[(currentIndex + 1) % tabOrder.length]!;
+      nextTab = tabOrder[(currentIndex + 1) % tabOrder.length] ?? null;
     } else if (event.key === 'ArrowLeft') {
-      nextTab = tabOrder[(currentIndex - 1 + tabOrder.length) % tabOrder.length]!;
+      nextTab = tabOrder[(currentIndex - 1 + tabOrder.length) % tabOrder.length] ?? null;
     } else if (event.key === 'Home') {
-      nextTab = tabOrder[0]!;
+      nextTab = tabOrder[0] ?? null;
     } else if (event.key === 'End') {
-      nextTab = tabOrder[tabOrder.length - 1]!;
+      nextTab = tabOrder[tabOrder.length - 1] ?? null;
     }
     if (!nextTab) return;
     event.preventDefault();

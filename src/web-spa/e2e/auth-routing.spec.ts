@@ -41,7 +41,7 @@ test.describe('SPA auth routing and recovery', () => {
     await page.goto('/app/unknown-route');
 
     await expect(page).toHaveURL(/\/app\/account$/);
-    await expect(page.getByRole('heading', { name: 'Operator Session', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
     await expect(page.getByText('operator-2').first()).toBeVisible();
   });
 

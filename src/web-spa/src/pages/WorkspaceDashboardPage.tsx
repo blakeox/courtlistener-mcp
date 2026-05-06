@@ -96,10 +96,18 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
               <p className="muted">Your environment is fully agent-ready.</p>
               <TextLink to="/app/readiness">View details</TextLink>
             </MetricCard>
-            <MetricCard label="Research Sessions" value="12 active sessions" accent="4 awaiting review">
+            <MetricCard
+              label="Research Sessions"
+              value="12 active sessions"
+              accent="4 awaiting review"
+            >
               <TextLink to="/app/sessions">Open sessions</TextLink>
             </MetricCard>
-            <MetricCard label="Human Review Queue" value="3 pending approvals" accent="Review required">
+            <MetricCard
+              label="Human Review Queue"
+              value="3 pending approvals"
+              accent="Review required"
+            >
               <TextLink to="/app/review">View queue</TextLink>
             </MetricCard>
             <MetricCard

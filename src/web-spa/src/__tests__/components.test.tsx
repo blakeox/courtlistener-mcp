@@ -171,7 +171,9 @@ describe('FeatureCard', () => {
       />,
     );
     expect(screen.getByText('Search Opinions')).toBeInTheDocument();
-    expect(screen.getByText('Find federal court opinions by query and citation.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Find federal court opinions by query and citation.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('⚖️')).toHaveClass('landing-icon-wrap');
   });
 });
@@ -680,9 +682,7 @@ describe('Stepper', () => {
   });
 
   it('renders trailing actions when provided', () => {
-    const steps = [
-      { label: 'Step 1', complete: true, action: <Badge tone="ok">Done</Badge> },
-    ];
+    const steps = [{ label: 'Step 1', complete: true, action: <Badge tone="ok">Done</Badge> }];
     render(
       <MemoryRouter>
         <Stepper steps={steps} />

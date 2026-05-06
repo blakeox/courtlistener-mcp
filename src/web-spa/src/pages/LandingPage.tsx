@@ -323,22 +323,22 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                 {setupClients.map((client) => (
                   <div
                     key={client.id}
-                  id={setupPanelId(client.id)}
-                  role="tabpanel"
-                  aria-labelledby={setupTabId(client.id)}
-                  hidden={activeSetup !== client.id}
-                  className="landing-setup-copy"
-                >
-                  <InfoBlock
-                    eyebrow={client.eyebrow}
-                    eyebrowClassName="landing-section-label"
-                    title={client.label}
-                    titleAs="h3"
-                    description={client.description}
-                  />
-                  <ol className="landing-numbered-list">
-                    {client.steps.map((step) => (
-                      <li key={step}>{step}</li>
+                    id={setupPanelId(client.id)}
+                    role="tabpanel"
+                    aria-labelledby={setupTabId(client.id)}
+                    hidden={activeSetup !== client.id}
+                    className="landing-setup-copy"
+                  >
+                    <InfoBlock
+                      eyebrow={client.eyebrow}
+                      eyebrowClassName="landing-section-label"
+                      title={client.label}
+                      titleAs="h3"
+                      description={client.description}
+                    />
+                    <ol className="landing-numbered-list">
+                      {client.steps.map((step) => (
+                        <li key={step}>{step}</li>
                       ))}
                     </ol>
                   </div>
@@ -357,7 +357,12 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                       descriptionClassName="landing-command-caption"
                     />
                     <InlineGroup gap="spacious" className="landing-inline-links">
-                      <TextLink href={DOWNLOAD_ZIP_URL} target="_blank" rel="noreferrer" tone="landing">
+                      <TextLink
+                        href={DOWNLOAD_ZIP_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        tone="landing"
+                      >
                         Download ZIP
                       </TextLink>
                       <TextLink
@@ -451,7 +456,11 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
       </main>
 
       <footer className="landing-footer">
-        <InlineGroup justify="between" gap="spacious" className="landing-container landing-footer-inner">
+        <InlineGroup
+          justify="between"
+          gap="spacious"
+          className="landing-container landing-footer-inner"
+        >
           <span className="landing-footer-brand">CourtListener MCP</span>
           <InlineGroup gap="spacious" className="landing-footer-links">
             <TextLink href={DOCUMENTATION_URL} target="_blank" rel="noreferrer" tone="landing">

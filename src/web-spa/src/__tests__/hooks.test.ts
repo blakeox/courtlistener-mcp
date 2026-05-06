@@ -119,10 +119,9 @@ describe('useElapsedTimer', () => {
   });
 
   it('resets when stopped', () => {
-    const { result, rerender } = renderHook(
-      ({ running }) => useElapsedTimer(running),
-      { initialProps: { running: true } },
-    );
+    const { result, rerender } = renderHook(({ running }) => useElapsedTimer(running), {
+      initialProps: { running: true },
+    });
     act(() => {
       vi.advanceTimersByTime(1000);
     });
