@@ -186,9 +186,10 @@ export class ToolHandlerRegistry {
 /**
  * Base class for tool handlers
  */
-export abstract class BaseToolHandler<TInput = unknown, _TOutput = unknown>
-  implements ToolHandler<TInput>
-{
+export abstract class BaseToolHandler<
+  TInput = unknown,
+  _TOutput = unknown,
+> implements ToolHandler<TInput> {
   abstract readonly name: string;
   abstract readonly description: string;
   abstract readonly category: string;

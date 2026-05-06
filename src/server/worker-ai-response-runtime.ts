@@ -21,7 +21,9 @@ export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): str
       '**Court Listing**: Present ALL courts from the data in a clear, organized format grouped by jurisdiction type (Federal, State, etc.). Include court name, jurisdiction, and any other available details.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   if (toolName.includes('judge')) {
@@ -36,7 +38,9 @@ export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): str
       '**Notable Details**: Any significant details from the data about their career or decisions.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   if (toolName.includes('docket')) {
@@ -51,10 +55,16 @@ export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): str
       '**Key Filings**: List the most important entries with dates and descriptions.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
-  if (toolName === 'lookup_citation' || toolName === 'validate_citations' || toolName === 'get_citation_network') {
+  if (
+    toolName === 'lookup_citation' ||
+    toolName === 'validate_citations' ||
+    toolName === 'get_citation_network'
+  ) {
     return [
       'You are an expert legal research analyst with access to CourtListener, a comprehensive legal database.',
       'You have been given REAL citation data retrieved from CourtListener. Analyze and present it clearly.',
@@ -66,7 +76,9 @@ export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): str
       '**Significance**: Explain the importance of this case based on citation count and other available data.',
       '**Suggested Follow-up**: One specific follow-up query to explore further.',
       followUp,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   return [
@@ -74,21 +86,23 @@ export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): str
     'You have been given REAL case data retrieved from CourtListener. Your job is to ANALYZE this data and provide substantive legal insight.',
     '',
     'ANALYSIS INSTRUCTIONS:',
-    '- Synthesize the case data into a coherent legal analysis that directly answers the user\'s question.',
+    "- Synthesize the case data into a coherent legal analysis that directly answers the user's question.",
     '- Identify key legal principles, trends, and holdings from the returned cases.',
-    '- Explain how the cases relate to each other and to the user\'s query.',
+    "- Explain how the cases relate to each other and to the user's query.",
     '- Highlight the most important or frequently-cited cases and explain WHY they matter.',
     '- Note any circuit splits, evolving standards, or notable dissents if apparent from the data.',
     '',
     ...commonRules,
     '',
     'FORMAT your response with these sections:',
-    '**Legal Analysis**: A substantive 3-5 sentence analysis answering the user\'s question, synthesizing findings from the case data.',
+    "**Legal Analysis**: A substantive 3-5 sentence analysis answering the user's question, synthesizing findings from the case data.",
     '**Key Cases Found**: The 3-5 most relevant cases with their citations, courts, dates, and a brief note on why each matters.',
     '**Legal Landscape**: 1-2 sentences on the broader legal landscape — are courts aligned? Is the law settled or evolving?',
     '**Suggested Follow-up**: One specific follow-up query to deepen the research.',
     followUp,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function buildLowCostSummary(
@@ -151,7 +165,10 @@ export function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen:
           if (parsed && typeof parsed === 'object') {
             const formatted = formatMcpDataForLlm(toolName, parsed);
             if (formatted) {
-              const trimmed = formatted.length > maxLen ? `${formatted.slice(0, maxLen)}... [truncated]` : formatted;
+              const trimmed =
+                formatted.length > maxLen
+                  ? `${formatted.slice(0, maxLen)}... [truncated]`
+                  : formatted;
               return `Tool: ${toolName}\n\n${trimmed}`;
             }
           }
@@ -161,7 +178,8 @@ export function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen:
             .map((c) => c.text as string)
             .join('\n\n');
           if (texts.length > 0) {
-            const trimmed = texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
+            const trimmed =
+              texts.length > maxLen ? `${texts.slice(0, maxLen)}... [truncated]` : texts;
             return `Tool: ${toolName}\n\nData returned:\n${trimmed}`;
           }
         }
@@ -176,7 +194,10 @@ export function extractMcpContext(toolName: string, mcpPayload: unknown, maxLen:
   }
 }
 
-export function formatMcpDataForLlm(toolName: string, data: Record<string, unknown>): string | null {
+export function formatMcpDataForLlm(
+  toolName: string,
+  data: Record<string, unknown>,
+): string | null {
   const lines: string[] = [];
   const results = data.data as Record<string, unknown> | unknown[] | undefined;
   const pagination = data.pagination as Record<string, unknown> | undefined;
@@ -191,7 +212,8 @@ export function formatMcpDataForLlm(toolName: string, data: Record<string, unkno
     if (nestedAnalysis && typeof nestedAnalysis === 'object') {
       if (nestedAnalysis.summary) lines.push(`Analysis: ${nestedAnalysis.summary}`);
       if (nestedAnalysis.query_used) lines.push(`Query: ${nestedAnalysis.query_used}`);
-      if (typeof nestedAnalysis.total_found === 'number') lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
+      if (typeof nestedAnalysis.total_found === 'number')
+        lines.push(`Total opinions found: ${nestedAnalysis.total_found}`);
 
       const topCases = nestedAnalysis.top_cases as unknown[] | undefined;
       if (Array.isArray(topCases) && topCases.length > 0) {
@@ -216,10 +238,10 @@ export function formatMcpDataForLlm(toolName: string, data: Record<string, unkno
       for (let i = 0; i < judges.length; i += 1) {
         const judge = judges[i] as Record<string, unknown>;
         const name =
-          judge.name_full
-          || judge.name
-          || `${judge.name_first || ''} ${judge.name_last || ''}`.trim()
-          || 'Unknown';
+          judge.name_full ||
+          judge.name ||
+          `${judge.name_first || ''} ${judge.name_last || ''}`.trim() ||
+          'Unknown';
         const court = judge.court || '';
         const born = judge.date_dob || '';
         const appointed = judge.date_nominated || judge.date_appointed || '';
@@ -265,7 +287,8 @@ export function formatMcpDataForLlm(toolName: string, data: Record<string, unkno
     const analysis = data.analysis as Record<string, unknown>;
     if (analysis.summary) lines.push(`Analysis: ${analysis.summary}`);
     if (analysis.query_used) lines.push(`Query: ${analysis.query_used}`);
-    if (typeof analysis.total_found === 'number') lines.push(`Total opinions found: ${analysis.total_found}`);
+    if (typeof analysis.total_found === 'number')
+      lines.push(`Total opinions found: ${analysis.total_found}`);
 
     const topCases = analysis.top_cases as unknown[] | undefined;
     if (Array.isArray(topCases) && topCases.length > 0) {
@@ -288,7 +311,12 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   const court = item.court || item.court_id || '';
   const dateFiled = item.date_filed || item.dateFiled || '';
   const citation =
-    item.federal_cite_one || item.state_cite_one || item.neutral_cite || item.citation || item.citation_string || '';
+    item.federal_cite_one ||
+    item.state_cite_one ||
+    item.neutral_cite ||
+    item.citation ||
+    item.citation_string ||
+    '';
   const citationCount = item.citation_count ?? item.citationCount;
   const status = item.precedential_status || item.status || '';
   const url = item.absolute_url || item.url || '';
@@ -298,11 +326,14 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   if (court) parts.push(`   Court: ${court}`);
   if (dateFiled) parts.push(`   Date: ${dateFiled}`);
   if (citation) parts.push(`   Citation: ${citation}`);
-  if (citationCount !== undefined && citationCount !== null) parts.push(`   Cited ${citationCount} times`);
+  if (citationCount !== undefined && citationCount !== null)
+    parts.push(`   Cited ${citationCount} times`);
   if (status) parts.push(`   Status: ${status}`);
   if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
   if (snippet) {
-    const cleanSnippet = String(snippet).replace(/<[^>]+>/g, '').slice(0, 300);
+    const cleanSnippet = String(snippet)
+      .replace(/<[^>]+>/g, '')
+      .slice(0, 300);
     parts.push(`   Snippet: ${cleanSnippet}`);
   }
 

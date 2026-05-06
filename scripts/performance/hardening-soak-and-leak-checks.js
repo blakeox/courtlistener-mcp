@@ -17,7 +17,11 @@ function parsePositiveFloat(value, fallback) {
 
 function parseArgs(argv) {
   const defaults = {
-    baseUrl: process.env.SOAK_BASE_URL || process.env.LOAD_PROFILE_BASE_URL || process.env.MCP_REMOTE_URL || 'http://127.0.0.1:8787',
+    baseUrl:
+      process.env.SOAK_BASE_URL ||
+      process.env.LOAD_PROFILE_BASE_URL ||
+      process.env.MCP_REMOTE_URL ||
+      'http://127.0.0.1:8787',
     durationMs: parsePositiveInt(process.env.SOAK_DURATION_MS, 5 * 60 * 1000),
     intervalMs: parsePositiveInt(process.env.SOAK_INTERVAL_MS, 20 * 1000),
     burstRequests: parsePositiveInt(process.env.SOAK_BURST_REQUESTS, 24),
@@ -42,29 +46,76 @@ function parseArgs(argv) {
     else if (arg === '--warn-only') options.warnOnly = true;
     else if (arg === '--light') options.light = true;
     else if (arg === '--base-url') options.baseUrl = argv[++i] || options.baseUrl;
-    else if (arg.startsWith('--base-url=')) options.baseUrl = arg.slice('--base-url='.length) || options.baseUrl;
-    else if (arg === '--duration-ms') options.durationMs = parsePositiveInt(argv[++i], options.durationMs);
-    else if (arg.startsWith('--duration-ms=')) options.durationMs = parsePositiveInt(arg.slice('--duration-ms='.length), options.durationMs);
-    else if (arg === '--interval-ms') options.intervalMs = parsePositiveInt(argv[++i], options.intervalMs);
-    else if (arg.startsWith('--interval-ms=')) options.intervalMs = parsePositiveInt(arg.slice('--interval-ms='.length), options.intervalMs);
-    else if (arg === '--burst-requests') options.burstRequests = parsePositiveInt(argv[++i], options.burstRequests);
-    else if (arg.startsWith('--burst-requests=')) options.burstRequests = parsePositiveInt(arg.slice('--burst-requests='.length), options.burstRequests);
-    else if (arg === '--burst-concurrency') options.burstConcurrency = parsePositiveInt(argv[++i], options.burstConcurrency);
-    else if (arg.startsWith('--burst-concurrency=')) options.burstConcurrency = parsePositiveInt(arg.slice('--burst-concurrency='.length), options.burstConcurrency);
-    else if (arg === '--timeout-ms') options.timeoutMs = parsePositiveInt(argv[++i], options.timeoutMs);
-    else if (arg.startsWith('--timeout-ms=')) options.timeoutMs = parsePositiveInt(arg.slice('--timeout-ms='.length), options.timeoutMs);
-    else if (arg === '--route-variants-per-round') options.routeVariantsPerRound = parsePositiveInt(argv[++i], options.routeVariantsPerRound);
-    else if (arg.startsWith('--route-variants-per-round=')) options.routeVariantsPerRound = parsePositiveInt(arg.slice('--route-variants-per-round='.length), options.routeVariantsPerRound);
-    else if (arg === '--queue-backlog-max') options.queueBacklogMax = parsePositiveInt(argv[++i], options.queueBacklogMax);
-    else if (arg.startsWith('--queue-backlog-max=')) options.queueBacklogMax = parsePositiveInt(arg.slice('--queue-backlog-max='.length), options.queueBacklogMax);
-    else if (arg === '--route-growth-max') options.routeGrowthMax = parsePositiveInt(argv[++i], options.routeGrowthMax);
-    else if (arg.startsWith('--route-growth-max=')) options.routeGrowthMax = parsePositiveInt(arg.slice('--route-growth-max='.length), options.routeGrowthMax);
-    else if (arg === '--route-absolute-max') options.routeAbsoluteMax = parsePositiveInt(argv[++i], options.routeAbsoluteMax);
-    else if (arg.startsWith('--route-absolute-max=')) options.routeAbsoluteMax = parsePositiveInt(arg.slice('--route-absolute-max='.length), options.routeAbsoluteMax);
-    else if (arg === '--memory-growth-max-mb') options.memoryGrowthMaxMb = parsePositiveFloat(argv[++i], options.memoryGrowthMaxMb);
-    else if (arg.startsWith('--memory-growth-max-mb=')) options.memoryGrowthMaxMb = parsePositiveFloat(arg.slice('--memory-growth-max-mb='.length), options.memoryGrowthMaxMb);
-    else if (arg === '--memory-growth-max-pct') options.memoryGrowthMaxPct = parsePositiveFloat(argv[++i], options.memoryGrowthMaxPct);
-    else if (arg.startsWith('--memory-growth-max-pct=')) options.memoryGrowthMaxPct = parsePositiveFloat(arg.slice('--memory-growth-max-pct='.length), options.memoryGrowthMaxPct);
+    else if (arg.startsWith('--base-url='))
+      options.baseUrl = arg.slice('--base-url='.length) || options.baseUrl;
+    else if (arg === '--duration-ms')
+      options.durationMs = parsePositiveInt(argv[++i], options.durationMs);
+    else if (arg.startsWith('--duration-ms='))
+      options.durationMs = parsePositiveInt(arg.slice('--duration-ms='.length), options.durationMs);
+    else if (arg === '--interval-ms')
+      options.intervalMs = parsePositiveInt(argv[++i], options.intervalMs);
+    else if (arg.startsWith('--interval-ms='))
+      options.intervalMs = parsePositiveInt(arg.slice('--interval-ms='.length), options.intervalMs);
+    else if (arg === '--burst-requests')
+      options.burstRequests = parsePositiveInt(argv[++i], options.burstRequests);
+    else if (arg.startsWith('--burst-requests='))
+      options.burstRequests = parsePositiveInt(
+        arg.slice('--burst-requests='.length),
+        options.burstRequests,
+      );
+    else if (arg === '--burst-concurrency')
+      options.burstConcurrency = parsePositiveInt(argv[++i], options.burstConcurrency);
+    else if (arg.startsWith('--burst-concurrency='))
+      options.burstConcurrency = parsePositiveInt(
+        arg.slice('--burst-concurrency='.length),
+        options.burstConcurrency,
+      );
+    else if (arg === '--timeout-ms')
+      options.timeoutMs = parsePositiveInt(argv[++i], options.timeoutMs);
+    else if (arg.startsWith('--timeout-ms='))
+      options.timeoutMs = parsePositiveInt(arg.slice('--timeout-ms='.length), options.timeoutMs);
+    else if (arg === '--route-variants-per-round')
+      options.routeVariantsPerRound = parsePositiveInt(argv[++i], options.routeVariantsPerRound);
+    else if (arg.startsWith('--route-variants-per-round='))
+      options.routeVariantsPerRound = parsePositiveInt(
+        arg.slice('--route-variants-per-round='.length),
+        options.routeVariantsPerRound,
+      );
+    else if (arg === '--queue-backlog-max')
+      options.queueBacklogMax = parsePositiveInt(argv[++i], options.queueBacklogMax);
+    else if (arg.startsWith('--queue-backlog-max='))
+      options.queueBacklogMax = parsePositiveInt(
+        arg.slice('--queue-backlog-max='.length),
+        options.queueBacklogMax,
+      );
+    else if (arg === '--route-growth-max')
+      options.routeGrowthMax = parsePositiveInt(argv[++i], options.routeGrowthMax);
+    else if (arg.startsWith('--route-growth-max='))
+      options.routeGrowthMax = parsePositiveInt(
+        arg.slice('--route-growth-max='.length),
+        options.routeGrowthMax,
+      );
+    else if (arg === '--route-absolute-max')
+      options.routeAbsoluteMax = parsePositiveInt(argv[++i], options.routeAbsoluteMax);
+    else if (arg.startsWith('--route-absolute-max='))
+      options.routeAbsoluteMax = parsePositiveInt(
+        arg.slice('--route-absolute-max='.length),
+        options.routeAbsoluteMax,
+      );
+    else if (arg === '--memory-growth-max-mb')
+      options.memoryGrowthMaxMb = parsePositiveFloat(argv[++i], options.memoryGrowthMaxMb);
+    else if (arg.startsWith('--memory-growth-max-mb='))
+      options.memoryGrowthMaxMb = parsePositiveFloat(
+        arg.slice('--memory-growth-max-mb='.length),
+        options.memoryGrowthMaxMb,
+      );
+    else if (arg === '--memory-growth-max-pct')
+      options.memoryGrowthMaxPct = parsePositiveFloat(argv[++i], options.memoryGrowthMaxPct);
+    else if (arg.startsWith('--memory-growth-max-pct='))
+      options.memoryGrowthMaxPct = parsePositiveFloat(
+        arg.slice('--memory-growth-max-pct='.length),
+        options.memoryGrowthMaxPct,
+      );
     else if (arg === '--output') options.outputPath = argv[++i] || '';
     else if (arg.startsWith('--output=')) options.outputPath = arg.slice('--output='.length) || '';
     else if (arg === '--help' || arg === '-h') {
@@ -112,7 +163,11 @@ async function fetchText(url, timeoutMs) {
     const bodyText = await response.text();
     return { ok: response.ok, status: response.status, bodyText };
   } catch (error) {
-    return { ok: false, status: 0, bodyText: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false,
+      status: 0,
+      bodyText: error instanceof Error ? error.message : String(error),
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -122,8 +177,10 @@ function parseMemoryBytes(healthPayload) {
   if (!healthPayload || typeof healthPayload !== 'object') return null;
   const metrics = healthPayload.metrics;
   if (!metrics || typeof metrics !== 'object') return null;
-  if (metrics.memoryUsage?.heapUsed && Number.isFinite(metrics.memoryUsage.heapUsed)) return metrics.memoryUsage.heapUsed;
-  if (metrics.memory?.heapUsed && Number.isFinite(metrics.memory.heapUsed)) return metrics.memory.heapUsed;
+  if (metrics.memoryUsage?.heapUsed && Number.isFinite(metrics.memoryUsage.heapUsed))
+    return metrics.memoryUsage.heapUsed;
+  if (metrics.memory?.heapUsed && Number.isFinite(metrics.memory.heapUsed))
+    return metrics.memory.heapUsed;
   return null;
 }
 
@@ -187,7 +244,8 @@ function evaluateChecks(options, samples) {
     const memoryDeltaPct = first.memoryBytes > 0 ? (memoryDeltaBytes / first.memoryBytes) * 100 : 0;
     checks.push({
       name: 'memory-growth',
-      pass: memoryDeltaMb <= options.memoryGrowthMaxMb && memoryDeltaPct <= options.memoryGrowthMaxPct,
+      pass:
+        memoryDeltaMb <= options.memoryGrowthMaxMb && memoryDeltaPct <= options.memoryGrowthMaxPct,
       details: {
         firstBytes: first.memoryBytes,
         lastBytes: last.memoryBytes,
@@ -201,7 +259,8 @@ function evaluateChecks(options, samples) {
 
   const routeSamples = samples.filter((sample) => Number.isFinite(sample.routeCount));
   if (routeSamples.length >= 2) {
-    const routeGrowth = routeSamples[routeSamples.length - 1].routeCount - routeSamples[0].routeCount;
+    const routeGrowth =
+      routeSamples[routeSamples.length - 1].routeCount - routeSamples[0].routeCount;
     const routePeak = Math.max(...routeSamples.map((sample) => sample.routeCount));
     checks.push({
       name: 'route-cardinality-growth',
@@ -268,7 +327,9 @@ async function main() {
     }
     const route = parseRouteCardinality(healthJson);
     const serverMemoryBytes = parseMemoryBytes(healthJson);
-    const memoryBytes = Number.isFinite(serverMemoryBytes) ? serverMemoryBytes : process.memoryUsage().heapUsed;
+    const memoryBytes = Number.isFinite(serverMemoryBytes)
+      ? serverMemoryBytes
+      : process.memoryUsage().heapUsed;
     samples.push({
       round: round + 1,
       timestamp: new Date().toISOString(),
@@ -296,7 +357,11 @@ async function main() {
   };
 
   const outputPath =
-    options.outputPath || path.join('performance-data', `hardening-soak-leak-checks-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    options.outputPath ||
+    path.join(
+      'performance-data',
+      `hardening-soak-leak-checks-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+    );
   await ensureOutputPath(outputPath);
   await fs.writeFile(outputPath, JSON.stringify(report, null, 2));
 

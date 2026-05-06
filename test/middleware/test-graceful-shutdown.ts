@@ -5,14 +5,16 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import {
-  createMockLogger,
-  performance,
-  type MockLogger,
-} from '../utils/test-helpers.ts';
+import { createMockLogger, performance, type MockLogger } from '../utils/test-helpers.ts';
 
 type Signal = 'SIGTERM' | 'SIGINT' | 'SIGUSR2' | 'SIGUSR1' | 'MANUAL';
-type ShutdownPhase = 'running' | 'stopping_connections' | 'draining_requests' | 'cleanup' | 'closing_connections' | 'completed';
+type ShutdownPhase =
+  | 'running'
+  | 'stopping_connections'
+  | 'draining_requests'
+  | 'cleanup'
+  | 'closing_connections'
+  | 'completed';
 
 interface GracefulShutdownConfig {
   enabled?: boolean;
@@ -176,10 +178,8 @@ class MockGracefulShutdown {
       });
 
       return { graceful: true, shutdownTime };
-
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Graceful shutdown failed, forcing exit', {
         error: errorMessage,
       });
@@ -194,9 +194,7 @@ class MockGracefulShutdown {
     this.logger.info('Stopping acceptance of new connections');
 
     // Simulate stopping server from accepting new connections
-    await new Promise<void>((resolve) =>
-      setTimeout(resolve, this.config.gracePeriodMs)
-    );
+    await new Promise<void>((resolve) => setTimeout(resolve, this.config.gracePeriodMs));
 
     this.logger.debug('New connection acceptance stopped');
   }
@@ -262,20 +260,17 @@ class MockGracefulShutdown {
 
     this.logger.info(`Executing ${this.shutdownCallbacks.length} cleanup callbacks`);
 
-    const cleanupPromises = this.shutdownCallbacks.map(
-      async (callbackObj, index) => {
-        try {
-          await callbackObj.callback();
-          this.logger.debug(`Cleanup callback ${index} completed`);
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          this.logger.error(`Cleanup callback ${index} failed`, {
-            error: errorMessage,
-          });
-        }
+    const cleanupPromises = this.shutdownCallbacks.map(async (callbackObj, index) => {
+      try {
+        await callbackObj.callback();
+        this.logger.debug(`Cleanup callback ${index} completed`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Cleanup callback ${index} failed`, {
+          error: errorMessage,
+        });
       }
-    );
+    });
 
     await Promise.allSettled(cleanupPromises);
     this.logger.debug('All cleanup callbacks executed');
@@ -289,17 +284,14 @@ class MockGracefulShutdown {
 
     this.logger.info(`Closing ${this.activeConnections.size} active connections`);
 
-    const connectionClosePromises = Array.from(this.activeConnections).map(
-      async (connection) => {
-        try {
-          await this.closeConnection(connection);
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          this.logger.error('Failed to close connection', { error: errorMessage });
-        }
+    const connectionClosePromises = Array.from(this.activeConnections).map(async (connection) => {
+      try {
+        await this.closeConnection(connection);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error('Failed to close connection', { error: errorMessage });
       }
-    );
+    });
 
     await Promise.allSettled(connectionClosePromises);
     this.activeConnections.clear();
@@ -321,14 +313,9 @@ class MockGracefulShutdown {
   }
 
   // Request lifecycle management
-  registerRequest(
-    requestId: string,
-    requestData: Partial<RequestData> = {}
-  ): string {
+  registerRequest(requestId: string, requestData: Partial<RequestData> = {}): string {
     if (this.isShuttingDown) {
-      throw new Error(
-        'Server is shutting down, cannot accept new requests'
-      );
+      throw new Error('Server is shutting down, cannot accept new requests');
     }
 
     this.activeRequests.set(requestId, {
@@ -388,10 +375,7 @@ class MockGracefulShutdown {
   }
 
   // Cleanup callback management
-  registerCleanupCallback(
-    callback: () => Promise<void> | void,
-    priority = 0
-  ): void {
+  registerCleanupCallback(callback: () => Promise<void> | void, priority = 0): void {
     this.shutdownCallbacks.push({ callback, priority });
 
     // Sort by priority (higher priority executes first)
@@ -404,9 +388,7 @@ class MockGracefulShutdown {
   }
 
   removeCleanupCallback(callback: () => Promise<void> | void): void {
-    const index = this.shutdownCallbacks.findIndex(
-      (cb) => cb.callback === callback
-    );
+    const index = this.shutdownCallbacks.findIndex((cb) => cb.callback === callback);
     if (index >= 0) {
       this.shutdownCallbacks.splice(index, 1);
       this.logger.debug('Cleanup callback removed');
@@ -420,9 +402,7 @@ class MockGracefulShutdown {
       shutdownStartTime: this.shutdownStartTime,
       activeConnections: this.activeConnections.size,
       activeRequests: this.activeRequests.size,
-      shutdownTimeElapsed: this.shutdownStartTime
-        ? Date.now() - this.shutdownStartTime
-        : 0,
+      shutdownTimeElapsed: this.shutdownStartTime ? Date.now() - this.shutdownStartTime : 0,
       phase: this.determineShutdownPhase(),
     };
   }
@@ -456,8 +436,7 @@ class MockGracefulShutdown {
   private updateAverageShutdownTime(): void {
     if (this.stats.shutdownTimes.length > 0) {
       this.stats.averageShutdownTime = Math.round(
-        this.stats.shutdownTimes.reduce((a, b) => a + b, 0) /
-          this.stats.shutdownTimes.length
+        this.stats.shutdownTimes.reduce((a, b) => a + b, 0) / this.stats.shutdownTimes.length,
       );
     }
   }
@@ -475,7 +454,7 @@ class MockGracefulShutdown {
   async middleware(
     req: { method?: string; url?: string },
     res: { status?: number; body?: { error?: string } },
-    next: () => Promise<void> | void
+    next: () => Promise<void> | void,
   ): Promise<void> {
     if (this.isShuttingDown) {
       res.status = 503;
@@ -526,7 +505,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
         drainTimeoutMs: 2000,
         gracePeriodMs: 100,
       },
-      mockLogger
+      mockLogger,
     );
   });
 
@@ -538,21 +517,9 @@ describe('Graceful Shutdown Middleware Tests', () => {
     it('should initialize with correct default state', () => {
       const status = shutdownHandler.getShutdownStatus();
 
-      assert.strictEqual(
-        status.isShuttingDown,
-        false,
-        'Should not be shutting down initially'
-      );
-      assert.strictEqual(
-        status.activeConnections,
-        0,
-        'Should have no active connections'
-      );
-      assert.strictEqual(
-        status.activeRequests,
-        0,
-        'Should have no active requests'
-      );
+      assert.strictEqual(status.isShuttingDown, false, 'Should not be shutting down initially');
+      assert.strictEqual(status.activeConnections, 0, 'Should have no active connections');
+      assert.strictEqual(status.activeRequests, 0, 'Should have no active requests');
       assert.strictEqual(status.phase, 'running', 'Should be in running phase');
     });
 
@@ -560,23 +527,12 @@ describe('Graceful Shutdown Middleware Tests', () => {
       const shutdownPromise = shutdownHandler.initiateShutdown('TEST');
 
       const status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.isShuttingDown,
-        true,
-        'Should be shutting down'
-      );
-      assert.ok(
-        status.shutdownStartTime !== null,
-        'Should have shutdown start time'
-      );
+      assert.strictEqual(status.isShuttingDown, true, 'Should be shutting down');
+      assert.ok(status.shutdownStartTime !== null, 'Should have shutdown start time');
 
       const result = await shutdownPromise;
       assert.strictEqual(result.graceful, true, 'Should complete gracefully');
-      assert.strictEqual(
-        typeof result.shutdownTime,
-        'number',
-        'Should report shutdown time'
-      );
+      assert.strictEqual(typeof result.shutdownTime, 'number', 'Should report shutdown time');
     });
 
     it('should prevent duplicate shutdown attempts', async () => {
@@ -586,29 +542,22 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         firstShutdown,
         secondShutdown,
-        'Should return same promise for duplicate attempts'
+        'Should return same promise for duplicate attempts',
       );
 
       await firstShutdown;
       assert.strictEqual(
         shutdownHandler.stats.shutdownAttempts,
         1,
-        'Should only count one attempt'
+        'Should only count one attempt',
       );
     });
 
     it('should setup and remove signal handlers', () => {
-      assert.ok(
-        shutdownHandler.signalHandlers.size > 0,
-        'Should register signal handlers'
-      );
+      assert.ok(shutdownHandler.signalHandlers.size > 0, 'Should register signal handlers');
 
       shutdownHandler.removeSignalHandlers();
-      assert.strictEqual(
-        shutdownHandler.signalHandlers.size,
-        0,
-        'Should remove signal handlers'
-      );
+      assert.strictEqual(shutdownHandler.signalHandlers.size, 0, 'Should remove signal handlers');
     });
   });
 
@@ -621,24 +570,16 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(typeof requestId, 'string', 'Should return request ID');
 
       let status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.activeRequests,
-        1,
-        'Should track active request'
-      );
+      assert.strictEqual(status.activeRequests, 1, 'Should track active request');
 
       await shutdownHandler.completeRequest(requestId);
 
       status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.activeRequests,
-        0,
-        'Should remove completed request'
-      );
+      assert.strictEqual(status.activeRequests, 0, 'Should remove completed request');
       assert.strictEqual(
         shutdownHandler.stats.requestsCompleted,
         1,
-        'Should count completed request'
+        'Should count completed request',
       );
     });
 
@@ -649,11 +590,10 @@ describe('Graceful Shutdown Middleware Tests', () => {
         shutdownHandler.registerRequest('rejected-req');
         assert.fail('Should reject new requests during shutdown');
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         assert.ok(
           errorMessage.includes('shutting down'),
-          'Should provide appropriate error message'
+          'Should provide appropriate error message',
         );
       }
     });
@@ -665,7 +605,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         shutdownHandler.getShutdownStatus().activeRequests,
         2,
-        'Should have 2 active requests'
+        'Should have 2 active requests',
       );
 
       // Start shutdown without completing requests
@@ -677,12 +617,9 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         shutdownHandler.getShutdownStatus().activeRequests,
         0,
-        'Should abort remaining requests'
+        'Should abort remaining requests',
       );
-      assert.ok(
-        shutdownHandler.stats.requestsAborted >= 2,
-        'Should count aborted requests'
-      );
+      assert.ok(shutdownHandler.stats.requestsAborted >= 2, 'Should count aborted requests');
     });
 
     it('should wait for requests to complete during drain period', async () => {
@@ -702,12 +639,12 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         shutdownHandler.stats.requestsCompleted,
         1,
-        'Should complete request during drain'
+        'Should complete request during drain',
       );
       assert.strictEqual(
         shutdownHandler.stats.requestsAborted,
         0,
-        'Should not abort completed request'
+        'Should not abort completed request',
       );
     });
   });
@@ -718,20 +655,12 @@ describe('Graceful Shutdown Middleware Tests', () => {
       shutdownHandler.registerConnection('conn-2');
 
       let status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.activeConnections,
-        2,
-        'Should track active connections'
-      );
+      assert.strictEqual(status.activeConnections, 2, 'Should track active connections');
 
       await shutdownHandler.closeConnection('conn-1');
 
       status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.activeConnections,
-        1,
-        'Should remove closed connection'
-      );
+      assert.strictEqual(status.activeConnections, 1, 'Should remove closed connection');
     });
 
     it('should close all connections during shutdown', async () => {
@@ -745,7 +674,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         shutdownHandler.getShutdownStatus().activeConnections,
         0,
-        'Should close all connections'
+        'Should close all connections',
       );
     });
   });
@@ -766,11 +695,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
       await shutdownHandler.initiateShutdown();
 
       assert.strictEqual(callback1Executed, true, 'Should execute first callback');
-      assert.strictEqual(
-        callback2Executed,
-        true,
-        'Should execute second callback'
-      );
+      assert.strictEqual(callback2Executed, true, 'Should execute second callback');
     });
 
     it('should execute callbacks in priority order', async () => {
@@ -790,21 +715,9 @@ describe('Graceful Shutdown Middleware Tests', () => {
 
       await shutdownHandler.initiateShutdown();
 
-      assert.strictEqual(
-        executionOrder[0],
-        'high',
-        'Should execute high priority first'
-      );
-      assert.strictEqual(
-        executionOrder[1],
-        'medium',
-        'Should execute medium priority second'
-      );
-      assert.strictEqual(
-        executionOrder[2],
-        'low',
-        'Should execute low priority last'
-      );
+      assert.strictEqual(executionOrder[0], 'high', 'Should execute high priority first');
+      assert.strictEqual(executionOrder[1], 'medium', 'Should execute medium priority second');
+      assert.strictEqual(executionOrder[2], 'low', 'Should execute low priority last');
     });
 
     it('should handle failing cleanup callbacks gracefully', async () => {
@@ -823,31 +736,19 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         result.graceful,
         true,
-        'Should complete gracefully despite callback failure'
+        'Should complete gracefully despite callback failure',
       );
-      assert.strictEqual(
-        successCallbackExecuted,
-        true,
-        'Should execute successful callbacks'
-      );
+      assert.strictEqual(successCallbackExecuted, true, 'Should execute successful callbacks');
     });
 
     it('should remove cleanup callbacks', () => {
       const callback = async () => {};
 
       shutdownHandler.registerCleanupCallback(callback);
-      assert.strictEqual(
-        shutdownHandler.shutdownCallbacks.length,
-        1,
-        'Should register callback'
-      );
+      assert.strictEqual(shutdownHandler.shutdownCallbacks.length, 1, 'Should register callback');
 
       shutdownHandler.removeCleanupCallback(callback);
-      assert.strictEqual(
-        shutdownHandler.shutdownCallbacks.length,
-        0,
-        'Should remove callback'
-      );
+      assert.strictEqual(shutdownHandler.shutdownCallbacks.length, 0, 'Should remove callback');
     });
   });
 
@@ -860,19 +761,12 @@ describe('Graceful Shutdown Middleware Tests', () => {
 
       // Check initial phase
       let status = shutdownHandler.getShutdownStatus();
-      assert.ok(
-        status.phase !== 'running',
-        'Should not be in running phase during shutdown'
-      );
+      assert.ok(status.phase !== 'running', 'Should not be in running phase during shutdown');
 
       await shutdownPromise;
 
       status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.phase,
-        'completed',
-        'Should be in completed phase after shutdown'
-      );
+      assert.strictEqual(status.phase, 'completed', 'Should be in completed phase after shutdown');
     });
 
     it('should determine correct phase based on active resources', () => {
@@ -882,21 +776,13 @@ describe('Graceful Shutdown Middleware Tests', () => {
       // With active requests
       shutdownHandler.registerRequest('req-1');
       let phase = shutdownHandler.determineShutdownPhase();
-      assert.strictEqual(
-        phase,
-        'draining_requests',
-        'Should be draining requests phase'
-      );
+      assert.strictEqual(phase, 'draining_requests', 'Should be draining requests phase');
 
       // After completing requests but with connections
       shutdownHandler.activeRequests.clear();
       shutdownHandler.registerConnection('conn-1');
       phase = shutdownHandler.determineShutdownPhase();
-      assert.strictEqual(
-        phase,
-        'closing_connections',
-        'Should be closing connections phase'
-      );
+      assert.strictEqual(phase, 'closing_connections', 'Should be closing connections phase');
 
       // After closing all connections
       shutdownHandler.activeConnections.clear();
@@ -932,10 +818,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
 
       assert.strictEqual(nextCalled, false, 'Should not call next middleware');
       assert.strictEqual(res.status, 503, 'Should return service unavailable');
-      assert.ok(
-        res.body?.error?.includes('shutting down'),
-        'Should include shutdown message'
-      );
+      assert.ok(res.body?.error?.includes('shutting down'), 'Should include shutdown message');
     });
 
     it('should handle middleware errors gracefully', async () => {
@@ -951,17 +834,13 @@ describe('Graceful Shutdown Middleware Tests', () => {
         assert.strictEqual(
           (error as Error).message,
           'Middleware error',
-          'Should get original error'
+          'Should get original error',
         );
       }
 
       // Request should be cleaned up even on error
       const status = shutdownHandler.getShutdownStatus();
-      assert.strictEqual(
-        status.activeRequests,
-        0,
-        'Should clean up request on error'
-      );
+      assert.strictEqual(status.activeRequests, 0, 'Should clean up request on error');
     });
   });
 
@@ -972,20 +851,9 @@ describe('Graceful Shutdown Middleware Tests', () => {
       const stats = shutdownHandler.getStats();
 
       assert.strictEqual(stats.shutdownAttempts, 1, 'Should track shutdown attempts');
-      assert.strictEqual(
-        stats.gracefulShutdowns,
-        1,
-        'Should track graceful shutdowns'
-      );
-      assert.strictEqual(
-        stats.forcedShutdowns,
-        0,
-        'Should track forced shutdowns'
-      );
-      assert.ok(
-        stats.averageShutdownTime.includes('ms'),
-        'Should format average time'
-      );
+      assert.strictEqual(stats.gracefulShutdowns, 1, 'Should track graceful shutdowns');
+      assert.strictEqual(stats.forcedShutdowns, 0, 'Should track forced shutdowns');
+      assert.ok(stats.averageShutdownTime.includes('ms'), 'Should format average time');
     });
 
     it('should calculate average shutdown time', async () => {
@@ -1002,12 +870,9 @@ describe('Graceful Shutdown Middleware Tests', () => {
       assert.strictEqual(
         shutdownHandler.stats.shutdownTimes.length,
         2,
-        'Should track multiple shutdown times'
+        'Should track multiple shutdown times',
       );
-      assert.ok(
-        parseInt(stats.averageShutdownTime) > 0,
-        'Should calculate average time'
-      );
+      assert.ok(parseInt(stats.averageShutdownTime) > 0, 'Should calculate average time');
     });
 
     it('should include current status in statistics', () => {
@@ -1015,11 +880,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
 
       assert.ok(stats.status !== undefined, 'Should include status');
       assert.ok(stats.config !== undefined, 'Should include configuration');
-      assert.strictEqual(
-        stats.status.isShuttingDown,
-        false,
-        'Should include shutdown state'
-      );
+      assert.strictEqual(stats.status.isShuttingDown, false, 'Should include shutdown state');
     });
   });
 
@@ -1034,14 +895,8 @@ describe('Graceful Shutdown Middleware Tests', () => {
       const result = await shutdownHandler.initiateShutdown();
 
       // Should still complete but may not be graceful
-      assert.ok(
-        result.graceful === true || result.graceful === false,
-        'Should complete shutdown'
-      );
-      assert.ok(
-        shutdownHandler.stats.requestsAborted >= 1,
-        'Should abort hanging request'
-      );
+      assert.ok(result.graceful === true || result.graceful === false, 'Should complete shutdown');
+      assert.ok(shutdownHandler.stats.requestsAborted >= 1, 'Should abort hanging request');
     });
 
     it('should handle cleanup callback timeouts', async () => {
@@ -1066,7 +921,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
         {
           drainTimeoutMs: 50, // Very short timeout
         },
-        mockLogger
+        mockLogger,
       );
 
       customHandler.registerRequest('test-req');
@@ -1084,13 +939,13 @@ describe('Graceful Shutdown Middleware Tests', () => {
         {
           enabled: false,
         },
-        mockLogger
+        mockLogger,
       );
 
       assert.strictEqual(
         disabledHandler.signalHandlers.size,
         0,
-        'Should not register signal handlers when disabled'
+        'Should not register signal handlers when disabled',
       );
 
       await disabledHandler.destroy();
@@ -1101,18 +956,11 @@ describe('Graceful Shutdown Middleware Tests', () => {
         {
           signals: ['SIGTERM', 'SIGUSR1'],
         },
-        mockLogger
+        mockLogger,
       );
 
-      assert.strictEqual(
-        customHandler.config.signals.length,
-        2,
-        'Should use custom signals'
-      );
-      assert.ok(
-        customHandler.config.signals.includes('SIGUSR1'),
-        'Should include custom signal'
-      );
+      assert.strictEqual(customHandler.config.signals.length, 2, 'Should use custom signals');
+      assert.ok(customHandler.config.signals.includes('SIGUSR1'), 'Should include custom signal');
 
       customHandler.destroy();
     });
@@ -1124,10 +972,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
         return await shutdownHandler.initiateShutdown();
       });
 
-      assert.ok(
-        result.duration < 1000,
-        `Should shutdown quickly, took ${result.duration}ms`
-      );
+      assert.ok(result.duration < 1000, `Should shutdown quickly, took ${result.duration}ms`);
       assert.strictEqual(result.result.graceful, true, 'Should be graceful shutdown');
     });
 
@@ -1155,15 +1000,8 @@ describe('Graceful Shutdown Middleware Tests', () => {
         Promise.all(completionPromises),
       ]);
 
-      assert.strictEqual(
-        shutdownResult.graceful,
-        true,
-        'Should handle many requests gracefully'
-      );
-      assert.ok(
-        shutdownHandler.stats.requestsCompleted >= 90,
-        'Should complete most requests'
-      );
+      assert.strictEqual(shutdownResult.graceful, true, 'Should handle many requests gracefully');
+      assert.ok(shutdownHandler.stats.requestsCompleted >= 90, 'Should complete most requests');
     });
   });
 
@@ -1182,11 +1020,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
         const newHandler = new MockGracefulShutdown({}, mockLogger);
         const result = await newHandler.initiateShutdown(signal);
 
-        assert.strictEqual(
-          result.graceful,
-          true,
-          `Should handle ${signal} signal`
-        );
+        assert.strictEqual(result.graceful, true, `Should handle ${signal} signal`);
         await newHandler.destroy();
       }
     });
@@ -1203,11 +1037,7 @@ describe('Graceful Shutdown Middleware Tests', () => {
       const result = await shutdownHandler.initiateShutdown();
 
       // Should still complete gracefully despite exceptions
-      assert.strictEqual(
-        result.graceful,
-        true,
-        'Should handle cleanup exceptions gracefully'
-      );
+      assert.strictEqual(result.graceful, true, 'Should handle cleanup exceptions gracefully');
     });
 
     it('should handle unknown request operations', async () => {
@@ -1230,26 +1060,14 @@ describe('Graceful Shutdown Middleware Tests', () => {
 
       await shutdownHandler.destroy();
 
-      assert.strictEqual(
-        shutdownHandler.activeRequests.size,
-        0,
-        'Should clear active requests'
-      );
+      assert.strictEqual(shutdownHandler.activeRequests.size, 0, 'Should clear active requests');
       assert.strictEqual(
         shutdownHandler.activeConnections.size,
         0,
-        'Should clear active connections'
+        'Should clear active connections',
       );
-      assert.strictEqual(
-        shutdownHandler.shutdownCallbacks.length,
-        0,
-        'Should clear callbacks'
-      );
-      assert.strictEqual(
-        shutdownHandler.signalHandlers.size,
-        0,
-        'Should clear signal handlers'
-      );
+      assert.strictEqual(shutdownHandler.shutdownCallbacks.length, 0, 'Should clear callbacks');
+      assert.strictEqual(shutdownHandler.signalHandlers.size, 0, 'Should clear signal handlers');
     });
 
     it('should wait for ongoing shutdown before destroy', async () => {
@@ -1258,19 +1076,11 @@ describe('Graceful Shutdown Middleware Tests', () => {
       const shutdownPromise = shutdownHandler.initiateShutdown();
       const destroyPromise = shutdownHandler.destroy();
 
-      const [shutdownResult] = await Promise.all([
-        shutdownPromise,
-        destroyPromise,
-      ]);
+      const [shutdownResult] = await Promise.all([shutdownPromise, destroyPromise]);
 
-      assert.strictEqual(
-        shutdownResult.graceful,
-        true,
-        'Should complete shutdown before destroy'
-      );
+      assert.strictEqual(shutdownResult.graceful, true, 'Should complete shutdown before destroy');
     });
   });
 });
 
 console.log('✅ Graceful Shutdown Middleware Tests Completed');
-

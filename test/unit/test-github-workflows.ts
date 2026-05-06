@@ -59,10 +59,11 @@ describe('GitHub workflow hardening', () => {
       'npm run test:unit && npm run test:integration && npm run test:spa:auth && npm run test:spa:e2e:auth',
     );
     assert.deepEqual(packageJson['lint-staged']?.['**/*.{ts,tsx,js,mjs,cjs}'], [
-      'pnpm exec eslint --max-warnings=0 --no-warn-ignored',
+      'pnpm exec eslint --fix --max-warnings=0 --no-warn-ignored',
+      'pnpm exec prettier --write',
     ]);
     assert.deepEqual(packageJson['lint-staged']?.['**/*.{json,md,yml,yaml}'], [
-      'pnpm exec prettier --check',
+      'pnpm exec prettier --write',
     ]);
     assert.equal(fs.existsSync(new URL('../../.lintstagedrc.json', import.meta.url)), false);
   });
@@ -108,7 +109,14 @@ describe('GitHub workflow hardening', () => {
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
+    assert.match(ciWorkflow, /concurrency:/);
+    assert.match(ciWorkflow, /cancel-in-progress: true/);
+    assert.match(ciWorkflow, /pnpm run format:check/);
+    assert.doesNotMatch(ciWorkflow, /pnpm install --frozen-lockfile --dry-run/);
     assert.match(ciWorkflow, /pnpm run ci:local-gate/);
+    assert.match(releaseWorkflow, /concurrency:/);
+    assert.match(releaseWorkflow, /pnpm run format:check/);
+    assert.doesNotMatch(releaseWorkflow, /pnpm install --frozen-lockfile --dry-run/);
     assert.match(releaseWorkflow, /Run shared local gate/);
     assert.match(releaseWorkflow, /pnpm run ci:local-gate/);
     assert.match(releaseWorkflow, /pnpm run test:spa:e2e:auth/);

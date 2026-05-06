@@ -5,11 +5,7 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import {
-  createMockLogger,
-  performance,
-  type MockLogger,
-} from '../utils/test-helpers.ts';
+import { createMockLogger, performance, type MockLogger } from '../utils/test-helpers.ts';
 
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 type ErrorType = 'TIMEOUT' | 'ERROR' | 'RATE_LIMIT' | 'CIRCUIT_OPEN' | string;
@@ -101,10 +97,7 @@ class MockCircuitBreaker {
     };
   }
 
-  async execute<T>(
-    operation: () => Promise<T> | T,
-    operationName = 'unknown'
-  ): Promise<T> {
+  async execute<T>(operation: () => Promise<T> | T, operationName = 'unknown'): Promise<T> {
     this.stats.totalRequests++;
 
     if (!this.config.enabled) {
@@ -120,10 +113,7 @@ class MockCircuitBreaker {
       }
     }
 
-    if (
-      this.state === 'HALF_OPEN' &&
-      this.halfOpenAttempts >= this.config.halfOpenMaxCalls
-    ) {
+    if (this.state === 'HALF_OPEN' && this.halfOpenAttempts >= this.config.halfOpenMaxCalls) {
       throw this.createCircuitOpenError();
     }
 
@@ -139,7 +129,7 @@ class MockCircuitBreaker {
 
   private async executeOperation<T>(
     operation: () => Promise<T> | T,
-    operationName: string
+    operationName: string,
   ): Promise<T> {
     const startTime = Date.now();
 
@@ -148,7 +138,7 @@ class MockCircuitBreaker {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           const timeoutError = new Error(
-            `Operation '${operationName}' timed out after ${this.config.timeoutMs}ms`
+            `Operation '${operationName}' timed out after ${this.config.timeoutMs}ms`,
           ) as ExtendedError;
           timeoutError.type = 'TIMEOUT';
           reject(timeoutError);
@@ -206,10 +196,7 @@ class MockCircuitBreaker {
 
       if (this.state === 'HALF_OPEN') {
         this.transitionToOpen();
-      } else if (
-        this.state === 'CLOSED' &&
-        this.failureCount >= this.config.failureThreshold
-      ) {
+      } else if (this.state === 'CLOSED' && this.failureCount >= this.config.failureThreshold) {
         this.transitionToOpen();
       }
     }
@@ -217,9 +204,7 @@ class MockCircuitBreaker {
 
   shouldAttemptReset(): boolean {
     if (!this.lastFailureTime) return false;
-    return (
-      Date.now() - this.lastFailureTime >= this.config.recoveryTimeout
-    );
+    return Date.now() - this.lastFailureTime >= this.config.recoveryTimeout;
   }
 
   transitionToOpen(): void {
@@ -254,9 +239,7 @@ class MockCircuitBreaker {
   }
 
   createCircuitOpenError(): ExtendedError {
-    const error = new Error(
-      'Circuit breaker is OPEN - service unavailable'
-    ) as ExtendedError;
+    const error = new Error('Circuit breaker is OPEN - service unavailable') as ExtendedError;
     error.type = 'CIRCUIT_OPEN';
     error.state = this.state;
     error.failureCount = this.failureCount;
@@ -281,8 +264,7 @@ class MockCircuitBreaker {
 
     // Update average
     this.stats.averageResponseTime =
-      this.stats.responseTimes.reduce((a, b) => a + b, 0) /
-      this.stats.responseTimes.length;
+      this.stats.responseTimes.reduce((a, b) => a + b, 0) / this.stats.responseTimes.length;
   }
 
   getState(): CircuitBreakerState {
@@ -316,8 +298,7 @@ class MockCircuitBreaker {
       ...this.stats,
       successRate: successRate.toFixed(2) + '%',
       failureRate: failureRate.toFixed(2) + '%',
-      averageResponseTime:
-        Math.round(this.stats.averageResponseTime) + 'ms',
+      averageResponseTime: Math.round(this.stats.averageResponseTime) + 'ms',
       currentState: this.state,
       config: { ...this.config },
     };
@@ -373,9 +354,7 @@ class MockCircuitBreaker {
 
       // Auto-recovery logic for stuck open circuits
       if (this.state === 'OPEN' && this.shouldAttemptReset()) {
-        this.logger.info(
-          'Auto-recovery: attempting to transition to half-open'
-        );
+        this.logger.info('Auto-recovery: attempting to transition to half-open');
       }
     }, this.config.monitoringInterval);
   }
@@ -402,7 +381,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         recoveryTimeout: 5000,
         halfOpenMaxCalls: 2,
       },
-      mockLogger
+      mockLogger,
     );
   });
 
@@ -417,11 +396,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       const result = await circuitBreaker.execute(operation, 'test_operation');
 
       assert.strictEqual(result, 'success', 'Should execute operation successfully');
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'CLOSED',
-        'Circuit should remain closed'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'CLOSED', 'Circuit should remain closed');
     });
 
     it('should count failures and open circuit when threshold is reached', async () => {
@@ -441,13 +416,9 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.getState().state,
         'OPEN',
-        'Circuit should be open after threshold'
+        'Circuit should be open after threshold',
       );
-      assert.strictEqual(
-        circuitBreaker.getState().failureCount,
-        3,
-        'Should track failure count'
-      );
+      assert.strictEqual(circuitBreaker.getState().failureCount, 3, 'Should track failure count');
     });
 
     it('should reject requests immediately when circuit is open', async () => {
@@ -461,20 +432,12 @@ describe('Circuit Breaker Middleware Tests', () => {
         assert.fail('Should throw circuit open error');
       } catch (error) {
         const err = error as ExtendedError;
-        assert.strictEqual(
-          err.type,
-          'CIRCUIT_OPEN',
-          'Should throw circuit open error'
-        );
+        assert.strictEqual(err.type, 'CIRCUIT_OPEN', 'Should throw circuit open error');
         assert.ok(
           err.message.includes('Circuit breaker is OPEN'),
-          'Should include appropriate message'
+          'Should include appropriate message',
         );
-        assert.strictEqual(
-          typeof err.retryAfter,
-          'number',
-          'Should provide retry after time'
-        );
+        assert.strictEqual(typeof err.retryAfter, 'number', 'Should provide retry after time');
       }
     });
 
@@ -492,19 +455,11 @@ describe('Circuit Breaker Middleware Tests', () => {
         await circuitBreaker.execute(failingOperation);
       } catch {}
 
-      assert.strictEqual(
-        circuitBreaker.getState().failureCount,
-        2,
-        'Should have 2 failures'
-      );
+      assert.strictEqual(circuitBreaker.getState().failureCount, 2, 'Should have 2 failures');
 
       // Successful operation should reset count
       await circuitBreaker.execute(successOperation);
-      assert.strictEqual(
-        circuitBreaker.getState().failureCount,
-        0,
-        'Should reset failure count'
-      );
+      assert.strictEqual(circuitBreaker.getState().failureCount, 0, 'Should reset failure count');
     });
   });
 
@@ -514,11 +469,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         throw new Error('Failed');
       };
 
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'CLOSED',
-        'Should start closed'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'CLOSED', 'Should start closed');
 
       // Reach failure threshold
       for (let i = 0; i < 3; i++) {
@@ -527,21 +478,13 @@ describe('Circuit Breaker Middleware Tests', () => {
         } catch {}
       }
 
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'OPEN',
-        'Should transition to open'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'OPEN', 'Should transition to open');
     });
 
     it('should transition from OPEN to HALF_OPEN after recovery timeout', async () => {
       // Force circuit open
       circuitBreaker.forceOpen();
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'OPEN',
-        'Should be open'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'OPEN', 'Should be open');
 
       // Simulate time passing by manually setting last failure time
       circuitBreaker.lastFailureTime = Date.now() - 6000; // 6 seconds ago (> 5 second recovery timeout)
@@ -555,7 +498,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.getState().state,
         'HALF_OPEN',
-        'Should transition to half-open'
+        'Should transition to half-open',
       );
     });
 
@@ -568,18 +511,10 @@ describe('Circuit Breaker Middleware Tests', () => {
 
       // Execute successful operations up to half-open limit
       await circuitBreaker.execute(successOperation);
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'HALF_OPEN',
-        'Should remain half-open'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'HALF_OPEN', 'Should remain half-open');
 
       await circuitBreaker.execute(successOperation);
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'CLOSED',
-        'Should transition to closed'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'CLOSED', 'Should transition to closed');
     });
 
     it('should transition from HALF_OPEN to OPEN on failure', async () => {
@@ -598,7 +533,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.getState().state,
         'OPEN',
-        'Should transition back to open on failure'
+        'Should transition back to open on failure',
       );
     });
 
@@ -614,11 +549,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         assert.fail('Should reject when half-open limit reached');
       } catch (error) {
         const err = error as ExtendedError;
-        assert.strictEqual(
-          err.type,
-          'CIRCUIT_OPEN',
-          'Should reject with circuit open error'
-        );
+        assert.strictEqual(err.type, 'CIRCUIT_OPEN', 'Should reject with circuit open error');
       }
     });
   });
@@ -636,10 +567,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         assert.fail('Should timeout long operation');
       } catch (error) {
         const err = error as ExtendedError;
-        assert.ok(
-          err.message.includes('timed out'),
-          'Should timeout operation'
-        );
+        assert.ok(err.message.includes('timed out'), 'Should timeout operation');
         assert.strictEqual(err.type, 'TIMEOUT', 'Should mark as timeout error');
       }
 
@@ -649,9 +577,7 @@ describe('Circuit Breaker Middleware Tests', () => {
 
     it('should count timeouts as failures', async () => {
       const slowOperation = async () => {
-        return new Promise<string>((resolve) =>
-          setTimeout(() => resolve('result'), 2000)
-        );
+        return new Promise<string>((resolve) => setTimeout(() => resolve('result'), 2000));
       };
 
       // Execute multiple timeout operations
@@ -667,12 +593,12 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.getState().state,
         'OPEN',
-        'Should open circuit after timeouts'
+        'Should open circuit after timeouts',
       );
       assert.strictEqual(
         circuitBreaker.getState().failureCount,
         3,
-        'Should count timeouts as failures'
+        'Should count timeouts as failures',
       );
     });
   });
@@ -699,18 +625,14 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.getState().failureCount,
         1,
-        'Should count rate limit error'
+        'Should count rate limit error',
       );
 
       // Auth error should not count
       try {
         await circuitBreaker.execute(authOperation);
       } catch {}
-      assert.strictEqual(
-        circuitBreaker.getState().failureCount,
-        1,
-        'Should not count auth error'
-      );
+      assert.strictEqual(circuitBreaker.getState().failureCount, 1, 'Should not count auth error');
     });
 
     it('should treat untyped errors as generic failures', async () => {
@@ -725,11 +647,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         await circuitBreaker.execute(genericOperation);
       } catch {}
 
-      assert.strictEqual(
-        circuitBreaker.getState().failureCount,
-        1,
-        'Should count generic error'
-      );
+      assert.strictEqual(circuitBreaker.getState().failureCount, 1, 'Should count generic error');
     });
   });
 
@@ -750,24 +668,10 @@ describe('Circuit Breaker Middleware Tests', () => {
       const stats = circuitBreaker.getStats();
 
       assert.strictEqual(stats.totalRequests, 3, 'Should track total requests');
-      assert.strictEqual(
-        stats.successfulRequests,
-        2,
-        'Should track successful requests'
-      );
-      assert.strictEqual(
-        stats.failedRequests,
-        1,
-        'Should track failed requests'
-      );
-      assert.ok(
-        parseFloat(stats.successRate) > 60,
-        'Should calculate success rate'
-      );
-      assert.ok(
-        parseFloat(stats.failureRate) < 40,
-        'Should calculate failure rate'
-      );
+      assert.strictEqual(stats.successfulRequests, 2, 'Should track successful requests');
+      assert.strictEqual(stats.failedRequests, 1, 'Should track failed requests');
+      assert.ok(parseFloat(stats.successRate) > 60, 'Should calculate success rate');
+      assert.ok(parseFloat(stats.failureRate) < 40, 'Should calculate failure rate');
     });
 
     it('should track response times', async () => {
@@ -785,10 +689,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       await circuitBreaker.execute(slowOperation);
 
       const stats = circuitBreaker.getStats();
-      assert.ok(
-        parseInt(stats.averageResponseTime) > 0,
-        'Should track average response time'
-      );
+      assert.ok(parseInt(stats.averageResponseTime) > 0, 'Should track average response time');
     });
 
     it('should track circuit state changes', async () => {
@@ -810,17 +711,9 @@ describe('Circuit Breaker Middleware Tests', () => {
     it('should provide current state in statistics', () => {
       const stats = circuitBreaker.getStats();
 
-      assert.strictEqual(
-        stats.currentState,
-        'CLOSED',
-        'Should include current state'
-      );
+      assert.strictEqual(stats.currentState, 'CLOSED', 'Should include current state');
       assert.ok(stats.config !== undefined, 'Should include configuration');
-      assert.strictEqual(
-        stats.config.failureThreshold,
-        3,
-        'Should include config values'
-      );
+      assert.strictEqual(stats.config.failureThreshold, 3, 'Should include config values');
     });
   });
 
@@ -829,16 +722,8 @@ describe('Circuit Breaker Middleware Tests', () => {
       const health = await circuitBreaker.healthCheck();
 
       assert.strictEqual(health.healthy, true, 'Should be healthy when closed');
-      assert.strictEqual(
-        health.circuitState,
-        'CLOSED',
-        'Should report circuit state'
-      );
-      assert.strictEqual(
-        health.status,
-        'healthy',
-        'Should include health status'
-      );
+      assert.strictEqual(health.circuitState, 'CLOSED', 'Should report circuit state');
+      assert.strictEqual(health.status, 'healthy', 'Should include health status');
     });
 
     it('should report unhealthy when circuit is open', async () => {
@@ -847,17 +732,9 @@ describe('Circuit Breaker Middleware Tests', () => {
       const health = await circuitBreaker.healthCheck();
 
       assert.strictEqual(health.healthy, false, 'Should be unhealthy when open');
-      assert.strictEqual(
-        health.circuitState,
-        'OPEN',
-        'Should report open state'
-      );
+      assert.strictEqual(health.circuitState, 'OPEN', 'Should report open state');
       assert.ok(health.error !== undefined, 'Should include error information');
-      assert.strictEqual(
-        typeof health.retryAfter,
-        'number',
-        'Should provide retry time'
-      );
+      assert.strictEqual(typeof health.retryAfter, 'number', 'Should provide retry time');
     });
   });
 
@@ -872,36 +749,17 @@ describe('Circuit Breaker Middleware Tests', () => {
 
       const state = circuitBreaker.getState();
       assert.strictEqual(state.state, 'CLOSED', 'Should reset to closed state');
-      assert.strictEqual(
-        state.failureCount,
-        0,
-        'Should reset failure count'
-      );
-      assert.strictEqual(
-        state.lastFailureTime,
-        null,
-        'Should clear last failure time'
-      );
+      assert.strictEqual(state.failureCount, 0, 'Should reset failure count');
+      assert.strictEqual(state.lastFailureTime, null, 'Should clear last failure time');
     });
 
     it('should allow manual force open', () => {
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'CLOSED',
-        'Should start closed'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'CLOSED', 'Should start closed');
 
       circuitBreaker.forceOpen();
 
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'OPEN',
-        'Should force open'
-      );
-      assert.ok(
-        circuitBreaker.getState().lastFailureTime !== null,
-        'Should set failure time'
-      );
+      assert.strictEqual(circuitBreaker.getState().state, 'OPEN', 'Should force open');
+      assert.ok(circuitBreaker.getState().lastFailureTime !== null, 'Should set failure time');
     });
   });
 
@@ -911,7 +769,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         {
           failureThreshold: 1, // Single failure should open circuit
         },
-        mockLogger
+        mockLogger,
       );
 
       const failingOperation = async () => {
@@ -925,7 +783,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         customBreaker.getState().state,
         'OPEN',
-        'Should open after single failure with threshold 1'
+        'Should open after single failure with threshold 1',
       );
     });
 
@@ -934,7 +792,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         {
           recoveryTimeout: 1000, // 1 second recovery
         },
-        mockLogger
+        mockLogger,
       );
 
       customBreaker.forceOpen();
@@ -947,7 +805,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         customBreaker.getState().state,
         'HALF_OPEN',
-        'Should transition to half-open with custom timeout'
+        'Should transition to half-open with custom timeout',
       );
     });
 
@@ -956,7 +814,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         {
           timeoutMs: 100, // Very short timeout
         },
-        mockLogger
+        mockLogger,
       );
 
       const slowOperation = async () => {
@@ -978,7 +836,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         {
           enabled: false,
         },
-        mockLogger
+        mockLogger,
       );
 
       const failingOperation = async () => {
@@ -993,7 +851,7 @@ describe('Circuit Breaker Middleware Tests', () => {
           assert.strictEqual(
             (error as Error).message,
             'Failed',
-            'Should get original error, not circuit error'
+            'Should get original error, not circuit error',
           );
         }
       }
@@ -1001,7 +859,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         disabledBreaker.getState().state,
         'CLOSED',
-        'Should remain closed when disabled'
+        'Should remain closed when disabled',
       );
     });
   });
@@ -1016,7 +874,7 @@ describe('Circuit Breaker Middleware Tests', () => {
 
       assert.ok(
         result.duration < 10,
-        `Circuit breaker should add minimal overhead, took ${result.duration}ms`
+        `Circuit breaker should add minimal overhead, took ${result.duration}ms`,
       );
       assert.strictEqual(result.result, 'result', 'Should return correct result');
     });
@@ -1029,21 +887,16 @@ describe('Circuit Breaker Middleware Tests', () => {
 
       // Execute many operations in parallel
       for (let i = 0; i < 100; i++) {
-        operations.push(
-          circuitBreaker.execute(simpleOperation, `operation_${i}`)
-        );
+        operations.push(circuitBreaker.execute(simpleOperation, `operation_${i}`));
       }
 
       const results = await Promise.all(operations);
       const duration = Date.now() - startTime;
 
-      assert.ok(
-        duration < 1000,
-        `Should handle 100 operations efficiently, took ${duration}ms`
-      );
+      assert.ok(duration < 1000, `Should handle 100 operations efficiently, took ${duration}ms`);
       assert.ok(
         results.every((r) => r === 'success'),
-        'All operations should succeed'
+        'All operations should succeed',
       );
 
       const stats = circuitBreaker.getStats();
@@ -1060,16 +913,8 @@ describe('Circuit Breaker Middleware Tests', () => {
       const undefinedResult = await circuitBreaker.execute(undefinedOperation);
 
       assert.strictEqual(nullResult, null, 'Should handle null return value');
-      assert.strictEqual(
-        undefinedResult,
-        undefined,
-        'Should handle undefined return value'
-      );
-      assert.strictEqual(
-        circuitBreaker.getState().state,
-        'CLOSED',
-        'Should remain closed'
-      );
+      assert.strictEqual(undefinedResult, undefined, 'Should handle undefined return value');
+      assert.strictEqual(circuitBreaker.getState().state, 'CLOSED', 'Should remain closed');
     });
 
     it('should handle promise rejections properly', async () => {
@@ -1084,14 +929,14 @@ describe('Circuit Breaker Middleware Tests', () => {
         assert.strictEqual(
           (error as Error).message,
           'Promise rejected',
-          'Should get original rejection'
+          'Should get original rejection',
         );
       }
 
       assert.strictEqual(
         circuitBreaker.getState().failureCount,
         1,
-        'Should count rejection as failure'
+        'Should count rejection as failure',
       );
     });
 
@@ -1107,7 +952,7 @@ describe('Circuit Breaker Middleware Tests', () => {
         assert.strictEqual(
           (error as Error).message,
           'Synchronous throw',
-          'Should get original error'
+          'Should get original error',
         );
       }
     });
@@ -1131,21 +976,14 @@ describe('Circuit Breaker Middleware Tests', () => {
       assert.strictEqual(
         circuitBreaker.monitoringInterval,
         null,
-        'Should not have monitoring initially'
+        'Should not have monitoring initially',
       );
 
       circuitBreaker.startMonitoring();
-      assert.ok(
-        circuitBreaker.monitoringInterval !== null,
-        'Should start monitoring'
-      );
+      assert.ok(circuitBreaker.monitoringInterval !== null, 'Should start monitoring');
 
       circuitBreaker.stopMonitoring();
-      assert.strictEqual(
-        circuitBreaker.monitoringInterval,
-        null,
-        'Should stop monitoring'
-      );
+      assert.strictEqual(circuitBreaker.monitoringInterval, null, 'Should stop monitoring');
     });
 
     it('should log statistics during monitoring', (done) => {
@@ -1157,7 +995,7 @@ describe('Circuit Breaker Middleware Tests', () => {
           debugMessageReceived = true;
           assert.ok(
             (data as Record<string, unknown>)?.totalRequests !== undefined,
-            'Should include stats in debug log'
+            'Should include stats in debug log',
           );
         }
         originalDebug.call(mockLogger, message, data);
@@ -1170,11 +1008,7 @@ describe('Circuit Breaker Middleware Tests', () => {
       // Wait for monitoring to trigger
       setTimeout(() => {
         circuitBreaker.stopMonitoring();
-        assert.strictEqual(
-          debugMessageReceived,
-          true,
-          'Should log stats during monitoring'
-        );
+        assert.strictEqual(debugMessageReceived, true, 'Should log stats during monitoring');
         done();
       }, 100);
     });
@@ -1182,4 +1016,3 @@ describe('Circuit Breaker Middleware Tests', () => {
 });
 
 console.log('✅ Circuit Breaker Middleware Tests Completed');
-

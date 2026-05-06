@@ -168,10 +168,7 @@ async function revokeKey(config, flags) {
     throw new Error('Use either --key-id or --token, not both');
   }
 
-  const filters = [
-    'is_active=eq.true',
-    'revoked_at=is.null',
-  ];
+  const filters = ['is_active=eq.true', 'revoked_at=is.null'];
   if (keyId) {
     filters.push(`id=eq.${encodeURIComponent(keyId)}`);
   } else {

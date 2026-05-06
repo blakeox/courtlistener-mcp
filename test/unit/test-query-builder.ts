@@ -18,10 +18,8 @@ const {
 
 describe('OpinionQueryBuilder', () => {
   it('builds simple query', () => {
-    const params = new OpinionQueryBuilder()
-      .query('privacy rights')
-      .build();
-    
+    const params = new OpinionQueryBuilder().query('privacy rights').build();
+
     assert.strictEqual(params.q, 'privacy rights');
   });
 
@@ -33,7 +31,7 @@ describe('OpinionQueryBuilder', () => {
       .paginate(2, 50)
       .orderBy('date_filed')
       .build();
-    
+
     assert.strictEqual(params.q, 'privacy rights');
     assert.strictEqual(params.court, 'scotus');
     assert.strictEqual(params.date_filed_after, '2020-01-01');
@@ -44,42 +42,32 @@ describe('OpinionQueryBuilder', () => {
   });
 
   it('builds query with judge filter', () => {
-    const params = new OpinionQueryBuilder()
-      .judge('Roberts')
-      .build();
-    
+    const params = new OpinionQueryBuilder().judge('Roberts').build();
+
     assert.strictEqual(params.judge, 'Roberts');
   });
 
   it('builds query with citation', () => {
-    const params = new OpinionQueryBuilder()
-      .citation('410 U.S. 113')
-      .build();
-    
+    const params = new OpinionQueryBuilder().citation('410 U.S. 113').build();
+
     assert.strictEqual(params.citation, '410 U.S. 113');
   });
 
   it('builds query with case name', () => {
-    const params = new OpinionQueryBuilder()
-      .caseName('Roe v. Wade')
-      .build();
-    
+    const params = new OpinionQueryBuilder().caseName('Roe v. Wade').build();
+
     assert.strictEqual(params.case_name, 'Roe v. Wade');
   });
 
   it('builds query with precedential status', () => {
-    const params = new OpinionQueryBuilder()
-      .precedentialStatus('Published')
-      .build();
-    
+    const params = new OpinionQueryBuilder().precedentialStatus('Published').build();
+
     assert.strictEqual(params.precedential_status, 'Published');
   });
 
   it('builds query with citation count range', () => {
-    const params = new OpinionQueryBuilder()
-      .citationCount(10, 100)
-      .build();
-    
+    const params = new OpinionQueryBuilder().citationCount(10, 100).build();
+
     assert.strictEqual(params.cited_gt, 10);
     assert.strictEqual(params.cited_lt, 100);
   });
@@ -89,7 +77,7 @@ describe('OpinionQueryBuilder', () => {
     builder.query('test').court('scotus');
     builder.reset();
     const params = builder.build();
-    
+
     assert.strictEqual(Object.keys(params).length, 0);
   });
 });
@@ -101,7 +89,7 @@ describe('CaseQueryBuilder', () => {
       .court('ca9')
       .paginate(1, 20)
       .build();
-    
+
     assert.strictEqual(params.q, 'constitutional law');
     assert.strictEqual(params.court, 'ca9');
     assert.strictEqual(params.page, 1);
@@ -109,31 +97,23 @@ describe('CaseQueryBuilder', () => {
   });
 
   it('builds query with docket number', () => {
-    const params = new CaseQueryBuilder()
-      .docketNumber('20-cv-1234')
-      .build();
-    
+    const params = new CaseQueryBuilder().docketNumber('20-cv-1234').build();
+
     assert.strictEqual(params.docket_number, '20-cv-1234');
   });
 });
 
 describe('DocketQueryBuilder', () => {
   it('builds docket search query', () => {
-    const params = new DocketQueryBuilder()
-      .caseName('Smith v. Jones')
-      .jurisdiction('FB')
-      .build();
-    
+    const params = new DocketQueryBuilder().caseName('Smith v. Jones').jurisdiction('FB').build();
+
     assert.strictEqual(params.case_name, 'Smith v. Jones');
     assert.strictEqual(params.court__jurisdiction, 'FB');
   });
 
   it('builds query with nature of suit', () => {
-    const params = new DocketQueryBuilder()
-      .natureOfSuit('Contract')
-      .status('pending')
-      .build();
-    
+    const params = new DocketQueryBuilder().natureOfSuit('Contract').status('pending').build();
+
     assert.strictEqual(params.nature_of_suit, 'Contract');
     assert.strictEqual(params.status, 'pending');
   });
@@ -141,11 +121,8 @@ describe('DocketQueryBuilder', () => {
 
 describe('JudgeQueryBuilder', () => {
   it('builds judge search query', () => {
-    const params = new JudgeQueryBuilder()
-      .name('Sotomayor')
-      .active(true)
-      .build();
-    
+    const params = new JudgeQueryBuilder().name('Sotomayor').active(true).build();
+
     assert.strictEqual(params.name, 'Sotomayor');
     assert.strictEqual(params.active, true);
   });
@@ -156,7 +133,7 @@ describe('JudgeQueryBuilder', () => {
       .appointer('Obama')
       .appointmentYear(2009)
       .build();
-    
+
     assert.strictEqual(params.school, 'Harvard');
     assert.strictEqual(params.appointer, 'Obama');
     assert.strictEqual(params.appointment_year, 2009);
@@ -197,7 +174,7 @@ describe('Query Builder Integration', () => {
       .paginate(1, 25)
       .orderBy('date_filed')
       .build();
-    
+
     assert.strictEqual(params.q, 'fourth amendment privacy');
     assert.strictEqual(params.court, 'scotus');
     assert.strictEqual(params.date_filed_after, '2020-01-01');
@@ -212,9 +189,8 @@ describe('Query Builder Integration', () => {
     const params = QueryBuilder.opinions()
       .dateRange('2020-01-01') // Only after date
       .build();
-    
+
     assert.strictEqual(params.date_filed_after, '2020-01-01');
     assert.strictEqual(params.date_filed_before, undefined);
   });
 });
-

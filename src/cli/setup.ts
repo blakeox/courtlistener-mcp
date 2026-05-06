@@ -291,14 +291,16 @@ export async function runSetup(): Promise<void> {
     // Step 2: Choose client
     console.log('Which MCP client would you like to configure?\n');
     for (let i = 0; i < CLIENTS.length; i++) {
-      const client = CLIENTS[i]!;
+      const client = CLIENTS[i];
+      if (!client) continue;
       const marker = detected.find((d) => d.client.id === client.id)?.found ? ' (detected)' : '';
       console.log(`  ${i + 1}) ${client.name}${marker}`);
     }
     console.log();
 
+    const autoDetectedClient = autoDetected[0]?.client;
     const defaultChoice =
-      autoDetected.length > 0 ? String(CLIENTS.indexOf(autoDetected[0]!.client) + 1) : '1';
+      autoDetectedClient !== undefined ? String(CLIENTS.indexOf(autoDetectedClient) + 1) : '1';
 
     const choiceStr = await ask(rl, `Enter choice [${defaultChoice}]: `);
     const choiceNum = parseInt(choiceStr || defaultChoice, 10);
@@ -308,7 +310,11 @@ export async function runSetup(): Promise<void> {
       process.exit(1);
     }
 
-    const selectedClient = CLIENTS[choiceNum - 1]!;
+    const selectedClient = CLIENTS[choiceNum - 1];
+    if (!selectedClient) {
+      console.error('\n❌ Invalid choice. Exiting.\n');
+      process.exit(1);
+    }
     console.log(`\n→ Configuring for ${selectedClient.name}\n`);
 
     // Step 3: API key

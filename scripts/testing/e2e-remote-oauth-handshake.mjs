@@ -24,7 +24,8 @@ export function resolveProbeConfig(env = process.env) {
   const baseUrlInput = env.OAUTH_BASE_URL?.trim() || env.REMOTE_SERVER_URL?.trim() || '';
   if (!baseUrlInput) {
     return {
-      skipReason: 'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to run the hosted OAuth handshake probe.',
+      skipReason:
+        'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to run the hosted OAuth handshake probe.',
     };
   }
 
@@ -59,9 +60,14 @@ export async function main() {
   });
 
   await step('Fetch protected-resource metadata', async () => {
-    const response = await fetchJson(protectedResourceUrl, { headers: { Origin: cfg.clientOrigin } });
+    const response = await fetchJson(protectedResourceUrl, {
+      headers: { Origin: cfg.clientOrigin },
+    });
     assert(response.status === 200, `Expected 200, got ${response.status}`);
-    assert(response.body?.resource === cfg.baseUrl, `Expected resource=${cfg.baseUrl}, got ${String(response.body?.resource)}`);
+    assert(
+      response.body?.resource === cfg.baseUrl,
+      `Expected resource=${cfg.baseUrl}, got ${String(response.body?.resource)}`,
+    );
   });
 
   const registration = await step('Register public OAuth client', async () => {
@@ -81,7 +87,10 @@ export async function main() {
       }),
     });
     assert(response.status === 201, `Expected 201, got ${response.status}`);
-    assert(typeof response.body?.client_id === 'string' && response.body.client_id.length > 0, 'Missing client_id');
+    assert(
+      typeof response.body?.client_id === 'string' && response.body.client_id.length > 0,
+      'Missing client_id',
+    );
     assert(response.headers.get('location'), 'Missing registration Location header');
     return response.body;
   });
@@ -104,20 +113,32 @@ export async function main() {
     return response;
   });
 
-  const authRedirect = await step('Request /authorize and capture auth portal redirect', async () => {
-    const response = await fetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
-    assert(isRedirect(response.status), `Expected redirect, got ${response.status}`);
-    const location = response.headers.get('location');
-    assert(location, 'Missing authorize redirect location');
-    const redirectUrl = new URL(location, cfg.baseUrl);
-    assert(redirectUrl.pathname === '/auth/start', `Expected /auth/start redirect, got ${redirectUrl.pathname}`);
-    assert(redirectUrl.searchParams.get('return_to') === authorizeUrl.toString(), 'return_to did not preserve /authorize URL');
-    return redirectUrl;
-  });
+  const authRedirect = await step(
+    'Request /authorize and capture auth portal redirect',
+    async () => {
+      const response = await fetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
+      assert(isRedirect(response.status), `Expected redirect, got ${response.status}`);
+      const location = response.headers.get('location');
+      assert(location, 'Missing authorize redirect location');
+      const redirectUrl = new URL(location, cfg.baseUrl);
+      assert(
+        redirectUrl.pathname === '/auth/start',
+        `Expected /auth/start redirect, got ${redirectUrl.pathname}`,
+      );
+      assert(
+        redirectUrl.searchParams.get('return_to') === authorizeUrl.toString(),
+        'return_to did not preserve /authorize URL',
+      );
+      return redirectUrl;
+    },
+  );
 
   await step('Fetch auth portal handoff page', async () => {
     const response = await fetch(authRedirect, { redirect: 'manual' });
-    assert(isRedirect(response.status) || response.status === 200, `Expected redirect or 200, got ${response.status}`);
+    assert(
+      isRedirect(response.status) || response.status === 200,
+      `Expected redirect or 200, got ${response.status}`,
+    );
     if (isRedirect(response.status)) {
       assert(response.headers.get('location'), 'Missing auth portal redirect location');
       return;
@@ -126,7 +147,9 @@ export async function main() {
     assertAuthPortalHandoffContent(html, { readinessProbeReady: readinessProbe.ready });
   });
 
-  console.log('\nRemote MCP OAuth handshake probe passed (through Worker-owned /auth/start handoff)');
+  console.log(
+    '\nRemote MCP OAuth handshake probe passed (through Worker-owned /auth/start handoff)',
+  );
 }
 
 function createPkce() {
@@ -169,7 +192,10 @@ export function summarizeHostedAuthProbeResponse(response) {
   return {
     status: response.status,
     location,
-    ready: isRedirect(response.status) && response.headers.get('x-hosted-auth-ready') === 'true' && Boolean(location),
+    ready:
+      isRedirect(response.status) &&
+      response.headers.get('x-hosted-auth-ready') === 'true' &&
+      Boolean(location),
     hostedAuthReady: response.headers.get('x-hosted-auth-ready'),
     hostedAuthStatus: trimHeader(response.headers, 'x-hosted-auth-status'),
     hostedAuthError: trimHeader(response.headers, 'x-hosted-auth-error'),
@@ -180,28 +206,52 @@ export function summarizeHostedAuthProbeResponse(response) {
     hostedAuthCredentialSource: trimHeader(response.headers, 'x-hosted-auth-credential-source'),
     hostedAuthConfigErrorCount: trimHeader(response.headers, 'x-hosted-auth-config-error-count'),
     hostedAuthDurationMs: trimHeader(response.headers, 'x-hosted-auth-duration-ms'),
-    hostedAuthUpstreamDiscoveryDurationMs: trimHeader(response.headers, 'x-hosted-auth-upstream-discovery-duration-ms'),
+    hostedAuthUpstreamDiscoveryDurationMs: trimHeader(
+      response.headers,
+      'x-hosted-auth-upstream-discovery-duration-ms',
+    ),
   };
 }
 
 export function assertHostedAuthReadinessContract(probe) {
-  assert(probe.hostedAuthRoute === 'auth-start', `Expected X-Hosted-Auth-Route=auth-start, got ${String(probe.hostedAuthRoute)}`);
+  assert(
+    probe.hostedAuthRoute === 'auth-start',
+    `Expected X-Hosted-Auth-Route=auth-start, got ${String(probe.hostedAuthRoute)}`,
+  );
   assert(probe.hostedAuthStatus, 'Missing X-Hosted-Auth-Status');
   assert(probe.hostedAuthOutcome, 'Missing X-Hosted-Auth-Outcome');
   assert(probe.hostedAuthCategory, 'Missing X-Hosted-Auth-Category');
   assert(probe.hostedAuthCorrelationId, 'Missing X-Hosted-Auth-Correlation-Id');
-  assert(/^[A-Za-z0-9_-]{8,}$/.test(probe.hostedAuthCorrelationId), `Invalid X-Hosted-Auth-Correlation-Id: ${String(probe.hostedAuthCorrelationId)}`);
+  assert(
+    /^[A-Za-z0-9_-]{8,}$/.test(probe.hostedAuthCorrelationId),
+    `Invalid X-Hosted-Auth-Correlation-Id: ${String(probe.hostedAuthCorrelationId)}`,
+  );
   assertDigitsHeader(probe.hostedAuthConfigErrorCount, 'X-Hosted-Auth-Config-Error-Count');
   assertDigitsHeader(probe.hostedAuthDurationMs, 'X-Hosted-Auth-Duration-Ms');
 
   if (probe.ready) {
     assert(isRedirect(probe.status), `Expected readiness probe redirect, got ${probe.status}`);
-    assert(probe.hostedAuthReady === 'true', `Expected X-Hosted-Auth-Ready=true, got ${String(probe.hostedAuthReady)}`);
-    assert(probe.hostedAuthStatus === 'ready', `Expected X-Hosted-Auth-Status=ready, got ${String(probe.hostedAuthStatus)}`);
-    assert(probe.hostedAuthOutcome === 'redirect', `Expected X-Hosted-Auth-Outcome=redirect, got ${String(probe.hostedAuthOutcome)}`);
-    assert(probe.hostedAuthCategory === 'ok', `Expected X-Hosted-Auth-Category=ok, got ${String(probe.hostedAuthCategory)}`);
+    assert(
+      probe.hostedAuthReady === 'true',
+      `Expected X-Hosted-Auth-Ready=true, got ${String(probe.hostedAuthReady)}`,
+    );
+    assert(
+      probe.hostedAuthStatus === 'ready',
+      `Expected X-Hosted-Auth-Status=ready, got ${String(probe.hostedAuthStatus)}`,
+    );
+    assert(
+      probe.hostedAuthOutcome === 'redirect',
+      `Expected X-Hosted-Auth-Outcome=redirect, got ${String(probe.hostedAuthOutcome)}`,
+    );
+    assert(
+      probe.hostedAuthCategory === 'ok',
+      `Expected X-Hosted-Auth-Category=ok, got ${String(probe.hostedAuthCategory)}`,
+    );
     assert(probe.location, 'Missing readiness probe redirect location');
-    assert(probe.hostedAuthConfigErrorCount === '0', `Expected X-Hosted-Auth-Config-Error-Count=0, got ${String(probe.hostedAuthConfigErrorCount)}`);
+    assert(
+      probe.hostedAuthConfigErrorCount === '0',
+      `Expected X-Hosted-Auth-Config-Error-Count=0, got ${String(probe.hostedAuthConfigErrorCount)}`,
+    );
     assertDigitsHeader(
       probe.hostedAuthUpstreamDiscoveryDurationMs,
       'X-Hosted-Auth-Upstream-Discovery-Duration-Ms',
@@ -215,8 +265,14 @@ export function assertHostedAuthReadinessContract(probe) {
     return;
   }
 
-  assert(!isRedirect(probe.status), `Expected non-redirect failure probe response, got ${probe.status}`);
-  assert(probe.hostedAuthReady === 'false', `Expected X-Hosted-Auth-Ready=false, got ${String(probe.hostedAuthReady)}`);
+  assert(
+    !isRedirect(probe.status),
+    `Expected non-redirect failure probe response, got ${probe.status}`,
+  );
+  assert(
+    probe.hostedAuthReady === 'false',
+    `Expected X-Hosted-Auth-Ready=false, got ${String(probe.hostedAuthReady)}`,
+  );
   assert(probe.hostedAuthStatus !== 'ready', 'Failure readiness probe unexpectedly reported ready');
   assert(
     probe.hostedAuthOutcome === 'unavailable',
@@ -239,8 +295,7 @@ export function assertHostedAuthReadinessContract(probe) {
 
 export function assertAuthPortalHandoffContent(html, { readinessProbeReady }) {
   const handoffPage =
-    html.includes('Complete secure sign-in') ||
-    html.includes('Loading auth handoff');
+    html.includes('Complete secure sign-in') || html.includes('Loading auth handoff');
   if (handoffPage) {
     return;
   }
@@ -276,20 +331,15 @@ function trimHeader(headers, name) {
 }
 
 function assertDigitsHeader(value, name) {
-  assert(typeof value === 'string' && /^\d+$/.test(value), `Missing or invalid ${name}: ${String(value)}`);
+  assert(
+    typeof value === 'string' && /^\d+$/.test(value),
+    `Missing or invalid ${name}: ${String(value)}`,
+  );
 }
 
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
-  }
-}
-
-function stringify(value) {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
   }
 }
 

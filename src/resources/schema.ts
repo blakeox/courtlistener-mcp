@@ -125,7 +125,11 @@ export class SchemaResourceHandler implements ResourceHandler {
       type: 'object',
       properties: {
         q: { type: 'string', description: 'Query string' },
-        type: { type: 'string', enum: ['o', 'd', 'r'], description: 'o: opinion, d: docket, r: recap' },
+        type: {
+          type: 'string',
+          enum: ['o', 'd', 'r'],
+          description: 'o: opinion, d: docket, r: recap',
+        },
         order_by: { type: 'string', enum: ['score desc', 'dateFiled desc', 'dateFiled asc'] },
         stat_Precedential: { type: 'boolean' },
         court: { type: 'array', items: { type: 'string' } },
@@ -160,7 +164,7 @@ export class SchemaResourceHandler implements ResourceHandler {
   }
 
   list(): Resource[] {
-    return Object.keys(this.schemas).map(type => ({
+    return Object.keys(this.schemas).map((type) => ({
       uri: `courtlistener://schema/${type}`,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)} Schema`,
       description: `Schema for ${type} data structure`,

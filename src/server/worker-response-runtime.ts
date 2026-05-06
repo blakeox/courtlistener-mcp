@@ -49,7 +49,11 @@ export function htmlResponse(html: string, nonce: string, extraHeaders?: Headers
   });
 }
 
-export function redirectResponse(location: string, status = 302, extraHeaders?: HeadersInit): Response {
+export function redirectResponse(
+  location: string,
+  status = 302,
+  extraHeaders?: HeadersInit,
+): Response {
   const headers = createSecureResponseHeaders(
     {
       Location: location,
@@ -81,7 +85,11 @@ export function buildCorsHeaders(origin: string | null, allowedOrigins: string[]
   return buildMcpCorsHeaders(origin, allowedOrigins);
 }
 
-export function withCors(response: Response, origin: string | null, allowedOrigins: string[]): Response {
+export function withCors(
+  response: Response,
+  origin: string | null,
+  allowedOrigins: string[],
+): Response {
   const headers = new Headers(response.headers);
   const corsHeaders = buildCorsHeaders(origin, allowedOrigins);
   for (const [key, value] of corsHeaders.entries()) {
@@ -103,7 +111,11 @@ function appendHeaders(headers: Headers, extraHeaders?: HeadersInit): void {
   }
 }
 
-function createSecureResponseHeaders(baseHeaders: HeadersInit, extraHeaders?: HeadersInit, nonce?: string): Headers {
+function createSecureResponseHeaders(
+  baseHeaders: HeadersInit,
+  extraHeaders?: HeadersInit,
+  nonce?: string,
+): Headers {
   const headers = new Headers(baseHeaders);
   appendHeaders(headers, extraHeaders);
   applySecurityHeaders(headers, nonce);
@@ -131,7 +143,7 @@ function applySecurityHeaders(headers: Headers, nonce?: string): void {
       scriptDirective,
       styleDirective,
       "connect-src 'self'",
-      "frame-src https://challenges.cloudflare.com",
+      'frame-src https://challenges.cloudflare.com',
       "form-action 'self'",
     ].join('; '),
   );

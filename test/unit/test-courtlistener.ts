@@ -101,7 +101,7 @@ class APIServerMock {
    */
   private async handleRequest(
     req: IncomingMessage,
-    res: ServerResponse<IncomingMessage>
+    res: ServerResponse<IncomingMessage>,
   ): Promise<void> {
     if (!req.url || !this.baseUrl) {
       res.writeHead(400);
@@ -124,9 +124,7 @@ class APIServerMock {
     try {
       // Simulate network delays
       if (this.config.defaultDelay > 0) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.config.defaultDelay)
-        );
+        await new Promise((resolve) => setTimeout(resolve, this.config.defaultDelay));
       }
 
       // Simulate network errors
@@ -168,11 +166,7 @@ class APIServerMock {
         this.sendErrorResponse(res, 404, 'Not Found');
       }
     } catch (error) {
-      this.sendErrorResponse(
-        res,
-        500,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      this.sendErrorResponse(res, 500, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -182,7 +176,7 @@ class APIServerMock {
   private sendErrorResponse(
     res: ServerResponse<IncomingMessage>,
     status: number,
-    message: string
+    message: string,
   ): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: message }));
@@ -191,10 +185,7 @@ class APIServerMock {
   /**
    * Find matching mock response
    */
-  private findResponse(
-    endpoint: string,
-    params: URLSearchParams
-  ): MockResponse | null {
+  private findResponse(endpoint: string, params: URLSearchParams): MockResponse | null {
     // Convert URLSearchParams to plain object
     const paramsObj: Record<string, string> = {};
     for (const [key, value] of params.entries()) {
@@ -221,10 +212,13 @@ class APIServerMock {
   private generateKey(endpoint: string, params: Record<string, string>): string {
     const sortedParams = Object.keys(params)
       .sort()
-      .reduce((obj, key) => {
-        obj[key] = params[key];
-        return obj;
-      }, {} as Record<string, string>);
+      .reduce(
+        (obj, key) => {
+          obj[key] = params[key];
+          return obj;
+        },
+        {} as Record<string, string>,
+      );
     return `${endpoint}:${JSON.stringify(sortedParams)}`;
   }
 
@@ -235,7 +229,7 @@ class APIServerMock {
     endpoint: string,
     params: Record<string, unknown> = {},
     data: unknown,
-    status: number = 200
+    status: number = 200,
   ): void {
     const key =
       Object.keys(params).length > 0
@@ -330,7 +324,7 @@ class MockDataFactory {
     results: T[],
     count: number | null = null,
     next: string | null = null,
-    previous: string | null = null
+    previous: string | null = null,
   ): {
     count: number;
     next: string | null;
@@ -347,7 +341,7 @@ class MockDataFactory {
 
   static createErrorResponse(
     message: string,
-    code: string | null = null
+    code: string | null = null,
   ): { error: string; code: string | null; detail: string } {
     return {
       error: message,
@@ -392,7 +386,7 @@ class MockLogger implements Partial<Logger> {
     endpoint: string,
     duration: number,
     status: number,
-    meta?: unknown
+    meta?: unknown,
   ): void {
     this.logs.push({
       level: 'api',
@@ -440,21 +434,13 @@ class MockCacheManager implements Partial<CacheManager> {
     this.enabled = enabled;
   }
 
-  get<T>(
-    endpoint: string,
-    params: Record<string, unknown>
-  ): T | null {
+  get<T>(endpoint: string, params: Record<string, unknown>): T | null {
     if (!this.enabled) return null;
     const key = `${endpoint}:${JSON.stringify(params || {})}`;
     return (this.cache.get(key) as T) || null;
   }
 
-  set<T>(
-    endpoint: string,
-    params: Record<string, unknown>,
-    data: T,
-    ttl?: number
-  ): void {
+  set<T>(endpoint: string, params: Record<string, unknown>, data: T, ttl?: number): void {
     if (!this.enabled) return;
     const key = `${endpoint}:${JSON.stringify(params || {})}`;
     this.cache.set(key, data);
@@ -466,7 +452,9 @@ class MockCacheManager implements Partial<CacheManager> {
     this.setCalls = [];
   }
 
-  getLastSetCall(): { endpoint: string; params: Record<string, unknown>; ttl?: number } | undefined {
+  getLastSetCall():
+    | { endpoint: string; params: Record<string, unknown>; ttl?: number }
+    | undefined {
     return this.setCalls[this.setCalls.length - 1];
   }
 }
@@ -533,7 +521,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
       config,
       mockCache as CacheManager,
       mockLogger as Logger,
-      mockMetrics as MetricsCollector
+      mockMetrics as MetricsCollector,
     );
   });
 
@@ -550,7 +538,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         (log) =>
           log.level === 'info' &&
           typeof log.msg === 'string' &&
-          log.msg.includes('CourtListener API client initialized')
+          log.msg.includes('CourtListener API client initialized'),
       );
       assert.ok(hasInitLog, 'Should log API client initialization');
     });
@@ -570,7 +558,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
       mockServer.mockResponse(
         '/api/rest/v4/search/',
         { q: 'test' },
-        MockDataFactory.createSearchResponse(mockResults)
+        MockDataFactory.createSearchResponse(mockResults),
       );
 
       try {
@@ -595,7 +583,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
       mockServer.mockResponse(
         '/api/rest/v4/search/',
         { q: 'nonexistent' },
-        MockDataFactory.createSearchResponse([])
+        MockDataFactory.createSearchResponse([]),
       );
 
       const result = await courtListenerAPI.searchOpinions({ q: 'nonexistent' });
@@ -621,7 +609,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
     it('should cache successful responses', async () => {
       // Ensure cache is enabled for this test
       mockCache.setEnabled(true);
-      
+
       const mockCluster = MockDataFactory.createOpinionCluster();
       mockServer.mockResponse('/api/rest/v4/clusters/123456/', {}, mockCluster);
 
@@ -633,8 +621,8 @@ describe('CourtListener API Integration (TypeScript)', () => {
       // Second request - should use cache (if cache is working)
       const result2 = await courtListenerAPI.getOpinionCluster(123456);
       const requestCountAfterSecond = mockServer.getRequestHistory().length;
-      
-      // Cache should prevent additional request, but if cache isn't working, 
+
+      // Cache should prevent additional request, but if cache isn't working,
       // we still verify the results are the same
       assert.deepStrictEqual(result1, result2, 'Results should be identical');
 
@@ -642,7 +630,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
       if (mockCache.isEnabled()) {
         assert.ok(
           requestCountAfterSecond <= requestCountAfterFirst + 1,
-          `Cache should reduce requests. First: ${requestCountAfterFirst}, Second: ${requestCountAfterSecond}`
+          `Cache should reduce requests. First: ${requestCountAfterFirst}, Second: ${requestCountAfterSecond}`,
         );
       }
 
@@ -677,10 +665,14 @@ describe('CourtListener API Integration (TypeScript)', () => {
           },
           mockCache as CacheManager,
           mockLogger as Logger,
-          mockMetrics as MetricsCollector
+          mockMetrics as MetricsCollector,
         );
 
-        mockServer.mockResponse('/api/rest/v4/courts/', {}, MockDataFactory.createSearchResponse([]));
+        mockServer.mockResponse(
+          '/api/rest/v4/courts/',
+          {},
+          MockDataFactory.createSearchResponse([]),
+        );
         await customClient.getCourts({});
 
         const lastSet = mockCache.getLastSetCall();
@@ -702,7 +694,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         '/api/rest/v4/clusters/999999/',
         {},
         MockDataFactory.createErrorResponse('Not found'),
-        404
+        404,
       );
 
       try {
@@ -713,7 +705,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         assert.ok(
           error.message.includes('404') ||
             error.message.includes('resource') ||
-            error.message.includes('Not found')
+            error.message.includes('Not found'),
         );
       }
     });
@@ -736,7 +728,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         assert.ok(
           error.message.includes('429') ||
             error.message.includes('Too Many') ||
-            error.message.includes('rate limit')
+            error.message.includes('rate limit'),
         );
       }
     });
@@ -755,7 +747,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         assert.ok(
           error.message.includes('aborted') ||
             error.message.includes('timeout') ||
-            error.message.includes('exceeded')
+            error.message.includes('exceeded'),
         );
       }
     });
@@ -778,10 +770,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
 
         // The retry should have taken some time due to exponential backoff
         // With 3 attempts and exponential backoff, minimum time should be several seconds
-        assert.ok(
-          duration >= 1000,
-          `Should have taken time for retries, took ${duration}ms`
-        );
+        assert.ok(duration >= 1000, `Should have taken time for retries, took ${duration}ms`);
 
         // Error should indicate network failure or retry attempts
         assert.ok(error instanceof Error);
@@ -790,7 +779,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
             error.message.includes('request') ||
             error.message.includes('network') ||
             error.message.includes('ECONNREFUSED') ||
-            error.message.includes('aborted')
+            error.message.includes('aborted'),
         );
       }
     });
@@ -815,7 +804,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
         (log) =>
           (typeof log.msg === 'string' && log.msg.includes('clusters')) ||
           log.level === 'api' ||
-          (log.meta && JSON.stringify(log.meta).includes('123456'))
+          (log.meta && JSON.stringify(log.meta).includes('123456')),
       );
 
       assert.ok(hasApiRelatedLog, 'Should have API-related logging');

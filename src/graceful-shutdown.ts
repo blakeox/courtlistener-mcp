@@ -139,7 +139,10 @@ export class GracefulShutdown {
       const timer = this.logger.startTimer(`shutdown_${hook.name}`);
 
       try {
-        await Promise.race([hook.cleanup(), this.createTimeoutPromise(hook.name, perHookTimeoutMs)]);
+        await Promise.race([
+          hook.cleanup(),
+          this.createTimeoutPromise(hook.name, perHookTimeoutMs),
+        ]);
 
         const duration = timer.end();
         this.logger.debug('Shutdown hook completed', {
@@ -182,7 +185,9 @@ export class GracefulShutdown {
         this.logger.info(`Received ${signal} signal`);
 
         if (this.signalShutdownInitiated) {
-          this.logger.warn('Signal received while graceful shutdown already in progress', { signal });
+          this.logger.warn('Signal received while graceful shutdown already in progress', {
+            signal,
+          });
           return;
         }
         this.signalShutdownInitiated = true;

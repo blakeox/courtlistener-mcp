@@ -15,7 +15,7 @@ interface WorkerOAuthRouteContext<TEnv> {
   env: TEnv;
 }
 
-export interface WorkerOAuthRouteDeps<TEnv> {
+export interface WorkerOAuthRouteDeps<_TEnv> {
   jsonError: (message: string, status: number, errorCode: string) => Response;
   jsonResponse: (payload: unknown, status?: number, extraHeaders?: HeadersInit) => Response;
   withCors: (response: Response, origin: string | null, allowedOrigins: string[]) => Response;

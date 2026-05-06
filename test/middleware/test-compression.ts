@@ -158,7 +158,7 @@ class MockCompressionMiddleware {
 
   async compressResponse(
     data: string | null,
-    acceptedEncodings: (string | null | undefined)[] = []
+    acceptedEncodings: (string | null | undefined)[] = [],
   ): Promise<CompressionResult> {
     this.stats.totalRequests++;
 
@@ -193,7 +193,7 @@ class MockCompressionMiddleware {
 
     // Filter out null/undefined from accepted encodings
     const validEncodings = acceptedEncodings.filter(
-      (e): e is string => typeof e === 'string' && e !== ''
+      (e): e is string => typeof e === 'string' && e !== '',
     );
 
     // Determine best compression algorithm
@@ -242,8 +242,7 @@ class MockCompressionMiddleware {
       this.stats.totalBytesSaved += bytesSaved;
       this.stats.compressionRatios.push(result.ratio);
       this.stats.compressionTimes.push(compressionTime);
-      this.stats.algorithmUsage[algorithm] =
-        (this.stats.algorithmUsage[algorithm] || 0) + 1;
+      this.stats.algorithmUsage[algorithm] = (this.stats.algorithmUsage[algorithm] || 0) + 1;
 
       if (this.config.compressionStats) {
         this.logger.debug('Response compressed', {
@@ -268,8 +267,7 @@ class MockCompressionMiddleware {
         bytesSaved,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Compression failed', {
         algorithm,
         error: errorMessage,
@@ -288,9 +286,7 @@ class MockCompressionMiddleware {
     }
   }
 
-  selectCompressionAlgorithm(
-    acceptedEncodings: string[]
-  ): CompressionAlgorithm | null {
+  selectCompressionAlgorithm(acceptedEncodings: string[]): CompressionAlgorithm | null {
     // Priority order: brotli > gzip > deflate
     for (const algorithm of this.config.algorithms) {
       if (acceptedEncodings.includes(algorithm)) {
@@ -300,10 +296,7 @@ class MockCompressionMiddleware {
     return null;
   }
 
-  shouldCompress(
-    data: string,
-    contentType = 'application/json'
-  ): CompressDecision {
+  shouldCompress(data: string, contentType = 'application/json'): CompressDecision {
     // Check data size threshold
     const dataSize = Buffer.byteLength(data, 'utf8');
     if (dataSize < this.config.threshold) {
@@ -319,7 +312,7 @@ class MockCompressionMiddleware {
     ];
 
     const isCompressible = compressibleTypes.some((type) =>
-      contentType.toLowerCase().includes(type)
+      contentType.toLowerCase().includes(type),
     );
 
     if (!isCompressible) {
@@ -329,10 +322,7 @@ class MockCompressionMiddleware {
     return { shouldCompress: true };
   }
 
-  async compressInChunks(
-    data: string,
-    algorithm: CompressionAlgorithm
-  ): Promise<ChunkResult> {
+  async compressInChunks(data: string, algorithm: CompressionAlgorithm): Promise<ChunkResult> {
     const chunks: CompressionResult[] = [];
     const chunkSize = this.config.chunkSize;
 
@@ -343,14 +333,8 @@ class MockCompressionMiddleware {
     }
 
     // Combine compressed chunks
-    const totalOriginalSize = chunks.reduce(
-      (sum, chunk) => sum + chunk.originalSize,
-      0
-    );
-    const totalCompressedSize = chunks.reduce(
-      (sum, chunk) => sum + chunk.compressedSize,
-      0
-    );
+    const totalOriginalSize = chunks.reduce((sum, chunk) => sum + chunk.originalSize, 0);
+    const totalCompressedSize = chunks.reduce((sum, chunk) => sum + chunk.compressedSize, 0);
 
     return {
       chunks,
@@ -364,14 +348,12 @@ class MockCompressionMiddleware {
   getCompressionStats(): CompressionStatsReport {
     const avgRatio =
       this.stats.compressionRatios.length > 0
-        ? this.stats.compressionRatios.reduce((a, b) => a + b) /
-          this.stats.compressionRatios.length
+        ? this.stats.compressionRatios.reduce((a, b) => a + b) / this.stats.compressionRatios.length
         : 0;
 
     const avgCompressionTime =
       this.stats.compressionTimes.length > 0
-        ? this.stats.compressionTimes.reduce((a, b) => a + b) /
-          this.stats.compressionTimes.length
+        ? this.stats.compressionTimes.reduce((a, b) => a + b) / this.stats.compressionTimes.length
         : 0;
 
     const compressionRate =
@@ -432,9 +414,7 @@ class MockCompressionMiddleware {
       'image/svg+xml',
     ];
 
-    return compressibleTypes.some((type) =>
-      contentType.toLowerCase().includes(type.toLowerCase())
-    );
+    return compressibleTypes.some((type) => contentType.toLowerCase().includes(type.toLowerCase()));
   }
 }
 
@@ -450,7 +430,7 @@ describe('Compression Middleware Tests', () => {
         threshold: 100, // Lower threshold for testing
         algorithms: ['br', 'gzip', 'deflate'],
       },
-      mockLogger
+      mockLogger,
     );
   });
 
@@ -459,16 +439,10 @@ describe('Compression Middleware Tests', () => {
       const largeData = 'x'.repeat(1000); // 1KB of data
       const acceptedEncodings = ['gzip', 'deflate'];
 
-      const result = await compressionMiddleware.compressResponse(
-        largeData,
-        acceptedEncodings
-      );
+      const result = await compressionMiddleware.compressResponse(largeData, acceptedEncodings);
 
       assert.strictEqual(result.compressed, true, 'Should compress large data');
-      assert.ok(
-        result.compressedSize < result.originalSize,
-        'Compressed size should be smaller'
-      );
+      assert.ok(result.compressedSize < result.originalSize, 'Compressed size should be smaller');
       assert.ok(result.ratio > 1, 'Compression ratio should be greater than 1');
       assert.strictEqual(result.algorithm, 'gzip', 'Should use gzip algorithm');
     });
@@ -477,21 +451,10 @@ describe('Compression Middleware Tests', () => {
       const smallData = 'small data';
       const acceptedEncodings = ['gzip'];
 
-      const result = await compressionMiddleware.compressResponse(
-        smallData,
-        acceptedEncodings
-      );
+      const result = await compressionMiddleware.compressResponse(smallData, acceptedEncodings);
 
-      assert.strictEqual(
-        result.compressed,
-        false,
-        'Should not compress small data'
-      );
-      assert.strictEqual(
-        result.reason,
-        'below_threshold',
-        'Should specify threshold reason'
-      );
+      assert.strictEqual(result.compressed, false, 'Should not compress small data');
+      assert.strictEqual(result.reason, 'below_threshold', 'Should specify threshold reason');
       assert.strictEqual(result.data, smallData, 'Should return original data');
     });
 
@@ -499,141 +462,69 @@ describe('Compression Middleware Tests', () => {
       const data = 'x'.repeat(1000);
 
       // Test brotli preference
-      let result = await compressionMiddleware.compressResponse(data, [
-        'br',
-        'gzip',
-      ]);
-      assert.strictEqual(
-        result.algorithm,
-        'br',
-        'Should prefer brotli when available'
-      );
+      let result = await compressionMiddleware.compressResponse(data, ['br', 'gzip']);
+      assert.strictEqual(result.algorithm, 'br', 'Should prefer brotli when available');
 
       // Test gzip fallback
-      result = await compressionMiddleware.compressResponse(data, [
-        'gzip',
-        'deflate',
-      ]);
-      assert.strictEqual(
-        result.algorithm,
-        'gzip',
-        'Should use gzip when brotli not available'
-      );
+      result = await compressionMiddleware.compressResponse(data, ['gzip', 'deflate']);
+      assert.strictEqual(result.algorithm, 'gzip', 'Should use gzip when brotli not available');
 
       // Test deflate fallback
       result = await compressionMiddleware.compressResponse(data, ['deflate']);
-      assert.strictEqual(
-        result.algorithm,
-        'deflate',
-        'Should use deflate as last resort'
-      );
+      assert.strictEqual(result.algorithm, 'deflate', 'Should use deflate as last resort');
     });
 
     it('should handle unsupported encodings', async () => {
       const data = 'x'.repeat(1000);
       const acceptedEncodings = ['unsupported'];
 
-      const result = await compressionMiddleware.compressResponse(
-        data,
-        acceptedEncodings
-      );
+      const result = await compressionMiddleware.compressResponse(data, acceptedEncodings);
 
-      assert.strictEqual(
-        result.compressed,
-        false,
-        'Should not compress with unsupported encoding'
-      );
-      assert.strictEqual(
-        result.reason,
-        'no_supported_encoding',
-        'Should specify encoding reason'
-      );
+      assert.strictEqual(result.compressed, false, 'Should not compress with unsupported encoding');
+      assert.strictEqual(result.reason, 'no_supported_encoding', 'Should specify encoding reason');
     });
   });
 
   describe('Compression Algorithms', () => {
-    const testData = 'This is a test string that will be compressed using different algorithms. '.repeat(50);
+    const testData =
+      'This is a test string that will be compressed using different algorithms. '.repeat(50);
 
     it('should use brotli compression', async () => {
-      const result = await compressionMiddleware.compressResponse(testData, [
-        'br',
-      ]);
+      const result = await compressionMiddleware.compressResponse(testData, ['br']);
 
       assert.strictEqual(result.compressed, true, 'Should compress with brotli');
       assert.strictEqual(result.algorithm, 'br', 'Should use brotli algorithm');
-      assert.ok(
-        result.data.includes('[BROTLI_COMPRESSED'),
-        'Should contain brotli marker'
-      );
-      assert.ok(
-        result.ratio > 2,
-        'Brotli should achieve good compression ratio'
-      );
+      assert.ok(result.data.includes('[BROTLI_COMPRESSED'), 'Should contain brotli marker');
+      assert.ok(result.ratio > 2, 'Brotli should achieve good compression ratio');
     });
 
     it('should use gzip compression', async () => {
-      const result = await compressionMiddleware.compressResponse(testData, [
-        'gzip',
-      ]);
+      const result = await compressionMiddleware.compressResponse(testData, ['gzip']);
 
       assert.strictEqual(result.compressed, true, 'Should compress with gzip');
       assert.strictEqual(result.algorithm, 'gzip', 'Should use gzip algorithm');
-      assert.ok(
-        result.data.includes('[GZIP_COMPRESSED'),
-        'Should contain gzip marker'
-      );
-      assert.ok(
-        result.ratio > 1.5,
-        'Gzip should achieve reasonable compression ratio'
-      );
+      assert.ok(result.data.includes('[GZIP_COMPRESSED'), 'Should contain gzip marker');
+      assert.ok(result.ratio > 1.5, 'Gzip should achieve reasonable compression ratio');
     });
 
     it('should use deflate compression', async () => {
-      const result = await compressionMiddleware.compressResponse(testData, [
-        'deflate',
-      ]);
+      const result = await compressionMiddleware.compressResponse(testData, ['deflate']);
 
-      assert.strictEqual(
-        result.compressed,
-        true,
-        'Should compress with deflate'
-      );
-      assert.strictEqual(
-        result.algorithm,
-        'deflate',
-        'Should use deflate algorithm'
-      );
-      assert.ok(
-        result.data.includes('[DEFLATE_COMPRESSED'),
-        'Should contain deflate marker'
-      );
-      assert.ok(
-        result.ratio > 1.2,
-        'Deflate should achieve some compression ratio'
-      );
+      assert.strictEqual(result.compressed, true, 'Should compress with deflate');
+      assert.strictEqual(result.algorithm, 'deflate', 'Should use deflate algorithm');
+      assert.ok(result.data.includes('[DEFLATE_COMPRESSED'), 'Should contain deflate marker');
+      assert.ok(result.ratio > 1.2, 'Deflate should achieve some compression ratio');
     });
 
     it('should compare compression ratios between algorithms', async () => {
-      const brotliResult = await compressionMiddleware.compressResponse(
-        testData,
-        ['br']
-      );
-      const gzipResult = await compressionMiddleware.compressResponse(
-        testData,
-        ['gzip']
-      );
-      const deflateResult = await compressionMiddleware.compressResponse(
-        testData,
-        ['deflate']
-      );
+      const brotliResult = await compressionMiddleware.compressResponse(testData, ['br']);
+      const gzipResult = await compressionMiddleware.compressResponse(testData, ['gzip']);
+      const deflateResult = await compressionMiddleware.compressResponse(testData, ['deflate']);
 
-      assert.ok(
-        brotliResult.ratio > gzipResult.ratio,
-        'Brotli should have better ratio than gzip'
-      );
+      assert.ok(brotliResult.ratio > gzipResult.ratio, 'Brotli should have better ratio than gzip');
       assert.ok(
         gzipResult.ratio > deflateResult.ratio,
-        'Gzip should have better ratio than deflate'
+        'Gzip should have better ratio than deflate',
       );
     });
   });
@@ -650,13 +541,8 @@ describe('Compression Middleware Tests', () => {
       ];
 
       compressibleTypes.forEach((contentType) => {
-        const isCompressible =
-          compressionMiddleware.isContentTypeCompressible(contentType);
-        assert.strictEqual(
-          isCompressible,
-          true,
-          `${contentType} should be compressible`
-        );
+        const isCompressible = compressionMiddleware.isContentTypeCompressible(contentType);
+        assert.strictEqual(isCompressible, true, `${contentType} should be compressible`);
       });
     });
 
@@ -670,40 +556,20 @@ describe('Compression Middleware Tests', () => {
       ];
 
       nonCompressibleTypes.forEach((contentType) => {
-        const isCompressible =
-          compressionMiddleware.isContentTypeCompressible(contentType);
-        assert.strictEqual(
-          isCompressible,
-          false,
-          `${contentType} should not be compressible`
-        );
+        const isCompressible = compressionMiddleware.isContentTypeCompressible(contentType);
+        assert.strictEqual(isCompressible, false, `${contentType} should not be compressible`);
       });
     });
 
     it('should handle compression decision based on content type', () => {
       const data = 'x'.repeat(1000);
 
-      let decision = compressionMiddleware.shouldCompress(
-        data,
-        'application/json'
-      );
-      assert.strictEqual(
-        decision.shouldCompress,
-        true,
-        'Should compress JSON data'
-      );
+      let decision = compressionMiddleware.shouldCompress(data, 'application/json');
+      assert.strictEqual(decision.shouldCompress, true, 'Should compress JSON data');
 
       decision = compressionMiddleware.shouldCompress(data, 'image/jpeg');
-      assert.strictEqual(
-        decision.shouldCompress,
-        false,
-        'Should not compress JPEG data'
-      );
-      assert.strictEqual(
-        decision.reason,
-        'incompressible_type',
-        'Should specify type reason'
-      );
+      assert.strictEqual(decision.shouldCompress, false, 'Should not compress JPEG data');
+      assert.strictEqual(decision.reason, 'incompressible_type', 'Should specify type reason');
     });
   });
 
@@ -711,45 +577,24 @@ describe('Compression Middleware Tests', () => {
     it('should compress data in chunks', async () => {
       const largeData = 'Large chunk of data. '.repeat(1000); // ~20KB
 
-      const chunkResult = await compressionMiddleware.compressInChunks(
-        largeData,
-        'gzip'
-      );
+      const chunkResult = await compressionMiddleware.compressInChunks(largeData, 'gzip');
 
       assert.ok(chunkResult.chunks.length > 1, 'Should create multiple chunks');
       assert.ok(
         chunkResult.totalCompressedSize < chunkResult.totalOriginalSize,
-        'Total compressed size should be smaller'
+        'Total compressed size should be smaller',
       );
-      assert.ok(
-        chunkResult.totalRatio > 1,
-        'Should achieve compression across chunks'
-      );
-      assert.strictEqual(
-        chunkResult.algorithm,
-        'gzip',
-        'Should use specified algorithm'
-      );
+      assert.ok(chunkResult.totalRatio > 1, 'Should achieve compression across chunks');
+      assert.strictEqual(chunkResult.algorithm, 'gzip', 'Should use specified algorithm');
     });
 
     it('should handle chunk boundaries correctly', async () => {
       const exactChunkData = 'x'.repeat(16384); // Exactly one chunk size
 
-      const chunkResult = await compressionMiddleware.compressInChunks(
-        exactChunkData,
-        'gzip'
-      );
+      const chunkResult = await compressionMiddleware.compressInChunks(exactChunkData, 'gzip');
 
-      assert.strictEqual(
-        chunkResult.chunks.length,
-        1,
-        'Should create exactly one chunk'
-      );
-      assert.strictEqual(
-        chunkResult.totalOriginalSize,
-        16384,
-        'Should handle exact chunk size'
-      );
+      assert.strictEqual(chunkResult.chunks.length, 1, 'Should create exactly one chunk');
+      assert.strictEqual(chunkResult.totalOriginalSize, 16384, 'Should handle exact chunk size');
     });
   });
 
@@ -766,22 +611,11 @@ describe('Compression Middleware Tests', () => {
       const stats = compressionMiddleware.getCompressionStats();
 
       assert.strictEqual(stats.totalRequests, 3, 'Should track total requests');
-      assert.strictEqual(
-        stats.compressedRequests,
-        2,
-        'Should track compressed requests'
-      );
-      assert.ok(
-        parseFloat(stats.compressionRate) > 50,
-        'Should calculate compression rate'
-      );
+      assert.strictEqual(stats.compressedRequests, 2, 'Should track compressed requests');
+      assert.ok(parseFloat(stats.compressionRate) > 50, 'Should calculate compression rate');
       assert.ok(stats.totalBytesSaved > 0, 'Should track bytes saved');
       assert.strictEqual(stats.algorithmUsage.gzip, 1, 'Should track gzip usage');
-      assert.strictEqual(
-        stats.algorithmUsage.br,
-        1,
-        'Should track brotli usage'
-      );
+      assert.strictEqual(stats.algorithmUsage.br, 1, 'Should track brotli usage');
     });
 
     it('should calculate average compression metrics', async () => {
@@ -795,11 +629,11 @@ describe('Compression Middleware Tests', () => {
 
       assert.ok(
         parseFloat(stats.averageCompressionRatio) > 1,
-        'Should calculate average compression ratio'
+        'Should calculate average compression ratio',
       );
       assert.ok(
         parseFloat(stats.averageCompressionTime) >= 0,
-        'Should calculate average compression time'
+        'Should calculate average compression time',
       );
     });
 
@@ -810,9 +644,8 @@ describe('Compression Middleware Tests', () => {
       const stats = compressionMiddleware.getCompressionStats();
 
       assert.ok(
-        stats.bandwidthSavings.includes('KB') ||
-          stats.bandwidthSavings.includes('Bytes'),
-        'Should format bandwidth savings with units'
+        stats.bandwidthSavings.includes('KB') || stats.bandwidthSavings.includes('Bytes'),
+        'Should format bandwidth savings with units',
       );
     });
 
@@ -820,21 +653,13 @@ describe('Compression Middleware Tests', () => {
       await compressionMiddleware.compressResponse('x'.repeat(1000), ['gzip']);
 
       let stats = compressionMiddleware.getCompressionStats();
-      assert.strictEqual(
-        stats.totalRequests,
-        1,
-        'Should have statistics before reset'
-      );
+      assert.strictEqual(stats.totalRequests, 1, 'Should have statistics before reset');
 
       compressionMiddleware.resetStats();
 
       stats = compressionMiddleware.getCompressionStats();
       assert.strictEqual(stats.totalRequests, 0, 'Should reset statistics');
-      assert.strictEqual(
-        stats.compressedRequests,
-        0,
-        'Should reset all counters'
-      );
+      assert.strictEqual(stats.compressedRequests, 0, 'Should reset all counters');
     });
   });
 
@@ -844,30 +669,21 @@ describe('Compression Middleware Tests', () => {
         {
           threshold: 2000, // 2KB threshold
         },
-        mockLogger
+        mockLogger,
       );
 
       const mediumData = 'x'.repeat(1000); // 1KB - below threshold
       const largeData = 'x'.repeat(3000); // 3KB - above threshold
 
-      const mediumResult = await customMiddleware.compressResponse(
-        mediumData,
-        ['gzip']
-      );
-      const largeResult = await customMiddleware.compressResponse(largeData, [
-        'gzip',
-      ]);
+      const mediumResult = await customMiddleware.compressResponse(mediumData, ['gzip']);
+      const largeResult = await customMiddleware.compressResponse(largeData, ['gzip']);
 
       assert.strictEqual(
         mediumResult.compressed,
         false,
-        'Should not compress below custom threshold'
+        'Should not compress below custom threshold',
       );
-      assert.strictEqual(
-        largeResult.compressed,
-        true,
-        'Should compress above custom threshold'
-      );
+      assert.strictEqual(largeResult.compressed, true, 'Should compress above custom threshold');
     });
 
     it('should disable compression when configured', async () => {
@@ -875,17 +691,13 @@ describe('Compression Middleware Tests', () => {
         {
           enabled: false,
         },
-        mockLogger
+        mockLogger,
       );
 
       const data = 'x'.repeat(5000);
       const result = await disabledMiddleware.compressResponse(data, ['gzip']);
 
-      assert.strictEqual(
-        result.compressed,
-        false,
-        'Should not compress when disabled'
-      );
+      assert.strictEqual(result.compressed, false, 'Should not compress when disabled');
       assert.strictEqual(result.data, data, 'Should return original data');
     });
 
@@ -894,20 +706,16 @@ describe('Compression Middleware Tests', () => {
         {
           algorithms: ['deflate', 'gzip', 'br'], // Custom priority order
         },
-        mockLogger
+        mockLogger,
       );
 
       const data = 'x'.repeat(1000);
-      const result = await customMiddleware.compressResponse(data, [
-        'br',
-        'gzip',
-        'deflate',
-      ]);
+      const result = await customMiddleware.compressResponse(data, ['br', 'gzip', 'deflate']);
 
       assert.strictEqual(
         result.algorithm,
         'deflate',
-        'Should use first algorithm in priority list'
+        'Should use first algorithm in priority list',
       );
     });
 
@@ -916,11 +724,10 @@ describe('Compression Middleware Tests', () => {
         compressionMiddleware.setCompressionLevel(10); // Invalid level
         assert.fail('Should throw error for invalid compression level');
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         assert.ok(
           errorMessage.includes('between 1 and 9'),
-          'Should validate compression level range'
+          'Should validate compression level range',
         );
       }
 
@@ -929,7 +736,7 @@ describe('Compression Middleware Tests', () => {
       assert.strictEqual(
         compressionMiddleware.config.level,
         9,
-        'Should set valid compression level'
+        'Should set valid compression level',
       );
     });
   });
@@ -939,15 +746,10 @@ describe('Compression Middleware Tests', () => {
       const largeData = 'Performance test data. '.repeat(1000); // ~23KB
 
       const result = await performance.measureTime(async () => {
-        return await compressionMiddleware.compressResponse(largeData, [
-          'gzip',
-        ]);
+        return await compressionMiddleware.compressResponse(largeData, ['gzip']);
       });
 
-      assert.ok(
-        result.duration < 100,
-        `Compression should be fast, took ${result.duration}ms`
-      );
+      assert.ok(result.duration < 100, `Compression should be fast, took ${result.duration}ms`);
       assert.strictEqual(result.result.compressed, true, 'Should successfully compress');
     });
 
@@ -959,21 +761,16 @@ describe('Compression Middleware Tests', () => {
 
       // Start multiple concurrent compressions
       for (let i = 0; i < 10; i++) {
-        compressions.push(
-          compressionMiddleware.compressResponse(data, ['gzip'])
-        );
+        compressions.push(compressionMiddleware.compressResponse(data, ['gzip']));
       }
 
       const results = await Promise.all(compressions);
       const duration = Date.now() - startTime;
 
-      assert.ok(
-        duration < 500,
-        `Concurrent compressions should be efficient, took ${duration}ms`
-      );
+      assert.ok(duration < 500, `Concurrent compressions should be efficient, took ${duration}ms`);
       assert.ok(
         results.every((r) => r.compressed === true),
-        'All compressions should succeed'
+        'All compressions should succeed',
       );
     });
 
@@ -1004,7 +801,7 @@ describe('Compression Middleware Tests', () => {
 
         assert.ok(
           currentRatio < previousRatio * 2,
-          'Compression should scale reasonably with data size'
+          'Compression should scale reasonably with data size',
         );
       }
     });
@@ -1017,7 +814,7 @@ describe('Compression Middleware Tests', () => {
         {
           algorithms: ['invalid-algorithm'] as CompressionAlgorithm[],
         },
-        mockLogger
+        mockLogger,
       );
 
       // Override the algorithm selection to return invalid algorithm
@@ -1027,33 +824,17 @@ describe('Compression Middleware Tests', () => {
       const data = 'x'.repeat(1000);
       const result = await errorMiddleware.compressResponse(data, ['gzip']);
 
-      assert.strictEqual(
-        result.compressed,
-        false,
-        'Should not compress on error'
-      );
+      assert.strictEqual(result.compressed, false, 'Should not compress on error');
       assert.ok(result.error !== undefined, 'Should include error information');
       assert.strictEqual(result.data, data, 'Should return original data on error');
     });
 
     it('should handle empty or null data', async () => {
-      const emptyResult = await compressionMiddleware.compressResponse('', [
-        'gzip',
-      ]);
-      assert.strictEqual(
-        emptyResult.compressed,
-        false,
-        'Should not compress empty data'
-      );
+      const emptyResult = await compressionMiddleware.compressResponse('', ['gzip']);
+      assert.strictEqual(emptyResult.compressed, false, 'Should not compress empty data');
 
-      const nullResult = await compressionMiddleware.compressResponse(null, [
-        'gzip',
-      ]);
-      assert.strictEqual(
-        nullResult.compressed,
-        false,
-        'Should handle null data gracefully'
-      );
+      const nullResult = await compressionMiddleware.compressResponse(null, ['gzip']);
+      assert.strictEqual(nullResult.compressed, false, 'Should handle null data gracefully');
     });
 
     it('should handle malformed encoding arrays', async () => {
@@ -1064,18 +845,10 @@ describe('Compression Middleware Tests', () => {
         undefined,
         '',
       ] as unknown as string[]);
-      assert.strictEqual(
-        result1.compressed,
-        false,
-        'Should handle malformed encoding values'
-      );
+      assert.strictEqual(result1.compressed, false, 'Should handle malformed encoding values');
 
       const result2 = await compressionMiddleware.compressResponse(data, []);
-      assert.strictEqual(
-        result2.compressed,
-        false,
-        'Should handle empty encoding array'
-      );
+      assert.strictEqual(result2.compressed, false, 'Should handle empty encoding array');
     });
   });
 
@@ -1094,17 +867,14 @@ describe('Compression Middleware Tests', () => {
         },
       });
 
-      const result = await compressionMiddleware.compressResponse(
-        mcpResponse,
-        ['br', 'gzip', 'deflate']
-      );
+      const result = await compressionMiddleware.compressResponse(mcpResponse, [
+        'br',
+        'gzip',
+        'deflate',
+      ]);
 
       assert.strictEqual(result.compressed, true, 'Should compress MCP responses');
-      assert.strictEqual(
-        result.algorithm,
-        'br',
-        'Should use best available algorithm'
-      );
+      assert.strictEqual(result.algorithm, 'br', 'Should use best available algorithm');
       assert.ok(result.ratio > 2, 'Should achieve good compression on JSON');
     });
 
@@ -1118,25 +888,17 @@ describe('Compression Middleware Tests', () => {
 
       const results: CompressionResult[] = [];
       for (const chunk of chunks) {
-        const result = await compressionMiddleware.compressResponse(chunk, [
-          'gzip',
-        ]);
+        const result = await compressionMiddleware.compressResponse(chunk, ['gzip']);
         results.push(result);
       }
 
       assert.ok(
         results.every((r) => r.compressed === true),
-        'Should compress all stream chunks'
+        'Should compress all stream chunks',
       );
 
-      const totalSavings = results.reduce(
-        (sum, r) => sum + (r.bytesSaved || 0),
-        0
-      );
-      assert.ok(
-        totalSavings > 0,
-        'Should save bandwidth across stream'
-      );
+      const totalSavings = results.reduce((sum, r) => sum + (r.bytesSaved || 0), 0);
+      assert.ok(totalSavings > 0, 'Should save bandwidth across stream');
     });
 
     it('should work with different response types', async () => {
@@ -1148,14 +910,8 @@ describe('Compression Middleware Tests', () => {
       };
 
       for (const [type, data] of Object.entries(responses)) {
-        const result = await compressionMiddleware.compressResponse(data, [
-          'gzip',
-        ]);
-        assert.strictEqual(
-          result.compressed,
-          true,
-          `Should compress ${type} content`
-        );
+        const result = await compressionMiddleware.compressResponse(data, ['gzip']);
+        assert.strictEqual(result.compressed, true, `Should compress ${type} content`);
         assert.ok(result.ratio > 1.5, `Should achieve good ratio for ${type}`);
       }
     });
@@ -1168,40 +924,29 @@ describe('Compression Middleware Tests', () => {
           enabled: true,
           threshold: 50,
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       // Test large response (should compress)
       const largeResponse = { data: 'x'.repeat(100) };
       const largeResult = await compressionMiddleware.compressResponse(
-        JSON.stringify(largeResponse)
+        JSON.stringify(largeResponse),
       );
 
-      assert.strictEqual(
-        largeResult.compressed,
-        true,
-        'Should compress large responses'
-      );
-      assert.ok(
-        (largeResult.bytesSaved || 0) > 0,
-        'Should save bytes for large responses'
-      );
+      assert.strictEqual(largeResult.compressed, true, 'Should compress large responses');
+      assert.ok((largeResult.bytesSaved || 0) > 0, 'Should save bytes for large responses');
 
       // Test small response (should not compress)
       const smallResponse = { data: 'small' };
       const smallResult = await compressionMiddleware.compressResponse(
-        JSON.stringify(smallResponse)
+        JSON.stringify(smallResponse),
       );
 
-      assert.strictEqual(
-        smallResult.compressed,
-        false,
-        'Should not compress small responses'
-      );
+      assert.strictEqual(smallResult.compressed, false, 'Should not compress small responses');
       assert.strictEqual(
         smallResult.bytesSaved || 0,
         0,
-        'Should not save bytes for small responses'
+        'Should not save bytes for small responses',
       );
     });
 
@@ -1211,31 +956,20 @@ describe('Compression Middleware Tests', () => {
           enabled: true,
           threshold: 1024,
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       const largeData = {
-        data: Array(10000)
-          .fill('test data string')
-          .join(' '),
+        data: Array(10000).fill('test data string').join(' '),
       };
 
       const start = Date.now();
-      const result = await compressionMiddleware.compressResponse(
-        JSON.stringify(largeData)
-      );
+      const result = await compressionMiddleware.compressResponse(JSON.stringify(largeData));
       const duration = Date.now() - start;
 
-      assert.strictEqual(
-        result.compressed,
-        true,
-        'Should compress large datasets'
-      );
+      assert.strictEqual(result.compressed, true, 'Should compress large datasets');
       assert.ok(duration < 500, 'Should complete compression within 500ms');
-      assert.ok(
-        (result.bytesSaved || 0) > 0,
-        'Should achieve significant compression'
-      );
+      assert.ok((result.bytesSaved || 0) > 0, 'Should achieve significant compression');
 
       console.log(`    ⚡ Large dataset compression completed in ${duration}ms`);
       console.log(`    💾 Achieved ${result.ratio.toFixed(2)}x compression ratio`);
@@ -1246,7 +980,7 @@ describe('Compression Middleware Tests', () => {
         {
           enabled: true,
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       // Test with invalid JSON (should handle gracefully)
@@ -1265,22 +999,14 @@ describe('Compression Middleware Tests', () => {
         {
           enabled: false,
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       const data = 'x'.repeat(1000);
       const result = await disabledMiddleware.compressResponse(data);
 
-      assert.strictEqual(
-        result.compressed,
-        false,
-        'Should not compress when disabled'
-      );
-      assert.strictEqual(
-        result.data,
-        data,
-        'Should return original data when disabled'
-      );
+      assert.strictEqual(result.compressed, false, 'Should not compress when disabled');
+      assert.strictEqual(result.data, data, 'Should return original data when disabled');
     });
 
     it('should respect compression level settings', async () => {
@@ -1289,7 +1015,7 @@ describe('Compression Middleware Tests', () => {
           enabled: true,
           level: 9, // Maximum compression
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       const lowCompressionMiddleware = new MockCompressionMiddleware(
@@ -1297,40 +1023,24 @@ describe('Compression Middleware Tests', () => {
           enabled: true,
           level: 1, // Minimum compression
         },
-        createMockLogger()
+        createMockLogger(),
       );
 
       const testData = 'x'.repeat(1000);
 
-      const highResult = await highCompressionMiddleware.compressResponse(
-        testData,
-        ['gzip']
-      );
-      const lowResult = await lowCompressionMiddleware.compressResponse(
-        testData,
-        ['gzip']
-      );
+      const highResult = await highCompressionMiddleware.compressResponse(testData, ['gzip']);
+      const lowResult = await lowCompressionMiddleware.compressResponse(testData, ['gzip']);
 
-      assert.strictEqual(
-        highResult.compressed,
-        true,
-        'High compression should work'
-      );
-      assert.strictEqual(
-        lowResult.compressed,
-        true,
-        'Low compression should work'
-      );
+      assert.strictEqual(highResult.compressed, true, 'High compression should work');
+      assert.strictEqual(lowResult.compressed, true, 'Low compression should work');
 
       // Note: In real implementation, high compression would have better ratio but take longer
       assert.ok(
-        highResult.ratio >= lowResult.ratio ||
-          Math.abs(highResult.ratio - lowResult.ratio) < 0.1,
-        'High compression should have equal or better ratio'
+        highResult.ratio >= lowResult.ratio || Math.abs(highResult.ratio - lowResult.ratio) < 0.1,
+        'High compression should have equal or better ratio',
       );
     });
   });
 });
 
 console.log('✅ Enhanced Compression Middleware Tests Completed');
-

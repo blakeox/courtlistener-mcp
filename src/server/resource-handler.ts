@@ -50,7 +50,7 @@ export class ResourceHandlerRegistry {
    * Find a handler for the given URI
    */
   findHandler(uri: string): ResourceHandler | undefined {
-    return this.handlers.find(h => h.matches(uri));
+    return this.handlers.find((h) => h.matches(uri));
   }
 
   /**
@@ -61,10 +61,7 @@ export class ResourceHandlerRegistry {
       handler.list().map((resource) => {
         const tags = handler.tags ?? [
           'resource',
-          ...handler.name
-            .toLowerCase()
-            .split(/\s+/)
-            .filter(Boolean),
+          ...handler.name.toLowerCase().split(/\s+/).filter(Boolean),
         ];
         const examples = handler.examples ?? [resource.uri];
         return {

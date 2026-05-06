@@ -3,10 +3,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import {
-  CallToolRequestSchema,
-  GetPromptRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { setupHandlers } from '../../src/server/handler-registry.js';
 

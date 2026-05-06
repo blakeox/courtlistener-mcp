@@ -31,11 +31,5 @@ export function buildSpaAuthVitestCommand() {
 }
 
 export function buildSpaAuthPlaywrightCommand() {
-  return [
-    'pnpm',
-    'exec',
-    'playwright',
-    'test',
-    ...spaAuthPlaywrightSpecs,
-  ];
+  return ['pnpm', 'exec', 'playwright', 'test', ...spaAuthPlaywrightSpecs];
 }

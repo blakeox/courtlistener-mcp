@@ -202,7 +202,7 @@ class TestCoverageActionPlan {
       '🏗️ Set up unit testing infrastructure',
       '📊 Implement Metrics Collector tests (CRITICAL)',
       '💾 Implement Cache Manager tests (CRITICAL)',
-      '⚙️ Implement Configuration tests (quick wins)'
+      '⚙️ Implement Configuration tests (quick wins)',
     );
 
     // Week 2: API integration
@@ -210,7 +210,7 @@ class TestCoverageActionPlan {
       '🌐 Implement CourtListener API tests (CRITICAL)',
       '🔧 Create comprehensive API mocking framework',
       '🧪 Add error scenario testing',
-      '⚡ Performance testing for caching'
+      '⚡ Performance testing for caching',
     );
 
     // Week 3: Server integration
@@ -218,7 +218,7 @@ class TestCoverageActionPlan {
       '🏥 Implement Health Server tests',
       '🏢 Begin Enterprise Server testing (high complexity)',
       '🔌 Test middleware integration points',
-      '🔒 Security boundary testing'
+      '🔒 Security boundary testing',
     );
 
     // Week 4: Completion and optimization
@@ -226,7 +226,7 @@ class TestCoverageActionPlan {
       '✅ Complete Enterprise Server tests',
       '📈 Set up test coverage reporting',
       '🚀 Integration with CI/CD pipeline',
-      '📚 Documentation and test maintenance guidelines'
+      '📚 Documentation and test maintenance guidelines',
     );
   }
 
@@ -397,9 +397,7 @@ runner.runAllTests().catch(error => {
     const packageJsonPath = path.join(projectRoot, 'package.json');
 
     if (fs.existsSync(packageJsonPath)) {
-      const packageJson = JSON.parse(
-        fs.readFileSync(packageJsonPath, 'utf-8')
-      ) as PackageJson;
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
 
       // Add unit test scripts
       if (!packageJson.scripts) {
@@ -423,18 +421,12 @@ runner.runAllTests().catch(error => {
       };
 
       for (const [dep, version] of Object.entries(testDeps)) {
-        if (
-          !packageJson.devDependencies[dep] &&
-          !packageJson.dependencies?.[dep]
-        ) {
+        if (!packageJson.devDependencies[dep] && !packageJson.dependencies?.[dep]) {
           packageJson.devDependencies[dep] = version;
         }
       }
 
-      fs.writeFileSync(
-        packageJsonPath,
-        JSON.stringify(packageJson, null, 2)
-      );
+      fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
       console.log('   ✅ Updated package.json with test scripts');
     }
   }
@@ -649,10 +641,7 @@ it('should handle async operation', async () => {
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
-    fs.writeFileSync(
-      path.join(testDir, 'TESTING_GUIDELINES.md'),
-      guidelines
-    );
+    fs.writeFileSync(path.join(testDir, 'TESTING_GUIDELINES.md'), guidelines);
     console.log('   ✅ Created test/TESTING_GUIDELINES.md');
   }
 
@@ -661,28 +650,16 @@ it('should handle async operation', async () => {
     console.log('='.repeat(60));
 
     console.log('\n📊 Priority Summary:');
-    const criticalItems = this.actionItems.filter(
-      (item) => item.priority === 'CRITICAL'
-    );
-    const highItems = this.actionItems.filter(
-      (item) => item.priority === 'HIGH'
-    );
-    const mediumItems = this.actionItems.filter(
-      (item) => item.priority === 'MEDIUM'
-    );
+    const criticalItems = this.actionItems.filter((item) => item.priority === 'CRITICAL');
+    const highItems = this.actionItems.filter((item) => item.priority === 'HIGH');
+    const mediumItems = this.actionItems.filter((item) => item.priority === 'MEDIUM');
 
     console.log(`   🔥 CRITICAL: ${criticalItems.length} components`);
     console.log(`   ⚡ HIGH: ${highItems.length} components`);
     console.log(`   🟡 MEDIUM: ${mediumItems.length} components`);
 
-    const totalMethods = this.actionItems.reduce(
-      (sum, item) => sum + item.methods,
-      0
-    );
-    const totalLines = this.actionItems.reduce(
-      (sum, item) => sum + item.lines,
-      0
-    );
+    const totalMethods = this.actionItems.reduce((sum, item) => sum + item.methods, 0);
+    const totalLines = this.actionItems.reduce((sum, item) => sum + item.lines, 0);
 
     console.log(`\n📈 Scope:`);
     console.log(`   Methods to test: ${totalMethods}`);
@@ -737,4 +714,3 @@ planner.generatePlan().catch((error) => {
   console.error('Error generating action plan:', error);
   process.exit(1);
 });
-

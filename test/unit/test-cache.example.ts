@@ -34,9 +34,13 @@ class MockLogger implements Logger {
     toolName: string,
     duration: number,
     success: boolean,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
-    this.logs.push({ level: success ? 'info' : 'error', msg: `Tool: ${toolName}`, meta: { duration, success, ...metadata } });
+    this.logs.push({
+      level: success ? 'info' : 'error',
+      msg: `Tool: ${toolName}`,
+      meta: { duration, success, ...metadata },
+    });
   }
 
   apiCall(
@@ -44,9 +48,13 @@ class MockLogger implements Logger {
     endpoint: string,
     duration: number,
     status: number,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
-    this.logs.push({ level: 'info', msg: `API ${method} ${endpoint}`, meta: { duration, status, ...metadata } });
+    this.logs.push({
+      level: 'info',
+      msg: `API ${method} ${endpoint}`,
+      meta: { duration, status, ...metadata },
+    });
   }
 
   child(component: string): Logger {
@@ -129,7 +137,7 @@ describe('Cache Manager (TypeScript)', () => {
       assert.notStrictEqual(retrieved, null);
 
       // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Should be expired
       retrieved = cache.get('expiring-endpoint', {});
@@ -157,4 +165,3 @@ describe('Cache Manager (TypeScript)', () => {
     });
   });
 });
-

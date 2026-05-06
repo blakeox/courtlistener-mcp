@@ -58,16 +58,31 @@ async function main() {
   for (const scenario of successScenarios) {
     await step(scenario.name, async () => {
       const response = await callAiChat(scenario.request);
-      assert(response.status === 200, `Expected 200, got ${response.status}: ${stringify(response.body)}`);
-      assert(typeof response.body === 'object' && response.body !== null, 'Expected JSON object response body');
+      assert(
+        response.status === 200,
+        `Expected 200, got ${response.status}: ${stringify(response.body)}`,
+      );
+      assert(
+        typeof response.body === 'object' && response.body !== null,
+        'Expected JSON object response body',
+      );
 
       const body = response.body;
-      assert(body.tool === scenario.expectedTool, `Expected tool=${scenario.expectedTool}, got ${String(body.tool)}`);
+      assert(
+        body.tool === scenario.expectedTool,
+        `Expected tool=${scenario.expectedTool}, got ${String(body.tool)}`,
+      );
       assert(body.mode === 'cheap', `Expected mode=cheap, got ${String(body.mode)}`);
       assert(body.test_mode === true, `Expected test_mode=true, got ${String(body.test_mode)}`);
       assert(typeof body.fallback_used === 'boolean', 'Expected fallback_used boolean');
-      assert(typeof body.session_id === 'string' && body.session_id.length > 0, 'Expected non-empty session_id');
-      assert(typeof body.ai_response === 'string' && body.ai_response.trim().length > 0, 'Expected non-empty ai_response');
+      assert(
+        typeof body.session_id === 'string' && body.session_id.length > 0,
+        'Expected non-empty session_id',
+      );
+      assert(
+        typeof body.ai_response === 'string' && body.ai_response.trim().length > 0,
+        'Expected non-empty ai_response',
+      );
       assert(body.mcp_result !== undefined, 'Expected mcp_result field');
     });
   }
@@ -79,7 +94,10 @@ async function main() {
       // invalid type on purpose
       testMode: 'yes',
     });
-    assert(response.status === 400, `Expected 400, got ${response.status}: ${stringify(response.body)}`);
+    assert(
+      response.status === 400,
+      `Expected 400, got ${response.status}: ${stringify(response.body)}`,
+    );
     assert(
       response.body?.error_code === 'invalid_request_schema',
       `Expected error_code=invalid_request_schema, got ${String(response.body?.error_code)}`,
@@ -140,4 +158,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });
-

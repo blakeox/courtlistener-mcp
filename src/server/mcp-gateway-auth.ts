@@ -1,4 +1,8 @@
-import type { McpAuthorizationResult, WorkerSecurityEnv, WorkerSecurityDeps } from './worker-security.js';
+import type {
+  McpAuthorizationResult,
+  WorkerSecurityEnv,
+  WorkerSecurityDeps,
+} from './worker-security.js';
 import {
   authorizeMcpRequestWithPrincipal,
   parseBoolean,

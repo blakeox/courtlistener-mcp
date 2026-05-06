@@ -24,7 +24,10 @@ export interface AsyncWorkflowConfig {
   maxQueueDepth?: number;
   queueLatencyGuardrailMs?: number;
   completionLatencyGuardrailMs?: number;
-  recordLatencyMetric?: (metric: 'queue_latency_ms' | 'async_completion_latency_ms', durationMs: number) => void;
+  recordLatencyMetric?: (
+    metric: 'queue_latency_ms' | 'async_completion_latency_ms',
+    durationMs: number,
+  ) => void;
   recordCostGuardrail?: (
     metric: 'queue_depth' | 'queue_latency_ms' | 'async_completion_latency_ms',
     value: number,
@@ -167,7 +170,9 @@ export function parseAsyncExecutionDirective(request: CallToolRequest): ParsedAs
   };
 }
 
-export function isAsyncControlToolName(name: string): name is (typeof MCP_ASYNC_CONTROL_TOOLS)[keyof typeof MCP_ASYNC_CONTROL_TOOLS] {
+export function isAsyncControlToolName(
+  name: string,
+): name is (typeof MCP_ASYNC_CONTROL_TOOLS)[keyof typeof MCP_ASYNC_CONTROL_TOOLS] {
   return (
     name === MCP_ASYNC_CONTROL_TOOLS.status ||
     name === MCP_ASYNC_CONTROL_TOOLS.result ||
@@ -175,7 +180,10 @@ export function isAsyncControlToolName(name: string): name is (typeof MCP_ASYNC_
   );
 }
 
-export function createAsyncEnvelope(payload: Record<string, unknown>, isError: boolean = false): CallToolResult {
+export function createAsyncEnvelope(
+  payload: Record<string, unknown>,
+  isError: boolean = false,
+): CallToolResult {
   const text = JSON.stringify(payload, null, 2);
   return {
     content: [{ type: 'text', text }],
@@ -192,7 +200,12 @@ export class AsyncToolWorkflowOrchestrator {
   private readonly idempotencyIndex = new Map<string, string>();
   private readonly requestCoalescingIndex = new Map<string, string>();
   private readonly queueLatency: AsyncLatencyMetric = { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 };
-  private readonly completionLatency: AsyncLatencyMetric = { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 };
+  private readonly completionLatency: AsyncLatencyMetric = {
+    count: 0,
+    totalMs: 0,
+    maxMs: 0,
+    lastMs: 0,
+  };
   private readonly queueDepthGuardrail = { breaches: 0, lastValue: 0 };
   private readonly queueLatencyGuardrail = { breaches: 0, lastValue: 0 };
   private readonly completionLatencyGuardrail = { breaches: 0, lastValue: 0 };
@@ -305,8 +318,16 @@ export class AsyncToolWorkflowOrchestrator {
   }): CallToolResult {
     this.sweepExpiredJobs();
     const { request, requestId, userId, directive, execute } = params;
-    const idempotencyScope = this.buildIdempotencyScope(request.params.name, userId, directive.idempotencyKey);
-    const coalescingScope = this.buildRequestCoalescingScope(request.params.name, userId, request.params.arguments);
+    const idempotencyScope = this.buildIdempotencyScope(
+      request.params.name,
+      userId,
+      directive.idempotencyKey,
+    );
+    const coalescingScope = this.buildRequestCoalescingScope(
+      request.params.name,
+      userId,
+      request.params.arguments,
+    );
     if (idempotencyScope) {
       const existingJobId = this.idempotencyIndex.get(idempotencyScope);
       if (existingJobId) {
@@ -339,12 +360,16 @@ export class AsyncToolWorkflowOrchestrator {
       status: 'queued',
       createdAtMs: now,
       updatedAtMs: now,
-      expiresAtMs: now + resolveTtlSeconds(directive.ttlSeconds, this.config.defaultTtlSeconds) * 1000,
+      expiresAtMs:
+        now + resolveTtlSeconds(directive.ttlSeconds, this.config.defaultTtlSeconds) * 1000,
       attempts: {
         current: 0,
         max: resolveBoundedPositiveInt(directive.maxAttempts, this.config.defaultMaxAttempts),
       },
-      retryDelayMs: resolveBoundedPositiveInt(directive.retryDelayMs, this.config.defaultRetryDelayMs),
+      retryDelayMs: resolveBoundedPositiveInt(
+        directive.retryDelayMs,
+        this.config.defaultRetryDelayMs,
+      ),
       cancellationRequested: false,
       queuedAtMs: now,
       ...(idempotencyScope && { idempotencyScope }),
@@ -480,7 +505,10 @@ export class AsyncToolWorkflowOrchestrator {
     this.recordQueueLatency(startedAtMs - job.queuedAtMs);
 
     try {
-      const result = await job.execute(job.request, `${job.requestId}:job:${job.id}:attempt:${job.attempts.current}`);
+      const result = await job.execute(
+        job.request,
+        `${job.requestId}:job:${job.id}:attempt:${job.attempts.current}`,
+      );
       if (job.cancellationRequested) {
         this.markFailed(job, 'cancelled', 'Job cancelled during execution', false);
         return;
@@ -630,7 +658,9 @@ export class AsyncToolWorkflowOrchestrator {
     }
 
     const terminalJobs = [...this.jobs.values()]
-      .filter((job) => job.status === 'succeeded' || job.status === 'failed' || job.status === 'expired')
+      .filter(
+        (job) => job.status === 'succeeded' || job.status === 'failed' || job.status === 'expired',
+      )
       .sort((a, b) => a.updatedAtMs - b.updatedAtMs);
     while (this.jobs.size > this.config.maxStoredJobs && terminalJobs.length > 0) {
       const next = terminalJobs.shift();
@@ -683,7 +713,12 @@ export class AsyncToolWorkflowOrchestrator {
     };
   }
 
-  private snapshotLatency(metric: AsyncLatencyMetric): { count: number; avgMs: number; maxMs: number; lastMs: number } {
+  private snapshotLatency(metric: AsyncLatencyMetric): {
+    count: number;
+    avgMs: number;
+    maxMs: number;
+    lastMs: number;
+  } {
     return {
       count: metric.count,
       avgMs: metric.count > 0 ? Number((metric.totalMs / metric.count).toFixed(2)) : 0,
@@ -698,7 +733,11 @@ export class AsyncToolWorkflowOrchestrator {
     if (durationMs > this.config.queueLatencyGuardrailMs) {
       this.queueLatencyGuardrail.breaches += 1;
       this.queueLatencyGuardrail.lastValue = durationMs;
-      this.config.recordCostGuardrail?.('queue_latency_ms', durationMs, this.config.queueLatencyGuardrailMs);
+      this.config.recordCostGuardrail?.(
+        'queue_latency_ms',
+        durationMs,
+        this.config.queueLatencyGuardrailMs,
+      );
     }
   }
 
@@ -756,7 +795,11 @@ export class AsyncToolWorkflowOrchestrator {
     return { jobId: value.trim() };
   }
 
-  private buildIdempotencyScope(toolName: string, userId: string | undefined, idempotencyKey: string | undefined): string | null {
+  private buildIdempotencyScope(
+    toolName: string,
+    userId: string | undefined,
+    idempotencyKey: string | undefined,
+  ): string | null {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       return null;
     }
@@ -802,9 +845,7 @@ function normalizeDirective(value: unknown): AsyncExecutionDirective {
   }
   const record = value as Record<string, unknown>;
   return {
-    ...(record.mode === 'async' || record.mode === 'sync'
-      ? { mode: record.mode }
-      : {}),
+    ...(record.mode === 'async' || record.mode === 'sync' ? { mode: record.mode } : {}),
     ...(typeof record.idempotencyKey === 'string' && record.idempotencyKey.trim().length > 0
       ? { idempotencyKey: record.idempotencyKey.trim() }
       : {}),

@@ -17,12 +17,6 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 
 console.log('🔍 Checking version consistency...\n');
 
-// List of files to check for version consistency
-const versionFiles = [
-  'package.json',
-  'package-lock.json'
-];
-
 const errors = [];
 const versions = new Map();
 

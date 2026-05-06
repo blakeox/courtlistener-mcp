@@ -128,7 +128,6 @@ import {
   AuthFailureLimiterDO,
   createWorkerDurableRuntime,
 } from './server/worker-durable-runtime.js';
-import { HOSTED_MCP_OAUTH_CONTRACT } from './auth/oauth-contract.js';
 import { buildHostedOAuthCompletionDetails } from './auth/oauth-authorization-completion.js';
 import { resolveGrantedScopes } from './auth/oauth-scope-resolver.js';
 

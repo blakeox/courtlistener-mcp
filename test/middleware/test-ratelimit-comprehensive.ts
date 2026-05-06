@@ -76,7 +76,11 @@ interface RateLimiter {
   handleAdaptiveRateLimiting(store: ClientStore, result: RateLimitResult): void;
   getStats(key?: string | null): Promise<unknown>;
   reset(key?: string | null): Promise<void>;
-  middleware(request: RateLimitRequest, response: { headers: Record<string, unknown> }, next?: () => unknown): Promise<unknown>;
+  middleware(
+    request: RateLimitRequest,
+    response: { headers: Record<string, unknown> },
+    next?: () => unknown,
+  ): Promise<unknown>;
 }
 
 interface RateLimitError extends Error {
@@ -110,10 +114,7 @@ class EnhancedRateLimitingTests {
     }
   }
 
-  private async runAsyncTest(
-    testName: string,
-    testFn: () => Promise<void>
-  ): Promise<void> {
+  private async runAsyncTest(testName: string, testFn: () => Promise<void>): Promise<void> {
     this.testCount++;
     try {
       await testFn();
@@ -134,8 +135,7 @@ class EnhancedRateLimitingTests {
         maxRequests: 100,
         skipSuccessfulRequests: false,
         skipFailedRequests: false,
-        keyGenerator: (req: RateLimitRequest) =>
-          req.clientId || req.ip || 'anonymous',
+        keyGenerator: (req: RateLimitRequest) => req.clientId || req.ip || 'anonymous',
         skip: () => false,
         onLimitReached: undefined,
         adaptiveEnabled: false,
@@ -210,14 +210,12 @@ class EnhancedRateLimitingTests {
       async updateStore(
         store: ClientStore,
         now: number,
-        request: RateLimitRequest
+        request: RateLimitRequest,
       ): Promise<RateLimitResult> {
         const windowStart = now - this.config.windowMs;
 
         // Clean old requests
-        store.requests = store.requests.filter(
-          (req) => req.timestamp > windowStart
-        );
+        store.requests = store.requests.filter((req) => req.timestamp > windowStart);
         store.currentCount = store.requests.length;
 
         // Reset window if needed
@@ -227,13 +225,10 @@ class EnhancedRateLimitingTests {
         }
 
         // Calculate effective limit (including burst allowance)
-        const burstLimit = Math.floor(
-          store.adaptiveLimit * (1 + this.config.burstAllowance)
-        );
+        const burstLimit = Math.floor(store.adaptiveLimit * (1 + this.config.burstAllowance));
         const effectiveLimit = Math.min(
           burstLimit,
-          store.adaptiveLimit +
-            Math.floor(store.adaptiveLimit * this.config.burstAllowance)
+          store.adaptiveLimit + Math.floor(store.adaptiveLimit * this.config.burstAllowance),
         );
 
         // Check if request is allowed
@@ -282,18 +277,12 @@ class EnhancedRateLimitingTests {
 
         // Update success rate
         const successCount = recentRequests.filter((req) => req.success).length;
-        store.successRate =
-          recentRequests.length > 0 ? successCount / recentRequests.length : 1.0;
+        store.successRate = recentRequests.length > 0 ? successCount / recentRequests.length : 1.0;
 
         // Update average response time
-        const totalResponseTime = recentRequests.reduce(
-          (sum, req) => sum + req.responseTime,
-          0
-        );
+        const totalResponseTime = recentRequests.reduce((sum, req) => sum + req.responseTime, 0);
         store.averageResponseTime =
-          recentRequests.length > 0
-            ? totalResponseTime / recentRequests.length
-            : 0;
+          recentRequests.length > 0 ? totalResponseTime / recentRequests.length : 0;
 
         // Track consecutive failures
         if (requestData.success) {
@@ -303,10 +292,7 @@ class EnhancedRateLimitingTests {
         }
       },
 
-      handleAdaptiveRateLimiting(
-        store: ClientStore,
-        result: RateLimitResult
-      ): void {
+      handleAdaptiveRateLimiting(store: ClientStore, result: RateLimitResult): void {
         const now = Date.now();
         const timeSinceLastAdjustment = now - store.lastAdaptiveAdjustment;
 
@@ -337,10 +323,7 @@ class EnhancedRateLimitingTests {
           const oldLimit = store.adaptiveLimit;
           store.adaptiveLimit = Math.max(
             1,
-            Math.min(
-              this.config.maxRequests * 2,
-              store.adaptiveLimit + adjustment
-            )
+            Math.min(this.config.maxRequests * 2, store.adaptiveLimit + adjustment),
           );
           store.lastAdaptiveAdjustment = now;
           this.globalStats.adaptiveAdjustments++;
@@ -348,7 +331,7 @@ class EnhancedRateLimitingTests {
           console.log(
             `    📊 Adaptive adjustment: ${oldLimit} → ${store.adaptiveLimit} (${
               adjustment > 0 ? '+' : ''
-            }${adjustment})`
+            }${adjustment})`,
           );
         }
       },
@@ -399,7 +382,7 @@ class EnhancedRateLimitingTests {
       async middleware(
         request: RateLimitRequest,
         response: { headers: Record<string, unknown> },
-        next?: () => unknown
+        next?: () => unknown,
       ): Promise<unknown> {
         const result = await this.checkLimit(request);
 
@@ -410,9 +393,7 @@ class EnhancedRateLimitingTests {
             'X-RateLimit-Limit': String(this.config.maxRequests),
             'X-RateLimit-Remaining': String(result.remaining),
             'X-RateLimit-Reset': String(result.resetTime),
-            'Retry-After': String(
-              Math.ceil((result.resetTime - Date.now()) / 1000)
-            ),
+            'Retry-After': String(Math.ceil((result.resetTime - Date.now()) / 1000)),
           };
           throw error;
         }
@@ -420,9 +401,7 @@ class EnhancedRateLimitingTests {
         // Add rate limit headers to response
         response.headers = {
           ...response.headers,
-          'X-RateLimit-Limit': String(
-            result.adaptiveLimit || this.config.maxRequests
-          ),
+          'X-RateLimit-Limit': String(result.adaptiveLimit || this.config.maxRequests),
           'X-RateLimit-Remaining': String(result.remaining),
           'X-RateLimit-Reset': String(result.resetTime),
         };
@@ -448,14 +427,8 @@ class EnhancedRateLimitingTests {
 
       for (let i = 0; i < 5; i++) {
         const result = await limiter.checkLimit({ clientId: 'client1' });
-        console.assert(
-          result.allowed === true,
-          `Request ${i + 1} should be allowed`
-        );
-        console.assert(
-          result.remaining === 4 - i,
-          `Should have ${4 - i} remaining`
-        );
+        console.assert(result.allowed === true, `Request ${i + 1} should be allowed`);
+        console.assert(result.remaining === 4 - i, `Should have ${4 - i} remaining`);
       }
     });
 
@@ -515,10 +488,7 @@ class EnhancedRateLimitingTests {
 
       // Should be allowed again
       const allowed = await limiter.checkLimit({ clientId: 'client1' });
-      console.assert(
-        allowed.allowed === true,
-        'Should be allowed after window reset'
-      );
+      console.assert(allowed.allowed === true, 'Should be allowed after window reset');
     });
 
     await this.runAsyncTest('should provide accurate reset time', async () => {
@@ -531,10 +501,7 @@ class EnhancedRateLimitingTests {
       const result = await limiter.checkLimit({ clientId: 'client1' });
 
       console.assert(result.resetTime > start, 'Reset time should be in the future');
-      console.assert(
-        result.resetTime <= start + 60000,
-        'Reset time should be within window'
-      );
+      console.assert(result.resetTime <= start + 60000, 'Reset time should be within window');
     });
 
     // Burst Handling Tests
@@ -556,7 +523,7 @@ class EnhancedRateLimitingTests {
 
       console.assert(
         allowedCount === 15,
-        `Should allow 15 requests with burst, got ${allowedCount}`
+        `Should allow 15 requests with burst, got ${allowedCount}`,
       );
     });
 
@@ -576,10 +543,7 @@ class EnhancedRateLimitingTests {
       const burstResult = await limiter.checkLimit({ clientId: 'client1' });
 
       console.assert(burstResult.allowed === true, 'Should allow burst request');
-      console.assert(
-        burstResult.burstRemaining === 1,
-        'Should have 1 burst remaining'
-      );
+      console.assert(burstResult.burstRemaining === 1, 'Should have 1 burst remaining');
     });
 
     // Adaptive Rate Limiting Tests
@@ -614,7 +578,7 @@ class EnhancedRateLimitingTests {
         } | null;
         console.assert(
           stats !== null && stats.adaptiveLimit < 10,
-          'Should decrease adaptive limit for poor performance'
+          'Should decrease adaptive limit for poor performance',
         );
       }
     });
@@ -648,7 +612,7 @@ class EnhancedRateLimitingTests {
         } | null;
         console.assert(
           stats !== null && stats.adaptiveLimit > 10,
-          'Should increase adaptive limit for good performance'
+          'Should increase adaptive limit for good performance',
         );
       }
     });
@@ -669,7 +633,7 @@ class EnhancedRateLimitingTests {
       await limiter.middleware(request, response);
       console.assert(
         response.headers['X-RateLimit-Remaining'] === '1',
-        'Should set remaining header'
+        'Should set remaining header',
       );
 
       // Second request should succeed
@@ -684,7 +648,7 @@ class EnhancedRateLimitingTests {
         console.assert(rateLimitError.status === 429, 'Should return 429 status');
         console.assert(
           (rateLimitError.headers?.['Retry-After'] as number) > 0,
-          'Should include Retry-After header'
+          'Should include Retry-After header',
         );
       }
     });
@@ -725,21 +689,13 @@ class EnhancedRateLimitingTests {
 
       const promises = Array(iterations)
         .fill(null)
-        .map((_, i) =>
-          limiter.checkLimit({ clientId: `client_${i % 10}` })
-        );
+        .map((_, i) => limiter.checkLimit({ clientId: `client_${i % 10}` }));
 
       const results = await Promise.all(promises);
       const duration = Date.now() - start;
 
-      console.assert(
-        results.length === iterations,
-        'Should process all requests'
-      );
-      console.assert(
-        duration < 2000,
-        'Should process 500 requests within 2 seconds'
-      );
+      console.assert(results.length === iterations, 'Should process all requests');
+      console.assert(duration < 2000, 'Should process 500 requests within 2 seconds');
 
       const avgTime = duration / iterations;
       console.log(`    ⚡ Average check time: ${avgTime.toFixed(2)}ms`);
@@ -762,7 +718,7 @@ class EnhancedRateLimitingTests {
 
       console.assert(
         allowedCount === 15,
-        `Should handle concurrent burst correctly, got ${allowedCount}`
+        `Should handle concurrent burst correctly, got ${allowedCount}`,
       );
     });
 
@@ -784,15 +740,14 @@ class EnhancedRateLimitingTests {
       };
       console.assert(
         stats.clients.some((c) => c.key === 'anonymous'),
-        'Should create anonymous client'
+        'Should create anonymous client',
       );
     });
 
     await this.runAsyncTest('should handle custom key generator', async () => {
       const limiter = this.createRateLimiter({
         maxRequests: 5,
-        keyGenerator: (req: RateLimitRequest) =>
-          `${req.ip}-${req.userAgent}`,
+        keyGenerator: (req: RateLimitRequest) => `${req.ip}-${req.userAgent}`,
         windowMs: 60000,
       });
 
@@ -808,7 +763,7 @@ class EnhancedRateLimitingTests {
       };
       console.assert(
         stats.clients.some((c) => c.key === '192.168.1.1-TestAgent/1.0'),
-        'Should use custom key'
+        'Should use custom key',
       );
     });
 
@@ -832,14 +787,8 @@ class EnhancedRateLimitingTests {
         clients: unknown[];
       };
 
-      console.assert(
-        stats.global.totalRequests === 5,
-        'Should track total requests'
-      );
-      console.assert(
-        stats.global.limitedRequests === 1,
-        'Should track limited requests'
-      );
+      console.assert(stats.global.totalRequests === 5, 'Should track total requests');
+      console.assert(stats.global.limitedRequests === 1, 'Should track limited requests');
       console.assert(stats.clients.length === 2, 'Should track different clients');
     });
 
@@ -853,22 +802,18 @@ class EnhancedRateLimitingTests {
     console.log('='.repeat(80));
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`Passed: ${this.passedTests} ✅`);
-    console.log(
-      `Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`
-    );
+    console.log(`Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`);
     if (this.testCount > 0) {
-      console.log(
-        `Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`
-      );
+      console.log(`Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`);
     }
 
     if (this.failedTests === 0) {
       console.log(
-        '\n🎉 All rate limiting tests passed! Traffic control and adaptive features are working correctly.'
+        '\n🎉 All rate limiting tests passed! Traffic control and adaptive features are working correctly.',
       );
     } else {
       console.log(
-        `\n💥 ${this.failedTests} test(s) failed. Please review rate limiting implementation.`
+        `\n💥 ${this.failedTests} test(s) failed. Please review rate limiting implementation.`,
       );
       process.exit(1);
     }
@@ -883,4 +828,3 @@ rateLimitTests.runComprehensiveTests().catch((error) => {
   console.error('Fatal error in rate limiting tests:', error);
   process.exit(1);
 });
-

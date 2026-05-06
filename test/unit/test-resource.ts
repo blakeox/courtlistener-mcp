@@ -14,7 +14,7 @@ describe('OpinionResourceHandler', () => {
     api = {
       getOpinion: async (id: number) => ({ id, plain_text: 'Test opinion' }),
     } as unknown as CourtListenerAPI;
-    
+
     handler = new OpinionResourceHandler(api);
     context = {
       logger: createMockLogger(),
@@ -29,7 +29,7 @@ describe('OpinionResourceHandler', () => {
 
   it('reads opinion successfully', async () => {
     const result = await handler.read('courtlistener://opinion/123', context);
-    
+
     assert.strictEqual(result.contents.length, 1);
     const content = JSON.parse(result.contents[0].text);
     assert.strictEqual(content.id, 123);
@@ -37,11 +37,13 @@ describe('OpinionResourceHandler', () => {
   });
 
   it('handles errors', async () => {
-    api.getOpinion = async () => { throw new Error('API Error'); };
-    
+    api.getOpinion = async () => {
+      throw new Error('API Error');
+    };
+
     await assert.rejects(
       async () => await handler.read('courtlistener://opinion/123', context),
-      /Failed to fetch opinion 123/
+      /Failed to fetch opinion 123/,
     );
   });
 });

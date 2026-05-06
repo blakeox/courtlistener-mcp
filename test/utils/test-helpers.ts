@@ -49,7 +49,7 @@ export function createMockLogger(): MockLogger {
       toolName: string,
       duration: number,
       success: boolean,
-      metadata?: Record<string, unknown>
+      metadata?: Record<string, unknown>,
     ): void {
       logs.info.push([`Tool: ${toolName}`, { duration, success, ...metadata }]);
     },
@@ -58,12 +58,9 @@ export function createMockLogger(): MockLogger {
       endpoint: string,
       duration: number,
       status: number,
-      metadata?: Record<string, unknown>
+      metadata?: Record<string, unknown>,
     ): void {
-      logs.info.push([
-        `API ${method} ${endpoint}`,
-        { duration, status, ...metadata },
-      ]);
+      logs.info.push([`API ${method} ${endpoint}`, { duration, status, ...metadata }]);
     },
     startTimer(operation: string) {
       const start = Date.now();
@@ -104,9 +101,7 @@ export interface MockRequest {
   [key: string]: unknown;
 }
 
-export function createMockRequest(
-  overrides: Partial<MockRequest> = {}
-): MockRequest {
+export function createMockRequest(overrides: Partial<MockRequest> = {}): MockRequest {
   return {
     method: 'POST',
     url: '/test',
@@ -312,33 +307,24 @@ export const assertions = {
       throw new Error('Expected input to be blocked, but it was allowed');
     }
     if (reason && !result.reason?.includes(reason)) {
-      throw new Error(
-        `Expected block reason to contain "${reason}", got: ${result.reason}`
-      );
+      throw new Error(`Expected block reason to contain "${reason}", got: ${result.reason}`);
     }
   },
 
   // Check if middleware allowed safe input
   expectAllowed(result: { blocked: boolean; reason?: string }): void {
     if (result.blocked) {
-      throw new Error(
-        `Expected input to be allowed, but it was blocked: ${result.reason}`
-      );
+      throw new Error(`Expected input to be allowed, but it was blocked: ${result.reason}`);
     }
   },
 
   // Check rate limit response
-  expectRateLimited(result: {
-    allowed: boolean;
-    retryAfter: number;
-  }): void {
+  expectRateLimited(result: { allowed: boolean; retryAfter: number }): void {
     if (result.allowed) {
       throw new Error('Expected request to be rate limited, but it was allowed');
     }
     if (result.retryAfter <= 0) {
-      throw new Error(
-        'Expected positive retryAfter value for rate limited request'
-      );
+      throw new Error('Expected positive retryAfter value for rate limited request');
     }
   },
 
@@ -346,13 +332,11 @@ export const assertions = {
   expectCompressed(original: unknown, compressed: string | unknown): void {
     const originalSize = JSON.stringify(original).length;
     const compressedSize =
-      typeof compressed === 'string'
-        ? compressed.length
-        : JSON.stringify(compressed).length;
+      typeof compressed === 'string' ? compressed.length : JSON.stringify(compressed).length;
 
     if (compressedSize >= originalSize) {
       throw new Error(
-        `Expected compression, but size increased: ${originalSize} -> ${compressedSize}`
+        `Expected compression, but size increased: ${originalSize} -> ${compressedSize}`,
       );
     }
   },
@@ -399,7 +383,7 @@ export const performance = {
   // Run function multiple times and collect statistics
   async benchmark<T>(
     fn: () => Promise<T> | T,
-    iterations = 100
+    iterations = 100,
   ): Promise<{
     iterations: number;
     errors: number;
@@ -498,7 +482,7 @@ export const validation = {
   // Validate that enterprise middleware configurations are properly loaded
   validateConfig(
     config: Record<string, { enabled?: boolean }>,
-    expectedFeatures: Record<string, boolean>
+    expectedFeatures: Record<string, boolean>,
   ): void {
     const issues: string[] = [];
 
@@ -510,26 +494,23 @@ export const validation = {
     });
 
     if (issues.length > 0) {
-      throw new Error(
-        `Configuration validation failed:\n${issues.join('\n')}`
-      );
+      throw new Error(`Configuration validation failed:\n${issues.join('\n')}`);
     }
   },
 
   // Validate middleware chain execution order
   validateMiddlewareOrder(
     executionLog: Array<{ middleware: string }>,
-    expectedOrder: string[]
+    expectedOrder: string[],
   ): void {
     const actualOrder = executionLog.map((entry) => entry.middleware);
 
     if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
       throw new Error(
         `Middleware execution order mismatch:\n` +
-        `Expected: ${expectedOrder.join(' -> ')}\n` +
-        `Actual: ${actualOrder.join(' -> ')}`
+          `Expected: ${expectedOrder.join(' -> ')}\n` +
+          `Actual: ${actualOrder.join(' -> ')}`,
       );
     }
   },
 };
-

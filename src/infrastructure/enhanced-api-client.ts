@@ -3,10 +3,7 @@
  * Uses async patterns for improved performance and reliability
  */
 
-import {
-  ConnectionPoolManager,
-  RequestQueueManager,
-} from './async-patterns.js';
+import { ConnectionPoolManager, RequestQueueManager } from './async-patterns.js';
 import {
   CircuitBreaker,
   type ResiliencePolicy,
@@ -99,8 +96,7 @@ export class EnhancedCourtListenerAPIClient {
 
     this.resiliencePolicy = createResiliencePolicy({
       retry: {
-        attempts:
-          this.options.resiliencePolicy?.retry?.attempts ?? this.options.retryAttempts ?? 3,
+        attempts: this.options.resiliencePolicy?.retry?.attempts ?? this.options.retryAttempts ?? 3,
         backoffMs: this.options.resiliencePolicy?.retry?.backoffMs ?? 1000,
       },
       circuitBreaker: {

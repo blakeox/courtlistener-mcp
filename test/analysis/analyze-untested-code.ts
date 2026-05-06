@@ -103,9 +103,7 @@ class DetailedUntestedAnalysis {
     const publicMethods: string[] = [];
 
     // Extract classes with detailed method analysis
-    const classMatches = content.matchAll(
-      /(?:export\s+)?class\s+(\w+).*?{([\s\S]*?)^}/gm
-    );
+    const classMatches = content.matchAll(/(?:export\s+)?class\s+(\w+).*?{([\s\S]*?)^}/gm);
     for (const match of classMatches) {
       const className = match[1];
       const classBody = match[2];
@@ -115,7 +113,7 @@ class DetailedUntestedAnalysis {
 
       // Extract methods
       const methodMatches = classBody.matchAll(
-        /(?:async\s+)?(private\s+|public\s+)?(\w+)\s*\([^)]*\)\s*[:{]/g
+        /(?:async\s+)?(private\s+|public\s+)?(\w+)\s*\([^)]*\)\s*[:{]/g,
       );
       for (const methodMatch of methodMatches) {
         const isPrivate = methodMatch[1]?.includes('private');
@@ -139,16 +137,14 @@ class DetailedUntestedAnalysis {
     }
 
     // Extract standalone functions
-    const functionMatches = content.matchAll(
-      /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g
-    );
+    const functionMatches = content.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g);
     for (const match of functionMatches) {
       functions.push(match[1]);
     }
 
     // Extract exports
     const exportMatches = content.matchAll(
-      /export\s+(?:default\s+)?(?:class|function|const|interface|type)\s+(\w+)/g
+      /export\s+(?:default\s+)?(?:class|function|const|interface|type)\s+(\w+)/g,
     );
     for (const match of exportMatches) {
       exports.push(match[1]);
@@ -162,16 +158,11 @@ class DetailedUntestedAnalysis {
     };
   }
 
-  private assessTestingPriority(
-    filePath: string,
-    analysis: FileStructure
-  ): void {
+  private assessTestingPriority(filePath: string, analysis: FileStructure): void {
     const priorities: string[] = [];
 
     if (filePath.includes('courtlistener.ts')) {
-      priorities.push(
-        '🔥 CRITICAL - API integration, error handling, rate limiting'
-      );
+      priorities.push('🔥 CRITICAL - API integration, error handling, rate limiting');
       priorities.push('🔥 CRITICAL - Caching behavior, retry logic');
       priorities.push('⚡ HIGH - Search methods, data parsing');
     }
@@ -322,4 +313,3 @@ analyzer.analyze().catch((error) => {
   console.error('Error in detailed analysis:', error);
   process.exit(1);
 });
-

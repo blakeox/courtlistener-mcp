@@ -2,7 +2,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { HOSTED_MCP_OAUTH_CONTRACT, HOSTED_MCP_OAUTH_DEFAULT_SCOPE } from '../../src/auth/oauth-contract.js';
+import {
+  HOSTED_MCP_OAUTH_CONTRACT,
+  HOSTED_MCP_OAUTH_DEFAULT_SCOPE,
+} from '../../src/auth/oauth-contract.js';
 import {
   buildHostedMcpDefaultClientAttributes,
   getHostedMcpScopesSupported,
@@ -11,7 +14,9 @@ import {
 
 describe('oauth service helpers', () => {
   it('resolves default supported scopes when no scopes are requested', () => {
-    assert.deepEqual(resolveHostedMcpRequestedScopes(), [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported]);
+    assert.deepEqual(resolveHostedMcpRequestedScopes(), [
+      ...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported,
+    ]);
     assert.deepEqual(getHostedMcpScopesSupported(), [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported]);
   });
 
@@ -27,8 +32,17 @@ describe('oauth service helpers', () => {
     assert.deepEqual(buildHostedMcpDefaultClientAttributes('secret').response_types, [
       ...HOSTED_MCP_OAUTH_CONTRACT.responseTypesSupported,
     ]);
-    assert.equal(buildHostedMcpDefaultClientAttributes('secret').token_endpoint_auth_method, 'client_secret_post');
-    assert.equal(buildHostedMcpDefaultClientAttributes(undefined).token_endpoint_auth_method, 'none');
-    assert.equal(buildHostedMcpDefaultClientAttributes('secret').scope, HOSTED_MCP_OAUTH_DEFAULT_SCOPE);
+    assert.equal(
+      buildHostedMcpDefaultClientAttributes('secret').token_endpoint_auth_method,
+      'client_secret_post',
+    );
+    assert.equal(
+      buildHostedMcpDefaultClientAttributes(undefined).token_endpoint_auth_method,
+      'none',
+    );
+    assert.equal(
+      buildHostedMcpDefaultClientAttributes('secret').scope,
+      HOSTED_MCP_OAUTH_DEFAULT_SCOPE,
+    );
   });
 });

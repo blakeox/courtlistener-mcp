@@ -52,9 +52,7 @@ class UnitTestRunner {
         // Only real TypeScript test files; ignore local backup copies such as
         // "test-foo 3.ts" that can appear in shared worktrees.
         return (
-          file.startsWith('test-') &&
-          file.endsWith('.ts') &&
-          !this.backupCopyPattern.test(file)
+          file.startsWith('test-') && file.endsWith('.ts') && !this.backupCopyPattern.test(file)
         );
       })
       .filter((file) => {

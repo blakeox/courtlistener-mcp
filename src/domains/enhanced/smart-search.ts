@@ -7,12 +7,19 @@ import { AdvancedSearchParams } from '../../types.js';
 
 const smartSearchSchema = z.object({
   query: z.string().describe('Natural language query describing what you are looking for'),
-  max_results: z.number().int().min(1).max(20).default(5).describe('Maximum number of results to return'),
+  max_results: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(5)
+    .describe('Maximum number of results to return'),
 });
 
 export class SmartSearchHandler extends TypedToolHandler<typeof smartSearchSchema> {
   name = 'smart_search';
-  description = 'Intelligently search for cases using natural language. Uses an LLM to optimize search parameters.';
+  description =
+    'Intelligently search for cases using natural language. Uses an LLM to optimize search parameters.';
   category = 'enhanced';
   protected schema = smartSearchSchema;
 
@@ -23,7 +30,7 @@ export class SmartSearchHandler extends TypedToolHandler<typeof smartSearchSchem
   @withDefaults()
   async execute(
     args: z.infer<typeof smartSearchSchema>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<CallToolResult> {
     if (!context.sampling) {
       return {
@@ -65,13 +72,12 @@ Return ONLY a JSON object with the parameters. Do not include markdown formattin
       {
         maxTokens: 500,
         systemPrompt: 'You are a precise legal search parameter generator.',
-      }
+      },
     );
 
     let searchParams: Partial<AdvancedSearchParams> = {};
     try {
-      const textContent =
-        samplingResult.content.type === 'text' ? samplingResult.content.text : '';
+      const textContent = samplingResult.content.type === 'text' ? samplingResult.content.text : '';
       // Strip markdown code blocks if present
       const jsonStr = textContent.replace(/```json\n?|\n?```/g, '').trim();
       searchParams = JSON.parse(jsonStr);
@@ -84,10 +90,10 @@ Return ONLY a JSON object with the parameters. Do not include markdown formattin
     // 2. Execute search using the generated parameters
     // Ensure we respect the max_results limit
     // Note: CourtListener API uses 'page' and implicit page size, but we can slice results
-    
+
     // Map parameters to API call
     // We'll use the searchOpinions method from the API
-    
+
     // Clean up params
     const apiParams: AdvancedSearchParams = {
       q: searchParams.q || args.query,
@@ -98,7 +104,8 @@ Return ONLY a JSON object with the parameters. Do not include markdown formattin
     if (searchParams.court) apiParams.court = searchParams.court;
     if (searchParams.judge) apiParams.judge = searchParams.judge;
     if (searchParams.date_filed_after) apiParams.date_filed_after = searchParams.date_filed_after;
-    if (searchParams.date_filed_before) apiParams.date_filed_before = searchParams.date_filed_before;
+    if (searchParams.date_filed_before)
+      apiParams.date_filed_before = searchParams.date_filed_before;
     if (searchParams.precedential_status) apiParams.status = searchParams.precedential_status;
 
     const results = await this.api.searchOpinions(apiParams);
@@ -110,11 +117,12 @@ Return ONLY a JSON object with the parameters. Do not include markdown formattin
       content: [
         {
           type: 'text',
-          text: `Smart Search Results for: "${args.query}"\nGenerated Parameters: ${JSON.stringify(apiParams, null, 2)}\n\nFound ${results.count} results. Showing top ${limitedResults.length}:\n\n` +
+          text:
+            `Smart Search Results for: "${args.query}"\nGenerated Parameters: ${JSON.stringify(apiParams, null, 2)}\n\nFound ${results.count} results. Showing top ${limitedResults.length}:\n\n` +
             limitedResults
               .map(
                 (r) =>
-                  `- ${r.case_name} (${r.date_filed}) [${r.court}]\n  Citation: ${r.citation_count} cites\n  URL: ${r.absolute_url}`
+                  `- ${r.case_name} (${r.date_filed}) [${r.court}]\n  Citation: ${r.citation_count} cites\n  URL: ${r.absolute_url}`,
               )
               .join('\n\n'),
         },

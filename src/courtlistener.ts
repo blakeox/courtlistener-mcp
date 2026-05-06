@@ -108,7 +108,11 @@ export class CourtListenerAPI {
       this.metrics.recordFailure(duration, operation);
 
       if (error instanceof Error) {
-        this.logger.error(`API request failed: ${endpoint}`, error, this.createParamLogMetadata(params));
+        this.logger.error(
+          `API request failed: ${endpoint}`,
+          error,
+          this.createParamLogMetadata(params),
+        );
       }
 
       throw error;
@@ -344,7 +348,7 @@ export class CourtListenerAPI {
     return new Promise((resolve, reject) => {
       if (this.rateLimitQueue.length >= this.maxRateLimitQueueSize) {
         const error = new Error(
-          `Rate limit queue overloaded: ${this.rateLimitQueue.length}/${this.maxRateLimitQueueSize}`
+          `Rate limit queue overloaded: ${this.rateLimitQueue.length}/${this.maxRateLimitQueueSize}`,
         );
         this.logger.warn('Rate limit queue capacity exceeded', {
           queueLength: this.rateLimitQueue.length,
@@ -389,10 +393,13 @@ export class CourtListenerAPI {
 
     if (this.rateLimitQueue.length > 0 && this.refillTimer === null) {
       const millisecondsUntilNextToken = Math.ceil((1 - this.availableTokens) / ratePerMillisecond);
-      this.refillTimer = setTimeout(() => {
-        this.refillTimer = null;
-        this.processQueue();
-      }, Math.max(1, millisecondsUntilNextToken));
+      this.refillTimer = setTimeout(
+        () => {
+          this.refillTimer = null;
+          this.processQueue();
+        },
+        Math.max(1, millisecondsUntilNextToken),
+      );
     }
 
     this.isProcessingQueue = false;
@@ -567,16 +574,21 @@ export class CourtListenerAPI {
 
     const topCases = results.slice(0, 10).map(
       (
-        r: OpinionCluster & { caseName?: string; court_id?: string; dateFiled?: string; snippet?: string },
+        r: OpinionCluster & {
+          caseName?: string;
+          court_id?: string;
+          dateFiled?: string;
+          snippet?: string;
+        },
       ) => ({
-      case_name: r.case_name || r.caseName || 'Unknown',
-      court: r.court || r.court_id || '',
-      date_filed: r.date_filed || r.dateFiled || '',
-      citation: r.federal_cite_one || r.state_cite_one || r.neutral_cite || '',
-      citation_count: r.citation_count ?? 0,
-      precedential_status: r.precedential_status || '',
-      absolute_url: r.absolute_url || '',
-      snippet: r.snippet || r.summary || '',
+        case_name: r.case_name || r.caseName || 'Unknown',
+        court: r.court || r.court_id || '',
+        date_filed: r.date_filed || r.dateFiled || '',
+        citation: r.federal_cite_one || r.state_cite_one || r.neutral_cite || '',
+        citation_count: r.citation_count ?? 0,
+        precedential_status: r.precedential_status || '',
+        absolute_url: r.absolute_url || '',
+        snippet: r.snippet || r.summary || '',
       }),
     );
 

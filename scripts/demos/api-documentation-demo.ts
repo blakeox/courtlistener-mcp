@@ -7,7 +7,6 @@
 
 import { Logger } from './dist/infrastructure/logger.js';
 import { OpenAPIGenerator } from './dist/infrastructure/openapi-generator.js';
-import { DocumentationService } from './dist/endpoints/documentation.js';
 
 async function demonstrateDocumentation(): Promise<void> {
   console.log('\n🏛️ Legal MCP Server - API Documentation Demo\n');
@@ -19,12 +18,11 @@ async function demonstrateDocumentation(): Promise<void> {
       format: 'console',
       enabled: true,
     },
-    'DocumentationDemo'
+    'DocumentationDemo',
   );
 
   // Initialize documentation generator
   const openAPIGenerator = new OpenAPIGenerator(logger);
-  const documentationService = new DocumentationService(logger);
 
   console.log('📚 Generating OpenAPI Specification...');
   const spec = openAPIGenerator.generateFullSpec();
@@ -33,9 +31,7 @@ async function demonstrateDocumentation(): Promise<void> {
   console.log(`   - ${Object.keys(spec.paths).length} API endpoints`);
   console.log(`   - ${Object.keys(spec.components?.schemas || {}).length} data schemas`);
   console.log(`   - ${spec.tags?.length || 0} endpoint categories`);
-  console.log(
-    `   - ${Object.keys(spec.components?.responses || {}).length} response templates`
-  );
+  console.log(`   - ${Object.keys(spec.components?.responses || {}).length} response templates`);
 
   console.log('\n📋 Available API Endpoints:');
   for (const [path, methods] of Object.entries(spec.paths)) {
@@ -43,7 +39,7 @@ async function demonstrateDocumentation(): Promise<void> {
       for (const method of Object.keys(methods)) {
         const operation = (methods as Record<string, { summary?: string }>)[method];
         console.log(
-          `   ${method.toUpperCase().padEnd(6)} ${path.padEnd(25)} - ${operation?.summary || 'N/A'}`
+          `   ${method.toUpperCase().padEnd(6)} ${path.padEnd(25)} - ${operation?.summary || 'N/A'}`,
         );
       }
     }
@@ -83,8 +79,8 @@ async function demonstrateDocumentation(): Promise<void> {
         'schemas (count)': Object.keys(jsonSample.components?.schemas || {}).length,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   console.log('\n✅ Documentation Features Demonstrated:');
@@ -107,7 +103,7 @@ async function demonstrateDocumentation(): Promise<void> {
 
   console.log('\n✅ Phase 2A: API Documentation & OpenAPI ✅ COMPLETE');
   console.log(
-    '\n💡 Use "npm start" and visit http://localhost:3001/api/docs/docs for live documentation'
+    '\n💡 Use "npm start" and visit http://localhost:3001/api/docs/docs for live documentation',
   );
 }
 
@@ -115,4 +111,3 @@ async function demonstrateDocumentation(): Promise<void> {
 if (import.meta.url === `file://${process.argv[1]}`) {
   demonstrateDocumentation().catch(console.error);
 }
-

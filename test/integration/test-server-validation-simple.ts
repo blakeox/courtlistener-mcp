@@ -52,7 +52,7 @@ describe('Standard Server Validation', { timeout: TEST_TIMEOUT }, () => {
     // Validate startup
     assert(
       serverError.includes('Legal MCP Server'),
-      `Expected server startup message, got: ${serverError}`
+      `Expected server startup message, got: ${serverError}`,
     );
 
     console.log('✅ Standard server started successfully');
@@ -78,13 +78,10 @@ describe('Standard Server Validation', { timeout: TEST_TIMEOUT }, () => {
 
     // Validate binary entries
     if (pkg.bin) {
-      assert(
-        pkg.bin['legal-mcp'] === 'dist/index.js',
-        'Standard binary should point to index.js'
-      );
+      assert(pkg.bin['legal-mcp'] === 'dist/index.js', 'Standard binary should point to index.js');
       assert(
         pkg.bin['legal-mcp-enterprise'] === 'dist/enterprise-server.js',
-        'Enterprise binary should point to enterprise-server.js'
+        'Enterprise binary should point to enterprise-server.js',
       );
     }
 
@@ -122,7 +119,7 @@ describe('Standard Server Validation', { timeout: TEST_TIMEOUT }, () => {
     // TypeScript compilation should succeed
     assert(
       exitCode === 0,
-      `TypeScript compilation failed with exit code ${exitCode}. Error: ${tscError}`
+      `TypeScript compilation failed with exit code ${exitCode}. Error: ${tscError}`,
     );
 
     console.log('✅ TypeScript compilation successful');
@@ -173,7 +170,7 @@ describe('Enterprise Server Validation', { timeout: TEST_TIMEOUT }, () => {
     // Validate startup
     assert(
       serverError.includes('Legal MCP Server') && serverError.includes('Enterprise'),
-      `Expected enterprise server startup message, got: ${serverError}`
+      `Expected enterprise server startup message, got: ${serverError}`,
     );
 
     console.log('✅ Enterprise server started successfully');
@@ -216,4 +213,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('🧪 Running Simple Server Validation Tests...');
   console.log('='.repeat(50));
 }
-

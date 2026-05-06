@@ -48,10 +48,29 @@ function baseConfig(overrides: Partial<BaseConfig> = {}): ServerConfig {
     },
     metrics: { enabled: false, port: 0 },
     cache: { enabled: false, ttl: 300, maxSize: 1000 },
-    circuitBreaker: { enabled: false, failureThreshold: 5, successThreshold: 3, timeout: 10000, resetTimeout: 60000 },
-    audit: { enabled: false, logLevel: 'info', includeRequestBody: false, includeResponseBody: false, maxBodyLength: 2000, sensitiveFields: [] },
+    circuitBreaker: {
+      enabled: false,
+      failureThreshold: 5,
+      successThreshold: 3,
+      timeout: 10000,
+      resetTimeout: 60000,
+    },
+    audit: {
+      enabled: false,
+      logLevel: 'info',
+      includeRequestBody: false,
+      includeResponseBody: false,
+      maxBodyLength: 2000,
+      sensitiveFields: [],
+    },
     compression: { enabled: false, threshold: 1024, level: 6 },
-    courtListener: { baseUrl: 'https://api.example.com', version: 'v4', timeout: 30000, retryAttempts: 3, rateLimitPerMinute: 100 },
+    courtListener: {
+      baseUrl: 'https://api.example.com',
+      version: 'v4',
+      timeout: 30000,
+      retryAttempts: 3,
+      rateLimitPerMinute: 100,
+    },
     ...overrides,
   } as ServerConfig;
 }
@@ -72,7 +91,7 @@ describe('MiddlewareFactory (TypeScript)', () => {
     const result = await factory.executeMiddlewareStack(
       stack,
       { requestId: 'r1', startTime: Date.now(), metadata: {} },
-      async () => 'done'
+      async () => 'done',
     );
     assert.strictEqual(result, 'done');
   });
@@ -86,7 +105,7 @@ describe('MiddlewareFactory (TypeScript)', () => {
     const result = await factory.executeMiddlewareStack(
       stack,
       { requestId: 'r2', startTime: Date.now(), metadata: {} },
-      async () => 'ok'
+      async () => 'ok',
     );
     assert.strictEqual(result, 'ok');
   });
@@ -108,8 +127,7 @@ describe('MiddlewareFactory (TypeScript)', () => {
     };
 
     // First two should pass
-    const call = () =>
-      factory.executeMiddlewareStack(stack, ctx, async () => 'ok');
+    const call = () => factory.executeMiddlewareStack(stack, ctx, async () => 'ok');
     assert.strictEqual(await call(), 'ok');
     assert.strictEqual(await call(), 'ok');
     // Third should fail
@@ -123,16 +141,15 @@ describe('MiddlewareFactory (TypeScript)', () => {
     });
     const stack = factory.createMiddlewareStack(config);
     assert.ok(stack.length >= 1);
-    
+
     const names = stack.map((mw: { name?: string }) => mw.name);
     assert.ok(names.includes('authentication') || names.includes('rateLimit'));
 
     const result = await factory.executeMiddlewareStack(
       stack,
       { requestId: 'r4', startTime: Date.now(), metadata: {} },
-      async () => 'ok'
+      async () => 'ok',
     );
     assert.strictEqual(result, 'ok');
   });
 });
-

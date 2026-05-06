@@ -56,9 +56,17 @@ export async function runProtocolHeaderNegotiationContract(
     }
 
     assert.ok(response, `${fixture.name} should return auth error response`);
-    assert.equal(response.status, fixture.expectedStatus, `${fixture.name} should return expected status`);
+    assert.equal(
+      response.status,
+      fixture.expectedStatus,
+      `${fixture.name} should return expected status`,
+    );
     const payload = (await response.json()) as { error?: string };
-    assert.equal(payload.error, fixture.expectedError, `${fixture.name} should return expected error code`);
+    assert.equal(
+      payload.error,
+      fixture.expectedError,
+      `${fixture.name} should return expected error code`,
+    );
   }
 }
 

@@ -13,10 +13,11 @@ import {
 describe('breaking change governance', () => {
   it('keeps BP8-BP10 gates and migration notes in sync', () => {
     assert.equal(BREAKING_CHANGE_GATES.length, 3);
-    assert.deepEqual(
-      BREAKING_CHANGE_GATES.map((gate) => gate.introducedBy).sort(),
-      ['BP10', 'BP8', 'BP9'],
-    );
+    assert.deepEqual(BREAKING_CHANGE_GATES.map((gate) => gate.introducedBy).sort(), [
+      'BP10',
+      'BP8',
+      'BP9',
+    ]);
 
     const notes = getBreakingChangeMigrationNotes();
     assert.equal(notes.length, BREAKING_CHANGE_GATES.length);

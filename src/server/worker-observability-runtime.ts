@@ -61,16 +61,6 @@ function normalizeRouteSegment(segment: string): string {
   return segment;
 }
 
-function normalizeOriginFromUrlLike(input: string | undefined): string | null {
-  const value = input?.trim();
-  if (!value) return null;
-  try {
-    return new URL(value).origin;
-  } catch {
-    return null;
-  }
-}
-
 function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
   return {
     count: stats.count,

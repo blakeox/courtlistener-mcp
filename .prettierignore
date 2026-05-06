@@ -21,6 +21,7 @@ node_modules/
 *.seed
 *.pid.lock
 src/web/spa-assets.ts
+src/web-spa/.spa-dist-analysis/
 
 # Environment
 .env

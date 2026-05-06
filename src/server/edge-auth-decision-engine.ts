@@ -2,9 +2,14 @@ export type EdgePrimaryAuthMethod = 'oidc';
 export type EdgeAuthAttempt = 'serviceToken' | EdgePrimaryAuthMethod;
 
 const PRIMARY_AUTH_PRECEDENCE: readonly EdgePrimaryAuthMethod[] = ['oidc'] as const;
-const EDGE_AUTH_PRECEDENCE: readonly EdgeAuthAttempt[] = ['serviceToken', ...PRIMARY_AUTH_PRECEDENCE] as const;
+const EDGE_AUTH_PRECEDENCE: readonly EdgeAuthAttempt[] = [
+  'serviceToken',
+  ...PRIMARY_AUTH_PRECEDENCE,
+] as const;
 
-function normalizePrimaryAuthMethod(value: string | null | undefined): EdgePrimaryAuthMethod | null {
+function normalizePrimaryAuthMethod(
+  value: string | null | undefined,
+): EdgePrimaryAuthMethod | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === 'oidc' || normalized === 'oauth') return 'oidc';

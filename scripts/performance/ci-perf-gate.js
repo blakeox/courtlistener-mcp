@@ -69,12 +69,12 @@ function main() {
   if (!baselinePath || !currentPath) {
     if (requireFiles) {
       console.error(
-        `❌ Performance gate requires baseline/current path (baseline="${baselinePath || 'unset'}", current="${currentPath || 'unset'}").`
+        `❌ Performance gate requires baseline/current path (baseline="${baselinePath || 'unset'}", current="${currentPath || 'unset'}").`,
       );
       process.exit(1);
     }
     console.log(
-      `⏭️  Skipping performance gate: missing baseline/current path (baseline="${baselinePath || 'unset'}", current="${currentPath || 'unset'}").`
+      `⏭️  Skipping performance gate: missing baseline/current path (baseline="${baselinePath || 'unset'}", current="${currentPath || 'unset'}").`,
     );
     process.exit(0);
   }
@@ -82,21 +82,25 @@ function main() {
   if (!fs.existsSync(baselinePath) || !fs.existsSync(currentPath)) {
     if (requireFiles) {
       console.error(
-        `❌ Performance gate files required but missing (baseline exists=${fs.existsSync(baselinePath)}, current exists=${fs.existsSync(currentPath)}).`
+        `❌ Performance gate files required but missing (baseline exists=${fs.existsSync(baselinePath)}, current exists=${fs.existsSync(currentPath)}).`,
       );
       process.exit(1);
     }
     console.log(
-      `⏭️  Skipping performance gate: file missing (baseline exists=${fs.existsSync(baselinePath)}, current exists=${fs.existsSync(currentPath)}).`
+      `⏭️  Skipping performance gate: file missing (baseline exists=${fs.existsSync(baselinePath)}, current exists=${fs.existsSync(currentPath)}).`,
     );
     process.exit(0);
   }
 
   const compareScript = path.join(__dirname, 'compare-performance.js');
-  const result = spawnSync(process.execPath, [compareScript, baselinePath, currentPath, ...passthrough], {
-    stdio: 'inherit',
-    env: process.env,
-  });
+  const result = spawnSync(
+    process.execPath,
+    [compareScript, baselinePath, currentPath, ...passthrough],
+    {
+      stdio: 'inherit',
+      env: process.env,
+    },
+  );
 
   if (result.error) {
     console.error(`❌ Failed to run compare-performance.js: ${result.error.message}`);

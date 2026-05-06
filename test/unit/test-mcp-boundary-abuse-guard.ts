@@ -35,7 +35,11 @@ describe('mcp-boundary-abuse-guard', () => {
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
     });
-    const fingerprint = await buildMcpReplayFingerprint(request, getRequestContentLength(request), 64 * 1024);
+    const fingerprint = await buildMcpReplayFingerprint(
+      request,
+      getRequestContentLength(request),
+      64 * 1024,
+    );
     assert.equal(fingerprint, 'POST|session-1|id:request-1');
   });
 
@@ -46,7 +50,11 @@ describe('mcp-boundary-abuse-guard', () => {
       headers: { 'content-type': 'application/json' },
       body,
     });
-    const fingerprint = await buildMcpReplayFingerprint(request, getRequestContentLength(request), 64 * 1024);
+    const fingerprint = await buildMcpReplayFingerprint(
+      request,
+      getRequestContentLength(request),
+      64 * 1024,
+    );
     assert.equal(fingerprint, 'POST|-|rpc:tools/call|id:42');
   });
 });

@@ -1,5 +1,0 @@
-dist/
-coverage/
-node_modules/
-**/*.js
-src/web/spa-assets.ts

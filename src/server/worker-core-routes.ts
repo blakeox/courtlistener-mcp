@@ -56,8 +56,7 @@ export async function handleWorkerCoreRoutes<
   context: WorkerCoreRouteContext<TEnv>,
   deps: HandleWorkerCoreRoutesDeps<TEnv>,
 ): Promise<Response | null> {
-  const { request, url, origin, allowedOrigins, env, ctx, pathname, requestMethod, mcpPath } =
-    context;
+  const { request, origin, allowedOrigins, env, ctx, pathname, requestMethod, mcpPath } = context;
 
   if (
     requestMethod === 'OPTIONS' &&

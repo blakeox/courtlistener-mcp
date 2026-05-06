@@ -24,7 +24,9 @@ if (dirtyGenerated.length === 0) {
   process.exit(0);
 }
 
-process.stderr.write('Generated tracked files changed after the gate ran. Commit regenerated outputs or fix the generator drift:\n');
+process.stderr.write(
+  'Generated tracked files changed after the gate ran. Commit regenerated outputs or fix the generator drift:\n',
+);
 for (const path of dirtyGenerated) {
   process.stderr.write(`- ${path}\n`);
 }

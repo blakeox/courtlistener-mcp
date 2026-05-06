@@ -50,7 +50,10 @@ export function redactSecretsInText(
   options: { additionalSecrets?: string[] } = {},
 ): string {
   let redacted = value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
-  redacted = redacted.replace(/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/g, REDACTED);
+  redacted = redacted.replace(
+    /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/g,
+    REDACTED,
+  );
   redacted = redacted.replace(
     /((?:token|secret|password|authorization|api[-_ ]?key|private[-_ ]?key|client[-_ ]?secret|session)[^:=\n]{0,24}[=:]\s*)(['"]?)([^\s,'";]+)/gi,
     '$1$2[REDACTED]',

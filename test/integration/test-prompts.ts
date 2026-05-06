@@ -35,19 +35,19 @@ async function runPromptTests(): Promise<void> {
 
   await test('List Prompts', async () => {
     const prompts = await server.listPrompts();
-    
+
     if (!prompts || !prompts.prompts) {
       throw new Error('No prompts returned');
     }
-    
+
     if (prompts.prompts.length === 0) {
       throw new Error('Expected at least one prompt');
     }
-    
+
     console.log(`   Found ${prompts.prompts.length} prompts`);
-    
+
     // Verify specific prompts exist
-    const legalAssistant = prompts.prompts.find(p => p.name === 'legal_assistant');
+    const legalAssistant = prompts.prompts.find((p) => p.name === 'legal_assistant');
     if (!legalAssistant) {
       throw new Error('legal_assistant prompt not found');
     }
@@ -58,20 +58,20 @@ async function runPromptTests(): Promise<void> {
     const args = { focus_area: 'copyright law' };
 
     const result = await server.getPrompt(name, args);
-    
+
     if (!result || !result.messages || result.messages.length === 0) {
       throw new Error('No messages returned for prompt');
     }
-    
+
     const message = result.messages[0];
     if (message.role !== 'user') {
       throw new Error(`Expected user role, got ${message.role}`);
     }
-    
+
     if (!message.content.type || message.content.type !== 'text') {
       throw new Error('Expected text content');
     }
-    
+
     const text = message.content.text as string;
     if (!text.includes('copyright law')) {
       throw new Error('Prompt arguments not correctly interpolated');
@@ -83,11 +83,11 @@ async function runPromptTests(): Promise<void> {
     const args = { statute_text: '17 U.S.C. 107' };
 
     const result = await server.getPrompt(name, args);
-    
+
     if (!result || !result.messages || result.messages.length === 0) {
       throw new Error('No messages returned for prompt');
     }
-    
+
     const message = result.messages[0];
     const text = message.content.text as string;
     if (!text.includes('17 U.S.C. 107')) {
@@ -97,7 +97,7 @@ async function runPromptTests(): Promise<void> {
 
   console.log('---------------------------------------------------');
   console.log(`Tests Completed: ${passed} Passed, ${failed} Failed`);
-  
+
   if (failed > 0) {
     process.exit(1);
   }

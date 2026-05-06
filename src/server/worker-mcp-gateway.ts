@@ -10,7 +10,9 @@ export interface HandleMcpGatewayRouteParams<
   Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
 > extends HandleWorkerMcpTransportBoundaryParams<Env> {}
 
-type McpGatewayRouteContext<Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string }> = Pick<
+type McpGatewayRouteContext<
+  Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
+> = Pick<
   HandleMcpGatewayRouteParams<Env>,
   'request' | 'env' | 'ctx' | 'pathname' | 'requestMethod' | 'origin' | 'allowedOrigins' | 'mcpPath'
 >;

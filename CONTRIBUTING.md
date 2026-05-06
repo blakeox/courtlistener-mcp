@@ -10,7 +10,7 @@ the architecture and best practices.
 ### Prerequisites
 
 - Node.js 18+ or 20+
-- npm or yarn
+- pnpm
 - TypeScript knowledge
 - Familiarity with Zod schemas
 
@@ -22,16 +22,16 @@ git clone https://github.com/blakeox/courtlistener-mcp.git
 cd courtlistener-mcp
 
 # Install dependencies
-npm install
+pnpm install
 
 # Install git hooks (Lefthook)
 pnpm run hooks:install
 
 # Build the project
-npm run build
+pnpm run build
 
 # Run tests
-npm test
+pnpm test
 ```
 
 Git hooks are installed into `.githooks/` and executed by Lefthook via

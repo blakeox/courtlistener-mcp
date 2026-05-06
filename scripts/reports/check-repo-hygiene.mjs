@@ -24,7 +24,8 @@ function gitLines(commandArgs) {
       .map((line) => line.trim())
       .filter(Boolean);
   } catch (error) {
-    const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+    const stderr =
+      error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
     throw new Error(stderr || `git ${commandArgs.join(' ')} failed`);
   }
 }
@@ -41,7 +42,9 @@ function shouldIgnore(path) {
 
 function collectPaths() {
   if (stagedOnly) {
-    return gitLines(['diff', '--cached', '--name-only', '--diff-filter=ACMR']).filter((path) => !shouldIgnore(path));
+    return gitLines(['diff', '--cached', '--name-only', '--diff-filter=ACMR']).filter(
+      (path) => !shouldIgnore(path),
+    );
   }
 
   const tracked = gitLines(['ls-files']);

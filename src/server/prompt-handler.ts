@@ -1,7 +1,4 @@
-import {
-  GetPromptResult,
-  Prompt,
-} from '@modelcontextprotocol/sdk/types.js';
+import { GetPromptResult, Prompt } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Interface for individual prompt handlers
@@ -47,16 +44,16 @@ function toPromptTitle(name: string): string {
 }
 
 function derivePromptTags(handler: PromptHandler): string[] {
-  const fromName = handler.name
-    .split(/[_-]+/)
-    .filter((token) => token.length > 2);
+  const fromName = handler.name.split(/[_-]+/).filter((token) => token.length > 2);
   const fromArgs = (handler.arguments ?? [])
     .map((argument) => argument.name)
     .filter((name) => name.length > 2);
   return [...new Set(['prompt', ...fromName, ...fromArgs])].slice(0, 8);
 }
 
-function derivePromptExamples(handler: PromptHandler): Array<{ description: string; arguments: Record<string, string> }> {
+function derivePromptExamples(
+  handler: PromptHandler,
+): Array<{ description: string; arguments: Record<string, string> }> {
   const argumentTemplate = Object.fromEntries(
     (handler.arguments ?? []).map((argument) => [argument.name, `<${argument.name}>`]),
   );
@@ -103,7 +100,9 @@ export class PromptHandlerRegistry {
             descriptors: {
               argumentCount: handler.arguments?.length ?? 0,
               requiredArguments:
-                handler.arguments?.filter((argument) => argument.required).map((argument) => argument.name) ?? [],
+                handler.arguments
+                  ?.filter((argument) => argument.required)
+                  .map((argument) => argument.name) ?? [],
             },
           },
         },

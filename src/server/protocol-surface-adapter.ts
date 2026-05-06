@@ -47,11 +47,10 @@ export function registerProtocolSurfaceHandlers(deps: HandlerDependencies): void
   registerToolExecutionHandler(deps, deps);
 }
 
-function registerDiscoveryHandlers({
-  server,
-  logger,
-  metrics,
-}: BaseHandlerDependencies, operations: ProtocolSurfaceOperations): void {
+function registerDiscoveryHandlers(
+  { server, logger, metrics }: BaseHandlerDependencies,
+  operations: ProtocolSurfaceOperations,
+): void {
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const timer = logger.startTimer('list_tools');
 
@@ -69,11 +68,10 @@ function registerDiscoveryHandlers({
   });
 }
 
-function registerResourceHandlers({
-  server,
-  logger,
-  metrics,
-}: BaseHandlerDependencies, operations: ProtocolSurfaceOperations): void {
+function registerResourceHandlers(
+  { server, logger, metrics }: BaseHandlerDependencies,
+  operations: ProtocolSurfaceOperations,
+): void {
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const timer = logger.startTimer('list_resources');
     try {
@@ -126,11 +124,10 @@ function registerSubscriptionHandlers({
   });
 }
 
-function registerPromptHandlers({
-  server,
-  logger,
-  metrics,
-}: BaseHandlerDependencies, operations: ProtocolSurfaceOperations): void {
+function registerPromptHandlers(
+  { server, logger, metrics }: BaseHandlerDependencies,
+  operations: ProtocolSurfaceOperations,
+): void {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     const timer = logger.startTimer('list_prompts');
     try {
@@ -169,8 +166,9 @@ function registerPromptHandlers({
   });
 }
 
-function registerToolExecutionHandler({
-  server,
-}: BaseHandlerDependencies, operations: ProtocolSurfaceOperations): void {
+function registerToolExecutionHandler(
+  { server }: BaseHandlerDependencies,
+  operations: ProtocolSurfaceOperations,
+): void {
   server.setRequestHandler(CallToolRequestSchema, operations.executeTool);
 }

@@ -3,9 +3,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-const DEFAULT_BASE_URL = process.env.LOAD_PROFILE_BASE_URL || process.env.MCP_REMOTE_URL || 'http://127.0.0.1:8787';
+const DEFAULT_BASE_URL =
+  process.env.LOAD_PROFILE_BASE_URL || process.env.MCP_REMOTE_URL || 'http://127.0.0.1:8787';
 const DEFAULT_AUTH_TOKEN =
-  process.env.LOAD_PROFILE_BEARER_TOKEN || process.env.MCP_REMOTE_BEARER_TOKEN || process.env.MCP_AUTH_TOKEN || '';
+  process.env.LOAD_PROFILE_BEARER_TOKEN ||
+  process.env.MCP_REMOTE_BEARER_TOKEN ||
+  process.env.MCP_AUTH_TOKEN ||
+  '';
 const DEFAULT_REQUESTS = Number.parseInt(process.env.LOAD_PROFILE_REQUESTS || '40', 10);
 const DEFAULT_CONCURRENCY = Number.parseInt(process.env.LOAD_PROFILE_CONCURRENCY || '4', 10);
 
@@ -32,7 +36,8 @@ function parseArgs(argv) {
     } else if (arg === '--base-url') options.baseUrl = argv[++i] || options.baseUrl;
     else if (arg.startsWith('--base-url=')) options.baseUrl = arg.split('=')[1] || options.baseUrl;
     else if (arg === '--requests') options.requests = Number.parseInt(argv[++i] || '', 10);
-    else if (arg.startsWith('--requests=')) options.requests = Number.parseInt(arg.split('=')[1] || '', 10);
+    else if (arg.startsWith('--requests='))
+      options.requests = Number.parseInt(arg.split('=')[1] || '', 10);
     else if (arg === '--concurrency') options.concurrency = Number.parseInt(argv[++i] || '', 10);
     else if (arg.startsWith('--concurrency=')) {
       options.concurrency = Number.parseInt(arg.split('=')[1] || '', 10);
@@ -60,7 +65,9 @@ function parseArgs(argv) {
 function printUsage() {
   console.log('Usage: node scripts/performance/load-profile-suite.js [options]');
   console.log('Options:');
-  console.log('  --base-url <url>       Base URL (default: LOAD_PROFILE_BASE_URL | MCP_REMOTE_URL | http://127.0.0.1:8787)');
+  console.log(
+    '  --base-url <url>       Base URL (default: LOAD_PROFILE_BASE_URL | MCP_REMOTE_URL | http://127.0.0.1:8787)',
+  );
   console.log('  --requests <n>         Requests per scenario (default: 40, --light caps at 12)');
   console.log('  --concurrency <n>      Concurrency per scenario (default: 4, --light caps at 2)');
   console.log('  --timeout-ms <n>       Per-request timeout in ms (default: 8000)');
@@ -248,7 +255,9 @@ async function createScenarioRunners(options, csrfToken) {
         );
 
         const parsed = parseMcpPayload(listResponse.bodyText);
-        const hasResult = Boolean(parsed && typeof parsed === 'object' && Object.hasOwn(parsed, 'result'));
+        const hasResult = Boolean(
+          parsed && typeof parsed === 'object' && Object.hasOwn(parsed, 'result'),
+        );
         return {
           ...listResponse,
           ok: listResponse.ok && listResponse.status === 200 && hasResult,
@@ -260,7 +269,8 @@ async function createScenarioRunners(options, csrfToken) {
       name: 'api_session_get',
       description: 'UI session endpoint (GET /api/session)',
       expectedStatus: [200],
-      run: async () => fetchWithTiming(`${options.baseUrl}/api/session`, { method: 'GET' }, options.timeoutMs),
+      run: async () =>
+        fetchWithTiming(`${options.baseUrl}/api/session`, { method: 'GET' }, options.timeoutMs),
     },
     {
       name: 'api_keys_get',
@@ -268,7 +278,11 @@ async function createScenarioRunners(options, csrfToken) {
       expectedStatus: [200, 401, 429, 503],
       run: async () => {
         const headers = options.authToken ? { authorization: `Bearer ${options.authToken}` } : {};
-        return fetchWithTiming(`${options.baseUrl}/api/keys`, { method: 'GET', headers }, options.timeoutMs);
+        return fetchWithTiming(
+          `${options.baseUrl}/api/keys`,
+          { method: 'GET', headers },
+          options.timeoutMs,
+        );
       },
     },
     {
@@ -296,7 +310,10 @@ async function createScenarioRunners(options, csrfToken) {
           {
             method: 'POST',
             headers: loginHeaders,
-            body: JSON.stringify({ email: 'load-profile@example.com', password: 'not-a-real-password' }),
+            body: JSON.stringify({
+              email: 'load-profile@example.com',
+              password: 'not-a-real-password',
+            }),
           },
           options.timeoutMs,
         ),
@@ -327,9 +344,7 @@ async function runScenario(scenario, options) {
     }
   }
 
-  await Promise.all(
-    Array.from({ length: options.concurrency }, () => workerLoop()),
-  );
+  await Promise.all(Array.from({ length: options.concurrency }, () => workerLoop()));
 
   const elapsedSeconds = Math.max((Date.now() - startedAt) / 1000, 0.001);
   const throughputRps = Number((options.requests / elapsedSeconds).toFixed(2));
@@ -399,7 +414,7 @@ function buildSummary(results) {
   }
 
   const totalTimeWeighted = results.reduce(
-    (acc, item) => acc + (item.requests / Math.max(item.throughput_rps, 0.001)),
+    (acc, item) => acc + item.requests / Math.max(item.throughput_rps, 0.001),
     0,
   );
   const throughput = Number((totalRequests / Math.max(totalTimeWeighted, 0.001)).toFixed(2));
@@ -492,7 +507,10 @@ async function main() {
     },
   };
 
-  const defaultOutput = path.join('performance-data', `load-profile-suite-${nowIso.replace(/[:.]/g, '-')}.json`);
+  const defaultOutput = path.join(
+    'performance-data',
+    `load-profile-suite-${nowIso.replace(/[:.]/g, '-')}.json`,
+  );
   const outputPath = options.outputPath || defaultOutput;
   await ensureOutputPath(outputPath);
   await fs.writeFile(outputPath, JSON.stringify(output, null, 2));

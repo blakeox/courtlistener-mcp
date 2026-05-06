@@ -10,7 +10,8 @@ export class LegalAssistantPromptHandler implements PromptHandler {
   arguments = [
     {
       name: 'focus_area',
-      description: 'The specific area of law to focus on (e.g., "Constitutional Law", "Bankruptcy")',
+      description:
+        'The specific area of law to focus on (e.g., "Constitutional Law", "Bankruptcy")',
       required: false,
     },
     {

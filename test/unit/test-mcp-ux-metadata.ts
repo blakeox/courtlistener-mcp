@@ -72,9 +72,9 @@ describe('MCP protocol UX metadata', () => {
 
     for (const prompt of prompts) {
       assert.equal(typeof prompt.title, 'string');
-      const discoverability = (
-        (prompt._meta as Record<string, unknown> | undefined)?.['courtlistener/discoverability'] ?? null
-      ) as { tags?: unknown[]; examples?: unknown[] } | null;
+      const discoverability = ((prompt._meta as Record<string, unknown> | undefined)?.[
+        'courtlistener/discoverability'
+      ] ?? null) as { tags?: unknown[]; examples?: unknown[] } | null;
       assert.ok(discoverability, `${prompt.name} should include discoverability metadata`);
       assert.ok(Array.isArray(discoverability?.tags));
       assert.ok((discoverability?.tags?.length ?? 0) > 0);
@@ -90,9 +90,9 @@ describe('MCP protocol UX metadata', () => {
 
     for (const resource of resources) {
       assert.equal(typeof resource.title, 'string');
-      const discoverability = (
-        (resource._meta as Record<string, unknown> | undefined)?.['courtlistener/discoverability'] ?? null
-      ) as { tags?: unknown[]; examples?: unknown[] } | null;
+      const discoverability = ((resource._meta as Record<string, unknown> | undefined)?.[
+        'courtlistener/discoverability'
+      ] ?? null) as { tags?: unknown[]; examples?: unknown[] } | null;
       assert.ok(discoverability, `${resource.uri} should include discoverability metadata`);
       assert.ok(Array.isArray(discoverability?.tags));
       assert.ok((discoverability?.tags?.length ?? 0) > 0);

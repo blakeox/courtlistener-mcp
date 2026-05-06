@@ -43,7 +43,7 @@ class MockLogger implements Logger {
     toolName: string,
     duration: number,
     success: boolean,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
     this.logs.push({
       level: success ? 'info' : 'error',
@@ -57,7 +57,7 @@ class MockLogger implements Logger {
     endpoint: string,
     duration: number,
     status: number,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
     this.logs.push({
       level: 'info',
@@ -152,12 +152,12 @@ describe('Cache Manager (TypeScript)', () => {
       cache.set(
         '/endpoint/search?b=2&a=1',
         { filters: { court: 'scotus', year: 2024 }, tags: ['federal', 'civil'] },
-        first
+        first,
       );
       cache.set(
         '/endpoint/search?a=1&b=2',
         { tags: ['federal', 'civil'], filters: { year: 2024, court: 'scotus' } },
-        second
+        second,
       );
 
       const retrieved = cache.get<Record<string, unknown>>('/endpoint/search?a=1&b=2', {
@@ -192,10 +192,7 @@ describe('Cache Manager (TypeScript)', () => {
         shortTtlCache.set('endpoint', { param: 'value' }, testData);
 
         // Should be available immediately
-        let retrieved = shortTtlCache.get<Record<string, unknown>>(
-          'endpoint',
-          { param: 'value' }
-        );
+        let retrieved = shortTtlCache.get<Record<string, unknown>>('endpoint', { param: 'value' });
         assert.deepStrictEqual(retrieved, testData);
 
         // Wait for expiration
@@ -391,10 +388,7 @@ describe('Cache Manager (TypeScript)', () => {
       const testData: Record<string, unknown> = { result: 'complex params' };
 
       cache.set('endpoint', complexParams, testData);
-      const retrieved = cache.get<Record<string, unknown>>(
-        'endpoint',
-        complexParams
-      );
+      const retrieved = cache.get<Record<string, unknown>>('endpoint', complexParams);
 
       assert.deepStrictEqual(retrieved, testData);
     });
@@ -461,10 +455,7 @@ describe('Cache Manager (TypeScript)', () => {
         const duration = Date.now() - startTime;
 
         // Should complete quickly (under 1 second)
-        assert.ok(
-          duration < 1000,
-          `Cache operations took too long: ${duration}ms`
-        );
+        assert.ok(duration < 1000, `Cache operations took too long: ${duration}ms`);
       } finally {
         // Always clean up the large cache instance
         largeCache.destroy();

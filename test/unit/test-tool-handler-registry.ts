@@ -10,9 +10,7 @@ import { describe, it } from 'node:test';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 
-const { ToolHandlerRegistry, BaseToolHandler } = await import(
-  '../../dist/server/tool-handler.js'
-);
+const { ToolHandlerRegistry, BaseToolHandler } = await import('../../dist/server/tool-handler.js');
 
 interface TestInput {
   invalid?: boolean;
@@ -32,10 +30,7 @@ class DummyHandler extends BaseToolHandler<TestInput, Record<string, unknown>> {
     return { success: true, data: (input as TestInput) || {} };
   }
 
-  async execute(
-    input: TestInput,
-    context: ToolContext
-  ): Promise<CallToolResult> {
+  async execute(input: TestInput, context: ToolContext): Promise<CallToolResult> {
     return this.success({ ok: true, input, id: context.requestId });
   }
 
@@ -123,7 +118,7 @@ describe('ToolHandlerRegistry (TypeScript)', () => {
           logger: new NoopLogger(),
           requestId: 'req-2',
         }),
-      /invalid input/
+      /invalid input/,
     );
   });
 
@@ -141,8 +136,7 @@ describe('ToolHandlerRegistry (TypeScript)', () => {
           logger: new NoopLogger(),
           requestId: 'req-3',
         }),
-      /Unknown tool/
+      /Unknown tool/,
     );
   });
 });
-

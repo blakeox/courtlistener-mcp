@@ -24,7 +24,7 @@ export class OpinionResourceHandler implements ResourceHandler {
 
     try {
       const opinion = await this.api.getOpinion(id);
-      
+
       return {
         contents: [
           {
@@ -48,7 +48,7 @@ export class OpinionResourceHandler implements ResourceHandler {
         name: 'Example Opinion 123456',
         description: 'Example of a legal opinion resource',
         mimeType: 'application/json',
-      }
+      },
     ];
   }
 }

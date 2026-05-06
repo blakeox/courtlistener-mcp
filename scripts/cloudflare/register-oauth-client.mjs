@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 
-const serverOrigin = (process.env.MCP_SERVER_ORIGIN || 'https://courtlistenermcp.blakeoxford.com').trim();
+const serverOrigin = (
+  process.env.MCP_SERVER_ORIGIN || 'https://courtlistenermcp.blakeoxford.com'
+).trim();
 const redirectUri = (process.env.OAUTH_REDIRECT_URI || '').trim();
 const clientName = (process.env.OAUTH_CLIENT_NAME || 'chatgpt-static-client').trim();
 const authMethod = (process.env.OAUTH_TOKEN_AUTH_METHOD || 'client_secret_post').trim();
 
 if (!redirectUri) {
   console.error('OAUTH_REDIRECT_URI is required.');
-  console.error('Example: OAUTH_REDIRECT_URI=https://chat.openai.com/aip/callback pnpm run cloudflare:register:oauth');
+  console.error(
+    'Example: OAUTH_REDIRECT_URI=https://chat.openai.com/aip/callback pnpm run cloudflare:register:oauth',
+  );
   process.exit(1);
 }
 
@@ -43,12 +47,18 @@ if (!response.ok) {
   process.exit(1);
 }
 
-console.log(JSON.stringify({
-  register_url: registerUrl,
-  client_id: body.client_id,
-  client_secret: body.client_secret || null,
-  redirect_uris: body.redirect_uris,
-  token_endpoint_auth_method: body.token_endpoint_auth_method,
-  grant_types: body.grant_types,
-  response_types: body.response_types,
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      register_url: registerUrl,
+      client_id: body.client_id,
+      client_secret: body.client_secret || null,
+      redirect_uris: body.redirect_uris,
+      token_endpoint_auth_method: body.token_endpoint_auth_method,
+      grant_types: body.grant_types,
+      response_types: body.response_types,
+    },
+    null,
+    2,
+  ),
+);

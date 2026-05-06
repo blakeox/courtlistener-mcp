@@ -28,4 +28,3 @@ async function debugSearch(): Promise<void> {
 }
 
 debugSearch().catch(console.error);
-

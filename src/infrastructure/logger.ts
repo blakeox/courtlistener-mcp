@@ -152,7 +152,7 @@ export class Logger {
       limitedEntries.map(([key, value]) => [
         key,
         isSensitiveKeyName(key) ? '[REDACTED]' : this.sanitizeValue(value),
-      ])
+      ]),
     ) as Record<string, unknown>;
 
     if (entries.length > Logger.MAX_METADATA_FIELDS) {

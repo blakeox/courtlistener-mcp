@@ -178,10 +178,7 @@ async function testEnhancedAPI(): Promise<boolean> {
       // Test method exists in CourtListener API
       const methodExists = await testMethodExists(test.tool);
       if (!methodExists) {
-        log(
-          `   ❌ FAIL: Method for ${test.tool} not found in CourtListener API`,
-          'red'
-        );
+        log(`   ❌ FAIL: Method for ${test.tool} not found in CourtListener API`, 'red');
         failed++;
         continue;
       }
@@ -189,10 +186,7 @@ async function testEnhancedAPI(): Promise<boolean> {
       // Test enterprise server handler exists
       const handlerExists = await testHandlerExists(test.tool);
       if (!handlerExists) {
-        log(
-          `   ❌ FAIL: Handler for ${test.tool} not found in enterprise server`,
-          'red'
-        );
+        log(`   ❌ FAIL: Handler for ${test.tool} not found in enterprise server`, 'red');
         failed++;
         continue;
       }
@@ -211,10 +205,7 @@ async function testEnhancedAPI(): Promise<boolean> {
   log('='.repeat(40), 'magenta');
   log(`✅ Passed: ${passed}`, 'green');
   log(`❌ Failed: ${failed}`, 'red');
-  log(
-    `📈 Coverage: ${Math.round((passed / (passed + failed)) * 100) || 0}%`,
-    'blue'
-  );
+  log(`📈 Coverage: ${Math.round((passed / (passed + failed)) * 100) || 0}%`, 'blue');
 
   if (failed === 0) {
     log('\n🎉 All enhanced REST API tests passed!', 'green');
@@ -276,10 +267,7 @@ async function analyzeRESTCoverage(): Promise<boolean> {
     'memberships',
   ];
 
-  log(
-    `📊 Total CourtListener v4 endpoints analyzed: ${courtListenerEndpoints.length}`,
-    'reset'
-  );
+  log(`📊 Total CourtListener v4 endpoints analyzed: ${courtListenerEndpoints.length}`, 'reset');
   log('✅ Core coverage: Case law, judges, courts, financial disclosures', 'green');
   log('🆕 Enhanced coverage: Docket entries, judge analytics, advanced RECAP', 'yellow');
   log('🔍 Specialized coverage: Citation validation, comprehensive profiles', 'blue');
@@ -303,4 +291,3 @@ main().catch((error) => {
   console.error('Error running enhanced REST API tests:', error);
   process.exit(1);
 });
-

@@ -50,15 +50,15 @@ interface AuditLogger {
   logRequest(
     request: Partial<Request>,
     response: Partial<Response> | null,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<string | undefined>;
   logSecurityEvent(
     eventType: string,
-    details: Record<string, unknown>
+    details: Record<string, unknown>,
   ): Promise<string | undefined>;
   exportAuditLogs(
     format: string,
-    filters?: Record<string, unknown>
+    filters?: Record<string, unknown>,
   ): Promise<{
     format: string;
     data: string;
@@ -66,7 +66,7 @@ interface AuditLogger {
   }>;
   getComplianceReport(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{
     period: { startDate: string; endDate: string };
     statistics: {
@@ -118,25 +118,20 @@ class EnhancedAuditLoggingTests {
       console.log(`  ✅ ${testName}`);
       this.passedTests++;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`  ❌ ${testName}: ${errorMessage}`);
       this.failedTests++;
     }
   }
 
-  async runAsyncTest(
-    testName: string,
-    testFn: () => Promise<void>
-  ): Promise<void> {
+  async runAsyncTest(testName: string, testFn: () => Promise<void>): Promise<void> {
     this.testCount++;
     try {
       await testFn();
       console.log(`  ✅ ${testName}`);
       this.passedTests++;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`  ❌ ${testName}: ${errorMessage}`);
       this.failedTests++;
     }
@@ -169,7 +164,7 @@ class EnhancedAuditLoggingTests {
       async logRequest(
         request: Partial<Request>,
         response: Partial<Response> | null,
-        metadata: Record<string, unknown> = {}
+        metadata: Record<string, unknown> = {},
       ): Promise<string | undefined> {
         if (!loggerConfig.enabled) return undefined;
 
@@ -181,9 +176,7 @@ class EnhancedAuditLoggingTests {
           method: request.method || 'POST',
           path: request.path || '/api/mcp',
           userAgent: request.headers?.['user-agent'],
-          ipAddress:
-            request.headers?.['x-forwarded-for'] ||
-            request.headers?.['x-real-ip'],
+          ipAddress: request.headers?.['x-forwarded-for'] || request.headers?.['x-real-ip'],
           requestId: request.id || this.generateRequestId(),
           ...metadata,
         };
@@ -223,7 +216,7 @@ class EnhancedAuditLoggingTests {
 
       async logSecurityEvent(
         eventType: string,
-        details: Record<string, unknown>
+        details: Record<string, unknown>,
       ): Promise<string | undefined> {
         if (!loggerConfig.enabled) return undefined;
 
@@ -245,19 +238,19 @@ class EnhancedAuditLoggingTests {
 
       async exportAuditLogs(
         format = 'json',
-        filters: Record<string, unknown> = {}
+        filters: Record<string, unknown> = {},
       ): Promise<{ format: string; data: string; count: number }> {
         let logs = [...auditEntries];
 
         // Apply filters
         if (filters.startDate) {
           logs = logs.filter(
-            (log) => new Date(log.timestamp) >= new Date(filters.startDate as string)
+            (log) => new Date(log.timestamp) >= new Date(filters.startDate as string),
           );
         }
         if (filters.endDate) {
           logs = logs.filter(
-            (log) => new Date(log.timestamp) <= new Date(filters.endDate as string)
+            (log) => new Date(log.timestamp) <= new Date(filters.endDate as string),
           );
         }
         if (filters.clientId) {
@@ -286,7 +279,7 @@ class EnhancedAuditLoggingTests {
 
       async getComplianceReport(
         startDate: string,
-        endDate: string
+        endDate: string,
       ): Promise<{
         period: { startDate: string; endDate: string };
         statistics: {
@@ -303,21 +296,14 @@ class EnhancedAuditLoggingTests {
       }> {
         const logs = auditEntries.filter((log) => {
           const logDate = new Date(log.timestamp);
-          return (
-            logDate >= new Date(startDate) && logDate <= new Date(endDate)
-          );
+          return logDate >= new Date(startDate) && logDate <= new Date(endDate);
         });
 
         const stats = {
           totalRequests: logs.filter((l) => l.type === 'request').length,
-          successfulRequests: logs.filter(
-            (l) => l.type === 'request' && l.success
-          ).length,
-          failedRequests: logs.filter(
-            (l) => l.type === 'request' && !l.success
-          ).length,
-          securityEvents: logs.filter((l) => l.type === 'security_event')
-            .length,
+          successfulRequests: logs.filter((l) => l.type === 'request' && l.success).length,
+          failedRequests: logs.filter((l) => l.type === 'request' && !l.success).length,
+          securityEvents: logs.filter((l) => l.type === 'security_event').length,
           uniqueClients: new Set(logs.map((l) => l.clientId)).size,
           averageResponseTime: this.calculateAverageResponseTime(logs),
           topClients: this.getTopClients(logs),
@@ -327,9 +313,7 @@ class EnhancedAuditLoggingTests {
         return {
           period: { startDate, endDate },
           statistics: stats,
-          logs: loggerConfig.complianceMode
-            ? logs
-            : logs.slice(0, 100), // Limit for demo
+          logs: loggerConfig.complianceMode ? logs : logs.slice(0, 100), // Limit for demo
         };
       },
 
@@ -338,14 +322,10 @@ class EnhancedAuditLoggingTests {
         remainingCount: number;
       }> {
         const cutoffDate = new Date();
-        cutoffDate.setDate(
-          cutoffDate.getDate() - loggerConfig.retentionDays
-        );
+        cutoffDate.setDate(cutoffDate.getDate() - loggerConfig.retentionDays);
 
         const initialCount = auditEntries.length;
-        const filtered = auditEntries.filter(
-          (entry) => new Date(entry.timestamp) > cutoffDate
-        );
+        const filtered = auditEntries.filter((entry) => new Date(entry.timestamp) > cutoffDate);
         auditEntries.length = 0;
         auditEntries.push(...filtered);
 
@@ -355,17 +335,19 @@ class EnhancedAuditLoggingTests {
     };
 
     // Add helper methods to logger instance
-    (auditLogger as AuditLogger & {
-      generateEntryId: () => string;
-      generateRequestId: () => string;
-      sanitizeData: (data: unknown, config: Required<AuditLoggerConfig>) => unknown;
-      sanitizeHeaders: (headers: Record<string, string>) => Record<string, string>;
-      determineSeverity: (eventType: string) => string;
-      calculateAverageResponseTime: (logs: AuditEntry[]) => number;
-      getTopClients: (logs: AuditEntry[]) => Array<{ clientId: string; requestCount: number }>;
-      groupErrorsByType: (logs: AuditEntry[]) => Record<string, number>;
-      convertToCSV: (logs: AuditEntry[]) => string;
-    }).generateEntryId = () => {
+    (
+      auditLogger as AuditLogger & {
+        generateEntryId: () => string;
+        generateRequestId: () => string;
+        sanitizeData: (data: unknown, config: Required<AuditLoggerConfig>) => unknown;
+        sanitizeHeaders: (headers: Record<string, string>) => Record<string, string>;
+        determineSeverity: (eventType: string) => string;
+        calculateAverageResponseTime: (logs: AuditEntry[]) => number;
+        getTopClients: (logs: AuditEntry[]) => Array<{ clientId: string; requestCount: number }>;
+        groupErrorsByType: (logs: AuditEntry[]) => Record<string, number>;
+        convertToCSV: (logs: AuditEntry[]) => string;
+      }
+    ).generateEntryId = () => {
       return `audit_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     };
 
@@ -373,12 +355,11 @@ class EnhancedAuditLoggingTests {
       return `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     };
 
-    (auditLogger as AuditLogger & {
-      sanitizeData: (data: unknown, config: Required<AuditLoggerConfig>) => unknown;
-    }).sanitizeData = (
-      data: unknown,
-      config: Required<AuditLoggerConfig>
-    ): unknown => {
+    (
+      auditLogger as AuditLogger & {
+        sanitizeData: (data: unknown, config: Required<AuditLoggerConfig>) => unknown;
+      }
+    ).sanitizeData = (data: unknown, config: Required<AuditLoggerConfig>): unknown => {
       if (typeof data !== 'object' || data === null) return data;
 
       try {
@@ -425,11 +406,11 @@ class EnhancedAuditLoggingTests {
       }
     };
 
-    (auditLogger as AuditLogger & {
-      sanitizeHeaders: (headers: Record<string, string>) => Record<string, string>;
-    }).sanitizeHeaders = (
-      headers: Record<string, string>
-    ): Record<string, string> => {
+    (
+      auditLogger as AuditLogger & {
+        sanitizeHeaders: (headers: Record<string, string>) => Record<string, string>;
+      }
+    ).sanitizeHeaders = (headers: Record<string, string>): Record<string, string> => {
       const sanitized = { ...headers };
       ['authorization', 'x-api-key', 'cookie'].forEach((header) => {
         if (sanitized[header]) {
@@ -439,9 +420,11 @@ class EnhancedAuditLoggingTests {
       return sanitized;
     };
 
-    (auditLogger as AuditLogger & {
-      determineSeverity: (eventType: string) => string;
-    }).determineSeverity = (eventType: string): string => {
+    (
+      auditLogger as AuditLogger & {
+        determineSeverity: (eventType: string) => string;
+      }
+    ).determineSeverity = (eventType: string): string => {
       const severityMap: Record<string, string> = {
         auth_failure: 'medium',
         rate_limit_exceeded: 'low',
@@ -452,28 +435,23 @@ class EnhancedAuditLoggingTests {
       return severityMap[eventType] || 'low';
     };
 
-    (auditLogger as AuditLogger & {
-      calculateAverageResponseTime: (logs: AuditEntry[]) => number;
-    }).calculateAverageResponseTime = (logs: AuditEntry[]): number => {
-      const requestLogs = logs.filter(
-        (l) => l.type === 'request' && l.responseTime
-      );
+    (
+      auditLogger as AuditLogger & {
+        calculateAverageResponseTime: (logs: AuditEntry[]) => number;
+      }
+    ).calculateAverageResponseTime = (logs: AuditEntry[]): number => {
+      const requestLogs = logs.filter((l) => l.type === 'request' && l.responseTime);
       if (requestLogs.length === 0) return 0;
 
-      const total = requestLogs.reduce(
-        (sum, log) => sum + (log.responseTime || 0),
-        0
-      );
+      const total = requestLogs.reduce((sum, log) => sum + (log.responseTime || 0), 0);
       return Math.round(total / requestLogs.length);
     };
 
-    (auditLogger as AuditLogger & {
-      getTopClients: (
-        logs: AuditEntry[]
-      ) => Array<{ clientId: string; requestCount: number }>;
-    }).getTopClients = (
-      logs: AuditEntry[]
-    ): Array<{ clientId: string; requestCount: number }> => {
+    (
+      auditLogger as AuditLogger & {
+        getTopClients: (logs: AuditEntry[]) => Array<{ clientId: string; requestCount: number }>;
+      }
+    ).getTopClients = (logs: AuditEntry[]): Array<{ clientId: string; requestCount: number }> => {
       const clientCounts: Record<string, number> = {};
       logs.forEach((log) => {
         const clientId = log.clientId || 'unknown';
@@ -486,9 +464,11 @@ class EnhancedAuditLoggingTests {
         .map(([clientId, count]) => ({ clientId, requestCount: count }));
     };
 
-    (auditLogger as AuditLogger & {
-      groupErrorsByType: (logs: AuditEntry[]) => Record<string, number>;
-    }).groupErrorsByType = (logs: AuditEntry[]): Record<string, number> => {
+    (
+      auditLogger as AuditLogger & {
+        groupErrorsByType: (logs: AuditEntry[]) => Record<string, number>;
+      }
+    ).groupErrorsByType = (logs: AuditEntry[]): Record<string, number> => {
       const errorCounts: Record<string, number> = {};
       logs
         .filter((l) => !l.success)
@@ -499,18 +479,18 @@ class EnhancedAuditLoggingTests {
       return errorCounts;
     };
 
-    (auditLogger as AuditLogger & {
-      convertToCSV: (logs: AuditEntry[]) => string;
-    }).convertToCSV = (logs: AuditEntry[]): string => {
+    (
+      auditLogger as AuditLogger & {
+        convertToCSV: (logs: AuditEntry[]) => string;
+      }
+    ).convertToCSV = (logs: AuditEntry[]): string => {
       if (logs.length === 0) return '';
 
       const headers = Object.keys(logs[0]).join(',');
       const rows = logs.map((log) =>
         Object.values(log)
-          .map((value) =>
-            typeof value === 'object' ? JSON.stringify(value) : String(value)
-          )
-          .join(',')
+          .map((value) => (typeof value === 'object' ? JSON.stringify(value) : String(value)))
+          .join(','),
       );
 
       return [headers, ...rows].join('\n');
@@ -525,42 +505,39 @@ class EnhancedAuditLoggingTests {
     // Basic Logging Tests
     console.log('📝 Basic Logging Tests:');
 
-    await this.runAsyncTest(
-      'should log basic request/response',
-      async () => {
-        const auditor = this.createAuditLogger();
+    await this.runAsyncTest('should log basic request/response', async () => {
+      const auditor = this.createAuditLogger();
 
-        const request: Request = {
-          id: 'req_123',
-          method: 'POST',
-          path: '/api/search',
-          clientId: 'client_123',
-          body: { query: 'test search' },
-          headers: { 'user-agent': 'TestClient/1.0' },
-        };
+      const request: Request = {
+        id: 'req_123',
+        method: 'POST',
+        path: '/api/search',
+        clientId: 'client_123',
+        body: { query: 'test search' },
+        headers: { 'user-agent': 'TestClient/1.0' },
+      };
 
-        const response: Response = {
-          statusCode: 200,
-          body: { results: ['result1', 'result2'] },
-        };
+      const response: Response = {
+        statusCode: 200,
+        body: { results: ['result1', 'result2'] },
+      };
 
-        const entryId = await auditor.logRequest(request, response, {
-          duration: 150,
-        });
+      const entryId = await auditor.logRequest(request, response, {
+        duration: 150,
+      });
 
-        assert(entryId !== undefined, 'Should return entry ID');
-        assert(auditor.auditEntries.length === 1, 'Should store audit entry');
+      assert(entryId !== undefined, 'Should return entry ID');
+      assert(auditor.auditEntries.length === 1, 'Should store audit entry');
 
-        const entry = auditor.auditEntries[0];
-        assert(entry.clientId === 'client_123', 'Should log client ID');
-        assert(
-          (entry.requestBody as { query?: string })?.query === 'test search',
-          'Should log request body'
-        );
-        assert(entry.responseTime === 150, 'Should log response time');
-        assert(entry.success === true, 'Should mark as successful');
-      }
-    );
+      const entry = auditor.auditEntries[0];
+      assert(entry.clientId === 'client_123', 'Should log client ID');
+      assert(
+        (entry.requestBody as { query?: string })?.query === 'test search',
+        'Should log request body',
+      );
+      assert(entry.responseTime === 150, 'Should log response time');
+      assert(entry.success === true, 'Should mark as successful');
+    });
 
     await this.runAsyncTest('should log security events', async () => {
       const auditor = this.createAuditLogger();
@@ -599,15 +576,9 @@ class EnhancedAuditLoggingTests {
 
       const entry = auditor.auditEntries[0];
       const requestBody = entry.requestBody as Record<string, unknown>;
-      assert(
-        requestBody.password === '[REDACTED]',
-        'Should redact password'
-      );
+      assert(requestBody.password === '[REDACTED]', 'Should redact password');
       assert(requestBody.token === '[REDACTED]', 'Should redact token');
-      assert(
-        requestBody.normalField === 'safe data',
-        'Should preserve normal fields'
-      );
+      assert(requestBody.normalField === 'safe data', 'Should preserve normal fields');
     });
 
     await this.runAsyncTest('should sanitize headers', async () => {
@@ -626,89 +597,59 @@ class EnhancedAuditLoggingTests {
 
       const entry = auditor.auditEntries[0];
       const headers = entry.headers as Record<string, string>;
-      assert(
-        headers.authorization === '[REDACTED]',
-        'Should redact authorization'
-      );
-      assert(
-        headers['x-api-key'] === '[REDACTED]',
-        'Should redact API key'
-      );
-      assert(
-        headers['user-agent'] === 'TestClient/1.0',
-        'Should preserve safe headers'
-      );
+      assert(headers.authorization === '[REDACTED]', 'Should redact authorization');
+      assert(headers['x-api-key'] === '[REDACTED]', 'Should redact API key');
+      assert(headers['user-agent'] === 'TestClient/1.0', 'Should preserve safe headers');
     });
 
     // Configuration Tests
     console.log('\n⚙️ Configuration Tests:');
 
-    await this.runAsyncTest(
-      'should respect disabled logging',
-      async () => {
-        const auditor = this.createAuditLogger({ enabled: false });
+    await this.runAsyncTest('should respect disabled logging', async () => {
+      const auditor = this.createAuditLogger({ enabled: false });
 
-        const entryId = await auditor.logRequest({ body: 'test' }, {});
+      const entryId = await auditor.logRequest({ body: 'test' }, {});
 
-        assert(
-          entryId === undefined,
-          'Should not return entry ID when disabled'
-        );
-        assert(
-          auditor.auditEntries.length === 0,
-          'Should not store entries when disabled'
-        );
-      }
-    );
+      assert(entryId === undefined, 'Should not return entry ID when disabled');
+      assert(auditor.auditEntries.length === 0, 'Should not store entries when disabled');
+    });
 
-    await this.runAsyncTest(
-      'should respect body inclusion settings',
-      async () => {
-        const auditor = this.createAuditLogger({
-          includeRequestBody: false,
-          includeResponseBody: false,
-        });
+    await this.runAsyncTest('should respect body inclusion settings', async () => {
+      const auditor = this.createAuditLogger({
+        includeRequestBody: false,
+        includeResponseBody: false,
+      });
 
-        const request: Request = { body: { sensitive: 'data' } };
-        const response: Response = { body: { results: 'data' } };
+      const request: Request = { body: { sensitive: 'data' } };
+      const response: Response = { body: { results: 'data' } };
 
-        await auditor.logRequest(request, response);
+      await auditor.logRequest(request, response);
 
-        const entry = auditor.auditEntries[0];
-        assert(
-          entry.requestBody === undefined,
-          'Should not include request body'
-        );
-        assert(
-          entry.responseBody === undefined,
-          'Should not include response body'
-        );
-      }
-    );
+      const entry = auditor.auditEntries[0];
+      assert(entry.requestBody === undefined, 'Should not include request body');
+      assert(entry.responseBody === undefined, 'Should not include response body');
+    });
 
     // Export and Compliance Tests
     console.log('\n📊 Export and Compliance Tests:');
 
-    await this.runAsyncTest(
-      'should export logs in JSON format',
-      async () => {
-        const auditor = this.createAuditLogger();
+    await this.runAsyncTest('should export logs in JSON format', async () => {
+      const auditor = this.createAuditLogger();
 
-        // Add some test data
-        await auditor.logRequest({ clientId: 'client1' }, { statusCode: 200 });
-        await auditor.logRequest({ clientId: 'client2' }, { statusCode: 404 });
+      // Add some test data
+      await auditor.logRequest({ clientId: 'client1' }, { statusCode: 200 });
+      await auditor.logRequest({ clientId: 'client2' }, { statusCode: 404 });
 
-        const export1 = await auditor.exportAuditLogs('json');
+      const export1 = await auditor.exportAuditLogs('json');
 
-        assert(export1.format === 'json', 'Should specify JSON format');
-        assert(export1.count === 2, 'Should include correct count');
-        assert(typeof export1.data === 'string', 'Should return JSON string');
+      assert(export1.format === 'json', 'Should specify JSON format');
+      assert(export1.count === 2, 'Should include correct count');
+      assert(typeof export1.data === 'string', 'Should return JSON string');
 
-        const parsedData = JSON.parse(export1.data);
-        assert(Array.isArray(parsedData), 'Should parse to array');
-        assert(parsedData.length === 2, 'Should include all entries');
-      }
-    );
+      const parsedData = JSON.parse(export1.data);
+      assert(Array.isArray(parsedData), 'Should parse to array');
+      assert(parsedData.length === 2, 'Should include all entries');
+    });
 
     await this.runAsyncTest('should export logs in CSV format', async () => {
       const auditor = this.createAuditLogger();
@@ -723,91 +664,79 @@ class EnhancedAuditLoggingTests {
       assert(export1.data.includes(','), 'Should contain CSV delimiters');
     });
 
-    await this.runAsyncTest(
-      'should filter exports by date range',
-      async () => {
-        const auditor = this.createAuditLogger();
+    await this.runAsyncTest('should filter exports by date range', async () => {
+      const auditor = this.createAuditLogger();
 
-        // Add entries with different timestamps
-        const oldDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
-        const recentDate = new Date();
+      // Add entries with different timestamps
+      const oldDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+      const recentDate = new Date();
 
-        auditor.auditEntries.push({
-          id: 'old_entry',
-          timestamp: oldDate.toISOString(),
-          clientId: 'client1',
-          type: 'request',
-        });
+      auditor.auditEntries.push({
+        id: 'old_entry',
+        timestamp: oldDate.toISOString(),
+        clientId: 'client1',
+        type: 'request',
+      });
 
-        auditor.auditEntries.push({
-          id: 'recent_entry',
-          timestamp: recentDate.toISOString(),
-          clientId: 'client2',
-          type: 'request',
-        });
+      auditor.auditEntries.push({
+        id: 'recent_entry',
+        timestamp: recentDate.toISOString(),
+        clientId: 'client2',
+        type: 'request',
+      });
 
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const export1 = await auditor.exportAuditLogs('json', {
-          startDate: yesterday.toISOString(),
-        });
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const export1 = await auditor.exportAuditLogs('json', {
+        startDate: yesterday.toISOString(),
+      });
 
-        const parsedData = JSON.parse(export1.data);
-        assert(parsedData.length === 1, 'Should filter by date range');
-        assert(
-          parsedData[0].id === 'recent_entry',
-          'Should include only recent entries'
-        );
-      }
-    );
+      const parsedData = JSON.parse(export1.data);
+      assert(parsedData.length === 1, 'Should filter by date range');
+      assert(parsedData[0].id === 'recent_entry', 'Should include only recent entries');
+    });
 
-    await this.runAsyncTest(
-      'should generate compliance reports',
-      async () => {
-        const auditor = this.createAuditLogger();
+    await this.runAsyncTest('should generate compliance reports', async () => {
+      const auditor = this.createAuditLogger();
 
-        // Add test data
-        await auditor.logRequest({ clientId: 'client1' }, { statusCode: 200 }, {
+      // Add test data
+      await auditor.logRequest(
+        { clientId: 'client1' },
+        { statusCode: 200 },
+        {
           duration: 100,
-        });
-        await auditor.logRequest({ clientId: 'client1' }, { statusCode: 200 }, {
+        },
+      );
+      await auditor.logRequest(
+        { clientId: 'client1' },
+        { statusCode: 200 },
+        {
           duration: 200,
-        });
-        await auditor.logRequest({ clientId: 'client2' }, { statusCode: 404 }, {
+        },
+      );
+      await auditor.logRequest(
+        { clientId: 'client2' },
+        { statusCode: 404 },
+        {
           duration: 50,
-        });
-        await auditor.logSecurityEvent('auth_failure', { clientId: 'client3' });
+        },
+      );
+      await auditor.logSecurityEvent('auth_failure', { clientId: 'client3' });
 
-        const report = await auditor.getComplianceReport(
-          new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          new Date().toISOString()
-        );
+      const report = await auditor.getComplianceReport(
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        new Date().toISOString(),
+      );
 
-        assert(
-          report.statistics.totalRequests === 3,
-          'Should count total requests'
-        );
-        assert(
-          report.statistics.successfulRequests === 2,
-          'Should count successful requests'
-        );
-        assert(
-          report.statistics.failedRequests === 1,
-          'Should count failed requests'
-        );
-        assert(
-          report.statistics.securityEvents === 1,
-          'Should count security events'
-        );
-        assert(
-          report.statistics.uniqueClients === 3,
-          'Should count unique clients'
-        );
-        assert(
-          report.statistics.averageResponseTime === 117,
-          'Should calculate average response time'
-        );
-      }
-    );
+      assert(report.statistics.totalRequests === 3, 'Should count total requests');
+      assert(report.statistics.successfulRequests === 2, 'Should count successful requests');
+      assert(report.statistics.failedRequests === 1, 'Should count failed requests');
+      assert(report.statistics.securityEvents === 1, 'Should count security events');
+      assert(report.statistics.uniqueClients === 3, 'Should count unique clients');
+      assert(
+        report.statistics.averageResponseTime === 117,
+        'Should calculate average response time',
+      );
+    });
 
     // Performance Tests
     console.log('\n⚡ Performance Tests:');
@@ -827,8 +756,8 @@ class EnhancedAuditLoggingTests {
               body: { query: `search_${i}` },
             },
             { statusCode: 200 },
-            { duration: Math.random() * 100 }
-          )
+            { duration: Math.random() * 100 },
+          ),
         );
 
       await Promise.all(promises);
@@ -841,32 +770,26 @@ class EnhancedAuditLoggingTests {
       console.log(`    ⚡ Average logging time: ${avgTime.toFixed(2)}ms`);
     });
 
-    await this.runAsyncTest(
-      'should handle cleanup of old logs',
-      async () => {
-        const auditor = this.createAuditLogger({ retentionDays: 1 });
+    await this.runAsyncTest('should handle cleanup of old logs', async () => {
+      const auditor = this.createAuditLogger({ retentionDays: 1 });
 
-        // Add old entry
-        const oldDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
-        auditor.auditEntries.push({
-          id: 'old_entry',
-          timestamp: oldDate.toISOString(),
-          type: 'request',
-        });
+      // Add old entry
+      const oldDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
+      auditor.auditEntries.push({
+        id: 'old_entry',
+        timestamp: oldDate.toISOString(),
+        type: 'request',
+      });
 
-        // Add recent entry
-        await auditor.logRequest({ clientId: 'recent' }, {});
+      // Add recent entry
+      await auditor.logRequest({ clientId: 'recent' }, {});
 
-        const cleanup = await auditor.cleanupOldLogs();
+      const cleanup = await auditor.cleanupOldLogs();
 
-        assert(cleanup.removedCount === 1, 'Should remove old entries');
-        assert(cleanup.remainingCount === 1, 'Should keep recent entries');
-        assert(
-          auditor.auditEntries.length === 1,
-          'Should have correct remaining count'
-        );
-      }
-    );
+      assert(cleanup.removedCount === 1, 'Should remove old entries');
+      assert(cleanup.remainingCount === 1, 'Should keep recent entries');
+      assert(auditor.auditEntries.length === 1, 'Should have correct remaining count');
+    });
 
     // Edge Cases
     console.log('\n⚠️ Edge Cases:');
@@ -880,10 +803,7 @@ class EnhancedAuditLoggingTests {
       // Should not throw even with circular references
       const entryId = await auditor.logRequest({ body: circularObj }, {});
 
-      assert(
-        entryId !== undefined,
-        'Should handle circular references gracefully'
-      );
+      assert(entryId !== undefined, 'Should handle circular references gracefully');
       assert(auditor.auditEntries.length === 1, 'Should still create entry');
     });
 
@@ -910,20 +830,16 @@ class EnhancedAuditLoggingTests {
     console.log('='.repeat(80));
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`Passed: ${this.passedTests} ✅`);
-    console.log(
-      `Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`
-    );
-    console.log(
-      `Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`
-    );
+    console.log(`Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`);
+    console.log(`Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`);
 
     if (this.failedTests === 0) {
       console.log(
-        '\n🎉 All audit logging tests passed! Compliance and logging features are working correctly.'
+        '\n🎉 All audit logging tests passed! Compliance and logging features are working correctly.',
       );
     } else {
       console.log(
-        `\n💥 ${this.failedTests} test(s) failed. Please review audit logging implementation.`
+        `\n💥 ${this.failedTests} test(s) failed. Please review audit logging implementation.`,
       );
       process.exit(1);
     }
@@ -945,4 +861,3 @@ auditTests.runComprehensiveTests().catch((error) => {
   console.error('Fatal error in audit logging tests:', error);
   process.exit(1);
 });
-

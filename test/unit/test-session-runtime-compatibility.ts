@@ -78,7 +78,10 @@ describe('session lifecycle runtime compatibility contract', () => {
     }
 
     assert.deepEqual(workerStatuses, nodeStatuses);
-    assert.deepEqual(nodeStatuses, fixtures.map(() => 400));
+    assert.deepEqual(
+      nodeStatuses,
+      fixtures.map(() => 400),
+    );
   });
 
   it('maintains the shared invalid-session payload shape', async () => {

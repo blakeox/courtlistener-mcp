@@ -56,26 +56,6 @@ function summarizeMcpTransportExchange(
   };
 }
 
-function rewriteRequestPath(request: Request, pathname: string): Request {
-  const url = new URL(request.url);
-  url.pathname = pathname;
-  return new Request(url, request);
-}
-
-function createPassiveEventStreamResponse(): Response {
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-  void writer.write(new TextEncoder().encode(': connected\n\n'));
-  return new Response(readable, {
-    status: 200,
-    headers: {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      connection: 'keep-alive',
-    },
-  });
-}
-
 function createUnavailableSessionLifecycleResponse(): Response {
   return Response.json(
     {

@@ -26,6 +26,6 @@ const child = spawn('npx', args, {
   env: process.env,
 });
 
-child.on('exit', code => {
+child.on('exit', (code) => {
   process.exit(code ?? 0);
 });

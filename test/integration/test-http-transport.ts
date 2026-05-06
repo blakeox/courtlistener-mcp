@@ -14,7 +14,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { InMemoryEventStore } from '../../src/infrastructure/event-store.js';
 import { startHttpTransport } from '../../src/server/http-transport-server.js';
 import { Logger } from '../../src/infrastructure/logger.js';
-import { runAuthFailureContract, runInvalidSessionLifecycleContract, runProtocolHeaderNegotiationContract } from '../utils/mcp-contract-harness.js';
+import {
+  runAuthFailureContract,
+  runInvalidSessionLifecycleContract,
+  runProtocolHeaderNegotiationContract,
+} from '../utils/mcp-contract-harness.js';
 
 // Silent logger for tests — disabled output to avoid noise
 const logger = new Logger({ level: 'error', format: 'json', enabled: false }, 'test');
@@ -144,8 +148,14 @@ describe('HTTP Transport Server', () => {
       }),
     ]);
 
-    assert.ok([200, 202, 204].includes(deleteA.status), `Unexpected delete status: ${deleteA.status}`);
-    assert.ok([200, 202, 204].includes(deleteB.status), `Unexpected delete status: ${deleteB.status}`);
+    assert.ok(
+      [200, 202, 204].includes(deleteA.status),
+      `Unexpected delete status: ${deleteA.status}`,
+    );
+    assert.ok(
+      [200, 202, 204].includes(deleteB.status),
+      `Unexpected delete status: ${deleteB.status}`,
+    );
   });
 
   it('enforces invalid session lifecycle contract', async () => {
@@ -364,7 +374,6 @@ describe('HTTP Transport Server shutdown race handling', () => {
       assert.equal(response.status, 200);
       assert.ok(response.headers.get('mcp-session-id'));
     }
-
   });
 
   it('rejects new MCP requests with 503 while concurrent close calls are in progress', async () => {
@@ -433,7 +442,10 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
   before(async () => {
     const createSessionServer = async () => {
       await sleep(100);
-      return new Server({ name: 'test-server-backpressure', version: '1.0.0' }, { capabilities: {} });
+      return new Server(
+        { name: 'test-server-backpressure', version: '1.0.0' },
+        { capabilities: {} },
+      );
     };
     const result = await startHttpTransport(createSessionServer, logger, {
       port,
@@ -522,7 +534,9 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
       };
     };
 
-    assert.ok((payload.diagnostics?.backpressure?.rejectedDueToSessionInitializationLimit ?? 0) >= 1);
+    assert.ok(
+      (payload.diagnostics?.backpressure?.rejectedDueToSessionInitializationLimit ?? 0) >= 1,
+    );
     assert.ok((payload.diagnostics?.backpressure?.rejectedDueToSessionCapacity ?? 0) >= 1);
     assert.ok(payload.diagnostics?.slo?.operations?.['mcp.initialize']);
     assert.equal(
@@ -568,7 +582,10 @@ describe('HTTP Transport Server active-request saturation', () => {
   before(async () => {
     const createSessionServer = async () => {
       await sleep(100);
-      return new Server({ name: 'test-server-active-requests', version: '1.0.0' }, { capabilities: {} });
+      return new Server(
+        { name: 'test-server-active-requests', version: '1.0.0' },
+        { capabilities: {} },
+      );
     };
     const result = await startHttpTransport(createSessionServer, logger, {
       port,

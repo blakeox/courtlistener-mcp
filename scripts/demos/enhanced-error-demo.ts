@@ -106,9 +106,8 @@ async function runEnhancedDemo() {
 
       try {
         // Simulate some errors for demonstration
-        const { ValidationError, AuthenticationError } = await import(
-          './infrastructure/error-types.js'
-        );
+        const { ValidationError, AuthenticationError } =
+          await import('./infrastructure/error-types.js');
         const errorHandler = server.getErrorHandler();
         const services = errorHandler.getServices();
 

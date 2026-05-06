@@ -50,7 +50,7 @@ describe('Utility Functions (TypeScript)', () => {
             maxAttempts: 3,
             baseDelay: 10,
           }),
-        /Always fails/
+        /Always fails/,
       );
     });
 
@@ -133,8 +133,7 @@ describe('Utility Functions (TypeScript)', () => {
 
     it('should generate valid UUID v4 format', () => {
       const id = generateId();
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
       assert.ok(uuidRegex.test(id), `Expected UUID format, got: ${id}`);
     });
@@ -201,4 +200,3 @@ describe('Utility Functions (TypeScript)', () => {
     });
   });
 });
-

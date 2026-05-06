@@ -279,4 +279,3 @@ export class QueryBuilderFactory {
 
 // Convenience exports
 export const QueryBuilder = QueryBuilderFactory;
-

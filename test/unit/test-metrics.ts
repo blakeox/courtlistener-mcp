@@ -40,7 +40,7 @@ class MockLogger implements Logger {
     toolName: string,
     duration: number,
     success: boolean,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
     this.logs.push({
       level: success ? 'info' : 'error',
@@ -54,7 +54,7 @@ class MockLogger implements Logger {
     endpoint: string,
     duration: number,
     status: number,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): void {
     this.logs.push({
       level: 'info',
@@ -80,9 +80,7 @@ class MockLogger implements Logger {
 }
 
 // Import the actual MetricsCollector
-const { MetricsCollector } = await import(
-  '../../dist/infrastructure/metrics.js'
-);
+const { MetricsCollector } = await import('../../dist/infrastructure/metrics.js');
 
 describe('Metrics Collector (TypeScript)', () => {
   let metrics: MetricsCollector;
@@ -147,7 +145,7 @@ describe('Metrics Collector (TypeScript)', () => {
 
       assert.ok(
         Math.abs(metricsData.average_response_time - expectedAverage) < 1,
-        `Expected average ~${expectedAverage}, got ${metricsData.average_response_time}`
+        `Expected average ~${expectedAverage}, got ${metricsData.average_response_time}`,
       );
     });
   });
@@ -200,7 +198,7 @@ describe('Metrics Collector (TypeScript)', () => {
       const expectedRate = 2 / 3;
       assert.ok(
         Math.abs(summary.successRate - expectedRate) < 0.01,
-        `Expected success rate ~${expectedRate}, got ${summary.successRate}`
+        `Expected success rate ~${expectedRate}, got ${summary.successRate}`,
       );
     });
   });

@@ -23,7 +23,7 @@ export function createSearchResponse<T>(
   count: number,
   page: number,
   pageSize: number,
-  searchParams?: Record<string, unknown>
+  searchParams?: Record<string, unknown>,
 ): SearchResultResponse<T> {
   return {
     summary: `Found ${count} results`,
@@ -39,7 +39,7 @@ export function createSearchResponse<T>(
 export function createEntityResponse<T>(
   entity: T,
   entityType: string,
-  entityId: string | number
+  entityId: string | number,
 ): {
   summary: string;
   [key: string]: unknown;
@@ -56,7 +56,7 @@ export function createEntityResponse<T>(
 export function createListResponse<T>(
   entities: T[],
   entityType: string,
-  pluralType?: string
+  pluralType?: string,
 ): {
   summary: string;
   [key: string]: unknown;
@@ -76,7 +76,7 @@ export function createPaginatedListResponse<T>(
   page: number,
   pageSize: number,
   entityType: string,
-  pluralType?: string
+  pluralType?: string,
 ): {
   summary: string;
   pagination: PaginationInfo;
@@ -84,7 +84,7 @@ export function createPaginatedListResponse<T>(
 } {
   const plural = pluralType || `${entityType}s`;
   const results = response.results || [];
-  
+
   return {
     summary: `Retrieved ${results.length} ${plural}`,
     [plural]: results,
@@ -98,7 +98,7 @@ export function createPaginatedListResponse<T>(
 export function createAnalysisResponse<T>(
   analysis: T,
   analysisType: string,
-  targetId?: string | number
+  targetId?: string | number,
 ): {
   summary: string;
   analysis: T;
@@ -106,7 +106,7 @@ export function createAnalysisResponse<T>(
   const summary = targetId
     ? `Analyzed ${analysisType} for ${targetId}`
     : `Completed ${analysisType} analysis`;
-    
+
   return {
     summary,
     analysis,
@@ -116,14 +116,10 @@ export function createAnalysisResponse<T>(
 /**
  * Format summary message with count
  */
-export function formatCountSummary(
-  count: number,
-  entityType: string,
-  pluralType?: string
-): string {
+export function formatCountSummary(count: number, entityType: string, pluralType?: string): string {
   const plural = pluralType || `${entityType}s`;
   const singular = entityType;
-  
+
   if (count === 0) return `No ${plural} found`;
   if (count === 1) return `Found 1 ${singular}`;
   return `Found ${count} ${plural}`;
@@ -135,14 +131,13 @@ export function formatCountSummary(
 export function formatActionSummary(
   action: string,
   entityType: string,
-  entityId?: string | number
+  entityId?: string | number,
 ): string {
   const pastTense = action.endsWith('e') ? `${action}d` : `${action}ed`;
-  
+
   if (entityId) {
     return `Successfully ${pastTense} ${entityType} ${entityId}`;
   }
-  
+
   return `Successfully ${pastTense} ${entityType}`;
 }
-

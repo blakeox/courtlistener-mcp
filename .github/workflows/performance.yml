@@ -40,15 +40,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: |
-          # Check if pnpm lock file is in sync, if not regenerate it
-          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
-            echo "⚠️ pnpm lock file out of sync, regenerating..."
-            pnpm install
-          else
-            echo "✅ pnpm lock file in sync, using frozen-lockfile"
-            pnpm install --frozen-lockfile
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build

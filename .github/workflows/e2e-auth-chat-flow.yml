@@ -34,12 +34,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: |
-          if ! pnpm install --frozen-lockfile --dry-run > /dev/null 2>&1; then
-            pnpm install
-          else
-            pnpm install --frozen-lockfile
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Verify required E2E secrets
         run: |

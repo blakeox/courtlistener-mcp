@@ -79,12 +79,12 @@
     "test:e2e:oauth-remote": "node scripts/testing/e2e-remote-oauth-handshake.mjs",
     "test:e2e:worker-auth-flow": "node scripts/testing/e2e-remote-oauth-handshake.mjs",
     "dev": "tsc --watch --preserveWatchOutput",
-    "lint": "eslint . --ext .ts",
-    "lint:critical": "eslint src/worker.ts src/index.ts src/types.ts --ext .ts",
-    "lint:src": "eslint src --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:critical": "eslint src/worker.ts src/index.ts src/types.ts",
+    "lint:src": "eslint src",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \".github/workflows/*.{yml,yaml}\" \"lefthook.yml\" \"package.json\" \"CONTRIBUTING.md\" \"eslint.config.js\" \"scripts/**/*.{js,mjs,cjs,ts,tsx}\" \"src/**/*.{ts,tsx}\" \"test/**/*.{ts,tsx}\" \"wrangler.jsonc\"",
+    "format:check": "prettier --check \".github/workflows/*.{yml,yaml}\" \"lefthook.yml\" \"package.json\" \"CONTRIBUTING.md\" \"eslint.config.js\" \"scripts/**/*.{js,mjs,cjs,ts,tsx}\" \"src/**/*.{ts,tsx}\" \"test/**/*.{ts,tsx}\" \"wrangler.jsonc\"",
     "clean": "node scripts/build/clean-dist.mjs",
     "health": "curl -f http://localhost:3001/health || exit 1",
     "enterprise:setup": "./scripts/build/setup-enterprise.sh",
@@ -194,10 +194,11 @@
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,mjs,cjs}": [
-      "pnpm exec eslint --max-warnings=0 --no-warn-ignored"
+      "pnpm exec eslint --fix --max-warnings=0 --no-warn-ignored",
+      "pnpm exec prettier --write"
     ],
     "**/*.{json,md,yml,yaml}": [
-      "pnpm exec prettier --check"
+      "pnpm exec prettier --write"
     ]
   }
 }

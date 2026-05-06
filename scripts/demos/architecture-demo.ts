@@ -78,7 +78,7 @@ async function demonstrateArchitecture(): Promise<void> {
 
     console.log(`   - CourtListener API Client: ✅ Registered`);
     console.log(
-      `   - Tool Handler Registry: ✅ Registered (${registry.getToolNames().length} tools)`
+      `   - Tool Handler Registry: ✅ Registered (${registry.getToolNames().length} tools)`,
     );
     console.log(`   - Configuration Manager: ✅ Registered`);
     console.log(`   - Logger Factory: ✅ Registered`);
@@ -100,7 +100,10 @@ async function demonstrateArchitecture(): Promise<void> {
       if (!toolsByCategory.has(category)) {
         toolsByCategory.set(category, []);
       }
-      toolsByCategory.get(category)!.push(toolName);
+      const categoryTools = toolsByCategory.get(category);
+      if (categoryTools) {
+        categoryTools.push(toolName);
+      }
     });
 
     toolsByCategory.forEach((tools, category) => {
@@ -143,4 +146,3 @@ async function demonstrateArchitecture(): Promise<void> {
 
 // Run the demonstration
 demonstrateArchitecture();
-

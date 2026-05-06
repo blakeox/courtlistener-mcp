@@ -62,7 +62,10 @@ describe('GetDocketsHandler (TypeScript)', () => {
 
     assert.strictEqual(result.success, false);
     if (!result.success) {
-      assert.match(result.error.message, /Too small.*>=1|Number must be greater than or equal to 1/);
+      assert.match(
+        result.error.message,
+        /Too small.*>=1|Number must be greater than or equal to 1/,
+      );
     }
   });
 
@@ -109,7 +112,10 @@ describe('GetDocketsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       // The decorator returns 'get_dockets failed' as the error and the original message in details
       assert.strictEqual(payload.error, 'get_dockets failed');
       assert.strictEqual(payload.details?.message, 'Dockets service unavailable');
@@ -229,7 +235,10 @@ describe('GetRecapDocumentsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string; details?: { message?: string } };
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        details?: { message?: string };
+      };
       assert.strictEqual(payload.error, 'get_recap_documents failed');
       assert.strictEqual(payload.details?.message, 'RECAP offline');
     }
@@ -327,7 +336,11 @@ describe('GetDocketEntriesHandler (TypeScript)', () => {
 
     const metricsCalls: Array<{ duration: number; fromCache: boolean }> = [];
     const handler = new GetDocketEntriesHandler({
-      async getDocketEntries(params: { docket: string; page?: number; page_size?: number }): Promise<{
+      async getDocketEntries(params: {
+        docket: string;
+        page?: number;
+        page_size?: number;
+      }): Promise<{
         count: number;
         results: Array<{ id: string }>;
         params: typeof params;
@@ -404,4 +417,3 @@ describe('GetDocketEntriesHandler (TypeScript)', () => {
     }
   });
 });
-

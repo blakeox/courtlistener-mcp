@@ -187,7 +187,9 @@ async function main() {
     config = parseWranglerConfig();
     ok(`Loaded wrangler config: ${wranglerConfigPath}`);
   } catch (error) {
-    fail(`Failed to parse wrangler config: ${error instanceof Error ? error.message : String(error)}`);
+    fail(
+      `Failed to parse wrangler config: ${error instanceof Error ? error.message : String(error)}`,
+    );
     hasCriticalError = true;
   }
   const configuredVars = config?.vars && typeof config.vars === 'object' ? config.vars : {};
@@ -231,29 +233,36 @@ async function main() {
       ok('Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
     }
 
-    const authUiOrigin = typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
-      ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
-      : '';
-    const allowDevFallback = typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
-      ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
-      : '';
-    const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
-      ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
-      : '';
+    const authUiOrigin =
+      typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
+        ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
+        : '';
+    const allowDevFallback =
+      typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
+        ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
+        : '';
     if (authUiOrigin) {
       const authUiOriginCheck = validateAuthUiOrigin(authUiOrigin);
       if (!authUiOriginCheck.ok) {
         warn(`MCP_AUTH_UI_ORIGIN is set but not a valid absolute URL: ${authUiOrigin}`);
       } else {
-        warn(`MCP_AUTH_UI_ORIGIN is configured (${authUiOriginCheck.normalized}) but deprecated and ignored; hosted auth now starts on the Worker origin.`);
-        if (authUiOriginCheck.hasExtraPath || authUiOriginCheck.hasExtraQuery || authUiOriginCheck.hasExtraHash) {
+        warn(
+          `MCP_AUTH_UI_ORIGIN is configured (${authUiOriginCheck.normalized}) but deprecated and ignored; hosted auth now starts on the Worker origin.`,
+        );
+        if (
+          authUiOriginCheck.hasExtraPath ||
+          authUiOriginCheck.hasExtraQuery ||
+          authUiOriginCheck.hasExtraHash
+        ) {
           warn(
             'MCP_AUTH_UI_ORIGIN is deprecated; remove it instead of pointing it at an auth app or URL path.',
           );
         }
       }
     } else {
-      ok('MCP_AUTH_UI_ORIGIN is not configured; hosted auth will use Worker-owned same-origin routes.');
+      ok(
+        'MCP_AUTH_UI_ORIGIN is not configured; hosted auth will use Worker-owned same-origin routes.',
+      );
     }
     if (!allowDevFallback || allowDevFallback === 'false' || allowDevFallback === '0') {
       ok('MCP_ALLOW_DEV_FALLBACK is disabled.');
@@ -262,7 +271,9 @@ async function main() {
       hasCriticalError = true;
     }
     if (trustCfAccessDeprecated) {
-      fail('MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and unsafe. Remove it and use the scoped trust flags only when an explicit trusted edge boundary exists.');
+      fail(
+        'MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and unsafe. Remove it and use the scoped trust flags only when an explicit trusted edge boundary exists.',
+      );
       hasCriticalError = true;
     }
     if ((trustCfAccessJwt || trustCfAccessHeaders) && !trustCfAccessAcknowledged) {
@@ -311,15 +322,21 @@ async function main() {
   const hasLegacyLogtoId =
     secretNames.includes('LOGTO_APP_ID') || hasConfiguredValue(configuredVars, 'LOGTO_APP_ID');
   const hasLegacyLogtoSecret =
-    secretNames.includes('LOGTO_APP_SECRET') || hasConfiguredValue(configuredVars, 'LOGTO_APP_SECRET');
-  const hasDedicatedRegistrationTokenSecret = secretNames.includes('MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
+    secretNames.includes('LOGTO_APP_SECRET') ||
+    hasConfiguredValue(configuredVars, 'LOGTO_APP_SECRET');
+  const hasDedicatedRegistrationTokenSecret = secretNames.includes(
+    'MCP_OAUTH_REGISTRATION_TOKEN_SECRET',
+  );
   if (!hasUiSessionSecret) {
-    const message = 'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
+    const message =
+      'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
     warn(message);
   }
 
   if (hasDedicatedRegistrationTokenSecret) {
-    ok('MCP_OAUTH_REGISTRATION_TOKEN_SECRET is configured for dedicated DCR management-token signing.');
+    ok(
+      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is configured for dedicated DCR management-token signing.',
+    );
   } else {
     warn(
       'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens will fall back to MCP_UI_SESSION_SECRET or COURTLISTENER_API_KEY, coupling rotation across unrelated trust boundaries.',
@@ -329,11 +346,15 @@ async function main() {
   if (hasOidcAuth) {
     ok('OIDC_ISSUER is configured.');
   } else {
-    warn('OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification and hosted upstream auth will be unavailable.');
+    warn(
+      'OIDC_ISSUER secret is missing. Direct bearer-token OIDC verification and hosted upstream auth will be unavailable.',
+    );
   }
 
   if (hasLegacyLogtoId || hasLegacyLogtoSecret) {
-    fail('Legacy LOGTO_APP_ID / LOGTO_APP_SECRET config is no longer supported. Remove both and use MCP_AUTH_OIDC_CLIENT_ID plus MCP_AUTH_OIDC_CLIENT_SECRET.');
+    fail(
+      'Legacy LOGTO_APP_ID / LOGTO_APP_SECRET config is no longer supported. Remove both and use MCP_AUTH_OIDC_CLIENT_ID plus MCP_AUTH_OIDC_CLIENT_SECRET.',
+    );
     hasCriticalError = true;
   }
 
@@ -341,8 +362,6 @@ async function main() {
     hasUiSessionSecret && trustCfAccessHeaders && trustCfAccessAcknowledged;
   const upstreamHostedAuthReadyByConfig =
     hasOidcAuth && hasUiSessionSecret && hasOidcClientId && hasOidcClientSecret;
-  const hostedAuthReadyByConfig =
-    upstreamHostedAuthReadyByConfig || accessHostedAuthReadyByConfig;
   const hostedAuthSignals =
     hasUiSessionSecret ||
     hasOidcClientId ||
@@ -354,7 +373,9 @@ async function main() {
     hasCriticalError = true;
   }
   if ((hasOidcClientId && !hasOidcClientSecret) || (!hasOidcClientId && hasOidcClientSecret)) {
-    fail('Hosted auth upstream OIDC config is incomplete: set both MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.');
+    fail(
+      'Hosted auth upstream OIDC config is incomplete: set both MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.',
+    );
     hasCriticalError = true;
   } else if (!accessHostedAuthReadyByConfig && hostedAuthSignals && !hasOidcClientId) {
     fail('Hosted auth requires MCP_AUTH_OIDC_CLIENT_ID and MCP_AUTH_OIDC_CLIENT_SECRET.');
@@ -368,7 +389,9 @@ async function main() {
   if (hasOidcAudience) {
     ok('OIDC_AUDIENCE is configured.');
   } else {
-    warn('OIDC_AUDIENCE is missing. Resource-bound upstream bearer validation and hosted auth may be incomplete.');
+    warn(
+      'OIDC_AUDIENCE is missing. Resource-bound upstream bearer validation and hosted auth may be incomplete.',
+    );
   }
 
   if (!hasStaticAuth && !hasOidcAuth) {
@@ -384,11 +407,14 @@ async function main() {
   }
 
   if (config) {
-    const registrationTokenTtlRaw = typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
-      ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
-      : '';
+    const registrationTokenTtlRaw =
+      typeof configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS === 'string'
+        ? configuredVars.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS.trim()
+        : '';
     if (!registrationTokenTtlRaw) {
-      warn('MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS is not set. Registration management tokens will default to 86400 seconds (24h). Set it explicitly so rollout intent is visible in config.');
+      warn(
+        'MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS is not set. Registration management tokens will default to 86400 seconds (24h). Set it explicitly so rollout intent is visible in config.',
+      );
     } else {
       const ttlSeconds = Number.parseInt(registrationTokenTtlRaw, 10);
       if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
@@ -397,7 +423,9 @@ async function main() {
       } else {
         ok(`MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS is set to ${ttlSeconds} seconds.`);
         if (ttlSeconds > 7 * 24 * 60 * 60) {
-          warn('MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS exceeds 7 days. Long-lived DCR management tokens increase credential leak blast radius.');
+          warn(
+            'MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS exceeds 7 days. Long-lived DCR management tokens increase credential leak blast radius.',
+          );
         }
       }
     }
@@ -489,9 +517,15 @@ async function main() {
   console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_SECRET');
   console.log('  wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
   console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
-  console.log('  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)');
-  console.log('  # set MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true to trust Cloudflare Access browser identity headers');
-  console.log('  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions');
+  console.log(
+    '  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)',
+  );
+  console.log(
+    '  # set MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true to trust Cloudflare Access browser identity headers',
+  );
+  console.log(
+    '  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions',
+  );
   console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
   console.log('  pnpm run cloudflare:deploy');
 

@@ -111,7 +111,11 @@ export class ErrorFactory {
     details?: Record<string, unknown>,
     context?: ErrorContext,
   ): ConfigurationError {
-    const error = new ConfigurationError(message, undefined, details ? { additionalData: details } : {});
+    const error = new ConfigurationError(
+      message,
+      undefined,
+      details ? { additionalData: details } : {},
+    );
     if (context) {
       this.addContext(error, context);
     }
@@ -167,7 +171,12 @@ export class ErrorFactory {
   ): RateLimitError {
     const limit = typeof details?.limit === 'number' ? details.limit : 0;
     const windowMs = typeof details?.windowMs === 'number' ? details.windowMs : retryAfter * 1000;
-    const error = new RateLimitError(limit, windowMs, retryAfter, details ? { additionalData: details } : {});
+    const error = new RateLimitError(
+      limit,
+      windowMs,
+      retryAfter,
+      details ? { additionalData: details } : {},
+    );
     error.message = message;
     if (context || details) {
       this.addContext(error, { ...context, ...details });

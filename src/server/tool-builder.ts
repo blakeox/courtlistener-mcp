@@ -43,7 +43,11 @@ function getCostHint(weight: number): 'low' | 'medium' | 'high' {
 function buildToolUxMetadata(
   toolName: string,
   metadata: ToolMetadata | undefined,
-  options: { asyncSupported: boolean; fallbackCategory: string; fallbackComplexity: 'simple' | 'intermediate' | 'advanced' },
+  options: {
+    asyncSupported: boolean;
+    fallbackCategory: string;
+    fallbackComplexity: 'simple' | 'intermediate' | 'advanced';
+  },
 ): {
   title: string;
   category: string;
@@ -144,8 +148,17 @@ export function buildToolDefinitions(
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
           MCP_ASYNC_CONTROL_TOOLS.status,
-          { name: MCP_ASYNC_CONTROL_TOOLS.status, title: 'Async Job Status', category: 'async-control', complexity: 'simple' },
-          { asyncSupported: false, fallbackCategory: 'async-control', fallbackComplexity: 'simple' },
+          {
+            name: MCP_ASYNC_CONTROL_TOOLS.status,
+            title: 'Async Job Status',
+            category: 'async-control',
+            complexity: 'simple',
+          },
+          {
+            asyncSupported: false,
+            fallbackCategory: 'async-control',
+            fallbackComplexity: 'simple',
+          },
         ),
       },
     },
@@ -164,8 +177,17 @@ export function buildToolDefinitions(
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
           MCP_ASYNC_CONTROL_TOOLS.result,
-          { name: MCP_ASYNC_CONTROL_TOOLS.result, title: 'Async Job Result', category: 'async-control', complexity: 'simple' },
-          { asyncSupported: false, fallbackCategory: 'async-control', fallbackComplexity: 'simple' },
+          {
+            name: MCP_ASYNC_CONTROL_TOOLS.result,
+            title: 'Async Job Result',
+            category: 'async-control',
+            complexity: 'simple',
+          },
+          {
+            asyncSupported: false,
+            fallbackCategory: 'async-control',
+            fallbackComplexity: 'simple',
+          },
         ),
       },
     },
@@ -184,8 +206,17 @@ export function buildToolDefinitions(
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
           MCP_ASYNC_CONTROL_TOOLS.cancel,
-          { name: MCP_ASYNC_CONTROL_TOOLS.cancel, title: 'Async Job Cancel', category: 'async-control', complexity: 'simple' },
-          { asyncSupported: false, fallbackCategory: 'async-control', fallbackComplexity: 'simple' },
+          {
+            name: MCP_ASYNC_CONTROL_TOOLS.cancel,
+            title: 'Async Job Cancel',
+            category: 'async-control',
+            complexity: 'simple',
+          },
+          {
+            asyncSupported: false,
+            fallbackCategory: 'async-control',
+            fallbackComplexity: 'simple',
+          },
         ),
       },
     },

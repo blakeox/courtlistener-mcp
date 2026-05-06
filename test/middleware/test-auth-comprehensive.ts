@@ -69,25 +69,20 @@ class EnhancedAuthenticationTests {
       console.log(`  ✅ ${testName}`);
       this.passedTests++;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`  ❌ ${testName}: ${errorMessage}`);
       this.failedTests++;
     }
   }
 
-  private async runAsyncTest(
-    testName: string,
-    testFn: () => Promise<void>
-  ): Promise<void> {
+  private async runAsyncTest(testName: string, testFn: () => Promise<void>): Promise<void> {
     this.testCount++;
     try {
       await testFn();
       console.log(`  ✅ ${testName}`);
       this.passedTests++;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`  ❌ ${testName}: ${errorMessage}`);
       this.failedTests++;
     }
@@ -128,13 +123,10 @@ class EnhancedAuthenticationTests {
         const apiKey = headers['x-api-key'];
         const authHeader = headers['authorization'];
         const bearerToken =
-          authHeader &&
-          typeof authHeader === 'string' &&
-          authHeader.startsWith('Bearer ')
+          authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
             ? authHeader.replace('Bearer ', '')
             : null;
-        const clientId =
-          headers['x-client-id'] || this.generateClientId(headers);
+        const clientId = headers['x-client-id'] || this.generateClientId(headers);
 
         // Check API key
         if (apiKey) {
@@ -196,8 +188,7 @@ class EnhancedAuthenticationTests {
         }
 
         const userAgent = headers['user-agent'] || 'unknown';
-        const ip =
-          headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown';
+        const ip = headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown';
 
         try {
           const combined = userAgent + ip;
@@ -211,11 +202,7 @@ class EnhancedAuthenticationTests {
         return 'client-default';
       },
 
-      logSecurityEvent(
-        type: string,
-        subtype: string,
-        data: Record<string, unknown> = {}
-      ): void {
+      logSecurityEvent(type: string, subtype: string, data: Record<string, unknown> = {}): void {
         if (this.config.logSecurityEvents) {
           this.securityEvents.push({
             type,
@@ -251,7 +238,7 @@ class EnhancedAuthenticationTests {
       console.assert(result.authenticated === false, 'Should reject invalid API key');
       console.assert(
         result.reason && result.reason.includes('Invalid'),
-        'Should provide clear error reason'
+        'Should provide clear error reason',
       );
     });
 
@@ -290,10 +277,7 @@ class EnhancedAuthenticationTests {
       };
       const result = await auth.authenticate(headers);
       console.assert(result.clientId?.startsWith('client-'), 'Should generate client ID');
-      console.assert(
-        (result.clientId?.length || 0) > 7,
-        'Should generate meaningful client ID'
-      );
+      console.assert((result.clientId?.length || 0) > 7, 'Should generate meaningful client ID');
     });
 
     await this.runAsyncTest('should use provided client ID', async () => {
@@ -360,7 +344,7 @@ class EnhancedAuthenticationTests {
       console.assert(result.authenticated === false, 'Should handle empty headers');
       console.assert(
         result.reason?.includes('No valid credentials'),
-        'Should indicate no credentials'
+        'Should indicate no credentials',
       );
     });
 
@@ -396,7 +380,7 @@ class EnhancedAuthenticationTests {
 
       console.assert(
         results.every((r) => r.authenticated === true),
-        'All authentications should succeed'
+        'All authentications should succeed',
       );
       console.assert(duration < 5000, 'Should complete 1000 authentications within 5 seconds');
 
@@ -415,7 +399,7 @@ class EnhancedAuthenticationTests {
           auth.authenticate({
             'x-api-key': 'test-api-key-123',
             'x-client-id': `client-${i}`,
-          })
+          }),
         );
 
       const results = await Promise.all(promises);
@@ -423,7 +407,7 @@ class EnhancedAuthenticationTests {
 
       console.assert(
         results.every((r) => r.authenticated === true),
-        'All concurrent authentications should succeed'
+        'All concurrent authentications should succeed',
       );
       console.assert(duration < 1000, 'Should handle 100 concurrent requests within 1 second');
 
@@ -431,7 +415,7 @@ class EnhancedAuthenticationTests {
       const clientIds = new Set(results.map((r) => r.clientId));
       console.assert(
         clientIds.size === concurrentRequests,
-        'Should handle unique client IDs correctly'
+        'Should handle unique client IDs correctly',
       );
     });
 
@@ -498,22 +482,16 @@ class EnhancedAuthenticationTests {
     console.log('='.repeat(80));
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`Passed: ${this.passedTests} ✅`);
-    console.log(
-      `Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`
-    );
+    console.log(`Failed: ${this.failedTests} ${this.failedTests > 0 ? '❌' : '✅'}`);
     if (this.testCount > 0) {
-      console.log(
-        `Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`
-      );
+      console.log(`Success Rate: ${((this.passedTests / this.testCount) * 100).toFixed(2)}%`);
     }
 
     if (this.failedTests === 0) {
-      console.log(
-        '\n🎉 All authentication tests passed! Security features are working correctly.'
-      );
+      console.log('\n🎉 All authentication tests passed! Security features are working correctly.');
     } else {
       console.log(
-        `\n💥 ${this.failedTests} test(s) failed. Please review authentication implementation.`
+        `\n💥 ${this.failedTests} test(s) failed. Please review authentication implementation.`,
       );
       process.exit(1);
     }
@@ -528,4 +506,3 @@ authTests.runComprehensiveTests().catch((error) => {
   console.error('Fatal error in authentication tests:', error);
   process.exit(1);
 });
-

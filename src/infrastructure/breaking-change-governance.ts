@@ -136,10 +136,12 @@ export function evaluateBreakingChangeGate(
   };
 }
 
-export function evaluateAllBreakingChangeGates(options: {
-  env?: Record<string, string | undefined>;
-  protocolVersion?: string;
-} = {}): readonly BreakingChangeDecision[] {
+export function evaluateAllBreakingChangeGates(
+  options: {
+    env?: Record<string, string | undefined>;
+    protocolVersion?: string;
+  } = {},
+): readonly BreakingChangeDecision[] {
   return BREAKING_CHANGE_GATES.map((gate) => evaluateBreakingChangeGate(gate, options));
 }
 

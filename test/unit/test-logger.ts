@@ -10,9 +10,7 @@ import assert from 'node:assert';
 import type { Logger } from '../../src/infrastructure/logger.js';
 
 // Import the actual Logger
-const { Logger: LoggerClass, createLogger } = await import(
-  '../../dist/infrastructure/logger.js'
-);
+const { Logger: LoggerClass, createLogger } = await import('../../dist/infrastructure/logger.js');
 
 interface LogOutput {
   level: string;
@@ -69,7 +67,7 @@ describe('Logger (TypeScript)', () => {
       const lastLog = logOutput[logOutput.length - 1];
       assert.ok(
         JSON.stringify(lastLog.args).includes(message),
-        `Expected message "${message}" in logs`
+        `Expected message "${message}" in logs`,
       );
     });
 
@@ -81,7 +79,7 @@ describe('Logger (TypeScript)', () => {
       const lastLog = logOutput[logOutput.length - 1];
       assert.ok(
         JSON.stringify(lastLog.args).includes(message),
-        `Expected message "${message}" in logs`
+        `Expected message "${message}" in logs`,
       );
     });
 
@@ -93,7 +91,7 @@ describe('Logger (TypeScript)', () => {
       const lastLog = logOutput[logOutput.length - 1];
       assert.ok(
         JSON.stringify(lastLog.args).includes(message),
-        `Expected message "${message}" in logs`
+        `Expected message "${message}" in logs`,
       );
     });
 
@@ -106,7 +104,7 @@ describe('Logger (TypeScript)', () => {
       const lastLog = logOutput[logOutput.length - 1];
       assert.ok(
         JSON.stringify(lastLog.args).includes(message),
-        `Expected message "${message}" in logs`
+        `Expected message "${message}" in logs`,
       );
     });
   });
@@ -153,7 +151,7 @@ describe('Logger (TypeScript)', () => {
     it('should respect debug level configuration', () => {
       const debugLogger = new LoggerClass(
         { level: 'debug', format: 'json', enabled: true },
-        'Debug'
+        'Debug',
       );
 
       debugLogger.debug('Debug message');
@@ -166,10 +164,7 @@ describe('Logger (TypeScript)', () => {
     });
 
     it('should filter debug messages at info level', () => {
-      const infoLogger = new LoggerClass(
-        { level: 'info', format: 'json', enabled: true },
-        'Info'
-      );
+      const infoLogger = new LoggerClass({ level: 'info', format: 'json', enabled: true }, 'Info');
 
       const initialLogCount = logOutput.length;
       infoLogger.debug('Debug message'); // Should be filtered
@@ -178,17 +173,11 @@ describe('Logger (TypeScript)', () => {
       infoLogger.error('Error message');
 
       // Debug should be filtered out, so less than 4 logs
-      assert.ok(
-        logOutput.length - initialLogCount < 4,
-        'Debug messages should be filtered'
-      );
+      assert.ok(logOutput.length - initialLogCount < 4, 'Debug messages should be filtered');
     });
 
     it('should filter debug and info messages at warn level', () => {
-      const warnLogger = new LoggerClass(
-        { level: 'warn', format: 'json', enabled: true },
-        'Warn'
-      );
+      const warnLogger = new LoggerClass({ level: 'warn', format: 'json', enabled: true }, 'Warn');
 
       const initialLogCount = logOutput.length;
       warnLogger.debug('Debug message'); // Should be filtered
@@ -199,14 +188,14 @@ describe('Logger (TypeScript)', () => {
       // Debug and info should be filtered out
       assert.ok(
         logOutput.length - initialLogCount >= 2,
-        'Warn and error messages should be logged'
+        'Warn and error messages should be logged',
       );
     });
 
     it('should only log error messages at error level', () => {
       const errorLogger = new LoggerClass(
         { level: 'error', format: 'json', enabled: true },
-        'Error'
+        'Error',
       );
 
       const initialLogCount = logOutput.length;
@@ -216,10 +205,7 @@ describe('Logger (TypeScript)', () => {
       errorLogger.error('Error message');
 
       // Only error should be logged
-      assert.ok(
-        logOutput.length - initialLogCount === 1,
-        'Only error messages should be logged'
-      );
+      assert.ok(logOutput.length - initialLogCount === 1, 'Only error messages should be logged');
     });
   });
 
@@ -239,7 +225,7 @@ describe('Logger (TypeScript)', () => {
       const lastLog = logOutput[logOutput.length - 1];
       assert.ok(
         JSON.stringify(lastLog.args).includes('ChildComponent'),
-        'Expected child component name in log'
+        'Expected child component name in log',
       );
     });
   });
@@ -307,10 +293,7 @@ describe('Logger (TypeScript)', () => {
 
   describe('Log Formatting', () => {
     it('should format logs as JSON', () => {
-      const jsonLogger = new LoggerClass(
-        { level: 'info', format: 'json', enabled: true },
-        'JSON'
-      );
+      const jsonLogger = new LoggerClass({ level: 'info', format: 'json', enabled: true }, 'JSON');
 
       jsonLogger.info('Test message', { key: 'value' });
 
@@ -325,10 +308,7 @@ describe('Logger (TypeScript)', () => {
     });
 
     it('should format logs as text', () => {
-      const textLogger = new LoggerClass(
-        { level: 'info', format: 'text', enabled: true },
-        'Text'
-      );
+      const textLogger = new LoggerClass({ level: 'info', format: 'text', enabled: true }, 'Text');
 
       textLogger.info('Test message', { key: 'value' });
 
@@ -337,10 +317,7 @@ describe('Logger (TypeScript)', () => {
       const logString = String(lastLog.args[0]);
 
       // Text format should be readable
-      assert.ok(
-        logString.includes('Test message'),
-        'Expected readable text format'
-      );
+      assert.ok(logString.includes('Test message'), 'Expected readable text format');
     });
   });
 
@@ -348,7 +325,7 @@ describe('Logger (TypeScript)', () => {
     it('should not log when disabled', () => {
       const disabledLogger = new LoggerClass(
         { level: 'info', format: 'json', enabled: false },
-        'Disabled'
+        'Disabled',
       );
 
       const initialLogCount = logOutput.length;
@@ -361,7 +338,7 @@ describe('Logger (TypeScript)', () => {
       assert.strictEqual(
         logOutput.length,
         initialLogCount,
-        'No logs should be generated when disabled'
+        'No logs should be generated when disabled',
       );
     });
   });
@@ -399,7 +376,7 @@ describe('Logger (TypeScript)', () => {
     it('should create logger using factory function', () => {
       const factoryLogger = createLogger(
         { level: 'info', format: 'json', enabled: true },
-        'Factory'
+        'Factory',
       );
 
       assert.ok(factoryLogger);

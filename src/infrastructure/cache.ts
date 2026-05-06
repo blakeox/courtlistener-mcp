@@ -90,8 +90,9 @@ export class CacheManager {
     try {
       const isAbsolute = /^[a-z]+:\/\//i.test(trimmed);
       const url = new URL(trimmed, 'https://cache.local');
-      const sortedEntries = [...url.searchParams.entries()].sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-        leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
+      const sortedEntries = [...url.searchParams.entries()].sort(
+        ([leftKey, leftValue], [rightKey, rightValue]) =>
+          leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
       );
       url.search = '';
       for (const [key, value] of sortedEntries) {

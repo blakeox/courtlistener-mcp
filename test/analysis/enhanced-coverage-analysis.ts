@@ -143,9 +143,7 @@ class CoverageAnalyzer {
 
       // Read final coverage summary if it exists
       if (existsSync('coverage/coverage-summary.json')) {
-        this.coverageData = JSON.parse(
-          readFileSync('coverage/coverage-summary.json', 'utf-8')
-        );
+        this.coverageData = JSON.parse(readFileSync('coverage/coverage-summary.json', 'utf-8'));
         console.log(`✅ Loaded existing coverage data`);
         return true;
       }
@@ -153,8 +151,7 @@ class CoverageAnalyzer {
       console.log(`⚠️  No coverage data found. Run 'npm run coverage' first.`);
       return false;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.log(`💥 Coverage analysis crashed: ${errorMessage}`);
       return false;
     }
@@ -190,9 +187,7 @@ class CoverageAnalyzer {
 
     // Analyze per-file coverage
     if (this.coverageData) {
-      const files = Object.keys(this.coverageData).filter(
-        (key) => key !== 'total'
-      );
+      const files = Object.keys(this.coverageData).filter((key) => key !== 'total');
       analysis.metrics.totalFiles = files.length;
 
       let totalLines = 0,
@@ -254,9 +249,7 @@ class CoverageAnalyzer {
   /**
    * Generate coverage recommendations
    */
-  private generateCoverageRecommendations(
-    analysis: CoverageAnalysis
-  ): Array<{
+  private generateCoverageRecommendations(analysis: CoverageAnalysis): Array<{
     type: string;
     category: string;
     message: string;
@@ -344,10 +337,7 @@ class CoverageAnalyzer {
     }
 
     // Success message
-    if (
-      recommendations.length === 0 ||
-      recommendations.every((r) => r.type !== 'CRITICAL')
-    ) {
+    if (recommendations.length === 0 || recommendations.every((r) => r.type !== 'CRITICAL')) {
       recommendations.unshift({
         type: 'SUCCESS',
         category: 'Overall',
@@ -372,9 +362,7 @@ class CoverageAnalyzer {
         overall_coverage: analysis.overall,
         metrics: analysis.metrics,
         recommendations_count: analysis.recommendations.length,
-        critical_issues: analysis.recommendations.filter(
-          (r) => r.type === 'CRITICAL'
-        ).length,
+        critical_issues: analysis.recommendations.filter((r) => r.type === 'CRITICAL').length,
       },
       coverage: analysis,
       test_files: this.testFiles,
@@ -428,12 +416,7 @@ class CoverageAnalyzer {
     // Recommendations
     markdown += `## 💡 Recommendations\n\n`;
     coverage.recommendations.forEach((rec) => {
-      const icon =
-        rec.type === 'SUCCESS'
-          ? '🎉'
-          : rec.type === 'WARNING'
-            ? '⚠️'
-            : '🚨';
+      const icon = rec.type === 'SUCCESS' ? '🎉' : rec.type === 'WARNING' ? '⚠️' : '🚨';
       markdown += `### ${icon} ${rec.category} (${rec.priority})\n\n`;
       markdown += `**${rec.message}**\n\n`;
       markdown += `*Action:* ${rec.action}\n\n`;
@@ -470,24 +453,24 @@ class CoverageAnalyzer {
     if (coverage.overall?.lines) {
       console.log(`📈 Overall Coverage:`);
       console.log(
-        `   Lines: ${coverage.overall.lines.pct?.toFixed(1) || 0}% (${coverage.overall.lines.covered}/${coverage.overall.lines.total})`
+        `   Lines: ${coverage.overall.lines.pct?.toFixed(1) || 0}% (${coverage.overall.lines.covered}/${coverage.overall.lines.total})`,
       );
       console.log(
-        `   Functions: ${coverage.overall.functions?.pct?.toFixed(1) || 0}% (${coverage.overall.functions?.covered}/${coverage.overall.functions?.total})`
+        `   Functions: ${coverage.overall.functions?.pct?.toFixed(1) || 0}% (${coverage.overall.functions?.covered}/${coverage.overall.functions?.total})`,
       );
       console.log(
-        `   Branches: ${coverage.overall.branches?.pct?.toFixed(1) || 0}% (${coverage.overall.branches?.covered}/${coverage.overall.branches?.total})`
+        `   Branches: ${coverage.overall.branches?.pct?.toFixed(1) || 0}% (${coverage.overall.branches?.covered}/${coverage.overall.branches?.total})`,
       );
       console.log(
-        `   Statements: ${coverage.overall.statements?.pct?.toFixed(1) || 0}% (${coverage.overall.statements?.covered}/${coverage.overall.statements?.total})`
+        `   Statements: ${coverage.overall.statements?.pct?.toFixed(1) || 0}% (${coverage.overall.statements?.covered}/${coverage.overall.statements?.total})`,
       );
     }
 
     console.log(
-      `\n📁 Files: ${summary.source_files} source files, ${summary.test_files} test files`
+      `\n📁 Files: ${summary.source_files} source files, ${summary.test_files} test files`,
     );
     console.log(
-      `🧪 Covered Files: ${coverage.metrics.coveredFiles}/${coverage.metrics.totalFiles}`
+      `🧪 Covered Files: ${coverage.metrics.coveredFiles}/${coverage.metrics.totalFiles}`,
     );
 
     console.log(`\n💡 Recommendations: ${summary.recommendations_count} total`);
@@ -504,9 +487,7 @@ class CoverageAnalyzer {
     console.log(`   📊 coverage/index.html - Interactive HTML report`);
 
     const overallGood = (coverage.overall?.lines?.pct || 0) >= 80;
-    console.log(
-      `\n🏆 Coverage Status: ${overallGood ? 'GOOD ✅' : 'NEEDS IMPROVEMENT ❌'}`
-    );
+    console.log(`\n🏆 Coverage Status: ${overallGood ? 'GOOD ✅' : 'NEEDS IMPROVEMENT ❌'}`);
     console.log(`${'='.repeat(80)}\n`);
   }
 
@@ -565,4 +546,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { CoverageAnalyzer };
-

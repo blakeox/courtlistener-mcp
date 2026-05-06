@@ -47,7 +47,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --frozen-lockfile || pnpm install
+          pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
@@ -127,7 +127,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --frozen-lockfile || pnpm install
+          pnpm install --frozen-lockfile
           pnpm add -g @modelcontextprotocol/inspector
           # Install Playwright for visual testing
           npx playwright install --with-deps chromium
@@ -236,7 +236,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --frozen-lockfile || pnpm install
+          pnpm install --frozen-lockfile
           pnpm add -g @modelcontextprotocol/inspector
 
       - name: Build project

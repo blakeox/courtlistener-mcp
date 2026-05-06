@@ -19,8 +19,15 @@ import {
   type AsyncJobSnapshot,
 } from '../../src/server/async-tool-workflow.js';
 import { CacheManager } from '../../src/infrastructure/cache.js';
-import { createDirectToolExecutionService, createMiddlewareToolExecutionService } from '../../src/server/tool-execution-service.js';
-import { BaseToolHandler, ToolHandlerRegistry, type ToolContext } from '../../src/server/tool-handler.js';
+import {
+  createDirectToolExecutionService,
+  createMiddlewareToolExecutionService,
+} from '../../src/server/tool-execution-service.js';
+import {
+  BaseToolHandler,
+  ToolHandlerRegistry,
+  type ToolContext,
+} from '../../src/server/tool-handler.js';
 import { handleMcpGatewayRoute } from '../../src/server/worker-mcp-gateway.js';
 import { getConfig } from '../../src/infrastructure/config.js';
 
@@ -63,7 +70,9 @@ class AsyncParityEchoHandler extends BaseToolHandler<{ payload?: string }, { pay
 
   async execute(input: { payload?: string }, _context: ToolContext): Promise<CallToolResult> {
     return {
-      content: [{ type: 'text', text: JSON.stringify({ ok: true, payload: input.payload ?? null }) }],
+      content: [
+        { type: 'text', text: JSON.stringify({ ok: true, payload: input.payload ?? null }) },
+      ],
     };
   }
 
@@ -73,7 +82,10 @@ class AsyncParityEchoHandler extends BaseToolHandler<{ payload?: string }, { pay
 }
 
 const SUPPORTED_PROTOCOLS = new Set(['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25']);
-const logger = new Logger({ level: 'error', format: 'json', enabled: false }, 'runtime-parity-cert');
+const logger = new Logger(
+  { level: 'error', format: 'json', enabled: false },
+  'runtime-parity-cert',
+);
 
 function parseJsonObject(text: string): JsonObject {
   const parsed = JSON.parse(text) as JsonObject;
@@ -96,7 +108,10 @@ function normalizeAuthSnapshot(status: number, body: JsonObject): JsonObject {
 
 function normalizeAsyncQueueEnvelope(result: CallToolResult): JsonObject {
   const first = result.content[0];
-  const payload = first && first.type === 'text' && typeof first.text === 'string' ? parseJsonObject(first.text) : {};
+  const payload =
+    first && first.type === 'text' && typeof first.text === 'string'
+      ? parseJsonObject(first.text)
+      : {};
   const job = (payload.job ?? {}) as AsyncJobSnapshot & Record<string, JsonValue>;
   const controls = (payload.controls ?? {}) as Record<string, JsonValue>;
   const readToolName = (value: JsonValue): string => {
@@ -112,7 +127,11 @@ function normalizeAsyncQueueEnvelope(result: CallToolResult): JsonObject {
     job: {
       status: String(job.status ?? ''),
       toolName: String(job.toolName ?? ''),
-      attemptsMax: Number(job.attempts && typeof job.attempts === 'object' ? (job.attempts as { max?: number }).max ?? -1 : -1),
+      attemptsMax: Number(
+        job.attempts && typeof job.attempts === 'object'
+          ? ((job.attempts as { max?: number }).max ?? -1)
+          : -1,
+      ),
       cancellationRequested: Boolean(job.cancellationRequested),
     },
     controls: {
@@ -150,7 +169,9 @@ function createDiffs(node: JsonValue, worker: JsonValue, currentPath = '$'): str
     const keys = new Set([...Object.keys(nodeRecord), ...Object.keys(workerRecord)]);
     const diffs: string[] = [];
     for (const key of [...keys].sort()) {
-      diffs.push(...createDiffs(nodeRecord[key] ?? null, workerRecord[key] ?? null, `${currentPath}.${key}`));
+      diffs.push(
+        ...createDiffs(nodeRecord[key] ?? null, workerRecord[key] ?? null, `${currentPath}.${key}`),
+      );
     }
     return diffs;
   }
@@ -158,7 +179,10 @@ function createDiffs(node: JsonValue, worker: JsonValue, currentPath = '$'): str
   return [`${currentPath}: node=${JSON.stringify(node)} worker=${JSON.stringify(worker)}`];
 }
 
-async function runInvalidSessionCase(sessionId: string, description: string): Promise<RuntimeParityCaseResult> {
+async function runInvalidSessionCase(
+  sessionId: string,
+  description: string,
+): Promise<RuntimeParityCaseResult> {
   const request = new Request('https://example.com/mcp', {
     method: 'POST',
     headers: {
@@ -183,7 +207,9 @@ async function runInvalidSessionCase(sessionId: string, description: string): Pr
     allowedOrigins: [],
     mcpPath: true,
     supportedProtocolVersions: SUPPORTED_PROTOCOLS,
-    mcpStreamableHandler: { fetch: async () => new Response('unexpected handler call', { status: 500 }) },
+    mcpStreamableHandler: {
+      fetch: async () => new Response('unexpected handler call', { status: 500 }),
+    },
     mcpSseCompatibilityHandler: { fetch: async () => new Response('sse') },
     withCors: (response) => response,
     buildCorsHeaders: () => new Headers(),
@@ -192,14 +218,26 @@ async function runInvalidSessionCase(sessionId: string, description: string): Pr
     recordAuthFailure: async () => {},
     clearAuthFailures: async () => {},
     validateSessionRequest: async (incomingRequest) =>
-      incomingRequest.headers.get('mcp-session-id') ? createInvalidSessionLifecycleResponse() : null,
+      incomingRequest.headers.get('mcp-session-id')
+        ? createInvalidSessionLifecycleResponse()
+        : null,
   });
   if (!workerResponse) {
     throw new Error('Worker parity case did not return a response');
   }
-  const worker = normalizeAuthSnapshot(workerResponse.status, await readResponsePayload(workerResponse));
+  const worker = normalizeAuthSnapshot(
+    workerResponse.status,
+    await readResponsePayload(workerResponse),
+  );
   const diffs = createDiffs(node, worker);
-  return { id: `invalid-session-${sessionId}`, description, node, worker, diffs, passed: diffs.length === 0 };
+  return {
+    id: `invalid-session-${sessionId}`,
+    description,
+    node,
+    worker,
+    diffs,
+    passed: diffs.length === 0,
+  };
 }
 
 async function runAuthCase(
@@ -216,7 +254,10 @@ async function runAuthCase(
   if (!nodeResult.authError) {
     throw new Error(`Node parity case ${id} unexpectedly passed authorization`);
   }
-  const node = normalizeAuthSnapshot(nodeResult.authError.status, await readResponsePayload(nodeResult.authError));
+  const node = normalizeAuthSnapshot(
+    nodeResult.authError.status,
+    await readResponsePayload(nodeResult.authError),
+  );
 
   const workerResponse = await handleMcpGatewayRoute({
     request,
@@ -228,7 +269,9 @@ async function runAuthCase(
     allowedOrigins: [],
     mcpPath: true,
     supportedProtocolVersions: SUPPORTED_PROTOCOLS,
-    mcpStreamableHandler: { fetch: async () => new Response('unexpected handler call', { status: 500 }) },
+    mcpStreamableHandler: {
+      fetch: async () => new Response('unexpected handler call', { status: 500 }),
+    },
     mcpSseCompatibilityHandler: { fetch: async () => new Response('sse') },
     withCors: (response) => response,
     buildCorsHeaders: () => new Headers(),
@@ -240,7 +283,10 @@ async function runAuthCase(
   if (!workerResponse) {
     throw new Error(`Worker parity case ${id} did not return a response`);
   }
-  const worker = normalizeAuthSnapshot(workerResponse.status, await readResponsePayload(workerResponse));
+  const worker = normalizeAuthSnapshot(
+    workerResponse.status,
+    await readResponsePayload(workerResponse),
+  );
   const diffs = createDiffs(node, worker);
   return { id, description, node, worker, diffs, passed: diffs.length === 0 };
 }
@@ -254,7 +300,10 @@ async function runAsyncEnvelopeParityCase(): Promise<RuntimeParityCaseResult> {
   const workerService = createDirectToolExecutionService({
     toolRegistry: registryForWorker,
     logger,
-    asyncWorkflow: new AsyncToolWorkflowOrchestrator(logger, { queueConcurrency: 1, defaultRetryDelayMs: 1 }),
+    asyncWorkflow: new AsyncToolWorkflowOrchestrator(logger, {
+      queueConcurrency: 1,
+      defaultRetryDelayMs: 1,
+    }),
   });
 
   const config = getConfig();
@@ -269,7 +318,10 @@ async function runAsyncEnvelopeParityCase(): Promise<RuntimeParityCaseResult> {
     config,
     cache: new CacheManager({ enabled: false, ttl: 1, maxSize: 10 }, logger),
     sampling: {} as never,
-    asyncWorkflow: new AsyncToolWorkflowOrchestrator(logger, { queueConcurrency: 1, defaultRetryDelayMs: 1 }),
+    asyncWorkflow: new AsyncToolWorkflowOrchestrator(logger, {
+      queueConcurrency: 1,
+      defaultRetryDelayMs: 1,
+    }),
   });
 
   const request = {
@@ -288,12 +340,15 @@ async function runAsyncEnvelopeParityCase(): Promise<RuntimeParityCaseResult> {
     },
   } as const;
 
-  const workerQueue = normalizeAsyncQueueEnvelope(await workerService.execute(request, 'worker-parity'));
+  const workerQueue = normalizeAsyncQueueEnvelope(
+    await workerService.execute(request, 'worker-parity'),
+  );
   const nodeQueue = normalizeAsyncQueueEnvelope(await nodeService.execute(request, 'node-parity'));
   const diffs = createDiffs(nodeQueue, workerQueue);
   return {
     id: 'bp9-async-envelope',
-    description: 'queued async envelope parity between node middleware service and worker direct service',
+    description:
+      'queued async envelope parity between node middleware service and worker direct service',
     node: nodeQueue,
     worker: workerQueue,
     diffs,
@@ -306,7 +361,8 @@ async function ensureDir(filePath: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const outputPath = process.env.RUNTIME_PARITY_ARTIFACT || 'test-output/runtime-parity/certification-report.json';
+  const outputPath =
+    process.env.RUNTIME_PARITY_ARTIFACT || 'test-output/runtime-parity/certification-report.json';
   const protocolVersion = process.env.RUNTIME_PARITY_PROTOCOL_VERSION || '2025-03-26';
   const cases: RuntimeParityCaseResult[] = [
     await runInvalidSessionCase('invalid-session-id', 'invalid session response parity'),
@@ -357,14 +413,18 @@ async function main(): Promise<void> {
   await fs.writeFile(outputPath, JSON.stringify(report, null, 2));
 
   if (failed.length > 0) {
-    console.error(`Runtime parity certification failed (${failed.length} mismatches). Artifact: ${outputPath}`);
+    console.error(
+      `Runtime parity certification failed (${failed.length} mismatches). Artifact: ${outputPath}`,
+    );
     for (const item of failed) {
       console.error(`- ${item.id}: ${item.diffs.join('; ')}`);
     }
     process.exit(1);
   }
 
-  console.log(`Runtime parity certification passed (${cases.length} cases). Artifact: ${outputPath}`);
+  console.log(
+    `Runtime parity certification passed (${cases.length} cases). Artifact: ${outputPath}`,
+  );
 }
 
 main().catch((error) => {

@@ -41,10 +41,7 @@ describe('HealthServer endpoints (TypeScript)', () => {
   before(async () => {
     logger = new LoggerClass({ level: 'error', format: 'json', enabled: false }, 'test');
     metrics = new MetricsCollectorClass(logger);
-    cache = new CacheManagerClass(
-      { enabled: true, ttl: 60, maxSize: 10 },
-      logger
-    );
+    cache = new CacheManagerClass({ enabled: true, ttl: 60, maxSize: 10 }, logger);
     server = new HealthServer(0, logger, metrics, cache) as HealthServerInstance;
     await server.start();
     const port = getFreePort(server.server);
@@ -69,9 +66,7 @@ describe('HealthServer endpoints (TypeScript)', () => {
       cache_stats?: unknown;
     };
     assert.ok(
-      data.status === 'healthy' ||
-        data.status === 'warning' ||
-        data.status === 'unhealthy'
+      data.status === 'healthy' || data.status === 'warning' || data.status === 'unhealthy',
     );
     assert.ok(typeof data.timestamp === 'string');
     assert.ok(data.cache_stats !== undefined);

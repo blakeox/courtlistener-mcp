@@ -8,44 +8,44 @@
     "MCP_ALLOW_DEV_FALLBACK": "false",
     "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
     "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
-    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300"
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300",
   },
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
   },
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",
-      "id": "56b997590e3344c98bf6875ae8b522c0"
-    }
+      "id": "56b997590e3344c98bf6875ae8b522c0",
+    },
   ],
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [
       {
         "name": "MCP_OBJECT",
-        "class_name": "CourtListenerMCP"
+        "class_name": "CourtListenerMCP",
       },
       {
         "name": "AUTH_FAILURE_LIMITER",
-        "class_name": "AuthFailureLimiterDO"
-      }
-    ]
+        "class_name": "AuthFailureLimiterDO",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["CourtListenerMCP"]
+      "new_sqlite_classes": ["CourtListenerMCP"],
     },
     {
       "tag": "v2",
-      "new_sqlite_classes": ["AuthFailureLimiterDO"]
-    }
+      "new_sqlite_classes": ["AuthFailureLimiterDO"],
+    },
   ],
   "routes": [
     {
       "pattern": "courtlistenermcp.blakeoxford.com",
-      "custom_domain": true
-    }
-  ]
+      "custom_domain": true,
+    },
+  ],
 }
