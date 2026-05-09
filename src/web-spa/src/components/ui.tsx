@@ -11,16 +11,11 @@ export function Card(
   props: React.PropsWithChildren<{
     title?: string;
     subtitle?: string;
-    tone?: 'default' | 'spotlight' | 'app-landing';
+    tone?: 'default' | 'spotlight';
     className?: string;
   }>,
 ): React.JSX.Element {
-  const toneClassName =
-    props.tone === 'spotlight'
-      ? 'card-spotlight'
-      : props.tone === 'app-landing'
-        ? 'card-app-landing'
-        : '';
+  const toneClassName = props.tone === 'spotlight' ? 'card-spotlight' : '';
   return (
     <section className={`ui-card ${toneClassName} ${props.className ?? ''}`.trim()}>
       {props.title ? <h2>{props.title}</h2> : null}
@@ -32,12 +27,11 @@ export function Card(
 
 export function Panel(
   props: React.PropsWithChildren<{
-    tone?: 'default' | 'inverse' | 'app-landing';
+    tone?: 'default' | 'inverse';
     className?: string;
   }>,
 ): React.JSX.Element {
-  const toneClassName =
-    props.tone === 'inverse' ? 'inverse' : props.tone === 'app-landing' ? 'panel-app-landing' : '';
+  const toneClassName = props.tone === 'inverse' ? 'inverse' : '';
   return (
     <section className={`panel-card ${toneClassName} ${props.className ?? ''}`.trim()}>
       {props.children}

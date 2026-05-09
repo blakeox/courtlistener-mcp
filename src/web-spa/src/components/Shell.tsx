@@ -163,7 +163,7 @@ export function Shell(
   }, []);
 
   return (
-    <div className="app-shell app-shell-landing">
+    <div className="app-shell workspace-shell">
       <SkipLink href="#main-content">Skip to content</SkipLink>
       {!online && <StatusBanner message="You're offline — changes may not save." type="warn" />}
       {!loading && !authed && hasLocalToken ? (
@@ -189,7 +189,7 @@ export function Shell(
       ) : null}
 
       <div
-        className={`main-layout app-main-layout-landing ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`.trim()}
+        className={`main-layout workspace-main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`.trim()}
       >
         <Button
           variant="secondary"
@@ -212,7 +212,7 @@ export function Shell(
         ) : null}
         <aside
           id="primary-navigation"
-          className={`sidebar app-sidebar-landing ${sidebarOpen ? 'open' : ''} ${
+          className={`sidebar workspace-sidebar ${sidebarOpen ? 'open' : ''} ${
             sidebarCollapsed ? 'collapsed' : ''
           }`.trim()}
         >
@@ -223,7 +223,6 @@ export function Shell(
                 label="CourtListener MCP"
                 subtitle="Operator workspace"
                 icon={<span className="app-sidebar-brand-mark">CL</span>}
-                tone="landing"
               />
             </div>
             <Button
@@ -372,7 +371,7 @@ export function Shell(
           </div>
         </aside>
         <div className="shell-main-column">
-          <header className="topbar app-topbar-landing">
+          <header className="topbar workspace-topbar">
             <InfoBlock
               eyebrow="Workspace"
               title={currentWorkspace.label}
@@ -475,18 +474,13 @@ export function Shell(
               </InlineGroup>
             </div>
           </header>
-          <main
-            id="main-content"
-            ref={mainRef}
-            tabIndex={-1}
-            className="content app-content-landing"
-          >
+          <main id="main-content" ref={mainRef} tabIndex={-1} className="content workspace-content">
             {props.children}
           </main>
         </div>
       </div>
 
-      <footer className="app-footer-landing">
+      <footer className="workspace-footer">
         CourtListener MCP workspace. Public sign-in flows through the hosted auth handoff. Need
         setup details?{' '}
         <TextLink href={WORKSPACE_DOCS_URL} target="_blank" rel="noopener noreferrer">
