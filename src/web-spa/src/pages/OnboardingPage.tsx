@@ -16,7 +16,6 @@ import {
   InlineGroup,
   KeyValueList,
   LoadingState,
-  PageHeader,
   StatusBanner,
   Stepper,
 } from '../components/ui';
@@ -140,16 +139,13 @@ export function OnboardingPage(): React.JSX.Element {
         }
       />
 
-      <PageHeader
-        eyebrow="Runtime posture"
+      <StatusBanner role="alert" message={sessionError} type="error" />
+      <StatusBanner role="alert" message={protocolMismatchMessage} type="error" />
+
+      <Card
         title="Diagnostic signals"
-        description="Verify the browser session, optional local diagnostic credential, negotiated protocol version, and live MCP tool availability from one operator route."
+        subtitle="Verify the browser session, optional local diagnostic credential, negotiated protocol version, and live MCP tool availability from one operator route."
       >
-        {!authed ? (
-          <InlineGroup>
-            <ButtonLink href={authStartHref}>Sign in</ButtonLink>
-          </InlineGroup>
-        ) : null}
         <DefinitionList
           entries={[
             {
@@ -178,10 +174,29 @@ export function OnboardingPage(): React.JSX.Element {
             },
           ]}
         />
-      </PageHeader>
-
-      <StatusBanner role="alert" message={sessionError} type="error" />
-      <StatusBanner role="alert" message={protocolMismatchMessage} type="error" />
+        <InlineGroup>
+          {!authed ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
+          <ButtonLink to="/app/session" variant="secondary">
+            Open session
+          </ButtonLink>
+          <ButtonLink to="/app/credentials" variant="secondary">
+            Open credentials
+          </ButtonLink>
+          <ButtonLink to="/app/playground">Open playground</ButtonLink>
+          <Button variant="secondary" onClick={() => refresh()} disabled={sessionLoading}>
+            {sessionLoading ? 'Refreshing...' : 'Refresh session'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              clear();
+              toast('Stored local credential cleared', 'info');
+            }}
+          >
+            Clear local credential
+          </Button>
+        </InlineGroup>
+      </Card>
 
       <Card
         title="Runtime checklist"
@@ -271,35 +286,6 @@ export function OnboardingPage(): React.JSX.Element {
           </>
         )}
       </Card>
-
-      <PageHeader
-        eyebrow="Operator actions"
-        title="Quick actions"
-        description="Shortcuts for session, credentials, and runtime checks."
-      >
-        <InlineGroup>
-          {!authed ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
-          <ButtonLink to="/app/session" variant="secondary">
-            Open session
-          </ButtonLink>
-          <ButtonLink to="/app/credentials" variant="secondary">
-            Open credentials
-          </ButtonLink>
-          <ButtonLink to="/app/playground">Open playground</ButtonLink>
-          <Button variant="secondary" onClick={() => refresh()} disabled={sessionLoading}>
-            {sessionLoading ? 'Refreshing...' : 'Refresh session'}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              clear();
-              toast('Stored local credential cleared', 'info');
-            }}
-          >
-            Clear local credential
-          </Button>
-        </InlineGroup>
-      </PageHeader>
     </div>
   );
 }

@@ -16,7 +16,6 @@ import {
   HeroPanel,
   InlineGroup,
   KeyValueList,
-  PageHeader,
   StatusBanner,
   TextLink,
 } from '../components/ui';
@@ -88,50 +87,10 @@ export function AccountPage(): React.JSX.Element {
         eyebrow="Operator session"
         title="Session"
         description="Confirm browser session posture, inspect optional local MCP credentials, and verify runtime readiness before moving into research or operational work."
-        aside={
-          <div className="page-hero-note">
-            <Eyebrow>Current status</Eyebrow>
-            <strong className="page-hero-note-title">{heroStatusTitle}</strong>
-            <p className="page-hero-note-text">{heroStatusDetail}</p>
-            <KeyValueList
-              entries={[
-                { label: 'Session', value: sessionSummary },
-                { label: 'Credential', value: credentialSummary },
-                { label: 'Runtime', value: protocolSummary },
-              ]}
-            />
-          </div>
-        }
-      />
-
-      <PageHeader
-        eyebrow="Session controls"
-        title="Manage posture"
-        description="Re-check session posture, clear local credentials, and recover browser or runtime access from one operator entry point."
-        meta={`${sessionSummary} • ${credentialSummary} • ${protocolSummary}`}
         actions={
           <InlineGroup>
             <Button onClick={() => refresh()} disabled={loading}>
               {loading ? 'Refreshing...' : 'Refresh session'}
-            </Button>
-            {hasServerSession && hasToken ? (
-              <Button
-                variant="secondary"
-                onClick={() => protocolQuery.refetch()}
-                disabled={protocolQuery.isFetching}
-              >
-                {protocolQuery.isFetching ? 'Checking protocol...' : 'Re-check protocol'}
-              </Button>
-            ) : null}
-            <Button
-              variant="secondary"
-              disabled={!hasToken}
-              onClick={() => {
-                clear();
-                toast('Token cleared', 'info');
-              }}
-            >
-              Clear local credential
             </Button>
             <ButtonLink to="/app/credentials" variant="secondary">
               Open credentials
@@ -154,12 +113,21 @@ export function AccountPage(): React.JSX.Element {
             )}
           </InlineGroup>
         }
-      >
-        <InlineGroup>
-          <TextLink to="/app/usage">Open usage</TextLink>
-          <TextLink to="/app/observability">Open observability</TextLink>
-        </InlineGroup>
-      </PageHeader>
+        aside={
+          <div className="page-hero-note">
+            <Eyebrow>Current status</Eyebrow>
+            <strong className="page-hero-note-title">{heroStatusTitle}</strong>
+            <p className="page-hero-note-text">{heroStatusDetail}</p>
+            <KeyValueList
+              entries={[
+                { label: 'Session', value: sessionSummary },
+                { label: 'Credential', value: credentialSummary },
+                { label: 'Runtime', value: protocolSummary },
+              ]}
+            />
+          </div>
+        }
+      />
 
       <div className="page-card-grid">
         <Card
@@ -198,6 +166,19 @@ export function AccountPage(): React.JSX.Element {
             type="error"
             className="page-status-banner"
           />
+          <InlineGroup>
+            <Button
+              variant="secondary"
+              disabled={!hasToken}
+              onClick={() => {
+                clear();
+                toast('Token cleared', 'info');
+              }}
+            >
+              Clear local credential
+            </Button>
+            <TextLink to="/app/usage">Open usage</TextLink>
+          </InlineGroup>
         </Card>
 
         <Card
@@ -242,6 +223,18 @@ export function AccountPage(): React.JSX.Element {
             type="error"
             className="page-status-banner"
           />
+          <InlineGroup>
+            {hasServerSession && hasToken ? (
+              <Button
+                variant="secondary"
+                onClick={() => protocolQuery.refetch()}
+                disabled={protocolQuery.isFetching}
+              >
+                {protocolQuery.isFetching ? 'Checking protocol...' : 'Re-check protocol'}
+              </Button>
+            ) : null}
+            <TextLink to="/app/observability">Open observability</TextLink>
+          </InlineGroup>
         </Card>
       </div>
     </div>

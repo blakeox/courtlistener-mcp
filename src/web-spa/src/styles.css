@@ -3152,12 +3152,6 @@ footer a {
   text-transform: uppercase;
 }
 
-.workspace-topbar-title {
-  display: block;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
 .sidebar-intro {
   margin: 16px 0 0;
   color: #cbd5e1;
@@ -3195,9 +3189,24 @@ footer a {
   grid-template-rows: auto 1fr;
 }
 
-.topbar-heading {
+.topbar-context {
   display: grid;
   gap: 2px;
+}
+
+.topbar-context-label {
+  color: var(--shell-account-menu-text-subtle);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topbar-context-value {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .topbar-actions {
@@ -3221,6 +3230,10 @@ footer a {
 
 .top-actions-utility .text-link {
   font-weight: 700;
+}
+
+.playground-mode-summary {
+  align-items: center;
 }
 
 .desktop-sidebar-toggle {

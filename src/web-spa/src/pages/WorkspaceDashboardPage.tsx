@@ -11,7 +11,6 @@ import {
   InlineGroup,
   KeyValueList,
   MetricCard,
-  PageHeader,
   Panel,
   StatusBanner,
   TextLink,
@@ -97,21 +96,6 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </div>
         }
       />
-
-      <PageHeader
-        eyebrow="Workspace signals"
-        title="Operational surface"
-        description="Recent work, credential posture, provider health, and runtime signals stay visible from the main operator route."
-        meta={
-          <InlineGroup>
-            <Badge tone={authed ? 'ok' : 'warn'}>{sessionSummary}</Badge>
-            <Badge tone={hasToken ? 'ok' : 'warn'}>{credentialSummary}</Badge>
-            <Badge tone={readinessQuery.isError ? 'warn' : 'ok'}>{runtimeLabel}</Badge>
-          </InlineGroup>
-        }
-      >
-        <StatusBanner message="Terminal · MCP · Court research. Legal infrastructure with operational control, not chatbot theater." />
-      </PageHeader>
 
       <StatusBanner role="alert" message={sessionError} type="error" />
       <StatusBanner

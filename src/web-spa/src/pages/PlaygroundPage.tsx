@@ -36,7 +36,6 @@ import {
   Input,
   KeyValueList,
   MetaNote,
-  PageHeader,
   Select,
   StatusBanner,
   StatusPill,
@@ -2639,35 +2638,14 @@ function PlaygroundContent(): React.JSX.Element {
         />
       )}
 
-      <PageHeader
-        eyebrow="Workspace modes"
-        title="Quick workflow"
-        description="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging."
-        meta={
-          <ConnectionBadge
-            connected={mcpSessionId.length > 0}
-            connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
-            disconnectedLabel="No session"
-            meta={`| ${toolCatalog.length} tools`}
-          />
-        }
-        actions={
-          <InlineGroup>
-            <ButtonLink to="/app/session" variant="secondary">
-              1) Set token
-            </ButtonLink>
-            <Button variant="secondary" onClick={() => setActiveTab('ai')}>
-              2) AI Chat
-            </Button>
-            <Button variant="secondary" onClick={() => setActiveTab('compare')}>
-              3) Compare
-            </Button>
-            <Button variant="secondary" onClick={() => setActiveTab('raw')}>
-              4) Raw Console
-            </Button>
-          </InlineGroup>
-        }
-      />
+      <InlineGroup className="playground-mode-summary">
+        <ConnectionBadge
+          connected={mcpSessionId.length > 0}
+          connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
+          disconnectedLabel="No session"
+          meta={`| ${toolCatalog.length} tools`}
+        />
+      </InlineGroup>
 
       <div
         className="tabs"

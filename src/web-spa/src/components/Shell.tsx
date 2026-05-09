@@ -7,7 +7,6 @@ import {
   BrandLink,
   Button,
   ButtonLink,
-  InfoBlock,
   InlineGroup,
   LoadingState,
   NavCardLink,
@@ -372,14 +371,10 @@ export function Shell(
         </aside>
         <div className="shell-main-column">
           <header className="topbar workspace-topbar">
-            <InfoBlock
-              eyebrow="Workspace"
-              title={currentWorkspace.label}
-              titleAs="strong"
-              description={currentWorkspace.description}
-              className="topbar-heading"
-              titleClassName="workspace-topbar-title"
-            />
+            <div className="topbar-context" aria-label="Current workspace route">
+              <span className="topbar-context-label">Workspace</span>
+              <strong className="topbar-context-value">{currentWorkspace.label}</strong>
+            </div>
             <div className="topbar-actions" role="group" aria-label="Workspace utilities">
               <InlineGroup className="top-actions top-actions-utility">
                 <Button
