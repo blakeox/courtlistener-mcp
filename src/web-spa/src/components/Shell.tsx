@@ -162,7 +162,7 @@ export function Shell(
   }, []);
 
   return (
-    <div className="app-shell workspace-shell">
+    <div className="workspace-shell">
       <SkipLink href="#main-content">Skip to content</SkipLink>
       {!online && <StatusBanner message="You're offline — changes may not save." type="warn" />}
       {!loading && !authed && hasLocalToken ? (
@@ -188,7 +188,7 @@ export function Shell(
       ) : null}
 
       <div
-        className={`main-layout workspace-main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`.trim()}
+        className={`workspace-main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`.trim()}
       >
         <Button
           variant="secondary"
@@ -211,7 +211,7 @@ export function Shell(
         ) : null}
         <aside
           id="primary-navigation"
-          className={`sidebar workspace-sidebar ${sidebarOpen ? 'open' : ''} ${
+          className={`workspace-sidebar ${sidebarOpen ? 'open' : ''} ${
             sidebarCollapsed ? 'collapsed' : ''
           }`.trim()}
         >
@@ -370,7 +370,7 @@ export function Shell(
           </div>
         </aside>
         <div className="shell-main-column">
-          <header className="topbar workspace-topbar">
+          <header className="workspace-topbar">
             <div className="topbar-context" aria-label="Current workspace route">
               <span className="topbar-context-label">Workspace</span>
               <strong className="topbar-context-value">{currentWorkspace.label}</strong>
@@ -469,7 +469,7 @@ export function Shell(
               </InlineGroup>
             </div>
           </header>
-          <main id="main-content" ref={mainRef} tabIndex={-1} className="content workspace-content">
+          <main id="main-content" ref={mainRef} tabIndex={-1} className="workspace-content">
             {props.children}
           </main>
         </div>
