@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       <div className="stack">
         <Card
           title="Something went wrong"
-          subtitle="An unexpected error occurred. You can try again or return to the workspace home."
+          subtitle="An unexpected error occurred. You can try again or return to the workspace overview."
         >
           <StatusBanner
             role="alert"
@@ -45,7 +45,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               Try again
             </Button>
             <ButtonLink href="/app" variant="secondary">
-              Go to Workspace Home
+              Go to Workspace Overview
             </ButtonLink>
           </InlineGroup>
         </Card>

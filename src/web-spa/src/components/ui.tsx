@@ -45,6 +45,76 @@ export function Panel(
   );
 }
 
+export function PageHeader(
+  props: React.PropsWithChildren<{
+    eyebrow?: React.ReactNode;
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    actions?: React.ReactNode;
+    meta?: React.ReactNode;
+    className?: string;
+    eyebrowClassName?: string;
+    titleClassName?: string;
+    descriptionClassName?: string;
+  }>,
+): React.JSX.Element {
+  return (
+    <section className={['page-header', props.className ?? ''].join(' ').trim()}>
+      <div className="page-header-main">
+        {props.eyebrow ? (
+          <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
+        ) : null}
+        <h1 className={props.titleClassName}>{props.title}</h1>
+        {props.description ? (
+          <p
+            className={['page-header-description', props.descriptionClassName ?? '']
+              .join(' ')
+              .trim()}
+          >
+            {props.description}
+          </p>
+        ) : null}
+        {props.children}
+      </div>
+      {props.actions || props.meta ? (
+        <div className="page-header-side">
+          {props.meta ? <div className="page-header-meta">{props.meta}</div> : null}
+          {props.actions ? <div className="page-header-actions">{props.actions}</div> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function HeroPanel(
+  props: React.PropsWithChildren<{
+    eyebrow?: React.ReactNode;
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    actions?: React.ReactNode;
+    aside?: React.ReactNode;
+    className?: string;
+    eyebrowClassName?: string;
+  }>,
+): React.JSX.Element {
+  return (
+    <section className={['page-hero', props.className ?? ''].join(' ').trim()}>
+      <div className="page-hero-layout">
+        <div className="page-hero-main">
+          {props.eyebrow ? (
+            <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
+          ) : null}
+          <h1>{props.title}</h1>
+          {props.description ? <p className="page-hero-description">{props.description}</p> : null}
+          {props.actions ? <div className="page-hero-actions">{props.actions}</div> : null}
+          {props.children}
+        </div>
+        {props.aside ? <aside className="page-hero-aside">{props.aside}</aside> : null}
+      </div>
+    </section>
+  );
+}
+
 export function SectionHeading(
   props: React.PropsWithChildren<{
     eyebrow: React.ReactNode;
@@ -140,6 +210,25 @@ export function MetricCard(
       {props.accent ? <p className="metric-card-accent">{props.accent}</p> : null}
       {props.children}
     </Card>
+  );
+}
+
+export function KeyValueList(props: {
+  entries: Array<{
+    label: React.ReactNode;
+    value: React.ReactNode;
+  }>;
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <ul className={['key-value-list', props.className ?? ''].join(' ').trim()}>
+      {props.entries.map((entry) => (
+        <li key={`${entry.label}-${entry.value}`}>
+          <span>{entry.label}</span>
+          <strong>{entry.value}</strong>
+        </li>
+      ))}
+    </ul>
   );
 }
 

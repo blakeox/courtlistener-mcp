@@ -49,7 +49,7 @@ vi.mock('../lib/api', () => ({
 }));
 
 vi.mock('../lib/hosted-auth', () => ({
-  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Faccount'),
+  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Fsession'),
   redirectToHostedAuth: vi.fn(),
 }));
 
@@ -100,7 +100,7 @@ describe('HostedAuthRedirectPage', () => {
     expect(screen.getByText('Redirecting to sign in')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
     await waitFor(() => {
       expect(hostedAuth.redirectToHostedAuth).toHaveBeenCalledTimes(1);
@@ -257,7 +257,7 @@ describe('OnboardingPage', () => {
     expect(screen.getByText(/no operator session/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
     expect(screen.getByRole('button', { name: /clear local credential/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open session page/i })).toHaveAttribute(
@@ -285,7 +285,7 @@ describe('OnboardingPage', () => {
     expect(screen.getByText(/session check failed/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
   });
 
@@ -359,7 +359,7 @@ describe('LandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
     expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute(
       'href',
@@ -384,8 +384,21 @@ describe('LandingPage', () => {
 });
 
 describe('AccountPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     stubBrowserStorage();
+    vi.clearAllMocks();
+    const api = await import('../lib/api');
+    vi.mocked(api.getUsage).mockReset();
+    vi.mocked(api.mcpCall).mockReset();
+    vi.mocked(api.getUsage).mockResolvedValue({
+      userId: 'u1',
+      totalRequests: 0,
+      dailyRequests: 0,
+      currentDay: '2026-03-05',
+      lastSeenAt: null,
+      byRoute: {},
+    });
+    vi.mocked(api.mcpCall).mockResolvedValue({ body: {}, sessionId: 'sid' });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -394,7 +407,7 @@ describe('AccountPage', () => {
   it('renders account heading', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('heading', { name: 'Session Control', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session', level: 1 })).toBeInTheDocument();
   });
 
   it('shows session info area', async () => {
@@ -404,7 +417,7 @@ describe('AccountPage', () => {
     expect(screen.getByText('Session posture')).toBeInTheDocument();
   });
 
-  it('surfaces protocol observability counts when token is available', async () => {
+  it('surfaces protocol readiness details when token is available', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall)
@@ -449,7 +462,7 @@ describe('AccountPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/2025-06-18/)).toBeInTheDocument();
-      expect(screen.getByText('1 tools · 1 resources · 1 prompts')).toBeInTheDocument();
+      expect(screen.getByText('Runtime session')).toBeInTheDocument();
       expect(screen.getByText(/Protocol session active: sid-account/i)).toBeInTheDocument();
     });
   });
@@ -484,7 +497,6 @@ describe('AccountPage', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/protocol mismatch/i).length).toBeGreaterThan(0);
-      expect(screen.getByText(/blocked by protocol mismatch/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /re-check protocol/i })).toBeInTheDocument();
     });
   });
@@ -505,7 +517,17 @@ describe('AccountPage', () => {
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
     expect(screen.getByText(/⚠ Failed/i)).toBeInTheDocument();
-    expect(screen.getByText(/sign in to view usage metrics/i)).toBeInTheDocument();
+    expect(screen.getByText('Runtime readiness')).toBeInTheDocument();
+    expect(screen.queryByText('Usage & activity')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open credentials' })).toHaveAttribute(
+      'href',
+      '/app/credentials',
+    );
+    expect(screen.getByRole('link', { name: 'Open usage' })).toHaveAttribute('href', '/app/usage');
+    expect(screen.getByRole('link', { name: 'Open observability' })).toHaveAttribute(
+      'href',
+      '/app/observability',
+    );
   });
 
   it('preserves the local credential and surfaces the failure when account logout rejects', async () => {
@@ -575,9 +597,12 @@ describe('PlaygroundPage', () => {
     };
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     stubBrowserStorage();
     vi.clearAllMocks();
+    const api = await import('../lib/api');
+    vi.mocked(api.mcpCall).mockReset();
+    vi.mocked(api.mcpCall).mockResolvedValue({ body: {}, sessionId: 'sid' });
   });
   afterEach(() => {
     vi.unstubAllGlobals();

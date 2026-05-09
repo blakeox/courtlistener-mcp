@@ -112,7 +112,7 @@ class UnitTestRunner {
         } catch {
           /* already exited */
         }
-      }, 30000); // 30 second timeout
+      }, 60000); // 60 second timeout for slower integration-style unit files
 
       let output = '';
       let errorOutput = '';

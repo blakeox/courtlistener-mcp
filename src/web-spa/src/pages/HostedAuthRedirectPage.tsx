@@ -20,7 +20,7 @@ export function HostedAuthRedirectPage(): React.JSX.Element {
       >
         <p className="muted">
           Continue in hosted auth to start or recover your browser session, then return to your
-          operator session at <span className="mono">/app/account</span>.
+          operator session at <span className="mono">/app/session</span>.
         </p>
         <InlineGroup>
           <ButtonLink href={authStartHref}>Continue to hosted auth</ButtonLink>

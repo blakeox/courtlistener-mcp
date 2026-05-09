@@ -28,7 +28,7 @@ describe('web-spa hosted auth helpers', () => {
   });
 
   it('buildHostedAuthStartHref targets the default operator session route', () => {
-    assert.equal(buildHostedAuthStartHref(), '/auth/start?return_to=%2Fapp%2Faccount');
+    assert.equal(buildHostedAuthStartHref(), '/auth/start?return_to=%2Fapp%2Fsession');
   });
 
   it('buildHostedAuthStartHref accepts an explicit return target', () => {

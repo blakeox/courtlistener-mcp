@@ -124,7 +124,7 @@ function AppContent(): React.JSX.Element {
               element={<WorkspaceSectionPage sectionKey="credentials" />}
             />
             <Route path="/app/session" element={<AccountPage />} />
-            <Route path="/app/account" element={<AccountPage />} />
+            <Route path="/app/account" element={<Navigate to="/app/session" replace />} />
             <Route path="/app/keys" element={<Navigate to="/app/credentials" replace />} />
             <Route path="/app/docs" element={<WorkspaceSectionPage sectionKey="docs" />} />
             <Route path="*" element={smartRedirectElement} />

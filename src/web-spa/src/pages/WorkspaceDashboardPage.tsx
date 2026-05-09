@@ -5,9 +5,13 @@ import {
   ButtonLink,
   Card,
   DefinitionList,
+  Eyebrow,
+  HeroPanel,
   InfoBlock,
   InlineGroup,
+  KeyValueList,
   MetricCard,
+  PageHeader,
   Panel,
   StatusBanner,
   TextLink,
@@ -21,8 +25,8 @@ import { useToken } from '../lib/token-context';
 import { WORKSPACE_RECENT_SESSIONS } from '../lib/workspace';
 
 export function WorkspaceDashboardPage(): React.JSX.Element {
-  useDocumentTitle('Agent Workspace');
-  const authStartHref = buildHostedAuthStartHref();
+  useDocumentTitle('Overview');
+  const authStartHref = buildHostedAuthStartHref('/app');
   const { session, sessionError } = useAuth();
   const { token } = useToken();
   const authed = Boolean(session?.authenticated);
@@ -49,38 +53,65 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
       : readinessQuery.isError
         ? 'Runtime check failed'
         : 'Runtime ready';
+  const sessionSummary = authed ? 'Session active' : 'Session not loaded';
+  const credentialSummary = hasToken
+    ? 'Browser credential loaded'
+    : 'Browser credential not loaded';
 
   return (
     <div className="stack">
-      <Card
-        title="Agent Workspace"
-        subtitle="Run reviewable legal-data workflows with CourtListener MCP. Start with a research question, approve tool calls, inspect results, and export a trace."
-      >
-        <InlineGroup>
-          <ButtonLink to="/app/sessions">Start research session</ButtonLink>
-          <ButtonLink to="/app/workflows" variant="secondary">
-            Use workflow template
-          </ButtonLink>
-          <ButtonLink to="/app/tools" variant="secondary">
-            Open tool builder
-          </ButtonLink>
-          {!authed ? (
-            <ButtonLink href={authStartHref} variant="secondary">
-              Sign in
+      <HeroPanel
+        eyebrow="Workspace overview"
+        title="Overview"
+        description="Start research work, check session and runtime posture, and jump into the parts of the workspace that need attention."
+        actions={
+          <InlineGroup>
+            <ButtonLink to="/app/sessions">Start research</ButtonLink>
+            <ButtonLink to="/app/workflows" variant="secondary">
+              Open workflows
             </ButtonLink>
-          ) : null}
-        </InlineGroup>
-        <InlineGroup>
-          <Badge tone={authed ? 'ok' : 'warn'}>
-            {authed ? 'Session active' : 'Session not loaded'}
-          </Badge>
-          <Badge tone={hasToken ? 'ok' : 'warn'}>
-            {hasToken ? 'Browser credential loaded' : 'Browser credential not loaded'}
-          </Badge>
-          <Badge tone={readinessQuery.isError ? 'warn' : 'ok'}>{runtimeLabel}</Badge>
-        </InlineGroup>
+            <ButtonLink to="/app/tools" variant="secondary">
+              Open tools
+            </ButtonLink>
+            {!authed ? (
+              <ButtonLink href={authStartHref} variant="secondary">
+                Sign in
+              </ButtonLink>
+            ) : null}
+          </InlineGroup>
+        }
+        aside={
+          <div className="page-hero-note">
+            <Eyebrow>Current posture</Eyebrow>
+            <strong className="page-hero-note-title">Operational surface</strong>
+            <p className="page-hero-note-text">
+              Terminal, MCP, and court research in one workspace with explicit control points.
+            </p>
+            <KeyValueList
+              entries={[
+                { label: 'Session', value: sessionSummary },
+                { label: 'Credential', value: credentialSummary },
+                { label: 'Runtime', value: runtimeLabel },
+              ]}
+            />
+          </div>
+        }
+      />
+
+      <PageHeader
+        eyebrow="Workspace signals"
+        title="Operational surface"
+        description="Recent work, credential posture, provider health, and runtime signals stay visible from the main operator route."
+        meta={
+          <InlineGroup>
+            <Badge tone={authed ? 'ok' : 'warn'}>{sessionSummary}</Badge>
+            <Badge tone={hasToken ? 'ok' : 'warn'}>{credentialSummary}</Badge>
+            <Badge tone={readinessQuery.isError ? 'warn' : 'ok'}>{runtimeLabel}</Badge>
+          </InlineGroup>
+        }
+      >
         <StatusBanner message="Terminal · MCP · Court research. Legal infrastructure with operational control, not chatbot theater." />
-      </Card>
+      </PageHeader>
 
       <StatusBanner role="alert" message={sessionError} type="error" />
       <StatusBanner
@@ -120,8 +151,8 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </div>
 
           <Card
-            title="Recent Research Sessions"
-            subtitle="The main working area keeps active, pending-review, and completed sessions visible."
+            title="Recent sessions"
+            subtitle="Keep active, pending-review, and completed work visible from the overview."
           >
             <div className="table-scroll">
               <table className="table">
@@ -162,7 +193,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </Card>
 
           <Card
-            title="Credentials & Providers"
+            title="Credentials"
             subtitle="Bring your own keys. Keep your billing. We never share or use your keys for other users."
           >
             <div className="two-up-grid">

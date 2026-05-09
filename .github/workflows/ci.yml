@@ -110,7 +110,7 @@ jobs:
           echo "mcp_related=${MCP_FILTER:-$MCP_DEFAULT}" >> "$GITHUB_OUTPUT"
 
   test:
-    name: Test Suite
+    name: Smoke Matrix
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -140,19 +140,44 @@ jobs:
         run: pnpm run format:check
 
       - name: Lint (critical files)
+        if: matrix.node-version == 20
         run: pnpm run lint:critical
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run unit tests
+        run: pnpm run test:unit
+
+  full-validation:
+    name: Full Validation
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Lint (full src - non-blocking)
         run: pnpm run lint:src
         continue-on-error: true
 
       - name: Run shared local gate
-        run: |
-          if [ "${{ matrix.node-version }}" = "18" ]; then
-            pnpm run ci:local-gate -- --skip-spa-auth
-          else
-            pnpm run ci:local-gate
-          fi
+        run: pnpm run ci:local-gate
 
       - name: Run integration tests
         run: pnpm run test:integration
@@ -168,7 +193,7 @@ jobs:
         uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: coverage-node-${{ matrix.node-version }}
+          name: coverage-node-20
           path: |
             coverage/
             coverage/lcov.info
@@ -182,7 +207,7 @@ jobs:
             LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json || echo 0)
             FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json || echo 0)
             STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json || echo 0)
-            echo "## Coverage Summary (Node ${{ matrix.node-version }})" >> $GITHUB_STEP_SUMMARY
+            echo "## Coverage Summary (Node 20)" >> $GITHUB_STEP_SUMMARY
             echo "- Lines: ${LINES}%" >> $GITHUB_STEP_SUMMARY
             echo "- Statements: ${STMTS}%" >> $GITHUB_STEP_SUMMARY
             echo "- Functions: ${FUNCS}%" >> $GITHUB_STEP_SUMMARY
@@ -199,7 +224,7 @@ jobs:
           PERF_BASELINE_FILE: ${{ vars.PERF_BASELINE_FILE }}
           PERF_CURRENT_FILE: ${{ vars.PERF_CURRENT_FILE }}
           PERF_COMMIT_SHA: ${{ github.sha }}
-          PERF_RUNTIME_MODE: node-${{ matrix.node-version }}
+          PERF_RUNTIME_MODE: node-20
         run: pnpm run ci:perf-gate
 
       - name: Install MCP Inspector
@@ -485,7 +510,7 @@ jobs:
         github.ref == 'refs/heads/main' &&
         vars.ENABLE_REMOTE_SERVER_VALIDATION == 'true'
       }}
-    needs: [test, mcp-compliance]
+    needs: [full-validation, mcp-compliance]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -554,12 +579,13 @@ jobs:
   required-checks-gate:
     name: Required Checks Gate
     runs-on: ubuntu-latest
-    needs: [test, hardening-release-gates, mcp-compliance, security-check]
+    needs: [test, full-validation, hardening-release-gates, mcp-compliance, security-check]
     if: always()
     steps:
       - name: Summarize upstream job results
         run: |
           echo "Test Suite result: ${{ needs.test.result }}"
+          echo "Full Validation result: ${{ needs['full-validation'].result }}"
           echo "Hardening Release Gates result: ${{ needs['hardening-release-gates'].result }}"
           echo "MCP Compliance result: ${{ needs['mcp-compliance'].result }}"
           echo "Security & Code Quality result: ${{ needs['security-check'].result }}"
@@ -567,6 +593,7 @@ jobs:
         if: >-
           ${{
             needs.test.result != 'success' ||
+            needs['full-validation'].result != 'success' ||
             contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
             contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
             needs['security-check'].result != 'success'
@@ -578,6 +605,7 @@ jobs:
         if: >-
           ${{
             needs.test.result == 'success' &&
+            needs['full-validation'].result == 'success' &&
             !contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) &&
             !contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) &&
             needs['security-check'].result == 'success'

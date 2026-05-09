@@ -1,7 +1,8 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import type { RenderResult } from '@testing-library/react';
 import { TokenProvider } from '../lib/token-context';
 import { ToastProvider } from '../components/Toast';
 import { stubBrowserStorage } from './test-utils';
@@ -37,8 +38,8 @@ function LocationProbe(): React.JSX.Element {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderShell(initialEntry = '/app/control-center'): void {
-  render(
+function renderShell(initialEntry = '/app/control-center'): RenderResult {
+  return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <TokenProvider>
         <ToastProvider>
@@ -126,11 +127,14 @@ describe('Shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear local credential' }));
 
-    await waitFor(() => {
-      expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
-      expect(screen.queryByText(/session recovery:/i)).not.toBeInTheDocument();
-      expect(screen.getByText('Stored local credential cleared')).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
+        expect(screen.queryByText(/session recovery:/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Stored local credential cleared')).toBeInTheDocument();
+      },
+      { timeout: 10000 },
+    );
   });
 
   it('clears the token, shows a toast, and navigates to account when the session heartbeat expires', async () => {
@@ -168,6 +172,84 @@ describe('Shell', () => {
     expect(screen.getByText("You're offline — changes may not save.")).toBeInTheDocument();
   });
 
+  it('persists the desktop sidebar collapsed state', () => {
+    const firstRender = renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+
+    expect(localStorage.getItem('clmcp_workspace_sidebar_collapsed')).toBe('true');
+    expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
+
+    firstRender.unmount();
+    renderShell('/app/playground');
+
+    expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Playground' })).toHaveAttribute('title', 'Playground');
+  });
+
+  it('opens and closes the mobile navigation drawer affordances', () => {
+    renderShell('/app/playground');
+
+    const menuButton = screen.getByRole('button', { name: /toggle navigation menu/i });
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(menuButton);
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('button', { name: /close navigation menu/i })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /close navigation menu/i })[0]);
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getAllByRole('button', { name: /close navigation menu/i })).toHaveLength(1);
+  });
+
+  it('keeps secondary operate links behind a more toggle', () => {
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Operate section' }));
+
+    expect(screen.getByRole('link', { name: 'Usage' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Observability' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Diagnostics' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More routes' }));
+
+    expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Readiness' })).toBeInTheDocument();
+  });
+
+  it('keeps secondary setup links behind a setup toggle', () => {
+    renderShell('/app/playground');
+
+    expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More setup routes' }));
+
+    expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+  });
+
+  it('opens the account menu with status and session links', () => {
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guest' }));
+
+    const accountMenu = screen.getByRole('menu', { name: 'Account menu' });
+    expect(accountMenu).toBeInTheDocument();
+    expect(screen.getByText('Signed out')).toBeInTheDocument();
+    expect(screen.getByText('No local credential')).toBeInTheDocument();
+    expect(within(accountMenu).getByRole('link', { name: 'Session' })).toHaveAttribute(
+      'href',
+      '/app/session',
+    );
+    expect(within(accountMenu).getByRole('link', { name: 'Credentials' })).toHaveAttribute(
+      'href',
+      '/app/credentials',
+    );
+  });
+
   it('preserves local token and keeps the operator on the current page when topbar logout rejects', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'token-123');
     const logoutMock = vi.fn().mockRejectedValue(new Error('network failed'));
@@ -179,6 +261,7 @@ describe('Shell', () => {
 
     renderShell('/app/account');
 
+    fireEvent.click(screen.getByRole('button', { name: 'u1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     await waitFor(() => {

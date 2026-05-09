@@ -21,9 +21,12 @@ import {
   InfoBlock,
   IconButton,
   InlineGroup,
+  KeyValueList,
   LoadingState,
   NavCardLink,
   Panel,
+  PageHeader,
+  HeroPanel,
   SectionHeading,
   PillLink,
   SkipLink,
@@ -156,6 +159,55 @@ describe('InfoBlock', () => {
       'workspace-topbar-title',
     );
     expect(screen.getByText('Workspace state for operators.')).toBeInTheDocument();
+  });
+});
+
+describe('PageHeader', () => {
+  it('renders the shared app page header with actions and meta', () => {
+    render(
+      <MemoryRouter>
+        <PageHeader
+          eyebrow="Workspace signals"
+          title="Operational surface"
+          description="Recent work and runtime posture."
+          meta="Session active"
+          actions={<ButtonLink to="/app/tools">Open tools</ButtonLink>}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Workspace signals')).toHaveClass('workspace-card-label');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Operational surface' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Recent work and runtime posture.')).toHaveClass(
+      'page-header-description',
+    );
+    expect(screen.getByText('Session active')).toHaveClass('page-header-meta');
+    expect(screen.getByRole('link', { name: 'Open tools' })).toBeInTheDocument();
+  });
+});
+
+describe('HeroPanel', () => {
+  it('renders the shared emphasized hero panel with an aside surface', () => {
+    render(
+      <HeroPanel
+        eyebrow="Operator session"
+        title="Session"
+        description="Session, credential, and runtime posture."
+        aside={
+          <div className="page-hero-note">
+            <strong className="page-hero-note-title">Current status</strong>
+            <KeyValueList entries={[{ label: 'Runtime', value: 'Ready' }]} />
+          </div>
+        }
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Session' })).toBeInTheDocument();
+    expect(screen.getByText('Session, credential, and runtime posture.')).toHaveClass(
+      'page-hero-description',
+    );
+    expect(screen.getByText('Current status')).toHaveClass('page-hero-note-title');
+    expect(screen.getByText('Ready')).toBeInTheDocument();
   });
 });
 

@@ -6,7 +6,9 @@ import { App } from '../App';
 import { createMatchMediaMock, renderWithSpaProviders, stubBrowserStorage } from './test-utils';
 
 vi.mock('../lib/hosted-auth', () => ({
-  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Faccount'),
+  buildHostedAuthStartHref: vi.fn((returnTo = '/app/session') => {
+    return `/auth/start?return_to=${encodeURIComponent(returnTo)}`;
+  }),
   redirectToHostedAuth: vi.fn(),
 }));
 
@@ -95,7 +97,7 @@ describe('App auth routing', () => {
     });
     expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
   });
 
@@ -120,7 +122,7 @@ describe('App auth routing', () => {
   it('redirects /app/keys to the credentials page', async () => {
     renderApp('/app/keys');
     expect(
-      await screen.findByRole('heading', { name: 'Credentials & Providers', level: 2 }),
+      await screen.findByRole('heading', { name: 'Credentials & Providers', level: 1 }),
     ).toBeInTheDocument();
   });
 
@@ -138,16 +140,14 @@ describe('App auth routing', () => {
     );
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp%2Fsession',
     );
     expect(screen.queryByText(/operator console/i)).not.toBeInTheDocument();
   });
 
   it('redirects /account to the operator session route', async () => {
     renderApp('/account');
-    expect(
-      await screen.findByRole('heading', { name: 'Session Control', level: 1 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Session', level: 1 })).toBeInTheDocument();
   });
 
   it('shows a primary sign-in entry when signed out on /app/control-center', async () => {
@@ -163,13 +163,11 @@ describe('App auth routing', () => {
 
     renderApp('/app/control-center');
 
-    expect(
-      await screen.findByRole('heading', { name: /Agent Workspace/i, level: 2 }),
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
-      'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
-    );
+    expect(await screen.findByRole('heading', { name: /Overview/i, level: 1 })).toBeInTheDocument();
+    const signInHrefs = screen
+      .getAllByRole('link', { name: /^sign in$/i })
+      .map((link) => link.getAttribute('href'));
+    expect(signInHrefs).toContain('/auth/start?return_to=%2Fapp');
     expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
   });
 
@@ -187,17 +185,13 @@ describe('App auth routing', () => {
     renderApp('/app/unknown');
 
     expect(await screen.findByLabelText('Loading page')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Session Control', level: 1 }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Session', level: 1 })).not.toBeInTheDocument();
   });
 
   it('sends authenticated unknown routes to /app/session before diagnostics', async () => {
     renderApp('/app/unknown');
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Session Control', level: 1 }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Session', level: 1 })).toBeInTheDocument();
     });
   });
 });

@@ -109,10 +109,13 @@ describe('GitHub workflow hardening', () => {
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
+    assert.match(ciWorkflow, /name: Smoke Matrix/);
+    assert.match(ciWorkflow, /full-validation:/);
     assert.match(ciWorkflow, /concurrency:/);
     assert.match(ciWorkflow, /cancel-in-progress: true/);
     assert.match(ciWorkflow, /pnpm run format:check/);
     assert.doesNotMatch(ciWorkflow, /pnpm install --frozen-lockfile --dry-run/);
+    assert.match(ciWorkflow, /pnpm run test:unit/);
     assert.match(ciWorkflow, /pnpm run ci:local-gate/);
     assert.match(releaseWorkflow, /concurrency:/);
     assert.match(releaseWorkflow, /pnpm run format:check/);

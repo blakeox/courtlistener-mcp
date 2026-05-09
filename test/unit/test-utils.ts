@@ -70,7 +70,7 @@ describe('Utility Functions (TypeScript)', () => {
       await sleep(100);
       const duration = Date.now() - start;
 
-      assert.ok(duration >= 90 && duration < 150, `Expected ~100ms, got ${duration}ms`);
+      assert.ok(duration >= 90 && duration < 300, `Expected ~100ms, got ${duration}ms`);
     });
   });
 

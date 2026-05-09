@@ -1,5 +1,12 @@
 import React from 'react';
-import { ButtonLink, Card, CodeSurface, Eyebrow, InlineGroup, MetricCard } from '../components/ui';
+import {
+  ButtonLink,
+  Card,
+  CodeSurface,
+  InlineGroup,
+  MetricCard,
+  PageHeader,
+} from '../components/ui';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { WORKSPACE_SECTIONS } from '../lib/workspace';
 import type { WorkspaceSection } from '../lib/workspace';
@@ -12,28 +19,32 @@ export function WorkspaceSectionPage(props: {
 
   return (
     <div className="stack">
-      <Card title={section.title} subtitle={section.description}>
-        <Eyebrow>{section.eyebrow}</Eyebrow>
-        {section.actions?.length ? (
-          <InlineGroup>
-            {section.actions.map((action, index) => (
-              <ButtonLink
-                key={`${action.label}-${action.to}`}
-                variant={index === 0 ? 'primary' : 'secondary'}
-                {...(action.external
-                  ? {
-                      href: action.to,
-                      rel: 'noopener noreferrer',
-                      target: '_blank',
-                    }
-                  : { to: action.to })}
-              >
-                {action.label}
-              </ButtonLink>
-            ))}
-          </InlineGroup>
-        ) : null}
-      </Card>
+      <PageHeader
+        eyebrow={section.eyebrow}
+        title={section.title}
+        description={section.description}
+        actions={
+          section.actions?.length ? (
+            <InlineGroup>
+              {section.actions.map((action, index) => (
+                <ButtonLink
+                  key={`${action.label}-${action.to}`}
+                  variant={index === 0 ? 'primary' : 'secondary'}
+                  {...(action.external
+                    ? {
+                        href: action.to,
+                        rel: 'noopener noreferrer',
+                        target: '_blank',
+                      }
+                    : { to: action.to })}
+                >
+                  {action.label}
+                </ButtonLink>
+              ))}
+            </InlineGroup>
+          ) : undefined
+        }
+      />
 
       {section.metrics?.length ? (
         <div className="two-up-grid">
