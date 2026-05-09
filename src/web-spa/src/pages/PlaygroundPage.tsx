@@ -30,10 +30,13 @@ import {
   ConnectionBadge,
   EmptyState,
   FormField,
+  HeroPanel,
   IconButton,
   InlineGroup,
   Input,
+  KeyValueList,
   MetaNote,
+  PageHeader,
   Select,
   StatusBanner,
   StatusPill,
@@ -2569,19 +2572,47 @@ function PlaygroundContent(): React.JSX.Element {
     URL.revokeObjectURL(url);
   }
 
+  const activeTabLabel =
+    activeTab === 'ai' ? 'AI Chat' : activeTab === 'compare' ? 'Compare' : 'Raw MCP Console';
+  const sessionLabel =
+    mcpSessionId.length > 0 ? `Session ${mcpSessionId.slice(0, 8)}…` : 'No active MCP session';
+
   return (
     <div className="stack">
-      <InlineGroup gap="spacious">
-        <ConnectionBadge
-          connected={mcpSessionId.length > 0}
-          connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
-          disconnectedLabel="No session"
-          meta={`| ${toolCatalog.length} tools`}
-        />
-        <Button variant="secondary" size="tiny" onClick={() => setShowCatalog(!showCatalog)}>
-          {showCatalog ? 'Hide' : 'Show'} Tool Catalog ({toolCatalog.length})
-        </Button>
-      </InlineGroup>
+      <HeroPanel
+        eyebrow="Operator workspace"
+        title="Playground"
+        description="Connect a direct MCP session, inspect live tool metadata, compare AI outputs with and without tool access, and drop to raw protocol calls when you need to debug the runtime boundary."
+        actions={
+          <InlineGroup>
+            <ButtonLink to="/app/session" variant="secondary">
+              Open session
+            </ButtonLink>
+            <ButtonLink to="/app/diagnostics" variant="secondary">
+              Open diagnostics
+            </ButtonLink>
+            <Button variant="secondary" onClick={() => setShowCatalog(!showCatalog)}>
+              {showCatalog ? 'Hide' : 'Show'} Tool Catalog ({toolCatalog.length})
+            </Button>
+          </InlineGroup>
+        }
+        aside={
+          <div className="page-hero-note">
+            <strong className="page-hero-note-title">Live workspace posture</strong>
+            <p className="page-hero-note-text">
+              Use AI Chat for guided research, Compare for quality checks, and Raw MCP Console when
+              you need direct protocol control.
+            </p>
+            <KeyValueList
+              entries={[
+                { label: 'Session', value: sessionLabel },
+                { label: 'Catalog', value: `${toolCatalog.length} tools` },
+                { label: 'Active tab', value: activeTabLabel },
+              ]}
+            />
+          </div>
+        }
+      />
 
       {showCatalog && <ToolCatalogPanel tools={toolCatalog} />}
 
@@ -2608,25 +2639,35 @@ function PlaygroundContent(): React.JSX.Element {
         />
       )}
 
-      <Card
+      <PageHeader
+        eyebrow="Workspace modes"
         title="Quick workflow"
-        subtitle="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging."
-      >
-        <InlineGroup>
-          <ButtonLink to="/app/session" variant="secondary">
-            1) Set token
-          </ButtonLink>
-          <Button variant="secondary" onClick={() => setActiveTab('ai')}>
-            2) AI Chat
-          </Button>
-          <Button variant="secondary" onClick={() => setActiveTab('compare')}>
-            3) Compare
-          </Button>
-          <Button variant="secondary" onClick={() => setActiveTab('raw')}>
-            4) Raw Console
-          </Button>
-        </InlineGroup>
-      </Card>
+        description="Recommended order: set token, run AI chat, compare outputs, then use raw MCP console for debugging."
+        meta={
+          <ConnectionBadge
+            connected={mcpSessionId.length > 0}
+            connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
+            disconnectedLabel="No session"
+            meta={`| ${toolCatalog.length} tools`}
+          />
+        }
+        actions={
+          <InlineGroup>
+            <ButtonLink to="/app/session" variant="secondary">
+              1) Set token
+            </ButtonLink>
+            <Button variant="secondary" onClick={() => setActiveTab('ai')}>
+              2) AI Chat
+            </Button>
+            <Button variant="secondary" onClick={() => setActiveTab('compare')}>
+              3) Compare
+            </Button>
+            <Button variant="secondary" onClick={() => setActiveTab('raw')}>
+              4) Raw Console
+            </Button>
+          </InlineGroup>
+        }
+      />
 
       <div
         className="tabs"

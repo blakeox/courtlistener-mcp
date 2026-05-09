@@ -8,7 +8,6 @@ import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Badge,
   Button,
   ButtonLink,
   Card,
@@ -45,27 +44,6 @@ export function AccountPage(): React.JSX.Element {
     ? `Protocol mismatch: server advertised ${protocolQuery.data?.protocolVersion || 'unknown'}, expected ${expectedProtocolVersion}.`
     : '';
 
-  const diagnostics: string[] = [];
-  if (!loading && sessionReady && !sessionError) {
-    if (hasToken && !hasServerSession) {
-      diagnostics.push(
-        'A local MCP credential is loaded, but the operator browser session is signed out. This credential is only for direct runtime probes.',
-      );
-    } else if (!hasToken && hasServerSession) {
-      diagnostics.push(
-        'Operator session is active. No local MCP credential is loaded, which is fine unless you need direct browser-side runtime probes.',
-      );
-    }
-  }
-  if (protocolQuery.data?.diagnostics?.length) {
-    diagnostics.push(...protocolQuery.data.diagnostics.slice(0, 2));
-  }
-  const observabilityHints = [
-    !persisted && hasToken
-      ? 'Token is session-scoped and will clear when this browser session ends.'
-      : '',
-    protocolQuery.data?.sessionId ? `Protocol session active: ${protocolQuery.data.sessionId}` : '',
-  ].filter(Boolean);
   const sessionSummary =
     loading || !sessionReady
       ? 'Checking browser session'
@@ -224,7 +202,7 @@ export function AccountPage(): React.JSX.Element {
 
         <Card
           title="Runtime readiness"
-          subtitle="Protocol readiness and browser-side probe posture."
+          subtitle="Protocol readiness for browser-side runtime access."
         >
           <DefinitionList
             entries={[
@@ -264,26 +242,6 @@ export function AccountPage(): React.JSX.Element {
             type="error"
             className="page-status-banner"
           />
-          <InlineGroup>
-            {(protocolQuery.data?.guardrails ?? []).slice(0, 3).map((guardrail) => (
-              <Badge key={guardrail} tone="warn">
-                {guardrail}
-              </Badge>
-            ))}
-            {observabilityHints.map((hint) => (
-              <Badge key={hint} tone="ok">
-                {hint}
-              </Badge>
-            ))}
-          </InlineGroup>
-          {diagnostics.map((message) => (
-            <StatusBanner
-              key={message}
-              message={message}
-              type="info"
-              className="page-status-banner"
-            />
-          ))}
         </Card>
       </div>
     </div>

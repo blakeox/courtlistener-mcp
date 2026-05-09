@@ -134,7 +134,7 @@ describe('OnboardingPage', () => {
   it('shows auth status', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/operator session active/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/operator session active/i).length).toBeGreaterThan(0);
   });
 
   it('shows loading skeleton while checking session posture', async () => {
@@ -254,7 +254,7 @@ describe('OnboardingPage', () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
 
-    expect(screen.getByText(/no operator session/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/no operator session/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
       '/auth/start?return_to=%2Fapp%2Fsession',
@@ -463,7 +463,7 @@ describe('AccountPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/2025-06-18/)).toBeInTheDocument();
       expect(screen.getByText('Runtime session')).toBeInTheDocument();
-      expect(screen.getByText(/Protocol session active: sid-account/i)).toBeInTheDocument();
+      expect(screen.getByText('sid-account')).toBeInTheDocument();
     });
   });
 

@@ -12,8 +12,11 @@ import {
   ButtonLink,
   Card,
   DefinitionList,
+  HeroPanel,
   InlineGroup,
+  KeyValueList,
   LoadingState,
+  PageHeader,
   StatusBanner,
   Stepper,
 } from '../components/ui';
@@ -91,22 +94,57 @@ export function OnboardingPage(): React.JSX.Element {
         : protocolMismatch
           ? '⚠ Blocked by protocol mismatch'
           : `${readiness?.toolCount ?? 0} tool(s) available`;
+  const sessionSummary = sessionChecking
+    ? 'Checking session'
+    : authed
+      ? 'Operator session active'
+      : 'No operator session';
+  const credentialSummary = hasToken ? 'Local credential loaded' : 'Local credential not loaded';
+  const runtimeSummary = hasMcpSuccess ? 'Runtime ready' : 'Readiness checks pending';
 
   return (
     <div className="stack">
-      <Card
+      <HeroPanel
+        eyebrow="Runtime diagnostics"
         title={authed ? 'Runtime Diagnostics' : 'Sign in to continue'}
-        subtitle={
+        description={
           authed
             ? 'Diagnostics for session state, local credential posture, protocol negotiation, and runtime readiness.'
             : 'Use the hosted auth flow first, then come back here for runtime diagnostics and MCP checks.'
         }
+        actions={
+          !authed ? (
+            <InlineGroup>
+              <ButtonLink href={authStartHref}>Sign in</ButtonLink>
+            </InlineGroup>
+          ) : undefined
+        }
+        aside={
+          <div className="page-hero-note">
+            <strong className="page-hero-note-title">
+              {authed ? 'Diagnostics surface' : 'Authentication required'}
+            </strong>
+            <p className="page-hero-note-text">
+              {authed
+                ? 'Use this route to validate session, credential, protocol, and tool discovery before deeper troubleshooting.'
+                : 'Start with hosted sign-in, then return here to validate the MCP runtime surface.'}
+            </p>
+            <KeyValueList
+              entries={[
+                { label: 'Session', value: sessionSummary },
+                { label: 'Credential', value: credentialSummary },
+                { label: 'Runtime', value: runtimeSummary },
+              ]}
+            />
+          </div>
+        }
+      />
+
+      <PageHeader
+        eyebrow="Runtime posture"
+        title="Diagnostic signals"
+        description="Verify the browser session, optional local diagnostic credential, negotiated protocol version, and live MCP tool availability from one operator route."
       >
-        <p className="muted">
-          {authed
-            ? 'Your browser session is active. Use this page for MCP diagnostics, protocol checks, and local credential troubleshooting.'
-            : 'This diagnostics view is for troubleshooting after sign-in. Start with the hosted auth flow first, then come back here for runtime checks.'}
-        </p>
         {!authed ? (
           <InlineGroup>
             <ButtonLink href={authStartHref}>Sign in</ButtonLink>
@@ -140,7 +178,7 @@ export function OnboardingPage(): React.JSX.Element {
             },
           ]}
         />
-      </Card>
+      </PageHeader>
 
       <StatusBanner role="alert" message={sessionError} type="error" />
       <StatusBanner role="alert" message={protocolMismatchMessage} type="error" />
@@ -234,9 +272,10 @@ export function OnboardingPage(): React.JSX.Element {
         )}
       </Card>
 
-      <Card
+      <PageHeader
+        eyebrow="Operator actions"
         title="Quick actions"
-        subtitle="Shortcuts for session, credentials, and runtime checks."
+        description="Shortcuts for session, credentials, and runtime checks."
       >
         <InlineGroup>
           {!authed ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
@@ -260,7 +299,7 @@ export function OnboardingPage(): React.JSX.Element {
             Clear local credential
           </Button>
         </InlineGroup>
-      </Card>
+      </PageHeader>
     </div>
   );
 }
