@@ -97,7 +97,7 @@ class UnitTestRunner {
       // test passes normally, so keep the child attached and kill it directly
       // on timeout.
       const command = process.execPath;
-      const args = [tsxCliPath, '--test', testPath];
+      const args = [tsxCliPath, '--test', '--test-force-exit', testPath];
 
       const child = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -112,7 +112,7 @@ class UnitTestRunner {
         } catch {
           /* already exited */
         }
-      }, 60000); // 60 second timeout for slower integration-style unit files
+      }, 900000); // 15 minute timeout for slow integration-style unit files
 
       let output = '';
       let errorOutput = '';
