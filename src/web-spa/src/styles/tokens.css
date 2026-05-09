@@ -1,0 +1,177 @@
+/*
+ * CourtListener MCP Portal — Design Tokens & Styles
+ *
+ * Spacing scale (--space-1 through --space-6):
+ *   1 = 4px, 2 = 8px, 3 = 12px, 4 = 16px, 5 = 24px, 6 = 32px
+ *
+ * Border radius: --radius-sm (8px), --radius-md (12px), --radius-lg (16px)
+ *
+ * Color tokens: --bg, --surface, --text, --muted, --border, --primary, --danger
+ *   Overridden in [data-theme="dark"] block for dark mode.
+ *
+ * Breakpoints:
+ *   480px  — small phones (reduced padding, full-width buttons)
+ *   768px  — tablets (single-column layouts)
+ *   980px  — desktop sidebar collapse, mobile menu
+ */
+:root {
+  --bg: #f5f0e8;
+  --bg-soft: #faf7f2;
+  --bg-elevated: #fffdf9;
+  --ink: #11253f;
+  --ink-muted: #4a6078;
+  --muted: var(--ink-muted);
+  --brand: #0a7f5a;
+  --brand-deep: #086245;
+  --line: #d9c8b1;
+  --card: #fffdf9;
+  --panel: var(--card);
+  --danger: #b83232;
+  --ok: #1f7a4d;
+  --success: var(--ok);
+  --shadow: 0 14px 30px rgba(17, 37, 63, 0.14);
+  --surface-border: rgba(148, 163, 184, 0.18);
+  --surface-border-strong: rgba(148, 163, 184, 0.22);
+  --surface-bg: rgba(255, 255, 255, 0.82);
+  --surface-bg-strong: rgba(255, 255, 255, 0.92);
+  --surface-bg-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
+  --surface-panel-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --surface-shadow: 0 24px 54px rgba(15, 23, 42, 0.08);
+  --surface-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.35);
+  --text-subtle: #64748b;
+  --hero-bg:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.22), transparent 34%),
+    linear-gradient(135deg, #071426 0%, #0b1b33 60%, #10233f 100%);
+  --hero-note-bg: rgba(255, 255, 255, 0.08);
+  --hero-note-border: rgba(255, 255, 255, 0.16);
+  --hero-note-text: #cbd5e1;
+  --shell-button-radius: 8px;
+  --shell-button-primary-bg: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --shell-button-primary-border: rgba(37, 99, 235, 0.7);
+  --shell-button-primary-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+  --shell-button-secondary-bg: rgba(255, 255, 255, 0.88);
+  --shell-button-secondary-border: #e2e8f0;
+  --shell-button-secondary-text: #0f172a;
+  --shell-button-danger-bg: rgba(255, 255, 255, 0.9);
+  --shell-button-danger-border: rgba(185, 28, 28, 0.24);
+  --shell-button-danger-text: #991b1b;
+  --shell-sidebar-bg:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.24), transparent 36%),
+    linear-gradient(180deg, #0b1b33 0%, #071426 100%);
+  --shell-sidebar-border: rgba(255, 255, 255, 0.14);
+  --shell-sidebar-shadow: 0 30px 64px rgba(7, 20, 38, 0.24);
+  --shell-sidebar-link-bg: rgba(255, 255, 255, 0.05);
+  --shell-sidebar-link-border: rgba(255, 255, 255, 0.1);
+  --shell-sidebar-link-text: #cbd5e1;
+  --shell-sidebar-link-hover-border: rgba(96, 165, 250, 0.3);
+  --shell-sidebar-link-hover-text: #f8fafc;
+  --shell-sidebar-link-short-bg: rgba(255, 255, 255, 0.12);
+  --shell-sidebar-link-active-bg: linear-gradient(135deg, #3b82f6, #2563eb);
+  --shell-sidebar-link-active-border: rgba(96, 165, 250, 0.9);
+  --shell-sidebar-link-active-text: #ffffff;
+  --shell-sidebar-link-active-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);
+  --shell-sidebar-link-active-indicator: rgba(255, 255, 255, 0.98);
+  --shell-sidebar-link-active-short-bg: rgba(255, 255, 255, 0.18);
+  --shell-sidebar-link-active-short-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  --shell-sidebar-brand-mark-bg: rgba(96, 165, 250, 0.18);
+  --shell-sidebar-brand-mark-text: #eff6ff;
+  --shell-topbar-bg: rgba(255, 255, 255, 0.82);
+  --shell-topbar-border: rgba(226, 232, 240, 0.72);
+  --shell-topbar-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shell-footer-text: #475569;
+  --shell-footer-border: rgba(226, 232, 240, 0.72);
+  --shell-account-menu-border: rgba(226, 232, 240, 0.88);
+  --shell-account-menu-bg: rgba(255, 255, 255, 0.98);
+  --shell-account-menu-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+  --shell-account-menu-text-subtle: #64748b;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --landing-color-navy-950: #071426;
+  --landing-color-navy-900: #0b1b33;
+  --landing-color-navy-850: #10233f;
+  --landing-color-blue-600: #2563eb;
+  --landing-color-blue-500: #3b82f6;
+  --landing-color-blue-400: #60a5fa;
+  --landing-color-white: #ffffff;
+  --landing-color-paper: #f8fafc;
+  --landing-color-text-primary: #0f172a;
+  --landing-color-text-secondary: #475569;
+  --landing-color-text-muted: #64748b;
+  --landing-color-text-inverse: #f8fafc;
+  --landing-color-text-inverse-muted: #cbd5e1;
+  --landing-color-border-light: #e2e8f0;
+  --landing-color-border-dark: rgba(255, 255, 255, 0.16);
+  --landing-radius-md: 8px;
+  --landing-radius-lg: 12px;
+  --landing-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --landing-shadow-hero-card: 0 24px 60px rgba(0, 0, 0, 0.35);
+  --landing-shadow-button: 0 8px 20px rgba(37, 99, 235, 0.28);
+}
+[data-theme='dark'] {
+  --bg: #1a1e2e;
+  --bg-soft: #232838;
+  --ink: #e2e8f0;
+  --ink-muted: #94a3b8;
+  --brand: #34d399;
+  --brand-deep: #10b981;
+  --line: #334155;
+  --card: #1e293b;
+  --danger: #f87171;
+  --ok: #4ade80;
+  --shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  --surface-border: rgba(51, 65, 85, 0.84);
+  --surface-border-strong: rgba(51, 65, 85, 0.92);
+  --surface-bg: rgba(15, 23, 42, 0.82);
+  --surface-bg-strong: rgba(15, 23, 42, 0.9);
+  --surface-bg-soft: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.84));
+  --surface-panel-bg: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.82));
+  --surface-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
+  --surface-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.42);
+  --text-subtle: #cbd5e1;
+  --hero-note-bg: rgba(15, 23, 42, 0.4);
+  --hero-note-border: rgba(51, 65, 85, 0.9);
+  --hero-note-text: #cbd5e1;
+  --shell-button-secondary-bg: rgba(15, 23, 42, 0.84);
+  --shell-button-secondary-border: rgba(148, 163, 184, 0.24);
+  --shell-button-secondary-text: #f8fafc;
+  --shell-button-danger-bg: rgba(15, 23, 42, 0.9);
+  --shell-button-danger-border: rgba(248, 113, 113, 0.3);
+  --shell-button-danger-text: #fca5a5;
+  --shell-sidebar-bg:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 36%),
+    linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  --shell-sidebar-border: rgba(51, 65, 85, 0.84);
+  --shell-sidebar-shadow: 0 30px 64px rgba(0, 0, 0, 0.34);
+  --shell-sidebar-link-bg: rgba(15, 23, 42, 0.52);
+  --shell-sidebar-link-border: rgba(51, 65, 85, 0.84);
+  --shell-sidebar-link-text: #cbd5e1;
+  --shell-sidebar-link-hover-border: rgba(96, 165, 250, 0.3);
+  --shell-sidebar-link-hover-text: #f8fafc;
+  --shell-sidebar-link-short-bg: rgba(255, 255, 255, 0.12);
+  --shell-sidebar-link-active-bg: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --shell-sidebar-link-active-border: rgba(96, 165, 250, 0.9);
+  --shell-sidebar-link-active-text: #ffffff;
+  --shell-sidebar-link-active-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);
+  --shell-sidebar-link-active-indicator: rgba(255, 255, 255, 0.98);
+  --shell-sidebar-link-active-short-bg: rgba(255, 255, 255, 0.18);
+  --shell-sidebar-link-active-short-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  --shell-sidebar-brand-mark-bg: rgba(96, 165, 250, 0.18);
+  --shell-sidebar-brand-mark-text: #eff6ff;
+  --shell-topbar-bg: rgba(15, 23, 42, 0.72);
+  --shell-topbar-border: rgba(51, 65, 85, 0.8);
+  --shell-topbar-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
+  --shell-footer-text: #cbd5e1;
+  --shell-footer-border: rgba(51, 65, 85, 0.84);
+  --shell-account-menu-border: rgba(51, 65, 85, 0.84);
+  --shell-account-menu-bg: rgba(15, 23, 42, 0.96);
+  --shell-account-menu-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+  --shell-account-menu-text-subtle: #cbd5e1;
+}
+
