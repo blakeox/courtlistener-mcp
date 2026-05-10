@@ -100,10 +100,11 @@ class UnitTestRunner {
       const args = [tsxCliPath, '--test', '--test-force-exit', testPath];
 
       const child = spawn(command, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe'],
         cwd: projectRoot,
       });
 
+      let settled = false;
       // Add a timeout to prevent hanging tests.
       const timeout = setTimeout(() => {
         console.log(`   ⏰ ${testFile} - TIMEOUT (killing process)`);
@@ -125,24 +126,32 @@ class UnitTestRunner {
         errorOutput += data.toString();
       });
 
-      child.on('close', (code) => {
+      const finish = (code: number | null, spawnError?: Error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
         clearTimeout(timeout);
+
+        if (spawnError) {
+          errorOutput += `${spawnError.message}\n`;
+        }
 
         const result: TestResult = {
           file: testFile,
-          success: code === 0,
+          success: code === 0 && !spawnError,
           output,
           error: errorOutput,
-          code,
+          code: spawnError ? 1 : code,
         };
 
         this.testResults.push(result);
 
-        if (code === 0) {
+        if (result.success) {
           console.log(`   ✅ ${testFile} - PASSED`);
           this.passedTests++;
         } else {
-          console.log(`   ❌ ${testFile} - FAILED (exit code: ${code})`);
+          console.log(`   ❌ ${testFile} - FAILED (exit code: ${result.code})`);
           if (errorOutput) {
             console.log(`      Error: ${errorOutput.split('\n')[0]}`);
           }
@@ -151,6 +160,14 @@ class UnitTestRunner {
 
         this.totalTests++;
         resolve(result);
+      };
+
+      child.once('exit', (code) => {
+        finish(code);
+      });
+
+      child.once('error', (error) => {
+        finish(1, error);
       });
     });
   }
