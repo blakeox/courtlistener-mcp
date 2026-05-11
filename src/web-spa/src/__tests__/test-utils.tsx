@@ -46,6 +46,42 @@ export function createMatchMediaMock(
   })) as typeof window.matchMedia;
 }
 
+export function createControlledMatchMediaMock(initialMatches = false): {
+  matchMedia: typeof window.matchMedia;
+  setMatches: (matches: boolean) => void;
+} {
+  let matches = initialMatches;
+  const listeners = new Set<(event: MediaQueryListEvent) => void>();
+
+  return {
+    matchMedia: ((query: string) => ({
+      get matches() {
+        return matches;
+      },
+      media: query,
+      onchange: null,
+      addListener: (listener: (event: MediaQueryListEvent) => void) => {
+        listeners.add(listener);
+      },
+      removeListener: (listener: (event: MediaQueryListEvent) => void) => {
+        listeners.delete(listener);
+      },
+      addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
+        listeners.add(listener);
+      },
+      removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
+        listeners.delete(listener);
+      },
+      dispatchEvent: vi.fn(),
+    })) as typeof window.matchMedia,
+    setMatches: (nextMatches: boolean) => {
+      matches = nextMatches;
+      const event = { matches: nextMatches } as MediaQueryListEvent;
+      listeners.forEach((listener) => listener(event));
+    },
+  };
+}
+
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: { queries: { retry: false } },

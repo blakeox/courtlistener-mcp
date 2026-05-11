@@ -1,11 +1,15 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { RenderResult } from '@testing-library/react';
 import { TokenProvider } from '../lib/token-context';
 import { ToastProvider } from '../components/Toast';
-import { stubBrowserStorage } from './test-utils';
+import {
+  createControlledMatchMediaMock,
+  createMatchMediaMock,
+  stubBrowserStorage,
+} from './test-utils';
 
 const { useAuthMock, useColorSchemeMock, useNetworkStatusMock, useSessionHeartbeatMock } =
   vi.hoisted(() => ({
@@ -108,6 +112,7 @@ describe('Shell', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubBrowserStorage();
+    vi.stubGlobal('matchMedia', createMatchMediaMock(true));
     useColorSchemeMock.mockReturnValue({ scheme: 'light', toggle: vi.fn() });
     useNetworkStatusMock.mockReturnValue({ online: true });
     useSessionHeartbeatMock.mockImplementation(() => {});
@@ -116,6 +121,10 @@ describe('Shell', () => {
       loading: false,
       logout: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('shows session recovery actions and clears the stored credential from the shell banner', async () => {
@@ -172,19 +181,14 @@ describe('Shell', () => {
     expect(screen.getByText("You're offline — changes may not save.")).toBeInTheDocument();
   });
 
-  it('persists the desktop sidebar collapsed state', () => {
-    const firstRender = renderShell('/app/playground');
+  it('removes the retired collapsed-sidebar preference and leaves desktop collapse disabled', () => {
+    localStorage.setItem('clmcp_workspace_sidebar_collapsed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
-
-    expect(localStorage.getItem('clmcp_workspace_sidebar_collapsed')).toBe('true');
-    expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
-
-    firstRender.unmount();
     renderShell('/app/playground');
 
-    expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Playground' })).toHaveAttribute('title', 'Playground');
+    expect(localStorage.getItem('clmcp_workspace_sidebar_collapsed')).toBeNull();
+    expect(screen.queryByRole('button', { name: /collapse sidebar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /expand sidebar/i })).not.toBeInTheDocument();
   });
 
   it('opens and closes the mobile navigation drawer affordances', () => {
@@ -204,50 +208,255 @@ describe('Shell', () => {
     expect(screen.getAllByRole('button', { name: /close navigation menu/i })).toHaveLength(1);
   });
 
-  it('keeps secondary operate links behind a more toggle', () => {
+  it('keeps both menu and account controls visible on mobile', () => {
+    vi.stubGlobal('matchMedia', createMatchMediaMock(false));
+    renderShell('/app/playground');
+
+    expect(screen.getByRole('button', { name: /toggle navigation menu/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('closes the mobile drawer and restores body scrolling when the viewport returns to desktop', async () => {
+    const controlledMatchMedia = createControlledMatchMediaMock(false);
+    vi.stubGlobal('matchMedia', controlledMatchMedia.matchMedia);
+
+    renderShell('/app/playground');
+
+    const menuButton = screen.getByRole('button', { name: /toggle navigation menu/i });
+    fireEvent.click(menuButton);
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    act(() => {
+      controlledMatchMedia.setMatches(true);
+    });
+
+    await waitFor(() => {
+      expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+      expect(document.body.style.overflow).toBe('');
+    });
+  });
+
+  it('traps focus inside the mobile drawer when tabbing backwards from the close button', async () => {
+    const controlledMatchMedia = createControlledMatchMediaMock(false);
+    vi.stubGlobal('matchMedia', controlledMatchMedia.matchMedia);
+
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle navigation menu/i }));
+
+    const closeButton = screen.getAllByRole('button', { name: /close navigation menu/i })[1];
+    await waitFor(() => {
+      expect(closeButton).toHaveFocus();
+    });
+
+    const brandLink = screen.getByRole('link', { name: /courtlistener mcp/i });
+    brandLink.focus();
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'Credentials' })[0]).toHaveFocus();
+    });
+  });
+
+  it('reveals the full operate section with a single mobile disclosure', () => {
+    vi.stubGlobal('matchMedia', createMatchMediaMock(false));
     renderShell('/app/playground');
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand Operate section' }));
 
     expect(screen.getByRole('link', { name: 'Usage' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Observability' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Diagnostics' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Readiness' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Show diagnostics links' }),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'More routes' }));
+  it('shows desktop nav groups without dead disclosure controls', () => {
+    renderShell('/app/playground');
 
+    expect(
+      screen.queryByRole('button', { name: 'Expand Operate section' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Expand Setup section' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Readiness' })).toBeInTheDocument();
   });
 
-  it('keeps secondary setup links behind a setup toggle', () => {
+  it('keeps home separate and shows setup links behind one setup toggle', () => {
+    vi.stubGlobal('matchMedia', createMatchMediaMock(false));
     renderShell('/app/playground');
 
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Docs/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More setup routes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Setup section' }));
 
+    expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Docs/i })).toHaveAttribute(
+      'href',
+      'https://github.com/blakeox/courtlistener-mcp#readme',
+    );
+  });
+
+  it('prioritizes work routes for returning operators', () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'token-123');
+
+    const { container } = renderShell('/app/playground');
+    const groupLabels = Array.from(container.querySelectorAll('.menu-group-label')).map((label) =>
+      label.textContent?.trim(),
+    );
+
+    expect(groupLabels).toEqual(['Home', 'Work', 'Operate']);
+    expect(screen.getByText('Setup & help')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
   });
 
-  it('opens the account menu with status and session links', () => {
+  it('keeps docs access out of the topbar and inside setup navigation', () => {
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guest' }));
+    expect(screen.queryByRole('link', { name: /open docs/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Docs/i })).toHaveAttribute(
+      'href',
+      'https://github.com/blakeox/courtlistener-mcp#readme',
+    );
+  });
 
-    const accountMenu = screen.getByRole('menu', { name: 'Account menu' });
-    expect(accountMenu).toBeInTheDocument();
-    expect(screen.getByText('Signed out')).toBeInTheDocument();
-    expect(screen.getByText('No local credential')).toBeInTheDocument();
-    expect(within(accountMenu).getByRole('link', { name: 'Session' })).toHaveAttribute(
+  it('surfaces session repair state on the account trigger', () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'token-123');
+
+    renderShell('/app/playground');
+
+    expect(screen.getByRole('button', { name: /Fix session/i })).toBeInTheDocument();
+  });
+
+  it('carries the session repair state into the account panel', () => {
+    sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'token-123');
+
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: /Fix session/i }));
+
+    const accountMenu = screen.getByRole('group', { name: 'Account panel' });
+    expect(within(accountMenu).getByText('Session repair')).toBeInTheDocument();
+    expect(within(accountMenu).getByText('Session repair needed')).toBeInTheDocument();
+    expect(
+      within(accountMenu).getByText(
+        'Browser session is signed out, but a local MCP credential is still stored on this device.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(accountMenu).getByRole('link', { name: 'Sign in to repair session' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps session and credential links visible in the shell utility section', () => {
+    renderShell('/app/playground');
+
+    expect(screen.getByText('Workspace utilities')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Session' })[0]).toHaveAttribute(
       'href',
       '/app/session',
     );
-    expect(within(accountMenu).getByRole('link', { name: 'Credentials' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Credentials' })[0]).toHaveAttribute(
       'href',
       '/app/credentials',
     );
+  });
+
+  it('opens the account menu with a status block above the primary action', async () => {
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    const accountMenu = screen.getByRole('group', { name: 'Account panel' });
+    expect(accountMenu).toBeInTheDocument();
+    expect(within(accountMenu).getByText('Account status')).toBeInTheDocument();
+    expect(within(accountMenu).getByText('Signed out')).toBeInTheDocument();
+    expect(
+      within(accountMenu).getByText('No local credential loaded on this device.'),
+    ).toBeInTheDocument();
+    expect(within(accountMenu).getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+    expect(within(accountMenu).queryByRole('link', { name: 'Session' })).not.toBeInTheDocument();
+    expect(
+      within(accountMenu).queryByRole('link', { name: 'Credentials' }),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(within(accountMenu).getByRole('link', { name: 'Sign in' })).toHaveFocus();
+    });
+  });
+
+  it('returns focus to the account trigger when the panel closes with escape', async () => {
+    renderShell('/app/playground');
+
+    const accountTrigger = screen.getByRole('button', { name: 'Sign in' });
+    fireEvent.click(accountTrigger);
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('group', { name: 'Account panel' })).not.toBeInTheDocument();
+      expect(accountTrigger).toHaveFocus();
+    });
+  });
+
+  it('returns focus to the account trigger when the panel closes from an outside click', async () => {
+    renderShell('/app/playground');
+
+    const accountTrigger = screen.getByRole('button', { name: 'Sign in' });
+    fireEvent.click(accountTrigger);
+    fireEvent.mouseDown(document.body);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('group', { name: 'Account panel' })).not.toBeInTheDocument();
+      expect(accountTrigger).toHaveFocus();
+    });
+  });
+
+  it('lets route navigation move focus to main content when the account panel closes', async () => {
+    useAuthMock.mockReturnValue({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: '' },
+      loading: false,
+      logout: vi.fn(),
+    });
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+
+    const accountMenu = screen.getByRole('group', { name: 'Account panel' });
+    fireEvent.click(within(accountMenu).getByRole('link', { name: 'Manage session' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/app/session');
+      expect(screen.queryByRole('group', { name: 'Account panel' })).not.toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveFocus();
+    });
+  });
+
+  it('shows the current workspace label in the topbar context', () => {
+    renderShell('/app/playground');
+
+    const context = screen.getByLabelText('Current workspace route');
+    expect(within(context).getByText('Playground')).toBeInTheDocument();
+    expect(within(context).getByText('Test tools.')).toBeInTheDocument();
+  });
+
+  it('keeps the theme toggle reachable from the topbar', () => {
+    const toggleThemeMock = vi.fn();
+    useColorSchemeMock.mockReturnValue({ scheme: 'light', toggle: toggleThemeMock });
+
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+
+    expect(toggleThemeMock).toHaveBeenCalledTimes(1);
   });
 
   it('preserves local token and keeps the operator on the current page when topbar logout rejects', async () => {
@@ -261,7 +470,7 @@ describe('Shell', () => {
 
     renderShell('/app/account');
 
-    fireEvent.click(screen.getByRole('button', { name: 'u1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     await waitFor(() => {
@@ -277,9 +486,14 @@ describe('AuthRequired', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubBrowserStorage();
+    vi.stubGlobal('matchMedia', createMatchMediaMock(true));
     useColorSchemeMock.mockReturnValue({ scheme: 'light', toggle: vi.fn() });
     useNetworkStatusMock.mockReturnValue({ online: true });
     useSessionHeartbeatMock.mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('shows a loading skeleton while auth is still resolving', () => {

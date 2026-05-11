@@ -12,23 +12,19 @@ import {
   NavCardLink,
   SkipLink,
   StatusBanner,
-  TextLink,
 } from './ui';
 import { useColorScheme } from '../hooks/useColorScheme';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useSessionHeartbeat } from '../hooks/useSessionHeartbeat';
 import { useToast } from './Toast';
-import { WORKSPACE_DOCS_URL, WORKSPACE_NAV_GROUPS, getWorkspaceMeta } from '../lib/workspace-shell';
+import {
+  getWorkspaceNavGroups,
+  getWorkspaceSecondaryNavSections,
+  getWorkspaceMeta,
+} from '../lib/workspace-shell';
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = 'clmcp_workspace_sidebar_collapsed';
-
-function getStoredSidebarCollapsed(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
+const LEGACY_SIDEBAR_COLLAPSED_STORAGE_KEY = 'clmcp_workspace_sidebar_collapsed';
+const DESKTOP_NAV_MEDIA_QUERY = '(min-width: 1101px)';
 
 export function Shell(
   props: React.PropsWithChildren<{
@@ -46,23 +42,25 @@ export function Shell(
   const location = useLocation();
   const { token, clear } = useToken();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => getStoredSidebarCollapsed());
+  const [isDesktopNav, setIsDesktopNav] = React.useState(false);
+  const [prioritizeWorkNav, setPrioritizeWorkNav] = React.useState(false);
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
-  const [expandedSecondaryGroups, setExpandedSecondaryGroups] = React.useState<
-    Record<string, boolean>
-  >({});
   const [accountMenuOpen, setAccountMenuOpen] = React.useState(false);
   const { scheme, toggle: toggleTheme } = useColorScheme();
   const { online } = useNetworkStatus();
   const mainRef = React.useRef<HTMLElement | null>(null);
   const previouslyOpenSidebarRef = React.useRef(false);
   const accountMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const accountMenuPanelRef = React.useRef<HTMLDivElement | null>(null);
+  const accountMenuReturnFocusRef = React.useRef(false);
+  const sidebarRef = React.useRef<HTMLElement | null>(null);
 
   const authed = Boolean(session?.authenticated);
   const hasLocalToken = Boolean(token.trim());
   const { toast } = useToast();
   const authStartHref = buildHostedAuthStartHref(location.pathname);
   const currentWorkspace = getWorkspaceMeta(location.pathname);
+  const showRecoveryBanner = !loading && !authed && hasLocalToken;
 
   useSessionHeartbeat(5 * 60 * 1000, {
     enabled: authed,
@@ -78,9 +76,53 @@ export function Shell(
   }, [location.pathname]);
 
   React.useEffect(() => {
+    if (authed || hasLocalToken) {
+      setPrioritizeWorkNav(true);
+    }
+  }, [authed, hasLocalToken]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSED_STORAGE_KEY);
+    } catch {
+      // localStorage not available
+    }
+  }, []);
+
+  React.useEffect(() => {
     setSidebarOpen(false);
+    accountMenuReturnFocusRef.current = false;
     setAccountMenuOpen(false);
   }, [location.pathname]);
+
+  React.useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mediaQueryList = window.matchMedia(DESKTOP_NAV_MEDIA_QUERY);
+    const handleDesktopViewport = (event: MediaQueryListEvent) => {
+      setIsDesktopNav(event.matches);
+      if (event.matches) {
+        setSidebarOpen(false);
+      }
+    };
+
+    if (mediaQueryList.matches) {
+      setIsDesktopNav(true);
+      setSidebarOpen(false);
+    } else {
+      setIsDesktopNav(false);
+    }
+
+    if (typeof mediaQueryList.addEventListener === 'function') {
+      mediaQueryList.addEventListener('change', handleDesktopViewport);
+      return () => mediaQueryList.removeEventListener('change', handleDesktopViewport);
+    }
+
+    mediaQueryList.addListener(handleDesktopViewport);
+    return () => mediaQueryList.removeListener(handleDesktopViewport);
+  }, []);
 
   React.useEffect(() => {
     if (!sidebarOpen) return undefined;
@@ -88,9 +130,44 @@ export function Shell(
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
 
+    const getFocusableElements = () =>
+      sidebarRef.current
+        ? Array.from(
+            sidebarRef.current.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((element) => !element.hasAttribute('disabled'))
+        : [];
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSidebarOpen(false);
+        return;
+      }
+
+      if (event.key === 'Tab') {
+        const focusableElements = getFocusableElements();
+        if (focusableElements.length === 0) {
+          event.preventDefault();
+          return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        const activeElement = document.activeElement;
+
+        if (event.shiftKey) {
+          if (activeElement === firstElement || !sidebarRef.current?.contains(activeElement)) {
+            event.preventDefault();
+            lastElement.focus();
+          }
+          return;
+        }
+
+        if (activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
       }
     };
 
@@ -114,15 +191,52 @@ export function Shell(
   React.useEffect(() => {
     if (!accountMenuOpen) return undefined;
 
+    const getFocusableElements = () =>
+      accountMenuPanelRef.current
+        ? Array.from(
+            accountMenuPanelRef.current.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((element) => !element.hasAttribute('disabled'))
+        : [];
+
+    getFocusableElements()[0]?.focus();
+
     const handlePointerDown = (event: MouseEvent) => {
       if (!accountMenuRef.current?.contains(event.target as Node)) {
+        accountMenuReturnFocusRef.current = true;
         setAccountMenuOpen(false);
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        accountMenuReturnFocusRef.current = true;
         setAccountMenuOpen(false);
+        return;
+      }
+
+      if (event.key === 'Tab' && accountMenuPanelRef.current) {
+        const focusableElements = getFocusableElements();
+        if (focusableElements.length === 0) {
+          return;
+        }
+
+        const activeElement = document.activeElement as HTMLElement | null;
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && activeElement === firstElement) {
+          event.preventDefault();
+          accountMenuReturnFocusRef.current = true;
+          setAccountMenuOpen(false);
+          return;
+        }
+
+        if (!event.shiftKey && activeElement === lastElement) {
+          accountMenuReturnFocusRef.current = true;
+          setAccountMenuOpen(false);
+        }
       }
     };
 
@@ -134,14 +248,50 @@ export function Shell(
     };
   }, [accountMenuOpen]);
 
+  React.useEffect(() => {
+    if (!accountMenuOpen && accountMenuReturnFocusRef.current) {
+      accountMenuRef.current?.querySelector<HTMLButtonElement>('.account-menu-trigger')?.focus();
+      accountMenuReturnFocusRef.current = false;
+    }
+  }, [accountMenuOpen]);
+
   const accountLabel = authed ? (session?.user?.id ?? 'Research operator') : 'Guest';
-  const authStatusLabel = authed ? 'Signed in' : 'Signed out';
   const credentialStatusLabel = hasLocalToken ? 'Credential loaded' : 'No local credential';
+  const accountTriggerLabel = showRecoveryBanner ? 'Fix session' : authed ? 'Session' : 'Sign in';
+  const accountStatusEyebrow = showRecoveryBanner ? 'Session repair' : 'Account status';
+  const accountStatusTitle = loading
+    ? 'Checking session'
+    : showRecoveryBanner
+      ? 'Session repair needed'
+      : authed
+        ? 'Signed in'
+        : 'Signed out';
+  const accountStatusDetail = loading
+    ? 'Confirming browser session and local credential state.'
+    : showRecoveryBanner
+      ? 'Browser session is signed out, but a local MCP credential is still stored on this device.'
+      : authed
+        ? `Signed in as ${accountLabel}. ${credentialStatusLabel}.`
+        : 'No local credential loaded on this device.';
+
+  const isRouteMatch = React.useCallback(
+    (path: string, external?: boolean) => {
+      if (external) {
+        return false;
+      }
+
+      return path === '/app'
+        ? location.pathname === path
+        : location.pathname === path || location.pathname.startsWith(`${path}/`);
+    },
+    [location.pathname],
+  );
 
   const handleLogout = React.useCallback(async () => {
     try {
       await logout();
       clear();
+      accountMenuReturnFocusRef.current = false;
       setAccountMenuOpen(false);
       navigate('/app');
     } catch {
@@ -149,58 +299,52 @@ export function Shell(
     }
   }, [clear, logout, navigate, toast]);
 
-  const toggleSidebarCollapsed = React.useCallback(() => {
-    setSidebarCollapsed((previous) => {
-      const next = !previous;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(next));
-      } catch {
-        // localStorage not available
-      }
-      return next;
-    });
-  }, []);
+  const navGroups = React.useMemo(
+    () => getWorkspaceNavGroups(prioritizeWorkNav),
+    [prioritizeWorkNav],
+  );
+
+  const secondaryNavSections = React.useMemo(
+    () => getWorkspaceSecondaryNavSections(prioritizeWorkNav),
+    [prioritizeWorkNav],
+  );
+
+  const renderWorkspaceLink = (
+    item: { label: string; to: string; external?: boolean },
+    options?: { className?: string; end?: boolean },
+  ) => {
+    const content = (
+      <>
+        <span className="nav-card-link-text">{item.label}</span>
+        {item.external ? <span className="nav-card-link-meta">New tab</span> : null}
+      </>
+    );
+
+    if (item.external) {
+      return (
+        <NavCardLink
+          key={item.to}
+          href={item.to}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={options?.className}
+        >
+          {content}
+        </NavCardLink>
+      );
+    }
+
+    return (
+      <NavCardLink key={item.to} to={item.to} end={options?.end} className={options?.className}>
+        {content}
+      </NavCardLink>
+    );
+  };
 
   return (
     <div className="workspace-shell">
       <SkipLink href="#main-content">Skip to content</SkipLink>
-      {!online && <StatusBanner message="You're offline — changes may not save." type="warn" />}
-      {!loading && !authed && hasLocalToken ? (
-        <StatusBanner
-          title="Session recovery:"
-          message="A local MCP credential is stored, but this browser session is signed out."
-        >
-          <InlineGroup>
-            <ButtonLink to="/app/account" variant="secondary">
-              Review session status
-            </ButtonLink>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                clear();
-                toast('Stored local credential cleared', 'info');
-              }}
-            >
-              Clear local credential
-            </Button>
-          </InlineGroup>
-        </StatusBanner>
-      ) : null}
-
-      <div
-        className={`workspace-main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`.trim()}
-      >
-        <Button
-          variant="secondary"
-          size="compact"
-          className="mobile-menu-btn"
-          onClick={() => setSidebarOpen((v) => !v)}
-          aria-label="Toggle navigation menu"
-          aria-expanded={sidebarOpen}
-          aria-controls="primary-navigation"
-        >
-          ☰ Menu
-        </Button>
+      <div className="workspace-main-layout">
         {sidebarOpen ? (
           <button
             type="button"
@@ -211,9 +355,8 @@ export function Shell(
         ) : null}
         <aside
           id="primary-navigation"
-          className={`workspace-sidebar ${sidebarOpen ? 'open' : ''} ${
-            sidebarCollapsed ? 'collapsed' : ''
-          }`.trim()}
+          ref={sidebarRef}
+          className={`workspace-sidebar ${sidebarOpen ? 'open' : ''}`.trim()}
         >
           <div className="app-sidebar-header">
             <div className="app-sidebar-brand-block">
@@ -235,178 +378,137 @@ export function Shell(
             </Button>
           </div>
           <div className="menu">
-            {WORKSPACE_NAV_GROUPS.map((group) => (
+            {navGroups.map((group) => (
               <div
-                key={group.label}
+                key={group.id}
                 className={`menu-group ${
-                  group.items.some((item) => location.pathname === item.to)
+                  group.items.some((item) => isRouteMatch(item.to, item.external))
                     ? 'menu-group-active'
                     : ''
                 }`.trim()}
               >
                 <div className="menu-group-header">
-                  <p className="menu-group-label">{group.label}</p>
                   {(() => {
                     const isGroupExpanded =
-                      group.items.some((item) => location.pathname === item.to) ||
-                      expandedGroups[group.label] === true;
+                      group.items.some((item) => isRouteMatch(item.to, item.external)) ||
+                      expandedGroups[group.id] === true;
 
-                    return group.collapsible && !sidebarCollapsed ? (
+                    return group.collapsible && !isDesktopNav ? (
                       <button
                         type="button"
-                        className="menu-group-toggle"
+                        className="menu-group-disclosure"
                         aria-expanded={isGroupExpanded}
                         aria-label={`${isGroupExpanded ? 'Collapse' : 'Expand'} ${group.label} section`}
                         onClick={() =>
                           setExpandedGroups((previous) => ({
                             ...previous,
-                            [group.label]: previous[group.label] !== true,
+                            [group.id]: previous[group.id] !== true,
                           }))
                         }
                       >
+                        <span className="menu-group-label">{group.label}</span>
                         <span className="menu-group-toggle-icon" aria-hidden="true">
                           {isGroupExpanded ? '▾' : '▸'}
                         </span>
-                        <span className="sr-only">
-                          {isGroupExpanded ? 'Collapse' : 'Expand'} {group.label}
-                        </span>
                       </button>
-                    ) : null;
+                    ) : (
+                      <p className="menu-group-label">{group.label}</p>
+                    );
                   })()}
                 </div>
                 {(() => {
-                  const primaryItems = group.items.filter((item) => item.priority !== 'secondary');
-                  const secondaryItems = group.items.filter(
-                    (item) => item.priority === 'secondary',
-                  );
                   const groupExpanded =
-                    sidebarCollapsed ||
+                    isDesktopNav ||
                     !group.collapsible ||
-                    group.items.some((item) => location.pathname === item.to) ||
-                    expandedGroups[group.label] === true;
-                  const hasActiveSecondaryItem = secondaryItems.some(
-                    (item) => location.pathname === item.to,
-                  );
-                  const secondaryExpanded = sidebarCollapsed
-                    ? hasActiveSecondaryItem
-                    : hasActiveSecondaryItem || expandedSecondaryGroups[group.label] === true;
-                  const secondaryToggleLabel =
-                    group.label === 'Get started'
-                      ? secondaryExpanded
-                        ? 'Fewer setup routes'
-                        : 'More setup routes'
-                      : secondaryExpanded
-                        ? 'Fewer routes'
-                        : 'More routes';
-                  const visibleItems = groupExpanded
-                    ? [
-                        ...primaryItems,
-                        ...(secondaryExpanded
-                          ? secondaryItems
-                          : secondaryItems.filter((item) => location.pathname === item.to)),
-                      ]
-                    : [];
+                    group.items.some((item) => isRouteMatch(item.to, item.external)) ||
+                    expandedGroups[group.id] === true;
+                  const visibleItems = groupExpanded ? group.items : [];
 
                   return (
                     <>
-                      {visibleItems.map((item) => {
-                        const content = (
-                          <>
-                            <span className="nav-card-link-short" aria-hidden="true">
-                              {item.shortLabel}
-                            </span>
-                            <span className="nav-card-link-text">{item.label}</span>
-                          </>
-                        );
-
-                        if (item.external) {
-                          return (
-                            <NavCardLink
-                              key={item.to}
-                              href={item.to}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={sidebarCollapsed ? item.label : undefined}
-                              title={sidebarCollapsed ? item.label : undefined}
-                            >
-                              {content}
-                            </NavCardLink>
-                          );
-                        }
-                        return (
-                          <NavCardLink
-                            key={item.to}
-                            to={item.to}
-                            aria-label={sidebarCollapsed ? item.label : undefined}
-                            title={sidebarCollapsed ? item.label : undefined}
-                          >
-                            {content}
-                          </NavCardLink>
-                        );
-                      })}
-                      {!sidebarCollapsed &&
-                      groupExpanded &&
-                      secondaryItems.length > 0 &&
-                      !hasActiveSecondaryItem ? (
-                        <button
-                          type="button"
-                          className="menu-group-more"
-                          onClick={() =>
-                            setExpandedSecondaryGroups((previous) => ({
-                              ...previous,
-                              [group.label]: previous[group.label] !== true,
-                            }))
-                          }
-                          aria-expanded={expandedSecondaryGroups[group.label] === true}
-                        >
-                          {secondaryToggleLabel}
-                        </button>
-                      ) : null}
+                      {visibleItems.map((item) =>
+                        renderWorkspaceLink(item, { end: item.to === '/app' }),
+                      )}
                     </>
                   );
                 })()}
               </div>
             ))}
           </div>
+          {secondaryNavSections.map((section) => (
+            <div
+              key={section.id}
+              className={`sidebar-secondary-section sidebar-${section.variant}`.trim()}
+            >
+              <p className={`sidebar-secondary-label sidebar-${section.variant}-label`.trim()}>
+                {section.label}
+              </p>
+              <div className={`sidebar-secondary-links sidebar-${section.variant}-links`.trim()}>
+                {section.items.map((item) =>
+                  renderWorkspaceLink(item, {
+                    className: `sidebar-secondary-link ${section.variant}-nav-link`,
+                  }),
+                )}
+              </div>
+            </div>
+          ))}
         </aside>
         <div className="shell-main-column">
+          {!online || showRecoveryBanner ? (
+            <div className="workspace-status-stack">
+              {!online && (
+                <StatusBanner message="You're offline — changes may not save." type="warn" />
+              )}
+              {showRecoveryBanner ? (
+                <StatusBanner
+                  title="Session recovery:"
+                  message="A local MCP credential is stored, but this browser session is signed out."
+                >
+                  <InlineGroup>
+                    <ButtonLink to="/app/account" variant="secondary">
+                      Review session status
+                    </ButtonLink>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        clear();
+                        toast('Stored local credential cleared', 'info');
+                      }}
+                    >
+                      Clear local credential
+                    </Button>
+                  </InlineGroup>
+                </StatusBanner>
+              ) : null}
+            </div>
+          ) : null}
           <header className="workspace-topbar">
-            <div className="topbar-context" aria-label="Current workspace route">
-              <span className="topbar-context-label">Workspace</span>
-              <strong className="topbar-context-value">{currentWorkspace.label}</strong>
+            <div className="topbar-context-shell" aria-label="Current workspace route">
+              <span className="topbar-context-icon" aria-hidden="true">
+                ●
+              </span>
+              <div className="topbar-context">
+                <strong className="topbar-context-value">{currentWorkspace.label}</strong>
+                <span className="topbar-context-description">{currentWorkspace.description}</span>
+              </div>
             </div>
             <div className="topbar-actions" role="group" aria-label="Workspace utilities">
               <InlineGroup className="top-actions top-actions-utility">
                 <Button
                   variant="secondary"
                   size="compact"
-                  className="toolbar-button desktop-sidebar-toggle"
-                  onClick={toggleSidebarCollapsed}
-                  aria-label={`${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar`}
+                  className="mobile-menu-btn toolbar-button toolbar-utility-button"
+                  onClick={() => setSidebarOpen((value) => !value)}
+                  aria-label="Toggle navigation menu"
+                  aria-expanded={sidebarOpen}
+                  aria-controls="primary-navigation"
                 >
-                  <span className="desktop-sidebar-toggle-icon" aria-hidden="true">
-                    {sidebarCollapsed ? '⇥' : '⇤'}
-                  </span>
-                  <span className="sr-only">
-                    {sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-                  </span>
+                  ☰ Menu
                 </Button>
-                <ButtonLink
-                  to="/app/docs"
-                  variant="secondary"
-                  size="compact"
-                  className="toolbar-button help-control"
-                  aria-label="Open docs"
-                >
-                  <span className="help-control-icon" aria-hidden="true">
-                    ?
-                  </span>
-                  <span className="sr-only">Open docs</span>
-                </ButtonLink>
                 <Button
                   variant="secondary"
                   size="compact"
-                  className="toolbar-button theme-toggle"
+                  className="toolbar-button toolbar-utility-button theme-toggle"
                   onClick={toggleTheme}
                   aria-label={`Switch to ${scheme === 'light' ? 'dark' : 'light'} mode`}
                 >
@@ -422,47 +524,75 @@ export function Shell(
                     variant="secondary"
                     size="compact"
                     className={`toolbar-button account-menu-trigger ${
-                      accountMenuOpen ? 'open' : ''
-                    }`.trim()}
-                    aria-haspopup="menu"
+                      showRecoveryBanner ? 'warning' : ''
+                    } ${accountMenuOpen ? 'open' : ''}`.trim()}
+                    aria-label={
+                      showRecoveryBanner ? 'Fix session — repair needed' : accountTriggerLabel
+                    }
+                    aria-controls="account-panel"
                     aria-expanded={accountMenuOpen}
-                    onClick={() => setAccountMenuOpen((previous) => !previous)}
+                    onClick={() =>
+                      setAccountMenuOpen((previous) => {
+                        accountMenuReturnFocusRef.current = previous;
+                        return !previous;
+                      })
+                    }
                   >
-                    <span>{accountLabel}</span>
+                    {showRecoveryBanner ? (
+                      <span className="account-menu-trigger-badge" aria-hidden="true">
+                        !
+                      </span>
+                    ) : null}
+                    <span>{accountTriggerLabel}</span>
                     <span className="account-menu-trigger-icon" aria-hidden="true">
                       ▾
                     </span>
                   </Button>
                   {accountMenuOpen ? (
-                    <div className="account-menu-panel" role="menu" aria-label="Account menu">
-                      <div className="account-menu-status">
-                        <strong>{authStatusLabel}</strong>
-                        <p>{credentialStatusLabel}</p>
+                    <div
+                      id="account-panel"
+                      ref={accountMenuPanelRef}
+                      className={`account-menu-panel ${showRecoveryBanner ? 'warning' : ''}`.trim()}
+                      role="group"
+                      aria-label="Account panel"
+                    >
+                      <div className="account-status-block" role="status" aria-live="polite">
+                        <p className="account-status-eyebrow">{accountStatusEyebrow}</p>
+                        <p className="account-status-title">{accountStatusTitle}</p>
+                        <p className="account-status-detail">{accountStatusDetail}</p>
                       </div>
-                      <div className="account-menu-links">
-                        <TextLink to="/app/session">Session</TextLink>
-                        <TextLink to="/app/credentials">Credentials</TextLink>
+                      <div className="account-menu-primary">
+                        {loading ? null : authed ? (
+                          <>
+                            <ButtonLink
+                              to="/app/session"
+                              variant="primary"
+                              size="compact"
+                              className="account-menu-action"
+                            >
+                              Manage session
+                            </ButtonLink>
+                            <Button
+                              id="logoutBtn"
+                              variant="secondary"
+                              size="compact"
+                              className="account-menu-action"
+                              onClick={handleLogout}
+                            >
+                              Log out
+                            </Button>
+                          </>
+                        ) : (
+                          <ButtonLink
+                            href={authStartHref}
+                            variant="primary"
+                            size="compact"
+                            className="account-menu-action"
+                          >
+                            {showRecoveryBanner ? 'Sign in to repair session' : 'Sign in'}
+                          </ButtonLink>
+                        )}
                       </div>
-                      {loading ? null : authed ? (
-                        <Button
-                          id="logoutBtn"
-                          variant="secondary"
-                          size="compact"
-                          className="account-menu-action"
-                          onClick={handleLogout}
-                        >
-                          Log out
-                        </Button>
-                      ) : (
-                        <ButtonLink
-                          href={authStartHref}
-                          variant="primary"
-                          size="compact"
-                          className="account-menu-action"
-                        >
-                          Sign in
-                        </ButtonLink>
-                      )}
                     </div>
                   ) : null}
                 </div>
@@ -474,14 +604,6 @@ export function Shell(
           </main>
         </div>
       </div>
-
-      <footer className="workspace-footer">
-        CourtListener MCP workspace. Public sign-in flows through the hosted auth handoff. Need
-        setup details?{' '}
-        <TextLink href={WORKSPACE_DOCS_URL} target="_blank" rel="noopener noreferrer">
-          Open the docs
-        </TextLink>
-      </footer>
     </div>
   );
 }
