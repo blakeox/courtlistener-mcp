@@ -1,0 +1,22 @@
+name: Main Promotion Policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  require-dev-promotion:
+    name: Require dev promotion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce dev as the only promotion source
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" != "dev" ]; then
+            echo "::error::Pull requests into main must come from dev. Promote validated dev into main instead of merging feature branches directly."
+            exit 1
+          fi
