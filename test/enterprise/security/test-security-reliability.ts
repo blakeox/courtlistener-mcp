@@ -437,7 +437,7 @@ class SecurityReliabilityTests {
   }> {
     const sensitiveErrors = [
       new Error('Database connection failed: mysql://user:password@host:3306/db'),
-      new Error('API key invalid: sk-123456789abcdef'),
+      new Error('API key invalid: sk-123456789abcdef'), // gitleaks:allow
       new Error('File not found: /etc/passwd'),
       new Error('Permission denied: /home/user/.ssh/id_rsa'),
     ];

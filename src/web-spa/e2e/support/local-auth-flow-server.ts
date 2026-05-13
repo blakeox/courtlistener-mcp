@@ -80,8 +80,8 @@ const workerUiSessionRuntime = createWorkerUiSessionRuntime<LocalAuthFlowEnv>({
   }),
   verifyOidcUserIdFromToken: async (token) =>
     token === 'header.payload.signature'
-      ? { userId: 'operator-real', error: null }
-      : { userId: null, error: 'invalid oidc token' },
+      ? { identity: { userId: 'operator-real' }, error: null }
+      : { identity: null, error: 'invalid oidc token' },
 });
 
 async function toRequest(request: http.IncomingMessage, baseUrl: string): Promise<Request> {
