@@ -250,6 +250,7 @@ jobs:
     needs: [validate-release, docker-test]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
+      contents: read
       packages: write
     environment: docker-publish
     steps:
