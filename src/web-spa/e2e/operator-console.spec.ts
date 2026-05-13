@@ -13,14 +13,13 @@ test.describe('SPA operator console', () => {
 
     await page.goto('/app/control-center');
 
-    await expect(
-      page.getByRole('heading', { name: 'Sign in to continue', level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sign in' }).first()).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Faccount',
+      '/auth/start?return_to=%2Fapp',
     );
-    await expect(page.getByText('No operator session')).toBeVisible();
+    await expect(page.getByText('Session not loaded')).toBeVisible();
+    await expect(page.getByText('Browser credential not loaded')).toBeVisible();
   });
 
   test('clears the session-recovery banner when the stored local credential is removed', async ({
@@ -38,7 +37,7 @@ test.describe('SPA operator console', () => {
     await page.goto('/app/control-center');
 
     const recoveryBanner = page.getByRole('status').filter({
-      hasText: 'Session recovery:',
+      hasText: 'Account recovery:',
     });
     await expect(recoveryBanner).toBeVisible();
 
@@ -124,19 +123,20 @@ test.describe('SPA operator console', () => {
 
     await page.goto('/app/account');
 
-    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account access', level: 2 })).toBeVisible();
     await expect(page.getByText('operator-1').first()).toBeVisible();
-    await expect(page.getByText('yes (server)')).toBeVisible();
-    await expect(page.getByText('2 tools · 1 resources · 1 prompts')).toBeVisible();
-    await expect(page.getByText('Protocol session active: mcp-session-e2e')).toBeVisible();
-    await expect(page.getByText('/mcp — 11')).toBeVisible();
+    await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
+    await expect(page.getByText('Runtime ready')).toBeVisible();
+    await expect(page.getByText('Runtime session')).toBeVisible();
+    await expect(page.getByText('mcp-session-e2e')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
 
-    await expect(page).toHaveURL(/\/app\/control-center$/);
-    await expect(
-      page.getByRole('heading', { name: 'Sign in to continue', level: 2 }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/account$/);
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByText('Sign in required')).toBeVisible();
+    await expect(page.getByText('Signed out', { exact: true })).toBeVisible();
     await expect
       .poll(async () =>
         page.evaluate(() => ({

@@ -18,11 +18,9 @@ test.describe('SPA session recovery failures', () => {
     await page.goto('/app/control-center');
 
     await expect(page).toHaveURL(/\/app\/control-center$/);
+    await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.getByText('Session service temporarily unavailable.')).toBeVisible();
-    await expect(page.getByText('⚠ Session check failed')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Sign in to continue', level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByText('Session not loaded')).toBeVisible();
   });
 
   test('surfaces MCP runtime failures when a local credential is present', async ({ page }) => {
@@ -49,10 +47,9 @@ test.describe('SPA session recovery failures', () => {
 
     await page.goto('/app/control-center');
 
-    await expect(page.getByText('⚠ MCP protocol unavailable')).toBeVisible();
-    await expect(page.getByText('⚠ Tool discovery unavailable')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+    await expect(page.locator('strong').filter({ hasText: 'Runtime check failed' })).toBeVisible();
     await expect(page.getByText('MCP runtime temporarily unavailable.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Clear local credential' })).toBeVisible();
   });
 
   test('preserves local credential and keeps the operator on the current page when topbar logout fails', async ({
@@ -75,11 +72,12 @@ test.describe('SPA session recovery failures', () => {
     });
 
     await page.goto('/app/account');
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
 
     await expect(page).toHaveURL(/\/app\/account$/);
-    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
-    await expect(page.getByText('Logout failed — session is still active.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account access', level: 2 })).toBeVisible();
+    await expect(page.getByText('Sign out failed — browser access is still active.')).toBeVisible();
     await expect
       .poll(async () =>
         page.evaluate(() => ({

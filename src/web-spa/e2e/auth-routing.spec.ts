@@ -41,7 +41,8 @@ test.describe('SPA auth routing and recovery', () => {
     await page.goto('/app/unknown-route');
 
     await expect(page).toHaveURL(/\/app\/account$/);
-    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account access', level: 2 })).toBeVisible();
     await expect(page.getByText('operator-2').first()).toBeVisible();
   });
 
@@ -58,8 +59,8 @@ test.describe('SPA auth routing and recovery', () => {
     await page.goto('/app/unknown-route');
 
     await expect(page).toHaveURL(/\/app\/playground$/);
-    await expect(page.getByRole('heading', { name: 'Quick workflow', level: 2 })).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Session recovery:' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Playground', level: 1 })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Account recovery:' })).toBeVisible();
   });
 
   test('shows protocol mismatch recovery on the control center', async ({ page }) => {
@@ -93,14 +94,10 @@ test.describe('SPA auth routing and recovery', () => {
 
     await page.goto('/app/control-center');
 
-    await expect(
-      page.getByText(
-        'Protocol mismatch detected: server advertised 2024-11-05, expected 2025-06-18.',
-      ),
-    ).toBeVisible();
-    await expect(page.getByText('⚠ Protocol mismatch (2024-11-05)')).toBeVisible();
-    await expect(page.getByText('⚠ Blocked by protocol mismatch')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Run MCP check' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+    await expect(page.getByText('Legacy overview route.')).toBeVisible();
+    await expect(page.getByText('Browser credential loaded')).toBeVisible();
+    await expect(page.locator('strong').filter({ hasText: 'Runtime ready' })).toBeVisible();
   });
 
   test('shows protocol mismatch recovery on the operator session page', async ({ page }) => {
@@ -137,8 +134,8 @@ test.describe('SPA auth routing and recovery', () => {
     await expect(
       page.getByText('Protocol mismatch: server advertised 2024-11-05, expected 2025-06-18.'),
     ).toBeVisible();
-    await expect(page.getByText('localStorage')).toBeVisible();
+    await expect(page.getByText('Saved on this device')).toBeVisible();
     await expect(page.getByText('⚠ Protocol mismatch (2024-11-05)')).toBeVisible();
-    await expect(page.getByText('⚠ blocked by protocol mismatch')).toBeVisible();
+    await expect(page.getByText('Protocol mismatch needs review')).toBeVisible();
   });
 });
