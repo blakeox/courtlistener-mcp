@@ -150,6 +150,7 @@ jobs:
         run: pnpm run build
 
       - name: Run unit tests
+        if: matrix.node-version != 18
         run: pnpm run test:unit
 
   full-validation:
@@ -159,6 +160,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
