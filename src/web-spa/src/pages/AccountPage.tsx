@@ -12,22 +12,20 @@ import {
   ButtonLink,
   Card,
   DefinitionList,
-  Eyebrow,
-  HeroPanel,
   InlineGroup,
-  KeyValueList,
+  PageHeader,
   StatusBanner,
   TextLink,
 } from '../components/ui';
 
 export function AccountPage(): React.JSX.Element {
-  useDocumentTitle('Session');
+  useDocumentTitle('Account');
   const { session, loading, sessionReady, sessionError, refresh, logout } = useAuth();
   const { token, persisted, clear } = useToken();
   const { toast } = useToast();
   const hasServerSession = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
-  const authStartHref = buildHostedAuthStartHref('/app/session');
+  const authStartHref = buildHostedAuthStartHref('/app/account');
   const protocolQuery = useQuery({
     queryKey: ['account-mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -45,14 +43,14 @@ export function AccountPage(): React.JSX.Element {
 
   const sessionSummary =
     loading || !sessionReady
-      ? 'Checking browser session'
+      ? 'Checking browser access'
       : hasServerSession
         ? 'Signed in'
         : 'Signed out';
   const credentialSummary = hasToken
     ? persisted
       ? 'Local credential saved'
-      : 'Session credential loaded'
+      : 'Temporary credential loaded'
     : 'No local credential';
   const protocolSummary =
     !hasServerSession || !hasToken
@@ -64,33 +62,42 @@ export function AccountPage(): React.JSX.Element {
           : protocolMismatch
             ? 'Protocol mismatch'
             : 'Runtime ready';
-  const heroStatusTitle = !hasServerSession
-    ? 'Sign in to unlock your operator session'
-    : !hasToken
-      ? 'Load a browser credential for direct runtime checks'
-      : protocolQuery.isError || protocolMismatch
-        ? 'Review runtime posture before continuing'
-        : 'Workspace posture looks ready';
-  const heroStatusDetail = !hasServerSession
-    ? 'Use the hosted sign-in flow before reviewing runtime readiness or loading a local credential.'
-    : !hasToken
-      ? 'Your operator session is active. Add a local credential when you need browser-side runtime probes.'
-      : protocolQuery.isError
-        ? 'The browser session is active, but the latest MCP readiness probe failed and needs attention.'
-        : protocolMismatch
-          ? 'The operator session is active, but the advertised runtime protocol does not match the expected release target.'
-          : 'Session, credential, and runtime readiness are aligned for research work.';
+  const accountSummary = hasServerSession
+    ? `Signed in as ${session?.user?.id ?? 'Research operator'}`
+    : 'Sign in required';
+  const accountDescription = !hasServerSession
+    ? 'Sign in, inspect account access, and recover stored credentials from one place.'
+    : 'Review sign-in state, local credentials, and recovery options without digging through diagnostics first.';
+  const recoverySummary =
+    !hasServerSession && hasToken
+      ? 'A local credential is still stored on this device.'
+      : hasToken
+        ? 'A local credential is available for browser-side runtime checks.'
+        : 'No local credential is stored on this device.';
+  const diagnosticsSummary =
+    !hasServerSession || !hasToken
+      ? 'Open diagnostics when you need deeper runtime checks.'
+      : protocolQuery.isLoading
+        ? 'Checking runtime access'
+        : protocolQuery.isError
+          ? 'Runtime diagnostics need attention'
+          : protocolMismatch
+            ? 'Protocol mismatch needs review'
+            : 'Runtime diagnostics look healthy';
+  const showDiagnosticsCard = Boolean(
+    sessionError || hasToken || protocolQuery.isError || protocolMismatch,
+  );
 
   return (
     <div className="stack">
-      <HeroPanel
-        eyebrow="Operator session"
-        title="Session"
-        description="Confirm browser session posture, inspect optional local MCP credentials, and verify runtime readiness before moving into research or operational work."
+      <PageHeader
+        eyebrow="Workspace account"
+        title="Account"
+        description={accountDescription}
         actions={
           <InlineGroup>
             <Button onClick={() => refresh()} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh session'}
+              {loading ? 'Refreshing...' : 'Refresh account'}
             </Button>
             <ButtonLink to="/app/credentials" variant="secondary">
               Open credentials
@@ -102,52 +109,36 @@ export function AccountPage(): React.JSX.Element {
                   try {
                     await logout();
                   } catch {
-                    toast('Logout failed — session is still active.', 'error');
+                    toast('Sign out failed — browser access is still active.', 'error');
                   }
                 }}
               >
-                Logout
+                Sign out
               </Button>
             ) : (
               <ButtonLink href={authStartHref}>Sign in</ButtonLink>
             )}
           </InlineGroup>
         }
-        aside={
-          <div className="page-hero-note">
-            <Eyebrow>Current status</Eyebrow>
-            <strong className="page-hero-note-title">{heroStatusTitle}</strong>
-            <p className="page-hero-note-text">{heroStatusDetail}</p>
-            <KeyValueList
-              entries={[
-                { label: 'Session', value: sessionSummary },
-                { label: 'Credential', value: credentialSummary },
-                { label: 'Runtime', value: protocolSummary },
-              ]}
-            />
-          </div>
-        }
       />
 
+      <StatusBanner role="alert" message={sessionError} type="error" />
       <div className="page-card-grid">
-        <Card
-          title="Session posture"
-          subtitle="Server session state and local credential storage in one operator view."
-        >
+        <Card title="Account access" subtitle={accountSummary}>
           <DefinitionList
             entries={[
               {
-                term: 'Session check',
+                term: 'Browser access',
                 description:
                   loading || !sessionReady
-                    ? '… Checking /api/session'
+                    ? '… Checking browser access'
                     : sessionError
                       ? '⚠ Failed'
                       : '✓ Ready',
               },
               {
-                term: 'Authenticated',
-                description: hasServerSession ? 'yes (server)' : 'no (server)',
+                term: 'Status',
+                description: sessionSummary,
               },
               {
                 term: 'User ID',
@@ -155,18 +146,44 @@ export function AccountPage(): React.JSX.Element {
                 descriptionClassName: 'mono',
               },
               {
-                term: 'Token storage mode',
-                description: hasToken ? (persisted ? 'localStorage' : 'sessionStorage') : 'none',
+                term: 'Recovery',
+                description: recoverySummary,
               },
             ]}
           />
-          <StatusBanner
-            role="alert"
-            message={sessionError}
-            type="error"
-            className="page-status-banner"
+          <InlineGroup>
+            {!hasServerSession ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
+            <TextLink to="/app/usage">Open usage</TextLink>
+          </InlineGroup>
+        </Card>
+
+        <Card title="Credential status" subtitle={credentialSummary}>
+          <DefinitionList
+            entries={[
+              {
+                term: 'Local credential',
+                description: hasToken ? 'Loaded' : 'Not loaded',
+              },
+              {
+                term: 'Storage',
+                description: hasToken
+                  ? persisted
+                    ? 'Saved on this device'
+                    : 'This browser tab only'
+                  : 'Not stored',
+              },
+              {
+                term: 'Use case',
+                description: hasToken
+                  ? 'Available for browser-side runtime probes'
+                  : 'Optional unless you need direct browser diagnostics',
+              },
+            ]}
           />
           <InlineGroup>
+            <ButtonLink to="/app/credentials" variant="secondary">
+              Manage credentials
+            </ButtonLink>
             <Button
               variant="secondary"
               disabled={!hasToken}
@@ -177,16 +194,18 @@ export function AccountPage(): React.JSX.Element {
             >
               Clear local credential
             </Button>
-            <TextLink to="/app/usage">Open usage</TextLink>
           </InlineGroup>
         </Card>
+      </div>
 
-        <Card
-          title="Runtime readiness"
-          subtitle="Protocol readiness for browser-side runtime access."
-        >
+      {showDiagnosticsCard ? (
+        <Card title="Diagnostics" subtitle={diagnosticsSummary}>
           <DefinitionList
             entries={[
+              {
+                term: 'Runtime summary',
+                description: protocolSummary,
+              },
               {
                 term: 'MCP protocol',
                 description:
@@ -200,15 +219,15 @@ export function AccountPage(): React.JSX.Element {
                           ? `⚠ Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
                           : `✓ ${protocolQuery.data?.protocolVersion || 'ready'}`,
               },
-              {
-                term: 'Runtime summary',
-                description: protocolSummary,
-              },
-              {
-                term: 'Runtime session',
-                description: protocolQuery.data?.sessionId ?? 'n/a',
-                descriptionClassName: protocolQuery.data?.sessionId ? 'mono' : undefined,
-              },
+              ...(protocolQuery.data?.sessionId
+                ? [
+                    {
+                      term: 'Runtime session',
+                      description: protocolQuery.data.sessionId,
+                      descriptionClassName: 'mono',
+                    },
+                  ]
+                : []),
             ]}
           />
           <StatusBanner
@@ -233,10 +252,11 @@ export function AccountPage(): React.JSX.Element {
                 {protocolQuery.isFetching ? 'Checking protocol...' : 'Re-check protocol'}
               </Button>
             ) : null}
+            <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
             <TextLink to="/app/observability">Open observability</TextLink>
           </InlineGroup>
         </Card>
-      </div>
+      ) : null}
     </div>
   );
 }

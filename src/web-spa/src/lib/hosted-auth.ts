@@ -1,4 +1,4 @@
-export const DEFAULT_AUTH_RETURN_TO = '/app/session';
+export const DEFAULT_AUTH_RETURN_TO = '/app/account';
 
 export function buildHostedAuthStartHref(returnTo = DEFAULT_AUTH_RETURN_TO): string {
   return `/auth/start?${new URLSearchParams({ return_to: returnTo }).toString()}`;

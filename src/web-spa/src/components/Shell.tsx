@@ -66,7 +66,7 @@ export function Shell(
     enabled: authed,
     onExpired: () => {
       clear();
-      toast('Session expired — review account status.', 'error');
+      toast('Browser access expired — review account status.', 'error');
       navigate('/app/account');
     },
   });
@@ -255,21 +255,21 @@ export function Shell(
     }
   }, [accountMenuOpen]);
 
-  const accountLabel = authed ? (session?.user?.id ?? 'Research operator') : 'Guest';
+  const accountLabel = session?.user?.id ?? 'Research operator';
   const credentialStatusLabel = hasLocalToken ? 'Credential loaded' : 'No local credential';
-  const accountTriggerLabel = showRecoveryBanner ? 'Fix session' : authed ? 'Session' : 'Sign in';
-  const accountStatusEyebrow = showRecoveryBanner ? 'Session repair' : 'Account status';
+  const accountTriggerLabel = 'Account';
+  const accountStatusEyebrow = showRecoveryBanner ? 'Account recovery' : 'Account status';
   const accountStatusTitle = loading
-    ? 'Checking session'
+    ? 'Checking account'
     : showRecoveryBanner
-      ? 'Session repair needed'
+      ? 'Action needed'
       : authed
         ? 'Signed in'
         : 'Signed out';
   const accountStatusDetail = loading
-    ? 'Confirming browser session and local credential state.'
+    ? 'Confirming browser access and local credential state.'
     : showRecoveryBanner
-      ? 'Browser session is signed out, but a local MCP credential is still stored on this device.'
+      ? 'You are signed out in this browser, but a local MCP credential is still stored on this device.'
       : authed
         ? `Signed in as ${accountLabel}. ${credentialStatusLabel}.`
         : 'No local credential loaded on this device.';
@@ -461,12 +461,12 @@ export function Shell(
               )}
               {showRecoveryBanner ? (
                 <StatusBanner
-                  title="Session recovery:"
-                  message="A local MCP credential is stored, but this browser session is signed out."
+                  title="Account recovery:"
+                  message="A local credential is still stored on this device, but browser access is signed out."
                 >
                   <InlineGroup>
                     <ButtonLink to="/app/account" variant="secondary">
-                      Review session status
+                      Review account status
                     </ButtonLink>
                     <Button
                       variant="secondary"
@@ -484,9 +484,6 @@ export function Shell(
           ) : null}
           <header className="workspace-topbar">
             <div className="topbar-context-shell" aria-label="Current workspace route">
-              <span className="topbar-context-icon" aria-hidden="true">
-                ●
-              </span>
               <div className="topbar-context">
                 <strong className="topbar-context-value">{currentWorkspace.label}</strong>
                 <span className="topbar-context-description">{currentWorkspace.description}</span>
@@ -527,7 +524,7 @@ export function Shell(
                       showRecoveryBanner ? 'warning' : ''
                     } ${accountMenuOpen ? 'open' : ''}`.trim()}
                     aria-label={
-                      showRecoveryBanner ? 'Fix session — repair needed' : accountTriggerLabel
+                      showRecoveryBanner ? 'Account — action needed' : accountTriggerLabel
                     }
                     aria-controls="account-panel"
                     aria-expanded={accountMenuOpen}
@@ -565,12 +562,20 @@ export function Shell(
                         {loading ? null : authed ? (
                           <>
                             <ButtonLink
-                              to="/app/session"
+                              to="/app/account"
                               variant="primary"
                               size="compact"
                               className="account-menu-action"
                             >
-                              Manage session
+                              Open account
+                            </ButtonLink>
+                            <ButtonLink
+                              to="/app/credentials"
+                              variant="secondary"
+                              size="compact"
+                              className="account-menu-action"
+                            >
+                              Open credentials
                             </ButtonLink>
                             <Button
                               id="logoutBtn"
@@ -583,14 +588,24 @@ export function Shell(
                             </Button>
                           </>
                         ) : (
-                          <ButtonLink
-                            href={authStartHref}
-                            variant="primary"
-                            size="compact"
-                            className="account-menu-action"
-                          >
-                            {showRecoveryBanner ? 'Sign in to repair session' : 'Sign in'}
-                          </ButtonLink>
+                          <>
+                            <ButtonLink
+                              href={authStartHref}
+                              variant="primary"
+                              size="compact"
+                              className="account-menu-action"
+                            >
+                              {showRecoveryBanner ? 'Sign in to recover account' : 'Sign in'}
+                            </ButtonLink>
+                            <ButtonLink
+                              to="/app/account"
+                              variant="secondary"
+                              size="compact"
+                              className="account-menu-action"
+                            >
+                              Open account
+                            </ButtonLink>
+                          </>
                         )}
                       </div>
                     </div>

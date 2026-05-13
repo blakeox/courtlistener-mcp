@@ -1301,7 +1301,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
   async function connect(): Promise<void> {
     if (!token.trim()) {
-      connectStatus.setError('Load a local MCP credential first (Session page).');
+      connectStatus.setError('Load a local MCP credential first (Account page).');
       return;
     }
     setConnecting(true);
@@ -2584,8 +2584,8 @@ function PlaygroundContent(): React.JSX.Element {
         description="Connect a direct MCP session, inspect live tool metadata, compare AI outputs with and without tool access, and drop to raw protocol calls when you need to debug the runtime boundary."
         actions={
           <InlineGroup>
-            <ButtonLink to="/app/session" variant="secondary">
-              Open session
+            <ButtonLink to="/app/account" variant="secondary">
+              Open account
             </ButtonLink>
             <ButtonLink to="/app/diagnostics" variant="secondary">
               Open diagnostics
@@ -2622,8 +2622,8 @@ function PlaygroundContent(): React.JSX.Element {
         >
           <StatusBanner message={carriedStatus.message} type={carriedStatus.type} />
           <InlineGroup>
-            <ButtonLink to="/app/session" variant="secondary">
-              Review session status
+            <ButtonLink to="/app/account" variant="secondary">
+              Review account status
             </ButtonLink>
             <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
           </InlineGroup>
@@ -2633,7 +2633,7 @@ function PlaygroundContent(): React.JSX.Element {
       {tokenMissing && (
         <StatusBanner
           role="alert"
-          message="No local MCP credential set. Open Session to load one for direct probes."
+          message="No local MCP credential set. Open Account to load one for direct probes."
           type="error"
         />
       )}

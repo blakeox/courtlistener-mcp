@@ -109,7 +109,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           <div className="two-up-grid">
             <MetricCard label="Agent Readiness" value="96 / 100" accent="Excellent">
               <p className="muted">Your environment is fully agent-ready.</p>
-              <TextLink to="/app/readiness">View details</TextLink>
+              <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
             </MetricCard>
             <MetricCard
               label="Research Sessions"

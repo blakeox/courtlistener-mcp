@@ -102,7 +102,7 @@ describe('Shell heartbeat integration', () => {
 
     expect(getSessionMock).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
-    expect(screen.getByText('Session expired — review account status.')).toBeInTheDocument();
+    expect(screen.getByText('Browser access expired — review account status.')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/app/account');
   });
 
@@ -118,7 +118,9 @@ describe('Shell heartbeat integration', () => {
 
     expect(getSessionMock).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBe('token-123');
-    expect(screen.queryByText('Session expired — review account status.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Browser access expired — review account status.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/app/playground');
   });
 

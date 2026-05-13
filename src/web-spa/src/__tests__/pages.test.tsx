@@ -49,7 +49,7 @@ vi.mock('../lib/api', () => ({
 }));
 
 vi.mock('../lib/hosted-auth', () => ({
-  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Fsession'),
+  buildHostedAuthStartHref: vi.fn().mockReturnValue('/auth/start?return_to=%2Fapp%2Faccount'),
   redirectToHostedAuth: vi.fn(),
 }));
 
@@ -100,7 +100,7 @@ describe('HostedAuthRedirectPage', () => {
     expect(screen.getByText('Redirecting to sign in')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /continue to hosted auth/i })).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Fsession',
+      '/auth/start?return_to=%2Fapp%2Faccount',
     );
     await waitFor(() => {
       expect(hostedAuth.redirectToHostedAuth).toHaveBeenCalledTimes(1);
@@ -134,10 +134,10 @@ describe('OnboardingPage', () => {
   it('shows auth status', async () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getAllByText(/operator session active/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/browser access ready/i).length).toBeGreaterThan(0);
   });
 
-  it('shows loading skeleton while checking session posture', async () => {
+  it('shows loading skeleton while checking browser access posture', async () => {
     const auth = await import('../lib/auth');
     vi.mocked(auth.useAuth).mockReturnValueOnce({
       session: { authenticated: false, user: { id: 'u1' }, turnstile_site_key: '' },
@@ -149,7 +149,7 @@ describe('OnboardingPage', () => {
     });
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/checking server session/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/checking browser access/i).length).toBeGreaterThan(0);
   });
 
   it('shows protocol explorer surfaces from live readiness metadata', async () => {
@@ -239,7 +239,7 @@ describe('OnboardingPage', () => {
     });
   });
 
-  it('shows session recovery actions when token exists but session is signed out', async () => {
+  it('shows account recovery actions when a local credential exists but browser access is signed out', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const auth = await import('../lib/auth');
     vi.mocked(auth.useAuth).mockReturnValueOnce({
@@ -254,15 +254,15 @@ describe('OnboardingPage', () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
 
-    expect(screen.getAllByText(/no operator session/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/sign in required/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Fsession',
+      '/auth/start?return_to=%2Fapp%2Faccount',
     );
     expect(screen.getByRole('button', { name: /clear local credential/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open session page/i })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: /open account/i })[0]).toHaveAttribute(
       'href',
-      '/app/session',
+      '/app/account',
     );
     expect(screen.queryByRole('link', { name: /legacy handoff/i })).not.toBeInTheDocument();
   });
@@ -282,10 +282,10 @@ describe('OnboardingPage', () => {
     render(<OnboardingPage />, { wrapper: Wrapper });
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
-    expect(screen.getByText(/session check failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/browser access check failed/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Fsession',
+      '/auth/start?return_to=%2Fapp%2Faccount',
     );
   });
 
@@ -359,7 +359,7 @@ describe('LandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
-      '/auth/start?return_to=%2Fapp%2Fsession',
+      '/auth/start?return_to=%2Fapp%2Faccount',
     );
     expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute(
       'href',
@@ -407,14 +407,18 @@ describe('AccountPage', () => {
   it('renders account heading', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('heading', { name: 'Session', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Account', level: 1 })).toBeInTheDocument();
   });
 
-  it('shows session info area', async () => {
+  it('shows account access details with user-facing labels', async () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
-    expect(screen.getByText('Authenticated')).toBeInTheDocument();
-    expect(screen.getByText('Session posture')).toBeInTheDocument();
+    expect(screen.getByText('Account access')).toBeInTheDocument();
+    expect(screen.getByText('Credential status')).toBeInTheDocument();
+    expect(screen.getByText('Browser access')).toBeInTheDocument();
+    expect(screen.getByText('Storage')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.queryByText('Diagnostics')).not.toBeInTheDocument();
   });
 
   it('surfaces protocol readiness details when token is available', async () => {
@@ -517,13 +521,17 @@ describe('AccountPage', () => {
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
     expect(screen.getByText(/⚠ Failed/i)).toBeInTheDocument();
-    expect(screen.getByText('Runtime readiness')).toBeInTheDocument();
+    expect(screen.getByText('Diagnostics')).toBeInTheDocument();
     expect(screen.queryByText('Usage & activity')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open credentials' })).toHaveAttribute(
       'href',
       '/app/credentials',
     );
     expect(screen.getByRole('link', { name: 'Open usage' })).toHaveAttribute('href', '/app/usage');
+    expect(screen.getByRole('link', { name: 'Open diagnostics' })).toHaveAttribute(
+      'href',
+      '/app/diagnostics',
+    );
     expect(screen.getByRole('link', { name: 'Open observability' })).toHaveAttribute(
       'href',
       '/app/observability',
@@ -546,12 +554,14 @@ describe('AccountPage', () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0]);
 
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalledTimes(1);
       expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBe('account-token');
-      expect(screen.getByText('Logout failed — session is still active.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Sign out failed — browser access is still active.'),
+      ).toBeInTheDocument();
     });
   });
 });
@@ -711,7 +721,7 @@ describe('PlaygroundPage', () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
     expect(screen.getByText(/auth flow was rate limited/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /review session status/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /review account status/i })).toBeInTheDocument();
   });
 
   it('renders AI Chat input area with textarea and send button', async () => {

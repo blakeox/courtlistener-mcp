@@ -294,7 +294,7 @@
 }
 
 @media (max-width: 480px) {
-  .card {
+  .ui-card {
     padding: var(--space-3);
   }
   .btn {
@@ -463,46 +463,32 @@
 
 .topbar-context-shell {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
   min-width: 0;
   flex: 1 1 auto;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--shell-sidebar-link-bg) 38%, transparent 62%);
+  padding: 0;
 }
 
 .topbar-context {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.topbar-context-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  color: var(--shell-sidebar-link-active-indicator);
-  font-size: 0.72rem;
-  line-height: 1;
-}
-
 .topbar-context-value {
   display: block;
-  font-size: 1.18rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
 .topbar-context-description {
   color: var(--shell-account-menu-text-subtle);
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   line-height: 1.4;
-  max-width: 42rem;
+  max-width: 36rem;
 }
 
 .topbar-actions {
@@ -565,10 +551,12 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 140px;
+  min-width: 112px;
   background: var(--shell-button-secondary-bg);
   border-color: var(--shell-button-secondary-border);
   color: var(--shell-button-secondary-text);
+  font-weight: 700;
+  box-shadow: var(--shell-button-primary-shadow);
 }
 
 .account-menu-trigger:hover,
@@ -696,11 +684,11 @@
 
 @media (max-width: 1080px) {
   .topbar-context-value {
-    font-size: 1.05rem;
+    font-size: 0.96rem;
   }
 
   .topbar-context-description {
-    font-size: 0.9rem;
+    font-size: 0.84rem;
   }
 
   .topbar-actions {
@@ -719,8 +707,16 @@
     gap: 12px;
   }
 
+  .topbar-context-shell {
+    width: 100%;
+  }
+
   .topbar-context {
     gap: 6px;
+  }
+
+  .topbar-context-description {
+    max-width: none;
   }
 
   .topbar-actions,
@@ -731,12 +727,28 @@
 
   .topbar-actions,
   .top-actions-utility {
-    justify-content: space-between;
-    align-items: center;
+    justify-content: stretch;
+    align-items: stretch;
   }
 
   .top-actions {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+  }
+
+  .mobile-menu-btn,
+  .account-menu {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+
+  .account-menu {
+    display: flex;
+  }
+
+  .account-menu-trigger {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
   }
 
   .toolbar-button {
@@ -748,6 +760,7 @@
   }
 
   .theme-toggle {
+    flex: 0 0 44px;
     width: 44px;
     min-width: 44px;
     min-height: 44px;

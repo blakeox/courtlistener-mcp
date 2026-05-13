@@ -52,10 +52,10 @@ export function OnboardingPage(): React.JSX.Element {
   const checklist = [
     {
       key: 'session',
-      label: 'Verify session status',
+      label: 'Verify account access',
       done: authed,
-      href: '/app/session',
-      action: 'Open session page',
+      href: '/app/account',
+      action: 'Open account',
     },
     {
       key: 'token',
@@ -94,11 +94,13 @@ export function OnboardingPage(): React.JSX.Element {
           ? '⚠ Blocked by protocol mismatch'
           : `${readiness?.toolCount ?? 0} tool(s) available`;
   const sessionSummary = sessionChecking
-    ? 'Checking session'
+    ? 'Checking browser access'
     : authed
-      ? 'Operator session active'
-      : 'No operator session';
-  const credentialSummary = hasToken ? 'Local credential loaded' : 'Local credential not loaded';
+      ? 'Browser access ready'
+      : 'Sign in required';
+  const credentialSummary = hasToken
+    ? 'Local diagnostic credential loaded'
+    : 'No local diagnostic credential';
   const runtimeSummary = hasMcpSuccess ? 'Runtime ready' : 'Readiness checks pending';
 
   return (
@@ -108,7 +110,7 @@ export function OnboardingPage(): React.JSX.Element {
         title={authed ? 'Runtime Diagnostics' : 'Sign in to continue'}
         description={
           authed
-            ? 'Diagnostics for session state, local credential posture, protocol negotiation, and runtime readiness.'
+            ? 'Diagnostics for browser access, local credential posture, protocol negotiation, and runtime readiness.'
             : 'Use the hosted auth flow first, then come back here for runtime diagnostics and MCP checks.'
         }
         actions={
@@ -125,12 +127,12 @@ export function OnboardingPage(): React.JSX.Element {
             </strong>
             <p className="page-hero-note-text">
               {authed
-                ? 'Use this route to validate session, credential, protocol, and tool discovery before deeper troubleshooting.'
+                ? 'Use this route to validate browser access, credential posture, protocol, and tool discovery before deeper troubleshooting.'
                 : 'Start with hosted sign-in, then return here to validate the MCP runtime surface.'}
             </p>
             <KeyValueList
               entries={[
-                { label: 'Session', value: sessionSummary },
+                { label: 'Access', value: sessionSummary },
                 { label: 'Credential', value: credentialSummary },
                 { label: 'Runtime', value: runtimeSummary },
               ]}
@@ -144,21 +146,21 @@ export function OnboardingPage(): React.JSX.Element {
 
       <Card
         title="Diagnostic signals"
-        subtitle="Verify the browser session, optional local diagnostic credential, negotiated protocol version, and live MCP tool availability from one operator route."
+        subtitle="Verify browser access, the optional local diagnostic credential, the negotiated protocol version, and live MCP tool availability from one operator route."
       >
         <DefinitionList
           entries={[
             {
-              term: 'Session',
+              term: 'Browser access',
               description: sessionChecking
-                ? '… Checking server session'
+                ? '… Checking browser access'
                 : sessionError
-                  ? '⚠ Session check failed'
-                  : '✓ Session endpoint reachable',
+                  ? '⚠ Browser access check failed'
+                  : '✓ Browser access ready',
             },
             {
-              term: 'Auth',
-              description: authed ? '✓ Operator session active' : '⚠ No operator session',
+              term: 'Account',
+              description: authed ? '✓ Signed in' : '⚠ Sign in required',
             },
             {
               term: 'Local MCP credential',
@@ -176,15 +178,15 @@ export function OnboardingPage(): React.JSX.Element {
         />
         <InlineGroup>
           {!authed ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
-          <ButtonLink to="/app/session" variant="secondary">
-            Open session
+          <ButtonLink to="/app/account" variant="secondary">
+            Open account
           </ButtonLink>
           <ButtonLink to="/app/credentials" variant="secondary">
             Open credentials
           </ButtonLink>
           <ButtonLink to="/app/playground">Open playground</ButtonLink>
           <Button variant="secondary" onClick={() => refresh()} disabled={sessionLoading}>
-            {sessionLoading ? 'Refreshing...' : 'Refresh session'}
+            {sessionLoading ? 'Refreshing...' : 'Refresh account'}
           </Button>
           <Button
             variant="secondary"

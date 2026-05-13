@@ -132,14 +132,14 @@ describe('Shell', () => {
 
     renderShell();
 
-    expect(screen.getByText(/session recovery:/i)).toBeInTheDocument();
+    expect(screen.getByText(/account recovery:/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear local credential' }));
 
     await waitFor(
       () => {
         expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
-        expect(screen.queryByText(/session recovery:/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/account recovery:/i)).not.toBeInTheDocument();
         expect(screen.getByText('Stored local credential cleared')).toBeInTheDocument();
       },
       { timeout: 10000 },
@@ -168,7 +168,9 @@ describe('Shell', () => {
 
     await waitFor(() => {
       expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
-      expect(screen.getByText('Session expired — review account status.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Browser access expired — review account status.'),
+      ).toBeInTheDocument();
       expect(screen.getByTestId('location')).toHaveTextContent('/app/account');
     });
   });
@@ -213,7 +215,7 @@ describe('Shell', () => {
     renderShell('/app/playground');
 
     expect(screen.getByRole('button', { name: /toggle navigation menu/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
   });
 
   it('closes the mobile drawer and restores body scrolling when the viewport returns to desktop', async () => {
@@ -269,7 +271,6 @@ describe('Shell', () => {
     expect(screen.getByRole('link', { name: 'Usage' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Observability' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Readiness' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Show diagnostics links' }),
     ).not.toBeInTheDocument();
@@ -283,7 +284,7 @@ describe('Shell', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Expand Setup section' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Readiness' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Readiness' })).not.toBeInTheDocument();
   });
 
   it('keeps home separate and shows setup links behind one setup toggle', () => {
@@ -334,7 +335,7 @@ describe('Shell', () => {
 
     renderShell('/app/playground');
 
-    expect(screen.getByRole('button', { name: /Fix session/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Account — action needed/i })).toBeInTheDocument();
   });
 
   it('carries the session repair state into the account panel', () => {
@@ -342,28 +343,28 @@ describe('Shell', () => {
 
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: /Fix session/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Account — action needed/i }));
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
-    expect(within(accountMenu).getByText('Session repair')).toBeInTheDocument();
-    expect(within(accountMenu).getByText('Session repair needed')).toBeInTheDocument();
+    expect(within(accountMenu).getByText('Account recovery')).toBeInTheDocument();
+    expect(within(accountMenu).getByText('Action needed')).toBeInTheDocument();
     expect(
       within(accountMenu).getByText(
-        'Browser session is signed out, but a local MCP credential is still stored on this device.',
+        'You are signed out in this browser, but a local MCP credential is still stored on this device.',
       ),
     ).toBeInTheDocument();
     expect(
-      within(accountMenu).getByRole('link', { name: 'Sign in to repair session' }),
+      within(accountMenu).getByRole('link', { name: 'Sign in to recover account' }),
     ).toBeInTheDocument();
   });
 
-  it('keeps session and credential links visible in the shell utility section', () => {
+  it('keeps account and credential links visible in the shell utility section', () => {
     renderShell('/app/playground');
 
     expect(screen.getByText('Workspace utilities')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Session' })[0]).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Account' })[0]).toHaveAttribute(
       'href',
-      '/app/session',
+      '/app/account',
     );
     expect(screen.getAllByRole('link', { name: 'Credentials' })[0]).toHaveAttribute(
       'href',
@@ -374,7 +375,7 @@ describe('Shell', () => {
   it('opens the account menu with a status block above the primary action', async () => {
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
     expect(accountMenu).toBeInTheDocument();
@@ -384,10 +385,10 @@ describe('Shell', () => {
       within(accountMenu).getByText('No local credential loaded on this device.'),
     ).toBeInTheDocument();
     expect(within(accountMenu).getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
-    expect(within(accountMenu).queryByRole('link', { name: 'Session' })).not.toBeInTheDocument();
-    expect(
-      within(accountMenu).queryByRole('link', { name: 'Credentials' }),
-    ).not.toBeInTheDocument();
+    expect(within(accountMenu).getByRole('link', { name: 'Open account' })).toHaveAttribute(
+      'href',
+      '/app/account',
+    );
 
     await waitFor(() => {
       expect(within(accountMenu).getByRole('link', { name: 'Sign in' })).toHaveFocus();
@@ -397,7 +398,7 @@ describe('Shell', () => {
   it('returns focus to the account trigger when the panel closes with escape', async () => {
     renderShell('/app/playground');
 
-    const accountTrigger = screen.getByRole('button', { name: 'Sign in' });
+    const accountTrigger = screen.getByRole('button', { name: 'Account' });
     fireEvent.click(accountTrigger);
     fireEvent.keyDown(window, { key: 'Escape' });
 
@@ -410,7 +411,7 @@ describe('Shell', () => {
   it('returns focus to the account trigger when the panel closes from an outside click', async () => {
     renderShell('/app/playground');
 
-    const accountTrigger = screen.getByRole('button', { name: 'Sign in' });
+    const accountTrigger = screen.getByRole('button', { name: 'Account' });
     fireEvent.click(accountTrigger);
     fireEvent.mouseDown(document.body);
 
@@ -428,13 +429,13 @@ describe('Shell', () => {
     });
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
-    fireEvent.click(within(accountMenu).getByRole('link', { name: 'Manage session' }));
+    fireEvent.click(within(accountMenu).getByRole('link', { name: 'Open account' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('/app/session');
+      expect(screen.getByTestId('location')).toHaveTextContent('/app/account');
       expect(screen.queryByRole('group', { name: 'Account panel' })).not.toBeInTheDocument();
       expect(screen.getByRole('main')).toHaveFocus();
     });
@@ -470,7 +471,7 @@ describe('Shell', () => {
 
     renderShell('/app/account');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     await waitFor(() => {

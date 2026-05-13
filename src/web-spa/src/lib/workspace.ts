@@ -64,8 +64,8 @@ export const WORKSPACE_SECTIONS: Record<string, WorkspaceSection> = {
       { title: 'Install flow', body: 'Install deps, build, then run doctor.' },
       {
         title: 'Next step',
-        body: 'Wire a client and validate readiness.',
-        action: { label: 'View readiness', to: '/app/readiness' },
+        body: 'Wire a client and validate runtime troubleshooting signals.',
+        action: { label: 'Open diagnostics', to: '/app/diagnostics' },
       },
     ],
     codeBlocks: [
@@ -220,7 +220,7 @@ export const WORKSPACE_SECTIONS: Record<string, WorkspaceSection> = {
     title: 'Usage & History',
     description: 'Summarize operator activity and route usage quickly.',
     actions: [
-      { label: 'Open session', to: '/app/session' },
+      { label: 'Open account', to: '/app/account' },
       { label: 'View observability', to: '/app/observability' },
     ],
     metrics: [
@@ -232,37 +232,13 @@ export const WORKSPACE_SECTIONS: Record<string, WorkspaceSection> = {
       { title: 'History panel', body: 'Recent session starts and recoverable failures.' },
     ],
   },
-  readiness: {
-    key: 'readiness',
-    eyebrow: 'Monitor',
-    title: 'Agent Readiness',
-    description: 'Show whether the environment is ready for agent workflows.',
-    actions: [
-      { label: 'Open diagnostics', to: '/app/diagnostics' },
-      { label: 'Open session', to: '/app/session' },
-    ],
-    metrics: [
-      { label: 'Checks', value: '7' },
-      { label: 'Score', value: '0-100' },
-    ],
-    cards: [
-      {
-        title: 'Recommended checks',
-        body: 'MCP reachable, OAuth active, tools available, playground ready.',
-      },
-      {
-        title: 'Recovery',
-        body: 'Send auth issues to Session and protocol issues to Diagnostics.',
-      },
-    ],
-  },
   credentials: {
     key: 'credentials',
     eyebrow: 'Account',
     title: 'Credentials & Providers',
     description: 'Bring your own keys and keep provider posture visible.',
     actions: [
-      { label: 'Open session', to: '/app/session' },
+      { label: 'Open account', to: '/app/account' },
       { label: 'Open docs', to: '/app/docs' },
     ],
     metrics: [

@@ -66,7 +66,7 @@ function AppContent(): React.JSX.Element {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/get-started" element={<LandingPage initialSectionId="setup" />} />
-            <Route path="/account" element={<Navigate to="/app/session" replace />} />
+            <Route path="/account" element={<Navigate to="/app/account" replace />} />
             <Route path="/download" element={<Navigate to="/app/download" replace />} />
             <Route path="/connect" element={<Navigate to="/app/connect" replace />} />
             <Route path="/playground" element={<Navigate to="/app/playground" replace />} />
@@ -77,9 +77,9 @@ function AppContent(): React.JSX.Element {
             <Route path="/observability" element={<Navigate to="/app/observability" replace />} />
             <Route path="/usage" element={<Navigate to="/app/usage" replace />} />
             <Route path="/diagnostics" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route path="/readiness" element={<Navigate to="/app/readiness" replace />} />
+            <Route path="/readiness" element={<Navigate to="/app/diagnostics" replace />} />
             <Route path="/credentials" element={<Navigate to="/app/credentials" replace />} />
-            <Route path="/session" element={<Navigate to="/app/session" replace />} />
+            <Route path="/session" element={<Navigate to="/app/account" replace />} />
             <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -115,16 +115,13 @@ function AppContent(): React.JSX.Element {
               element={<WorkspaceSectionPage sectionKey="observability" />}
             />
             <Route path="/app/diagnostics" element={<OnboardingPage />} />
-            <Route
-              path="/app/readiness"
-              element={<WorkspaceSectionPage sectionKey="readiness" />}
-            />
+            <Route path="/app/readiness" element={<Navigate to="/app/diagnostics" replace />} />
             <Route
               path="/app/credentials"
               element={<WorkspaceSectionPage sectionKey="credentials" />}
             />
-            <Route path="/app/session" element={<AccountPage />} />
-            <Route path="/app/account" element={<Navigate to="/app/session" replace />} />
+            <Route path="/app/account" element={<AccountPage />} />
+            <Route path="/app/session" element={<Navigate to="/app/account" replace />} />
             <Route path="/app/keys" element={<Navigate to="/app/credentials" replace />} />
             <Route path="/app/docs" element={<WorkspaceSectionPage sectionKey="docs" />} />
             <Route path="*" element={smartRedirectElement} />
@@ -145,6 +142,6 @@ function SmartRedirect(props: {
   if (props.hasMcpSuccess) target = '/app';
   else if (props.hasProtocolMismatch) target = '/app/control-center';
   else if (props.hasToken) target = '/app/playground';
-  else if (props.hasVerifiedAndLoggedIn) target = '/app/session';
+  else if (props.hasVerifiedAndLoggedIn) target = '/app/account';
   return <Navigate to={target} replace />;
 }

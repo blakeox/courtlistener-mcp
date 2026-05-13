@@ -31,7 +31,7 @@ const WORKSPACE_SETUP_LINKS: WorkspaceLink[] = [
 ];
 
 const WORKSPACE_UTILITY_LINKS: WorkspaceLink[] = [
-  { label: 'Session', shortLabel: 'SE', to: '/app/session' },
+  { label: 'Account', shortLabel: 'AC', to: '/app/account' },
   { label: 'Credentials', shortLabel: 'CR', to: '/app/credentials' },
 ];
 
@@ -70,7 +70,6 @@ export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
       { label: 'Usage', shortLabel: 'US', to: '/app/usage', priority: 'primary' },
       { label: 'Observability', shortLabel: 'OB', to: '/app/observability', priority: 'primary' },
       { label: 'Diagnostics', shortLabel: 'DG', to: '/app/diagnostics', priority: 'secondary' },
-      { label: 'Readiness', shortLabel: 'RD', to: '/app/readiness', priority: 'secondary' },
     ],
   },
 ];
@@ -122,10 +121,10 @@ const WORKSPACE_PATH_META = [
   { path: '/app/usage', label: 'Usage', description: 'Inspect activity.' },
   { path: '/app/observability', label: 'Observability', description: 'Monitor health.' },
   { path: '/app/diagnostics', label: 'Diagnostics', description: 'Inspect protocol state.' },
-  { path: '/app/readiness', label: 'Readiness', description: 'Check readiness.' },
+  { path: '/app/readiness', label: 'Diagnostics', description: 'Legacy diagnostics route.' },
   { path: '/app/credentials', label: 'Credentials', description: 'Manage providers.' },
-  { path: '/app/session', label: 'Session', description: 'Inspect session.' },
-  { path: '/app/account', label: 'Session', description: 'Legacy session route.' },
+  { path: '/app/account', label: 'Account', description: 'Manage access and recovery.' },
+  { path: '/app/session', label: 'Account', description: 'Legacy account route.' },
   { path: '/app/control-center', label: 'Overview', description: 'Legacy overview route.' },
   { path: '/app/docs', label: 'Docs', description: 'Install and troubleshoot.' },
 ];
