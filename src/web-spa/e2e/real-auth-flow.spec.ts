@@ -50,16 +50,17 @@ test.describe('SPA real auth flow', () => {
 
     await page.goto(`${server.baseUrl}/app/account`);
 
-    await expect(page.getByRole('heading', { name: 'Session Control', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account access', level: 2 })).toBeVisible();
     await expect(page.getByText('operator-real').first()).toBeVisible();
-    await expect(page.getByText('yes (server)')).toBeVisible();
+    await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
 
-    await expect(page).toHaveURL(/\/app\/control-center$/);
-    await expect(
-      page.getByRole('heading', { name: 'Sign in to continue', level: 2 }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/account$/);
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expect(page.getByText('Sign in required')).toBeVisible();
+    await expect(page.getByText('Signed out', { exact: true })).toBeVisible();
 
     const sessionSnapshot = await page.evaluate(async () => {
       const response = await fetch('/api/session', { credentials: 'same-origin' });
@@ -92,7 +93,6 @@ test.describe('SPA real auth flow', () => {
 
     await page.goto(authorizeUrl.toString());
 
-    await page.waitForURL(/\/auth\/approve\?/);
     await expect(page.getByRole('heading', { name: 'Approve OAuth access' })).toBeVisible();
     await expect(page.getByText('client-1')).toBeVisible();
     await expect(page.getByText('legal:read')).toBeVisible();
