@@ -741,11 +741,11 @@ describe('handleWorkerAuthHandoffRoutes', () => {
         workerUiSessionRuntime: {
           getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
           resolveUiSession: async () => ({ kind: 'invalid' }),
-          createUiSessionState: async (_request, _env, userId) => ({
-            sessionToken: `signed-session:${userId}`,
+          createUiSessionState: async (_request, _env, identity) => ({
+            sessionToken: `signed-session:${identity.userId}`,
             expiresInSeconds: 3600,
             headers: new Headers({
-              'set-cookie': `clmcp_ui=signed-session:${userId}; Path=/; HttpOnly`,
+              'set-cookie': `clmcp_ui=signed-session:${identity.userId}; Path=/; HttpOnly`,
             }),
           }),
           isSecureCookieRequest: () => true,

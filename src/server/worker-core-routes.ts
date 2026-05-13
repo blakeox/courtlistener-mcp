@@ -128,17 +128,23 @@ export async function handleWorkerCoreRoutes<
         allowedOrigins,
       );
     }
-    const sessionUserId = sessionState.kind === 'authenticated' ? sessionState.userId : null;
+    const sessionUser = sessionState.kind === 'authenticated' ? sessionState : null;
     const bearerUserId = await deps.workerUiSessionRuntime.resolveCloudflareOAuthUserId(
       request,
       env,
     );
     return deps.withCors(
       deps.jsonResponse({
-        authenticated: Boolean(sessionUserId),
-        user: sessionUserId ? { id: sessionUserId } : null,
+        authenticated: Boolean(sessionUser),
+        user: sessionUser
+          ? {
+              id: sessionUser.userId,
+              ...(sessionUser.email ? { email: sessionUser.email } : {}),
+              ...(sessionUser.displayName ? { displayName: sessionUser.displayName } : {}),
+            }
+          : null,
         auth_backend: 'cloudflare_oauth',
-        session_authenticated: Boolean(sessionUserId),
+        session_authenticated: Boolean(sessionUser),
         bearer_authenticated: Boolean(bearerUserId),
       }),
       origin,
@@ -176,19 +182,19 @@ export async function handleWorkerCoreRoutes<
 
     const bootstrapVerification =
       await deps.workerUiSessionRuntime.verifyBootstrapUserIdFromAuthorization(request, env);
-    if (!bootstrapVerification.userId) {
+    if (!bootstrapVerification.identity) {
       return deps.withCors(
         buildInvalidBootstrapAssertionResponse(deps, bootstrapVerification.error),
         origin,
         allowedOrigins,
       );
     }
-    const userId = bootstrapVerification.userId;
+    const identity = bootstrapVerification.identity;
 
     const sessionState = await deps.workerUiSessionRuntime.createUiSessionState(
       request,
       env,
-      userId,
+      identity,
       sessionSecret,
     );
     if (!sessionState) {
@@ -210,7 +216,7 @@ export async function handleWorkerCoreRoutes<
     return deps.jsonResponse(
       {
         ok: true,
-        userId,
+        userId: identity.userId,
         expiresInSeconds: sessionState.expiresInSeconds,
       },
       200,

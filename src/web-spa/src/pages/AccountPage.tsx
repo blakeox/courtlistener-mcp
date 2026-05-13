@@ -5,6 +5,7 @@ import { toErrorMessage } from '../lib/api';
 import { useToken } from '../lib/token-context';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
+import { getSessionDisplayLabel } from '../lib/session-display';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
@@ -40,6 +41,7 @@ export function AccountPage(): React.JSX.Element {
   const protocolMismatchMessage = protocolMismatch
     ? `Protocol mismatch: server advertised ${protocolQuery.data?.protocolVersion || 'unknown'}, expected ${expectedProtocolVersion}.`
     : '';
+  const accountLabel = getSessionDisplayLabel(session?.user);
 
   const sessionSummary =
     loading || !sessionReady
@@ -62,9 +64,7 @@ export function AccountPage(): React.JSX.Element {
           : protocolMismatch
             ? 'Protocol mismatch'
             : 'Runtime ready';
-  const accountSummary = hasServerSession
-    ? `Signed in as ${session?.user?.id ?? 'Research operator'}`
-    : 'Sign in required';
+  const accountSummary = hasServerSession ? `Signed in as ${accountLabel}` : 'Sign in required';
   const accountDescription = !hasServerSession
     ? 'Sign in, inspect account access, and recover stored credentials from one place.'
     : 'Review sign-in state, local credentials, and recovery options without digging through diagnostics first.';
@@ -96,9 +96,6 @@ export function AccountPage(): React.JSX.Element {
         description={accountDescription}
         actions={
           <InlineGroup>
-            <Button onClick={() => refresh()} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh account'}
-            </Button>
             <ButtonLink to="/app/credentials" variant="secondary">
               Open credentials
             </ButtonLink>
@@ -141,6 +138,10 @@ export function AccountPage(): React.JSX.Element {
                 description: sessionSummary,
               },
               {
+                term: 'Sign-in email',
+                description: session?.user?.email ?? 'Not available from identity provider',
+              },
+              {
                 term: 'User ID',
                 description: session?.user?.id ?? 'n/a',
                 descriptionClassName: 'mono',
@@ -152,6 +153,9 @@ export function AccountPage(): React.JSX.Element {
             ]}
           />
           <InlineGroup>
+            <Button variant="secondary" onClick={() => refresh()} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh status'}
+            </Button>
             {!hasServerSession ? <ButtonLink href={authStartHref}>Sign in</ButtonLink> : null}
             <TextLink to="/app/usage">Open usage</TextLink>
           </InlineGroup>
@@ -199,7 +203,7 @@ export function AccountPage(): React.JSX.Element {
       </div>
 
       {showDiagnosticsCard ? (
-        <Card title="Diagnostics" subtitle={diagnosticsSummary}>
+        <Card title="Diagnostics" subtitle={diagnosticsSummary} className="account-support-card">
           <DefinitionList
             entries={[
               {

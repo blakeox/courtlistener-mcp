@@ -421,6 +421,38 @@ describe('AccountPage', () => {
     expect(screen.queryByText('Diagnostics')).not.toBeInTheDocument();
   });
 
+  it('prefers the sign-in email for account display while keeping the internal user id visible', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: {
+        authenticated: true,
+        user: { id: 'tuqi3jzgswiz', email: 'operator@example.com' },
+        turnstile_site_key: '',
+      },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Signed in as operator@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Sign-in email')).toBeInTheDocument();
+    expect(screen.getByText('operator@example.com')).toBeInTheDocument();
+    expect(screen.getByText('tuqi3jzgswiz')).toBeInTheDocument();
+  });
+
+  it('keeps refresh as a secondary account access action instead of a page header action', async () => {
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    expect(screen.getByRole('button', { name: 'Refresh status' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh account' })).not.toBeInTheDocument();
+  });
+
   it('surfaces protocol readiness details when token is available', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');

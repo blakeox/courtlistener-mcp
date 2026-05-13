@@ -441,6 +441,26 @@ describe('Shell', () => {
     });
   });
 
+  it('prefers sign-in email in the account menu status copy', () => {
+    useAuthMock.mockReturnValue({
+      session: {
+        authenticated: true,
+        user: { id: 'tuqi3jzgswiz', email: 'operator@example.com' },
+        turnstile_site_key: '',
+      },
+      loading: false,
+      logout: vi.fn(),
+    });
+
+    renderShell('/app/playground');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+
+    const accountMenu = screen.getByRole('group', { name: 'Account panel' });
+    expect(within(accountMenu).getByText(/signed in as operator@example.com/i)).toBeInTheDocument();
+    expect(within(accountMenu).queryByText(/tuqi3jzgswiz/i)).not.toBeInTheDocument();
+  });
+
   it('shows the current workspace label in the topbar context', () => {
     renderShell('/app/playground');
 

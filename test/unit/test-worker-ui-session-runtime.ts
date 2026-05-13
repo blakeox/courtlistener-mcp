@@ -50,11 +50,17 @@ function createRuntime(
     verifyOidcUserIdFromToken?: (
       token: string,
       env: TestEnv,
-    ) => Promise<{ userId: string | null; error: string | null }>;
+    ) => Promise<{
+      identity: { userId: string; email?: string | null; displayName?: string | null } | null;
+      error: string | null;
+    }>;
     verifyOidcUserIdFromAuthorization?: (
       request: Request,
       env: TestEnv,
-    ) => Promise<{ userId: string | null; error: string | null }>;
+    ) => Promise<{
+      identity: { userId: string; email?: string | null; displayName?: string | null } | null;
+      error: string | null;
+    }>;
   } = {},
 ) {
   return createWorkerUiSessionRuntime<TestEnv>({
@@ -244,7 +250,7 @@ describe('worker UI session runtime', () => {
     const state = await runtime.createUiSessionState(
       new Request('https://worker.example/api/session/bootstrap'),
       env,
-      'user-99',
+      { userId: 'user-99' },
       env.MCP_UI_SESSION_SECRET!,
     );
 
@@ -289,9 +295,9 @@ describe('worker UI session runtime', () => {
     const runtime = createRuntime({
       revocationUnavailable: true,
       verifyOidcUserIdFromAuthorization: async (request) => ({
-        userId:
+        identity:
           request.headers.get('authorization') === 'Bearer header.payload.signature'
-            ? 'oidc-user-1'
+            ? { userId: 'oidc-user-1' }
             : null,
         error:
           request.headers.get('authorization') === 'Bearer header.payload.signature'
@@ -317,6 +323,8 @@ describe('worker UI session runtime', () => {
     assert.deepEqual(result, {
       kind: 'authenticated',
       userId: 'oidc-user-1',
+      email: null,
+      displayName: null,
       authSource: 'oidc_bearer',
     });
   });
@@ -387,7 +395,7 @@ describe('worker UI session runtime', () => {
     };
     const runtime = createRuntime({
       verifyOidcUserIdFromToken: async (token) => ({
-        userId: token === 'header.payload.signature' ? 'oidc_user_123' : null,
+        identity: token === 'header.payload.signature' ? { userId: 'oidc_user_123' } : null,
         error: token === 'header.payload.signature' ? null : 'invalid oidc token',
       }),
     });
@@ -399,7 +407,7 @@ describe('worker UI session runtime', () => {
       env,
     );
 
-    assert.equal(result.userId, 'oidc_user_123');
+    assert.equal(result.identity?.userId, 'oidc_user_123');
     assert.equal(result.error, null);
   });
 
@@ -410,7 +418,7 @@ describe('worker UI session runtime', () => {
     };
     const runtime = createRuntime({
       verifyOidcUserIdFromToken: async () => ({
-        userId: null,
+        identity: null,
         error: 'should not be called',
       }),
     });
@@ -422,7 +430,7 @@ describe('worker UI session runtime', () => {
       env,
     );
 
-    assert.equal(result.userId, null);
+    assert.equal(result.identity, null);
     assert.match(String(result.error), /Malformed OIDC bearer token/i);
   });
 
@@ -432,7 +440,7 @@ describe('worker UI session runtime', () => {
     };
     const runtime = createRuntime({
       verifyOidcUserIdFromToken: async () => ({
-        userId: 'should-not-be-returned',
+        identity: { userId: 'should-not-be-returned' },
         error: null,
       }),
     });
@@ -444,7 +452,7 @@ describe('worker UI session runtime', () => {
       env,
     );
 
-    assert.equal(result.userId, null);
+    assert.equal(result.identity, null);
     assert.match(String(result.error), /OIDC audience is not configured/i);
   });
 

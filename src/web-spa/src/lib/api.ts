@@ -6,6 +6,8 @@ export const sessionSchema = z.object({
   user: z
     .object({
       id: z.string(),
+      email: z.string().optional(),
+      displayName: z.string().optional(),
     })
     .nullable(),
   turnstile_site_key: z.string().optional(),

@@ -84,11 +84,16 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
       resolveCloudflareOAuthIdentity: async () => ({
         kind: 'authenticated',
         userId: 'user-1',
+        email: null,
+        displayName: null,
         authSource: 'ui_session',
       }),
       getSessionBootstrapRateLimitedResponse: async () => null,
       getUiSessionSecret: () => 'session-secret',
-      verifyBootstrapUserIdFromAuthorization: async () => ({ userId: 'user-1', error: null }),
+      verifyBootstrapUserIdFromAuthorization: async () => ({
+        identity: { userId: 'user-1' },
+        error: null,
+      }),
       createUiSessionToken: async () => 'signed-session',
       parseUiSessionToken: () => ({ sub: 'user-1', exp: 9999999999, jti: 'jti-1' }),
       buildUiSessionBootstrapHeaders: () =>
@@ -204,6 +209,8 @@ describe('handleWorkerCoreRoutes', () => {
           resolveCloudflareOAuthIdentity: async () => ({
             kind: 'authenticated',
             userId: 'user-1',
+            email: null,
+            displayName: null,
             authSource: 'ui_session',
           }),
           getSessionBootstrapRateLimitedResponse: async () => null,
@@ -305,9 +312,9 @@ describe('handleWorkerCoreRoutes', () => {
           getSessionBootstrapRateLimitedResponse: async () => null,
           getUiSessionSecret: () => 'session-secret',
           verifyBootstrapUserIdFromAuthorization: async (incomingRequest) => ({
-            userId:
+            identity:
               incomingRequest.headers.get('authorization') === 'Bearer header.payload.signature'
-                ? 'oidc-user-123'
+                ? { userId: 'oidc-user-123' }
                 : null,
             error: null,
           }),

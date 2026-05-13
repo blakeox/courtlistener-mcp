@@ -678,6 +678,21 @@
   justify-content: center;
 }
 
+.account-support-card {
+  border-style: dashed;
+  border-color: var(--surface-border-strong);
+  background: color-mix(in srgb, var(--surface-bg) 82%, var(--surface-panel-bg) 18%);
+  box-shadow: none;
+}
+
+.account-support-card h2 {
+  font-size: 1.08rem;
+}
+
+.account-support-card > .muted {
+  font-size: 0.92rem;
+}
+
 .toolbar-button {
   border-radius: 10px;
 }

@@ -2775,7 +2775,22 @@ export async function handleWorkerAuthHandoffRoutes<
       const sessionState = await deps.workerUiSessionRuntime.createUiSessionState(
         request,
         env,
-        subject,
+        {
+          userId: subject,
+          email:
+            typeof verified.payload.email === 'string' && verified.payload.email.trim()
+              ? verified.payload.email.trim()
+              : null,
+          displayName:
+            typeof verified.payload.name === 'string' && verified.payload.name.trim()
+              ? verified.payload.name.trim()
+              : typeof verified.payload.preferred_username === 'string' &&
+                  verified.payload.preferred_username.trim()
+                ? verified.payload.preferred_username.trim()
+                : typeof verified.payload.email === 'string' && verified.payload.email.trim()
+                  ? verified.payload.email.trim()
+                  : null,
+        },
         hostedAuth.sessionSecret,
       );
       sessionCreationDurationMs = getElapsedDurationMs(sessionCreationStartedAtMs);
@@ -2966,7 +2981,11 @@ export async function handleWorkerAuthHandoffRoutes<
           const bootstrappedSession = await deps.workerUiSessionRuntime.createUiSessionState(
             request,
             env,
-            trustedIdentity.userId,
+            {
+              userId: trustedIdentity.userId,
+              email: trustedIdentity.email ?? null,
+              displayName: trustedIdentity.displayName ?? null,
+            },
             sessionSecret,
           );
           if (bootstrappedSession) {

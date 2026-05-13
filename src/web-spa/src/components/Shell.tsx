@@ -17,6 +17,7 @@ import { useColorScheme } from '../hooks/useColorScheme';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useSessionHeartbeat } from '../hooks/useSessionHeartbeat';
 import { useToast } from './Toast';
+import { getSessionDisplayLabel } from '../lib/session-display';
 import {
   getWorkspaceNavGroups,
   getWorkspaceSecondaryNavSections,
@@ -255,7 +256,7 @@ export function Shell(
     }
   }, [accountMenuOpen]);
 
-  const accountLabel = session?.user?.id ?? 'Research operator';
+  const accountLabel = getSessionDisplayLabel(session?.user);
   const credentialStatusLabel = hasLocalToken ? 'Credential loaded' : 'No local credential';
   const accountTriggerLabel = 'Account';
   const accountStatusEyebrow = showRecoveryBanner ? 'Account recovery' : 'Account status';

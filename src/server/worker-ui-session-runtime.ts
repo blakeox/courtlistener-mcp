@@ -12,6 +12,12 @@ export interface UiApiAuthResult {
   authType: 'api_key' | 'session';
 }
 
+interface UiSessionIdentity {
+  userId: string;
+  email?: string | null;
+  displayName?: string | null;
+}
+
 interface UiSessionState {
   sessionToken: string;
   expiresInSeconds: number;
@@ -20,6 +26,8 @@ interface UiSessionState {
 
 interface UiSessionPayload {
   sub: string;
+  email?: string;
+  name?: string;
   exp: number;
   jti: string;
 }
@@ -32,7 +40,7 @@ interface SessionBootstrapLimiterState {
 type DurableAvailabilityResult<T> = { kind: 'ok'; value: T } | { kind: 'unavailable' };
 
 type UiSessionResolution =
-  | { kind: 'authenticated'; userId: string }
+  | { kind: 'authenticated'; userId: string; email?: string | null; displayName?: string | null }
   | { kind: 'invalid' }
   | { kind: 'revocation_unavailable' };
 
@@ -40,6 +48,8 @@ type OAuthIdentityResolution =
   | {
       kind: 'authenticated';
       userId: string;
+      email?: string | null;
+      displayName?: string | null;
       authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access' | 'dev_fallback';
     }
   | { kind: 'missing' }
@@ -83,16 +93,21 @@ interface WorkerUiSessionRuntimeDeps<TEnv extends WorkerUiSessionRuntimeEnv> {
   verifyOidcUserIdFromToken?: (
     token: string,
     env: TEnv,
-  ) => Promise<{ userId: string | null; error: string | null }>;
+  ) => Promise<{ identity: UiSessionIdentity | null; error: string | null }>;
   verifyOidcUserIdFromAuthorization?: (
     request: Request,
     env: TEnv,
-  ) => Promise<{ userId: string | null; error: string | null }>;
+  ) => Promise<{ identity: UiSessionIdentity | null; error: string | null }>;
 }
 
 export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> {
   getUiSessionSecret(env: TEnv): string | null;
-  createUiSessionToken(userId: string, secret: string, ttlSeconds?: number): Promise<string>;
+  createUiSessionToken(
+    userId: string,
+    secret: string,
+    ttlSeconds?: number,
+    options?: { email?: string | null | undefined; displayName?: string | null | undefined },
+  ): Promise<string>;
   parseUiSessionToken(token: string): UiSessionPayload | null;
   resolveUiSession(request: Request, env: TEnv): Promise<UiSessionResolution>;
   resolveUiSessionUserId(request: Request, env: TEnv): Promise<string | null>;
@@ -102,7 +117,7 @@ export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> 
   createUiSessionState(
     request: Request,
     env: TEnv,
-    userId: string,
+    identity: UiSessionIdentity,
     sessionSecret: string,
   ): Promise<UiSessionState | null>;
   getOrCreateCsrfCookieHeader(request: Request, env: TEnv): string | null;
@@ -111,7 +126,7 @@ export interface WorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntimeEnv> 
   verifyBootstrapUserIdFromAuthorization(
     request: Request,
     env: TEnv,
-  ): Promise<{ userId: string | null; error: string | null }>;
+  ): Promise<{ identity: UiSessionIdentity | null; error: string | null }>;
   resolveCloudflareOAuthIdentity(request: Request, env: TEnv): Promise<OAuthIdentityResolution>;
   resolveCloudflareOAuthUserId(request: Request, env: TEnv): Promise<string | null>;
   getSessionBootstrapRateLimitedResponse(
@@ -266,9 +281,12 @@ async function createUiSessionToken(
   userId: string,
   secret: string,
   ttlSeconds: number,
+  options?: { email?: string | null | undefined; displayName?: string | null | undefined },
 ): Promise<string> {
   const payloadObj: UiSessionPayload = {
     sub: userId,
+    ...(options?.email?.trim() ? { email: options.email.trim() } : {}),
+    ...(options?.displayName?.trim() ? { name: options.displayName.trim() } : {}),
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
     jti: generateRandomToken(24),
   };
@@ -298,13 +316,18 @@ async function getUiSessionUserId<TEnv extends WorkerUiSessionRuntimeEnv>(
   if (revocationState.value) {
     return { kind: 'invalid' };
   }
-  return { kind: 'authenticated', userId: payload.sub };
+  return {
+    kind: 'authenticated',
+    userId: payload.sub,
+    email: payload.email ?? null,
+    displayName: payload.name ?? null,
+  };
 }
 
 async function verifyOidcUserIdFromAuthorization<TEnv extends WorkerUiSessionRuntimeEnv>(
   request: Request,
   env: TEnv,
-): Promise<{ userId: string | null; error: string | null }> {
+): Promise<{ identity: UiSessionIdentity | null; error: string | null }> {
   return verifyOidcUserId(
     extractBearerToken(request.headers.get('authorization')),
     env,
@@ -316,24 +339,38 @@ async function verifyOidcUserId<TEnv extends WorkerUiSessionRuntimeEnv>(
   bearerToken: string | null,
   env: TEnv,
   missingTokenError: string,
-): Promise<{ userId: string | null; error: string | null }> {
+): Promise<{ identity: UiSessionIdentity | null; error: string | null }> {
   if (!bearerToken) {
-    return { userId: null, error: missingTokenError };
+    return { identity: null, error: missingTokenError };
   }
   const oidcConfig = getWorkerOidcConfig(env);
   if (!oidcConfig) {
-    return { userId: null, error: 'OIDC issuer is not configured.' };
+    return { identity: null, error: 'OIDC issuer is not configured.' };
   }
   try {
     const verified = await verifyAccessToken(bearerToken, oidcConfig);
     const subject = verified.payload.sub;
     if (typeof subject === 'string' && subject.trim().length > 0) {
-      return { userId: subject.trim(), error: null };
+      const email =
+        typeof verified.payload.email === 'string' && verified.payload.email.trim().length > 0
+          ? verified.payload.email.trim()
+          : null;
+      const displayName =
+        typeof verified.payload.name === 'string' && verified.payload.name.trim().length > 0
+          ? verified.payload.name.trim()
+          : typeof verified.payload.preferred_username === 'string' &&
+              verified.payload.preferred_username.trim().length > 0
+            ? verified.payload.preferred_username.trim()
+            : email;
+      return {
+        identity: { userId: subject.trim(), email, displayName },
+        error: null,
+      };
     }
-    return { userId: null, error: 'Verified token missing subject claim.' };
+    return { identity: null, error: 'Verified token missing subject claim.' };
   } catch (error) {
     return {
-      userId: null,
+      identity: null,
       error: error instanceof Error ? error.message : 'OIDC verification failed.',
     };
   }
@@ -342,7 +379,7 @@ async function verifyOidcUserId<TEnv extends WorkerUiSessionRuntimeEnv>(
 async function verifyOidcUserIdFromToken<TEnv extends WorkerUiSessionRuntimeEnv>(
   bearerToken: string,
   env: TEnv,
-): Promise<{ userId: string | null; error: string | null }> {
+): Promise<{ identity: UiSessionIdentity | null; error: string | null }> {
   return verifyOidcUserId(bearerToken, env, 'Missing bearer token.');
 }
 
@@ -392,17 +429,17 @@ async function verifyBootstrapBearerToken<TEnv extends WorkerUiSessionRuntimeEnv
   bearerToken: string | null,
   env: TEnv,
   deps: WorkerUiSessionRuntimeDeps<TEnv>,
-): Promise<{ userId: string | null; error: string | null }> {
+): Promise<{ identity: UiSessionIdentity | null; error: string | null }> {
   if (!bearerToken) {
-    return { userId: null, error: 'Missing bootstrap bearer token.' };
+    return { identity: null, error: 'Missing bootstrap bearer token.' };
   }
 
   if (bearerToken.split('.').length !== 3) {
-    return { userId: null, error: 'Malformed OIDC bearer token.' };
+    return { identity: null, error: 'Malformed OIDC bearer token.' };
   }
 
   if (!env.OIDC_AUDIENCE?.trim()) {
-    return { userId: null, error: 'OIDC audience is not configured.' };
+    return { identity: null, error: 'OIDC audience is not configured.' };
   }
 
   const verifyOidc = deps.verifyOidcUserIdFromToken ?? verifyOidcUserIdFromToken;
@@ -421,8 +458,9 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       userId: string,
       secret: string,
       ttlSeconds = UI_SESSION_TTL_SECONDS,
+      options?: { email?: string | null | undefined; displayName?: string | null | undefined },
     ): Promise<string> {
-      return createUiSessionToken(userId, secret, ttlSeconds);
+      return createUiSessionToken(userId, secret, ttlSeconds, options);
     },
 
     parseUiSessionToken(token: string): UiSessionPayload | null {
@@ -471,11 +509,19 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
     async createUiSessionState(
       request: Request,
       env: TEnv,
-      userId: string,
+      identity: UiSessionIdentity,
       sessionSecret: string,
     ): Promise<UiSessionState | null> {
       const expiresInSeconds = UI_SESSION_TTL_SECONDS;
-      const sessionToken = await createUiSessionToken(userId, sessionSecret, expiresInSeconds);
+      const sessionToken = await createUiSessionToken(
+        identity.userId,
+        sessionSecret,
+        expiresInSeconds,
+        {
+          email: identity.email,
+          displayName: identity.displayName,
+        },
+      );
       const parsedSession = parseUiSessionToken(sessionToken);
       if (!parsedSession) {
         return null;
@@ -532,7 +578,7 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
     async verifyBootstrapUserIdFromAuthorization(
       request: Request,
       env: TEnv,
-    ): Promise<{ userId: string | null; error: string | null }> {
+    ): Promise<{ identity: UiSessionIdentity | null; error: string | null }> {
       const bearerToken = extractBearerToken(request.headers.get('authorization'));
       return verifyBootstrapBearerToken(bearerToken, env, deps);
     },
@@ -557,10 +603,12 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
           const verifyOidcFromAuthorization =
             deps.verifyOidcUserIdFromAuthorization ?? verifyOidcUserIdFromAuthorization;
           const verifiedOidc = await verifyOidcFromAuthorization(request, env);
-          return verifiedOidc.userId
+          return verifiedOidc.identity
             ? ({
                 kind: 'authenticated',
-                userId: verifiedOidc.userId,
+                userId: verifiedOidc.identity.userId,
+                email: verifiedOidc.identity.email ?? null,
+                displayName: verifiedOidc.identity.displayName ?? null,
                 authSource: 'oidc_bearer',
               } satisfies OAuthIdentityResolution)
             : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
@@ -575,6 +623,8 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
             ? ({
                 kind: 'authenticated',
                 userId: sessionState.userId,
+                email: sessionState.email ?? null,
+                displayName: sessionState.displayName ?? null,
                 authSource: 'ui_session',
               } satisfies OAuthIdentityResolution)
             : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
