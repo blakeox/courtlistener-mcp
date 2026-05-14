@@ -1,10 +1,24 @@
 import assert from 'node:assert/strict';
+import {
+  chmodSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
   hasManagedCodexCourtlistenerBlock,
   hasUnmanagedCodexCourtlistenerBlock,
   upsertManagedCodexCourtlistenerBlock,
+  writeTextFileAtomically,
 } from '../../src/cli/setup.js';
 
 describe('cli setup codex helpers', () => {
@@ -61,5 +75,42 @@ url = "https://custom.example.com/mcp"
 
     assert.equal(hasUnmanagedCodexCourtlistenerBlock(unmanaged), true);
     assert.equal(hasManagedCodexCourtlistenerBlock(unmanaged), false);
+  });
+
+  it('detects unmanaged Codex sections outside the managed block', () => {
+    const mixed = `
+# >>> courtlistener-mcp codex >>>
+[mcp_servers.courtlistener]
+url = "https://courtlistenermcp.blakeoxford.com/mcp"
+# <<< courtlistener-mcp codex <<<
+
+[mcp_servers.courtlistener]
+url = "https://custom.example.com/mcp"
+`.trim();
+
+    assert.equal(hasManagedCodexCourtlistenerBlock(mixed), true);
+    assert.equal(hasUnmanagedCodexCourtlistenerBlock(mixed), true);
+  });
+
+  it('preserves symlink targets and existing file mode for atomic writes', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'courtlistener-cli-setup-'));
+    try {
+      const targetDir = join(tempDir, 'real');
+      mkdirSync(targetDir, { recursive: true });
+      const targetPath = join(targetDir, 'config.toml');
+      const symlinkPath = join(tempDir, 'config.toml');
+
+      writeFileSync(targetPath, 'before\n', 'utf8');
+      chmodSync(targetPath, 0o640);
+      symlinkSync(targetPath, symlinkPath);
+
+      writeTextFileAtomically(symlinkPath, 'after\n');
+
+      assert.equal(readlinkSync(symlinkPath), targetPath);
+      assert.equal(readFileSync(targetPath, 'utf8'), 'after\n');
+      assert.equal(statSync(targetPath).mode & 0o777, 0o640);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

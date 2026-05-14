@@ -8,9 +8,11 @@
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   renameSync,
+  realpathSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -84,7 +86,6 @@ function codexConfigPath(): string {
 const CODEX_MANAGED_BLOCK_START = '# >>> courtlistener-mcp codex >>>';
 const CODEX_MANAGED_BLOCK_END = '# <<< courtlistener-mcp codex <<<';
 const CODEX_COURTLISTENER_SECTION_HEADER = '[mcp_servers.courtlistener]';
-const FILE_PERMISSION_MASK = 0o777;
 
 // ── Client definitions ─────────────────────────────────────────────
 
@@ -327,22 +328,22 @@ function mergeConfig(
   return existing;
 }
 
-function writeTextFileAtomically(filePath: string, content: string, mode?: number): void {
-  const dir = dirname(filePath);
+export function writeTextFileAtomically(filePath: string, content: string, mode?: number): void {
+  const targetPath =
+    existsSync(filePath) && lstatSync(filePath).isSymbolicLink()
+      ? realpathSync(filePath)
+      : filePath;
+  const dir = dirname(targetPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 
-  const tempPath = `${filePath}.tmp-${process.pid}`;
-  writeFileSync(tempPath, content, { encoding: 'utf-8', mode });
-  renameSync(tempPath, filePath);
-}
+  const effectiveMode =
+    mode ?? (existsSync(targetPath) ? statSync(targetPath).mode & 0o777 : undefined);
 
-function getConfigFileMode(filePath: string): number | undefined {
-  if (!existsSync(filePath)) {
-    return undefined;
-  }
-  return statSync(filePath).mode & FILE_PERMISSION_MASK;
+  const tempPath = `${targetPath}.tmp-${process.pid}`;
+  writeFileSync(tempPath, content, { encoding: 'utf-8', mode: effectiveMode });
+  renameSync(tempPath, targetPath);
 }
 
 function writeConfig(client: McpClient, configContent: string): string | null {
@@ -373,7 +374,7 @@ function writeConfig(client: McpClient, configContent: string): string | null {
   writeTextFileAtomically(
     client.configPath,
     JSON.stringify(finalConfig, null, 2) + '\n',
-    getConfigFileMode(client.configPath) ?? 0o600,
+    existsSync(client.configPath) ? undefined : 0o600,
   );
   return client.configPath;
 }
