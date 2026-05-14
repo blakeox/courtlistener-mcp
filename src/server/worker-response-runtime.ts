@@ -206,6 +206,11 @@ function getSetCookieValues(source: HeadersInit, headers: Headers): string[] {
     return headers.getSetCookie();
   }
 
-  const combined = headers.get('set-cookie');
-  return combined ? [combined] : [];
+  if (headers.has('set-cookie')) {
+    throw new Error(
+      'Preserving multiple Set-Cookie headers from a Headers object requires a runtime with Headers.getSetCookie().',
+    );
+  }
+
+  return [];
 }
