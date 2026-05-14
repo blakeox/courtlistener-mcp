@@ -150,6 +150,7 @@ Prebuilt configs are provided in [`configs/`](./configs):
 - `hosted-remote-claude.json`
 - `hosted-oauth-chatgpt.json`
 - `hosted-oauth-codex.json`
+- `codex.toml`
 - `claude-desktop.json`
 - `claude-desktop-remote.json`
 - `cursor.json`
@@ -168,12 +169,15 @@ Explicit contract examples:
   hosted remote use with Claude-style clients
 - [`configs/hosted-oauth-chatgpt.json`](./configs/hosted-oauth-chatgpt.json) for
   hosted remote OAuth with ChatGPT-style clients
+- [`configs/codex.toml`](./configs/codex.toml) for the current terminal Codex
+  CLI (`~/.codex/config.toml`, then run `codex mcp login courtlistener`)
 - [`configs/hosted-oauth-codex.json`](./configs/hosted-oauth-codex.json) for
-  hosted remote OAuth with Codex-style clients
+  older JSON-based Codex-style clients
 
 Legacy filenames are still shipped for compatibility:
 
-- [`configs/codex.json`](./configs/codex.json) for direct HTTP transport
+- [`configs/codex.json`](./configs/codex.json) for the legacy direct HTTP JSON
+  example
 - [`configs/openai-chatgpt.json`](./configs/openai-chatgpt.json) for hosted
   OAuth
 - [`configs/claude-desktop-remote.json`](./configs/claude-desktop-remote.json)
