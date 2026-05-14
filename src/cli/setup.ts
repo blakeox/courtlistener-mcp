@@ -5,7 +5,14 @@
  * Detects MCP clients, prompts for configuration, and writes config files.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { createInterface } from 'node:readline';
 import { homedir, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -19,6 +26,7 @@ interface McpClient {
   configFile: string; // template filename in configs/
   configPath: string | null; // target path on disk (null = print to stdout)
   merge: boolean; // whether to merge into an existing config
+  format: 'json' | 'managed-toml';
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -68,6 +76,14 @@ function vscodeSettingsPath(): string {
   return join(home, 'Library', 'Application Support', 'Code', 'User', 'settings.json');
 }
 
+function codexConfigPath(): string {
+  return join(home, '.codex', 'config.toml');
+}
+
+const CODEX_MANAGED_BLOCK_START = '# >>> courtlistener-mcp codex >>>';
+const CODEX_MANAGED_BLOCK_END = '# <<< courtlistener-mcp codex <<<';
+const CODEX_COURTLISTENER_SECTION_HEADER = '[mcp_servers.courtlistener]';
+
 // ── Client definitions ─────────────────────────────────────────────
 
 const CLIENTS: McpClient[] = [
@@ -77,6 +93,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'claude-desktop.json',
     configPath: claudeDesktopConfigPath(),
     merge: true,
+    format: 'json',
   },
   {
     id: 'claude-code',
@@ -84,6 +101,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'claude-desktop.json',
     configPath: claudeCodeConfigPath(),
     merge: true,
+    format: 'json',
   },
   {
     id: 'cursor',
@@ -91,6 +109,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'cursor.json',
     configPath: cursorConfigPath(),
     merge: true,
+    format: 'json',
   },
   {
     id: 'continue',
@@ -98,6 +117,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'continue-dev.json',
     configPath: continueConfigPath(),
     merge: false,
+    format: 'json',
   },
   {
     id: 'vscode-copilot',
@@ -105,6 +125,15 @@ const CLIENTS: McpClient[] = [
     configFile: 'vscode-copilot.json',
     configPath: vscodeSettingsPath(),
     merge: true,
+    format: 'json',
+  },
+  {
+    id: 'codex-cli',
+    name: 'Codex CLI',
+    configFile: 'codex.toml',
+    configPath: codexConfigPath(),
+    merge: false,
+    format: 'managed-toml',
   },
   {
     id: 'zed',
@@ -112,6 +141,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'zed.json',
     configPath: zedSettingsPath(),
     merge: true,
+    format: 'json',
   },
   {
     id: 'other',
@@ -119,6 +149,7 @@ const CLIENTS: McpClient[] = [
     configFile: 'claude-desktop.json',
     configPath: null,
     merge: false,
+    format: 'json',
   },
 ];
 
@@ -136,6 +167,7 @@ function detectClients(): DetectedClient[] {
     cursor: [join(home, '.cursor')],
     continue: [join(home, '.continue')],
     'vscode-copilot': [vscodeSettingsPath(), join(home, '.vscode')],
+    'codex-cli': [codexConfigPath(), join(home, '.codex')],
     zed: [join(home, '.config', 'zed')],
   };
 
@@ -183,14 +215,18 @@ function findConfigsDir(): string {
   );
 }
 
-function loadTemplate(configFile: string, apiKey: string): string {
+function loadTemplate(client: McpClient, apiKey: string): string {
   const configsDir = findConfigsDir();
-  const templatePath = join(configsDir, configFile);
+  const templatePath = join(configsDir, client.configFile);
   let content = readFileSync(templatePath, 'utf-8');
 
   // Replace placeholder paths with actual project path
   const projectDir = process.cwd();
   content = content.replace(/\/path\/to\/courtlistener-mcp/g, projectDir);
+
+  if (client.format !== 'json') {
+    return content;
+  }
 
   // Replace API key placeholder
   if (apiKey) {
@@ -205,6 +241,42 @@ function loadTemplate(configFile: string, apiKey: string): string {
   }
 
   return content;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getCodexManagedBlock(content: string): string {
+  return `${CODEX_MANAGED_BLOCK_START}\n${content.trim()}\n${CODEX_MANAGED_BLOCK_END}`;
+}
+
+export function hasManagedCodexCourtlistenerBlock(content: string): boolean {
+  return content.includes(CODEX_MANAGED_BLOCK_START) && content.includes(CODEX_MANAGED_BLOCK_END);
+}
+
+export function hasUnmanagedCodexCourtlistenerBlock(content: string): boolean {
+  return (
+    !hasManagedCodexCourtlistenerBlock(content) &&
+    new RegExp(`^\\s*${escapeRegExp(CODEX_COURTLISTENER_SECTION_HEADER)}\\s*$`, 'm').test(content)
+  );
+}
+
+export function upsertManagedCodexCourtlistenerBlock(
+  existingContent: string,
+  managedBlockContent: string,
+): string {
+  const managedBlock = getCodexManagedBlock(managedBlockContent);
+  if (hasManagedCodexCourtlistenerBlock(existingContent)) {
+    const managedPattern = new RegExp(
+      `${escapeRegExp(CODEX_MANAGED_BLOCK_START)}[\\s\\S]*?${escapeRegExp(CODEX_MANAGED_BLOCK_END)}`,
+      'm',
+    );
+    return existingContent.replace(managedPattern, managedBlock);
+  }
+
+  const trimmed = existingContent.trimEnd();
+  return trimmed.length > 0 ? `${trimmed}\n\n${managedBlock}\n` : `${managedBlock}\n`;
 }
 
 function mergeConfig(
@@ -245,8 +317,32 @@ function mergeConfig(
   return existing;
 }
 
+function writeTextFileAtomically(filePath: string, content: string, mode?: number): void {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+
+  const tempPath = `${filePath}.tmp-${process.pid}`;
+  writeFileSync(tempPath, content, { encoding: 'utf-8', mode });
+  renameSync(tempPath, filePath);
+}
+
 function writeConfig(client: McpClient, configContent: string): string | null {
   if (!client.configPath) return null;
+
+  if (client.format === 'managed-toml') {
+    const existing = existsSync(client.configPath) ? readFileSync(client.configPath, 'utf-8') : '';
+    const finalConfig = upsertManagedCodexCourtlistenerBlock(existing, configContent);
+    if (existsSync(client.configPath)) {
+      const backupPath = `${client.configPath}.bak`;
+      if (!existsSync(backupPath)) {
+        copyFileSync(client.configPath, backupPath);
+      }
+    }
+    writeTextFileAtomically(client.configPath, finalConfig, 0o600);
+    return client.configPath;
+  }
 
   const parsed = JSON.parse(configContent) as Record<string, unknown>;
 
@@ -257,12 +353,7 @@ function writeConfig(client: McpClient, configContent: string): string | null {
     finalConfig = parsed;
   }
 
-  const dir = dirname(client.configPath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  writeFileSync(client.configPath, JSON.stringify(finalConfig, null, 2) + '\n', 'utf-8');
+  writeTextFileAtomically(client.configPath, JSON.stringify(finalConfig, null, 2) + '\n');
   return client.configPath;
 }
 
@@ -318,26 +409,54 @@ export async function runSetup(): Promise<void> {
     console.log(`\n→ Configuring for ${selectedClient.name}\n`);
 
     // Step 3: API key
-    console.log('CourtListener API key (optional — public endpoints work without one).');
-    console.log('Get one free at: https://www.courtlistener.com/help/api/rest/#permissions\n');
-    const apiKey = await ask(rl, 'API key (press Enter to skip): ');
-
-    if (apiKey) {
-      console.log('  ✅ API key will be saved in config');
+    let apiKey = '';
+    if (selectedClient.id === 'codex-cli') {
+      console.log(
+        'Codex CLI uses hosted OAuth for this setup, so no CourtListener API key is needed.',
+      );
+      console.log('You will authenticate after setup with `codex mcp login courtlistener`.\n');
     } else {
-      console.log('  ⏭️  Skipping API key (you can add it later)');
+      console.log('CourtListener API key (optional — public endpoints work without one).');
+      console.log('Get one free at: https://www.courtlistener.com/help/api/rest/#permissions\n');
+      apiKey = await ask(rl, 'API key (press Enter to skip): ');
+
+      if (apiKey) {
+        console.log('  ✅ API key will be saved in config');
+      } else {
+        console.log('  ⏭️  Skipping API key (you can add it later)');
+      }
+      console.log();
     }
-    console.log();
 
     // Step 4: Generate config
-    const configContent = loadTemplate(selectedClient.configFile, apiKey);
+    const configContent = loadTemplate(selectedClient, apiKey);
 
     if (selectedClient.configPath) {
       // Check if file already exists and has courtlistener configured
       if (existsSync(selectedClient.configPath)) {
         try {
           const existing = readFileSync(selectedClient.configPath, 'utf-8');
-          if (existing.includes('courtlistener')) {
+          if (
+            selectedClient.format === 'managed-toml' &&
+            hasUnmanagedCodexCourtlistenerBlock(existing)
+          ) {
+            console.log(
+              `\n⚠️  ${selectedClient.configPath} already has an unmanaged ${CODEX_COURTLISTENER_SECTION_HEADER} entry.`,
+            );
+            console.log(
+              'Merge this managed block manually so the wizard can update it safely later:\n',
+            );
+            console.log('─'.repeat(60));
+            console.log(getCodexManagedBlock(configContent));
+            console.log('─'.repeat(60));
+            printNextSteps(selectedClient, null);
+            return;
+          }
+          if (
+            (selectedClient.format === 'managed-toml' &&
+              hasManagedCodexCourtlistenerBlock(existing)) ||
+            (selectedClient.format === 'json' && existing.includes('courtlistener'))
+          ) {
             const overwrite = await ask(
               rl,
               `⚠️  ${selectedClient.configPath} already has a courtlistener entry. Overwrite? [y/N]: `,
@@ -346,7 +465,11 @@ export async function runSetup(): Promise<void> {
               console.log(
                 '\n⏭️  Skipping config write. Here is the config you can merge manually:\n',
               );
-              console.log(configContent);
+              console.log(
+                selectedClient.format === 'managed-toml'
+                  ? getCodexManagedBlock(configContent)
+                  : configContent,
+              );
               printNextSteps(selectedClient, null);
               return;
             }
@@ -376,6 +499,21 @@ export async function runSetup(): Promise<void> {
 
 function printNextSteps(client: McpClient, writtenPath: string | null): void {
   console.log('\n📋 Next steps:\n');
+
+  if (client.id === 'codex-cli') {
+    if (!writtenPath && client.configPath) {
+      console.log(`  1. Copy the managed block above to: ${client.configPath}`);
+      console.log('  2. Run `codex mcp login courtlistener`');
+      console.log('  3. Restart Codex if it is already open');
+      console.log('  4. Run `/mcp` in Codex to confirm the server is available\n');
+    } else {
+      console.log('  1. Run `codex mcp login courtlistener`');
+      console.log('  2. Restart Codex if it is already open');
+      console.log('  3. Run `/mcp` in Codex to confirm the server is available\n');
+    }
+    console.log('📖 Docs: https://developers.openai.com/codex/mcp\n');
+    return;
+  }
 
   if (!writtenPath && client.configPath) {
     console.log(`  1. Copy the config above to: ${client.configPath}`);
