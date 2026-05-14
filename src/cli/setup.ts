@@ -11,6 +11,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -337,6 +338,13 @@ function writeTextFileAtomically(filePath: string, content: string, mode?: numbe
   renameSync(tempPath, filePath);
 }
 
+function getConfigFileMode(filePath: string): number | undefined {
+  if (!existsSync(filePath)) {
+    return undefined;
+  }
+  return statSync(filePath).mode & 0o777;
+}
+
 function writeConfig(client: McpClient, configContent: string): string | null {
   if (!client.configPath) return null;
 
@@ -362,7 +370,11 @@ function writeConfig(client: McpClient, configContent: string): string | null {
     finalConfig = parsed;
   }
 
-  writeTextFileAtomically(client.configPath, JSON.stringify(finalConfig, null, 2) + '\n');
+  writeTextFileAtomically(
+    client.configPath,
+    JSON.stringify(finalConfig, null, 2) + '\n',
+    getConfigFileMode(client.configPath) ?? 0o600,
+  );
   return client.configPath;
 }
 
