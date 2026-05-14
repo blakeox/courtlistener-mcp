@@ -61,7 +61,7 @@ multi_agent = true
 
     const updated = upsertManagedCodexCourtlistenerBlock(existing, managedTomlBlock);
 
-    assert.equal(updated.includes('https://old.example.com/mcp'), false);
+    assert.doesNotMatch(updated, /url = "https:\/\/old\.example\.com\/mcp"/);
     assert.equal(updated.match(/# >>> courtlistener-mcp codex >>>/g)?.length, 1);
     assert.equal(updated.match(/# <<< courtlistener-mcp codex <<</g)?.length, 1);
     assert.match(updated, /\[features\]\nmulti_agent = true/);
