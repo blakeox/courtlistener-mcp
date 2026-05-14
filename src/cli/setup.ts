@@ -251,15 +251,24 @@ function getCodexManagedBlock(content: string): string {
   return `${CODEX_MANAGED_BLOCK_START}\n${content.trim()}\n${CODEX_MANAGED_BLOCK_END}`;
 }
 
+function stripManagedCodexCourtlistenerBlocks(content: string): string {
+  const managedPattern = new RegExp(
+    `${escapeRegExp(CODEX_MANAGED_BLOCK_START)}[\\s\\S]*?${escapeRegExp(CODEX_MANAGED_BLOCK_END)}`,
+    'gm',
+  );
+  return content.replace(managedPattern, '');
+}
+
 export function hasManagedCodexCourtlistenerBlock(content: string): boolean {
   return content.includes(CODEX_MANAGED_BLOCK_START) && content.includes(CODEX_MANAGED_BLOCK_END);
 }
 
 export function hasUnmanagedCodexCourtlistenerBlock(content: string): boolean {
-  return (
-    !hasManagedCodexCourtlistenerBlock(content) &&
-    new RegExp(`^\\s*${escapeRegExp(CODEX_COURTLISTENER_SECTION_HEADER)}\\s*$`, 'm').test(content)
-  );
+  const contentOutsideManagedBlocks = stripManagedCodexCourtlistenerBlocks(content);
+  return new RegExp(
+    `^\\s*${escapeRegExp(CODEX_COURTLISTENER_SECTION_HEADER)}\\s*$`,
+    'm',
+  ).test(contentOutsideManagedBlocks);
 }
 
 export function upsertManagedCodexCourtlistenerBlock(
