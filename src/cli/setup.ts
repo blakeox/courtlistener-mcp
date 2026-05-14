@@ -20,6 +20,7 @@ import { createInterface } from 'node:readline';
 import { homedir, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redactSecretsInText } from '../infrastructure/secret-redaction.js';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -254,6 +255,18 @@ function getCodexManagedBlock(content: string): string {
   return `${CODEX_MANAGED_BLOCK_START}\n${content.trim()}\n${CODEX_MANAGED_BLOCK_END}`;
 }
 
+function getSafeConfigPreview(
+  client: McpClient,
+  configContent: string,
+  options: { apiKey?: string } = {},
+): string {
+  const preview =
+    client.format === 'managed-toml' ? getCodexManagedBlock(configContent) : configContent;
+  return redactSecretsInText(preview, {
+    additionalSecrets: options.apiKey ? [options.apiKey] : [],
+  });
+}
+
 function stripManagedCodexCourtlistenerBlocks(content: string): string {
   const managedPattern = new RegExp(
     `${escapeRegExp(CODEX_MANAGED_BLOCK_START)}[\\s\\S]*?${escapeRegExp(CODEX_MANAGED_BLOCK_END)}`,
@@ -469,7 +482,11 @@ export async function runSetup(): Promise<void> {
               'Merge this managed block manually so the wizard can update it safely later:\n',
             );
             console.log('─'.repeat(60));
-            console.log(getCodexManagedBlock(configContent));
+            console.log(
+              getSafeConfigPreview(selectedClient, configContent, {
+                apiKey,
+              }),
+            );
             console.log('─'.repeat(60));
             printNextSteps(selectedClient, null);
             return;
@@ -487,11 +504,7 @@ export async function runSetup(): Promise<void> {
               console.log(
                 '\n⏭️  Skipping config write. Here is the config you can merge manually:\n',
               );
-              console.log(
-                selectedClient.format === 'managed-toml'
-                  ? getCodexManagedBlock(configContent)
-                  : configContent,
-              );
+              console.log(getSafeConfigPreview(selectedClient, configContent, { apiKey }));
               printNextSteps(selectedClient, null);
               return;
             }
@@ -510,7 +523,7 @@ export async function runSetup(): Promise<void> {
       // "Other" client — print to stdout
       console.log('Add this to your MCP client configuration:\n');
       console.log('─'.repeat(60));
-      console.log(configContent);
+      console.log(getSafeConfigPreview(selectedClient, configContent, { apiKey }));
       console.log('─'.repeat(60));
       printNextSteps(selectedClient, null);
     }
