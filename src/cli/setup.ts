@@ -84,6 +84,7 @@ function codexConfigPath(): string {
 const CODEX_MANAGED_BLOCK_START = '# >>> courtlistener-mcp codex >>>';
 const CODEX_MANAGED_BLOCK_END = '# <<< courtlistener-mcp codex <<<';
 const CODEX_COURTLISTENER_SECTION_HEADER = '[mcp_servers.courtlistener]';
+const FILE_PERMISSION_MASK = 0o777;
 
 // ── Client definitions ─────────────────────────────────────────────
 
@@ -266,10 +267,9 @@ export function hasManagedCodexCourtlistenerBlock(content: string): boolean {
 
 export function hasUnmanagedCodexCourtlistenerBlock(content: string): boolean {
   const contentOutsideManagedBlocks = stripManagedCodexCourtlistenerBlocks(content);
-  return new RegExp(
-    `^\\s*${escapeRegExp(CODEX_COURTLISTENER_SECTION_HEADER)}\\s*$`,
-    'm',
-  ).test(contentOutsideManagedBlocks);
+  return new RegExp(`^\\s*${escapeRegExp(CODEX_COURTLISTENER_SECTION_HEADER)}\\s*$`, 'm').test(
+    contentOutsideManagedBlocks,
+  );
 }
 
 export function upsertManagedCodexCourtlistenerBlock(
@@ -342,7 +342,7 @@ function getConfigFileMode(filePath: string): number | undefined {
   if (!existsSync(filePath)) {
     return undefined;
   }
-  return statSync(filePath).mode & 0o777;
+  return statSync(filePath).mode & FILE_PERMISSION_MASK;
 }
 
 function writeConfig(client: McpClient, configContent: string): string | null {
