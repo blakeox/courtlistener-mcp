@@ -1994,6 +1994,7 @@ async function buildApprovalPageResponse<
     }),
     nonce,
     headers,
+    // OAuth loopback and hosted callbacks rely on explicit callback origins in the CSP.
     redirectUri ? { formActionOrigins: [redirectUri.origin] } : undefined,
   );
 }
