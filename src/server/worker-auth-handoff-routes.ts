@@ -26,6 +26,10 @@ import {
 } from './worker-upstream-oidc-config.js';
 import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-limit.js';
 import { getOAuthFrontdoorRateLimitedResponse } from './worker-oauth-frontdoor-rate-limit.js';
+import {
+  cloneHeadersPreservingSetCookie,
+  type HtmlResponseSecurityOptions,
+} from './worker-response-runtime.js';
 
 const AUTH_STATE_COOKIE_NAME = 'clauth_state';
 const AUTH_APPROVAL_COOKIE_NAME = 'clauth_approve';
@@ -958,7 +962,12 @@ interface AuthFlowPayload {
 interface HandleWorkerAuthHandoffRoutesDeps<TEnv extends WorkerUiSessionRuntimeEnv> {
   jsonError: (message: string, status: number, errorCode: string) => Response;
   generateCspNonce: () => string;
-  htmlResponse: (html: string, nonce: string, extraHeaders?: HeadersInit) => Response;
+  htmlResponse: (
+    html: string,
+    nonce: string,
+    extraHeaders?: HeadersInit,
+    securityOptions?: HtmlResponseSecurityOptions,
+  ) => Response;
   workerUiSessionRuntime: WorkerUiSessionRuntime<TEnv>;
   getOAuthHelpers: (env: TEnv) => OAuthHelpers;
   buildHostedOAuthCompletionDetails: (
@@ -1464,7 +1473,10 @@ function appendHostedAuthHeaders(headers: Headers, signal: HostedAuthResponseSig
 }
 
 function attachHostedAuthHeaders(response: Response, signal: HostedAuthResponseSignal): Response {
-  const headers = appendHostedAuthHeaders(new Headers(response.headers), signal);
+  const headers = appendHostedAuthHeaders(
+    cloneHeadersPreservingSetCookie(response.headers),
+    signal,
+  );
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -1982,6 +1994,7 @@ async function buildApprovalPageResponse<
     }),
     nonce,
     headers,
+    redirectUri ? { formActionOrigins: [redirectUri.origin] } : undefined,
   );
 }
 

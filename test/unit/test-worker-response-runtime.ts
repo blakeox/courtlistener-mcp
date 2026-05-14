@@ -46,6 +46,30 @@ describe('worker response runtime', () => {
     assert.ok((response.headers.get('content-security-policy') ?? '').includes(`nonce-${nonce}`));
   });
 
+  it('allows explicit callback origins in HTML form-action CSP', () => {
+    const response = htmlResponse('<html></html>', 'nonce', undefined, {
+      formActionOrigins: ['http://127.0.0.1:59547/callback', 'https://chatgpt.com/oauth/callback'],
+    });
+
+    assert.match(
+      response.headers.get('content-security-policy') ?? '',
+      /form-action 'self' http:\/\/127\.0\.0\.1:59547 https:\/\/chatgpt\.com/,
+    );
+  });
+
+  it('preserves multiple Set-Cookie headers passed into HTML responses', () => {
+    const extraHeaders = new Headers();
+    extraHeaders.append('Set-Cookie', 'first=value-1; Path=/; HttpOnly');
+    extraHeaders.append('Set-Cookie', 'second=value-2; Path=/; HttpOnly');
+
+    const response = htmlResponse('<html></html>', 'nonce', extraHeaders);
+    const cookies = response.headers.getSetCookie();
+
+    assert.equal(cookies.length, 2);
+    assert.equal(cookies[0], 'first=value-1; Path=/; HttpOnly');
+    assert.equal(cookies[1], 'second=value-2; Path=/; HttpOnly');
+  });
+
   it('preserves redirect location and security headers', () => {
     const response = redirectResponse('https://example.com/app', 302);
 
