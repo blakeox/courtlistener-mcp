@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 
 import { handleWorkerAuthHandoffRoutes } from '../../src/server/worker-auth-handoff-routes.js';
+import { htmlResponse as secureHtmlResponse } from '../../src/server/worker-response-runtime.js';
 import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
 
 installNodeWebCryptoForTests();
@@ -13,13 +14,13 @@ type FetchCall = { url: string; init?: RequestInit };
 
 const originalFetch = globalThis.fetch;
 
-function htmlResponse(html: string, _nonce?: string, extraHeaders?: HeadersInit): Response {
-  const headers = new Headers(extraHeaders);
-  headers.set('content-type', 'text/html; charset=utf-8');
-  return new Response(html, {
-    status: 200,
-    headers,
-  });
+function htmlResponse(
+  html: string,
+  nonce?: string,
+  extraHeaders?: HeadersInit,
+  securityOptions?: { formActionOrigins?: string[] },
+): Response {
+  return secureHtmlResponse(html, nonce ?? 'nonce', extraHeaders, securityOptions);
 }
 
 function jsonError(message: string, status: number, errorCode: string): Response {
@@ -819,10 +820,18 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.ok(getResponse);
     assert.equal(getResponse.status, 200);
     assert.match(await getResponse.text(), /Approve OAuth access/);
+    const responseCookies = getResponse.headers.getSetCookie();
     const setCookie = String(getResponse.headers.get('set-cookie'));
     assert.match(setCookie, /clauth_approve=/);
     assert.match(setCookie, /clauth_flow=/);
     assert.match(setCookie, /clmcp_csrf=csrf-token-123/);
+    assert.ok(responseCookies.some((cookie) => cookie.startsWith('clauth_approve=')));
+    assert.ok(responseCookies.some((cookie) => cookie.startsWith('clauth_flow=')));
+    assert.ok(responseCookies.some((cookie) => cookie.startsWith('clmcp_csrf=csrf-token-123')));
+    assert.match(
+      getResponse.headers.get('content-security-policy') ?? '',
+      /form-action 'self' https:\/\/chatgpt\.com/,
+    );
     const approvalCorrelationId = getResponse.headers.get('x-hosted-auth-correlation-id');
     assert.match(String(approvalCorrelationId), /^[A-Za-z0-9_-]{8,}$/);
     assert.equal(completionCount, 0);
