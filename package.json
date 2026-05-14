@@ -143,7 +143,7 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.70.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
-    "@opentelemetry/sdk-node": "^0.212.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
     "@opentelemetry/sdk-trace-node": "^2.5.1",
     "@tanstack/react-query": "^5.80.7",
     "agents": "^0.5.1",
