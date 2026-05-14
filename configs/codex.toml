@@ -1,0 +1,5 @@
+# Terminal Codex CLI MCP config for the hosted CourtListener endpoint.
+# After adding this server, run: codex mcp login courtlistener
+
+[mcp_servers.courtlistener]
+url = "https://courtlistenermcp.blakeoxford.com/mcp"
