@@ -193,6 +193,24 @@ function normalizeFormActionOrigins(origins: string[]): string[] {
   return [...uniqueOrigins];
 }
 
+type HeadersWithRawSetCookie = Headers & {
+  raw?: () => Record<string, string[] | undefined>;
+};
+
+function getRawSetCookieValues(headers: Headers): string[] {
+  const raw = (headers as HeadersWithRawSetCookie).raw;
+  if (typeof raw !== 'function') {
+    return [];
+  }
+
+  const values = raw.call(headers)['set-cookie'];
+  return Array.isArray(values) ? values : [];
+}
+
+function looksLikeCombinedSetCookieHeader(value: string): boolean {
+  return /,\s*[^;,\s=][^;,\s=]*=/.test(value);
+}
+
 function getSetCookieValues(source: HeadersInit, headers: Headers): string[] {
   if (Array.isArray(source)) {
     return source.filter(([key]) => key.toLowerCase() === 'set-cookie').map(([, value]) => value);
@@ -202,13 +220,30 @@ function getSetCookieValues(source: HeadersInit, headers: Headers): string[] {
     return source.getSetCookie();
   }
 
+  if (source instanceof Headers) {
+    const rawSetCookieValues = getRawSetCookieValues(source);
+    if (rawSetCookieValues.length > 0) {
+      return rawSetCookieValues;
+    }
+  }
+
   if (typeof headers.getSetCookie === 'function') {
     return headers.getSetCookie();
   }
 
-  if (headers.has('set-cookie')) {
+  const rawSetCookieValues = getRawSetCookieValues(headers);
+  if (rawSetCookieValues.length > 0) {
+    return rawSetCookieValues;
+  }
+
+  const setCookieValue = headers.get('set-cookie');
+  if (setCookieValue !== null) {
+    if (!looksLikeCombinedSetCookieHeader(setCookieValue)) {
+      return [setCookieValue];
+    }
+
     throw new Error(
-      'Preserving multiple Set-Cookie headers from a Headers object requires a runtime with Headers.getSetCookie().',
+      'Preserving multiple Set-Cookie headers from a Headers object requires a runtime with Headers.getSetCookie() or another raw Set-Cookie accessor.',
     );
   }
 
