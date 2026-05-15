@@ -150,7 +150,6 @@ jobs:
         run: pnpm run build
 
       - name: Run unit tests
-        if: matrix.node-version != 18
         run: pnpm run test:unit
 
   full-validation:
