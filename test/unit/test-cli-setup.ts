@@ -67,6 +67,41 @@ multi_agent = true
     assert.match(updated, /\[features\]\nmulti_agent = true/);
   });
 
+  it('deduplicates multiple managed Codex MCP blocks on rerun', () => {
+    const existing = `
+model = "gpt-5.5"
+
+# >>> courtlistener-mcp codex >>>
+[mcp_servers.courtlistener]
+url = "https://old-1.example.com/mcp"
+# <<< courtlistener-mcp codex <<<
+
+# >>> courtlistener-mcp codex >>>
+[mcp_servers.courtlistener]
+url = "https://old-2.example.com/mcp"
+# <<< courtlistener-mcp codex <<<
+
+[mcp_servers.courtlistener]
+url = "https://custom.example.com/mcp"
+`.trim();
+
+    const updated = upsertManagedCodexCourtlistenerBlock(existing, managedTomlBlock);
+
+    assert.equal(updated.match(/# >>> courtlistener-mcp codex >>>/g)?.length, 1);
+    assert.equal(updated.match(/# <<< courtlistener-mcp codex <<</g)?.length, 1);
+    assert.doesNotMatch(updated, /old-1\.example\.com/);
+    assert.doesNotMatch(updated, /old-2\.example\.com/);
+    assert.match(updated, /https:\/\/custom\.example\.com\/mcp/);
+    assert.doesNotMatch(updated, /\n{3,}/);
+  });
+
+  it('is idempotent when rerun with an existing managed Codex MCP block', () => {
+    const once = upsertManagedCodexCourtlistenerBlock('', managedTomlBlock);
+    const twice = upsertManagedCodexCourtlistenerBlock(once, managedTomlBlock);
+
+    assert.equal(twice, once);
+  });
+
   it('detects unmanaged existing courtlistener Codex sections', () => {
     const unmanaged = `
 [mcp_servers.courtlistener]

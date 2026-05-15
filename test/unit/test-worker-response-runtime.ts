@@ -17,6 +17,18 @@ import { installNodeWebCryptoForTests } from '../utils/node-webcrypto.ts';
 
 installNodeWebCryptoForTests();
 
+function withoutSetCookieAccessors(headers: Headers): Headers {
+  Object.defineProperty(headers, 'getSetCookie', {
+    value: undefined,
+    configurable: true,
+  });
+  Object.defineProperty(headers, 'raw', {
+    value: undefined,
+    configurable: true,
+  });
+  return headers;
+}
+
 describe('worker response runtime', () => {
   it('applies secure headers to JSON responses', async () => {
     const response = jsonResponse({ ok: true });
@@ -68,6 +80,32 @@ describe('worker response runtime', () => {
     assert.equal(cookies.length, 2);
     assert.equal(cookies[0], 'first=value-1; Path=/; HttpOnly');
     assert.equal(cookies[1], 'second=value-2; Path=/; HttpOnly');
+  });
+
+  it('preserves a single Set-Cookie header without getSetCookie support', () => {
+    const extraHeaders = withoutSetCookieAccessors(
+      new Headers({
+        'Set-Cookie': 'session=value-1; Expires=Wed, 09 Jun 2027 10:18:14 GMT; Path=/; HttpOnly',
+      }),
+    );
+
+    const response = htmlResponse('<html></html>', 'nonce', extraHeaders);
+    const cookies = response.headers.getSetCookie();
+
+    assert.deepEqual(cookies, [
+      'session=value-1; Expires=Wed, 09 Jun 2027 10:18:14 GMT; Path=/; HttpOnly',
+    ]);
+  });
+
+  it('throws when multiple Set-Cookie headers cannot be represented safely', () => {
+    const extraHeaders = withoutSetCookieAccessors(new Headers());
+    extraHeaders.append('Set-Cookie', 'first=value-1; Path=/; HttpOnly');
+    extraHeaders.append('Set-Cookie', 'second=value-2; Path=/; HttpOnly');
+
+    assert.throws(
+      () => htmlResponse('<html></html>', 'nonce', extraHeaders),
+      /requires a runtime with Headers\.getSetCookie\(\) or another raw Set-Cookie accessor/,
+    );
   });
 
   it('preserves redirect location and security headers', () => {
