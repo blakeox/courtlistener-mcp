@@ -362,6 +362,7 @@
     border: 0;
     padding: 0;
     background: var(--shell-sidebar-overlay);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
   }
   .workspace-sidebar {
