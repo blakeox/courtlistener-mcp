@@ -97,7 +97,10 @@ class UnitTestRunner {
       // test passes normally, so keep the child attached and kill it directly
       // on timeout.
       const command = process.execPath;
-      const args = [tsxCliPath, '--test', '--test-force-exit', testPath];
+      const supportsForceExit = Number(process.versions.node.split('.')[0] ?? '0') >= 20;
+      const args = supportsForceExit
+        ? [tsxCliPath, '--test', '--test-force-exit', testPath]
+        : [tsxCliPath, '--test', testPath];
 
       const child = spawn(command, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
