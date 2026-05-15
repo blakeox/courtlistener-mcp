@@ -249,6 +249,7 @@ a {
   border-radius: var(--surface-radius-xl);
   padding: 22px;
   box-shadow: var(--surface-shadow);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 }
 
@@ -413,6 +414,7 @@ a {
   border-radius: var(--radius-md);
   background: var(--hero-note-bg);
   color: var(--landing-color-text-inverse);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
