@@ -12,11 +12,15 @@ jobs:
     name: Require dev promotion
     runs-on: ubuntu-latest
     steps:
-      - name: Enforce dev as the only promotion source
+      - name: Enforce approved promotion sources
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ "$HEAD_REF" != "dev" ]; then
-            echo "::error::Pull requests into main must come from dev. Promote validated dev into main instead of merging feature branches directly."
-            exit 1
-          fi
+          case "$HEAD_REF" in
+            dev|promote-dev-to-main-*)
+              ;;
+            *)
+              echo "::error::Pull requests into main must come from dev or an approved promote-dev-to-main-* branch. Promote validated dev into main instead of merging feature branches directly."
+              exit 1
+              ;;
+          esac
