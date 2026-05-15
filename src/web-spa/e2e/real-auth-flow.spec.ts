@@ -3,6 +3,15 @@ import type { AddressInfo } from 'node:net';
 import { expect, test, type Page } from 'playwright/test';
 import { startLocalAuthFlowServer } from './support/local-auth-flow-server';
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 test.describe('SPA real auth flow', () => {
   let server: Awaited<ReturnType<typeof startLocalAuthFlowServer>>;
   let externalCallbackServer: Awaited<ReturnType<typeof startExternalCallbackServer>>;
@@ -21,9 +30,14 @@ test.describe('SPA real auth flow', () => {
     baseUrl: string;
     close: () => Promise<void>;
   }> {
-    const callbackServer = http.createServer((_request, response) => {
+    const callbackServer = http.createServer((request, response) => {
+      const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+      const code = escapeHtml(requestUrl.searchParams.get('code') || '');
+      const state = escapeHtml(requestUrl.searchParams.get('state') || '');
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end('<html><body><h1>External authorization completed</h1></body></html>');
+      response.end(
+        `<html><body><h1>External authorization completed</h1><p>code=${code}</p><p>state=${state}</p></body></html>`,
+      );
     });
 
     await new Promise<void>((resolve, reject) => {

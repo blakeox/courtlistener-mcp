@@ -291,15 +291,9 @@ export function upsertManagedCodexCourtlistenerBlock(
   managedBlockContent: string,
 ): string {
   const managedBlock = getCodexManagedBlock(managedBlockContent);
-  if (hasManagedCodexCourtlistenerBlock(existingContent)) {
-    const managedPattern = new RegExp(
-      `${escapeRegExp(CODEX_MANAGED_BLOCK_START)}[\\s\\S]*?${escapeRegExp(CODEX_MANAGED_BLOCK_END)}`,
-      'm',
-    );
-    return existingContent.replace(managedPattern, managedBlock);
-  }
-
-  const trimmed = existingContent.trimEnd();
+  const trimmed = stripManagedCodexCourtlistenerBlocks(existingContent)
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
   return trimmed.length > 0 ? `${trimmed}\n\n${managedBlock}\n` : `${managedBlock}\n`;
 }
 
