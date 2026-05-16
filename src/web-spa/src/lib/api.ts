@@ -23,7 +23,7 @@ export const sessionSchema = z.object({
       displayName: z.string().optional(),
     })
     .nullable(),
-  turnstile_site_key: z.string().optional(),
+  turnstile_site_key: z.string().nullable().optional(),
 });
 
 const aiChatSchema = z.object({

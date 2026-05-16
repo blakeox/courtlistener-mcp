@@ -1,7 +1,7 @@
 export interface AuthSessionResponse {
   authenticated: boolean;
   user: { id: string; email?: string; displayName?: string } | null;
-  turnstile_site_key?: string;
+  turnstile_site_key?: string | null;
 }
 
 export interface SessionBootstrapResponse {
