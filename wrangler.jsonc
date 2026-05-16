@@ -19,6 +19,25 @@
       "id": "56b997590e3344c98bf6875ae8b522c0",
     },
   ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "courtlistener_mcp",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "ASYNC_TOOL_QUEUE",
+        "queue": "courtlistener-mcp-async-tool-jobs",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "courtlistener-mcp-async-tool-jobs",
+      },
+    ],
+  },
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [

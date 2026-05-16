@@ -2,7 +2,12 @@
  * Mock API layer — in-memory fakes for UI development without a backend.
  * Activate via `?mock=true` query param.
  */
-import type { AuthSessionResponse } from './types';
+import type {
+  AuthSessionResponse,
+  SessionBootstrapResponse,
+  UsageSnapshotResponse,
+  WorkerHealthResponse,
+} from './types';
 
 let mockAuthenticated = false;
 const mockUserId = 'mock-user-001';
@@ -23,6 +28,76 @@ export async function getSession(): Promise<AuthSessionResponse> {
 export async function logout(): Promise<void> {
   await delay(100);
   mockAuthenticated = false;
+}
+
+export async function postUiTelemetryEvent(): Promise<void> {
+  await delay(25);
+}
+
+export async function bootstrapSession(_args: {
+  authorization: string;
+  turnstileToken?: string;
+}): Promise<SessionBootstrapResponse> {
+  await delay(100);
+  mockAuthenticated = true;
+  return {
+    ok: true,
+    userId: mockUserId,
+    expiresInSeconds: 12 * 60 * 60,
+  };
+}
+
+export async function getUsage(): Promise<UsageSnapshotResponse> {
+  await delay(100);
+  return {
+    userId: mockUserId,
+    totalRequests: 21,
+    dailyRequests: 5,
+    currentDay: '2026-05-15',
+    lastSeenAt: '2026-05-15T12:00:00.000Z',
+    byRoute: {
+      '/mcp': 14,
+      '/api/session/bootstrap': 3,
+      '/api/ai-chat': 4,
+    },
+    browserBootstrap: {
+      attempted: 3,
+      succeeded: 2,
+      failed: 1,
+      turnstileRefreshed: 1,
+      lastOutcome: 'success',
+      lastEventAt: '2026-05-15T11:58:00.000Z',
+    },
+  };
+}
+
+export async function getWorkerHealth(): Promise<WorkerHealthResponse> {
+  await delay(100);
+  return {
+    status: 'ok',
+    service: 'courtlistener-mcp',
+    transport: 'cloudflare-agents-streamable-http',
+    cloudflare: {
+      analytics_enabled: true,
+      async_queue_configured: true,
+      async_jobs_kv_configured: true,
+      turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
+    },
+    metrics: {
+      latency_ms: {
+        route_latency_ms: {
+          '/mcp': { count: 4, avg_ms: 120 },
+        },
+      },
+    },
+    session_topology: {
+      version: 'v1',
+      shard_count: 4,
+      idle_ttl_ms: 1800000,
+      absolute_ttl_ms: 43200000,
+      eviction_sweep_limit: 100,
+    },
+  };
 }
 
 export async function mcpCall<T>(

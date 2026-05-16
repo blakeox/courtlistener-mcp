@@ -13,6 +13,9 @@ type TestEnv = {
     run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   CLOUDFLARE_AI_MODEL?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  MCP_TURNSTILE_ENFORCED_ROUTES?: string;
 };
 
 function jsonResponse(payload: unknown, status = 200, extraHeaders?: HeadersInit): Response {
@@ -53,6 +56,8 @@ function buildDeps(
     defaultCfAiModelCheap: '@cf/meta/llama-3.1-8b-instruct',
     cheapModeMaxTokens: 450,
     balancedModeMaxTokens: 900,
+    getClientIdentifier: () => '127.0.0.1',
+    recordTurnstileVerdict: () => undefined,
     ...overrides,
   };
 }
@@ -107,5 +112,70 @@ describe('handleWorkerAiUiRoutes', () => {
     assert.equal(response.status, 502);
     const payload = (await response.json()) as { error_code?: string };
     assert.equal(payload.error_code, 'ai_unavailable');
+  });
+
+  it('blocks ai-chat when Turnstile is enforced and token is missing', async () => {
+    const request = new Request('https://example.com/api/ai-chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'hello world' }),
+    });
+
+    const response = await handleWorkerAiUiRoutes({
+      context: {
+        request,
+        url: new URL(request.url),
+        origin: 'https://example.com',
+        allowedOrigins: ['https://example.com'],
+        env: {
+          TURNSTILE_SITE_KEY: 'site-key-1',
+          TURNSTILE_SECRET_KEY: 'secret-key-1',
+          MCP_TURNSTILE_ENFORCED_ROUTES: 'ai_chat',
+        },
+        ctx: {},
+      },
+      deps: buildDeps(),
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 403);
+    const payload = (await response.json()) as { error_code?: string };
+    assert.equal(payload.error_code, 'turnstile_token_missing');
+  });
+
+  it('checks Turnstile before mutating hosted AI chat quota', async () => {
+    let quotaCalls = 0;
+    const request = new Request('https://example.com/api/ai-chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'hello world' }),
+    });
+
+    const response = await handleWorkerAiUiRoutes({
+      context: {
+        request,
+        url: new URL(request.url),
+        origin: 'https://example.com',
+        allowedOrigins: ['https://example.com'],
+        env: {
+          TURNSTILE_SITE_KEY: 'site-key-1',
+          TURNSTILE_SECRET_KEY: 'secret-key-1',
+          MCP_TURNSTILE_ENFORCED_ROUTES: 'ai_chat',
+        },
+        ctx: {},
+      },
+      deps: buildDeps({
+        applyAiChatLifetimeQuota: async () => {
+          quotaCalls += 1;
+          return null;
+        },
+      }),
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 403);
+    assert.equal(quotaCalls, 0);
+    const payload = (await response.json()) as { error_code?: string };
+    assert.equal(payload.error_code, 'turnstile_token_missing');
   });
 });

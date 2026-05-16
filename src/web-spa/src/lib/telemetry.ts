@@ -1,3 +1,4 @@
+import { postUiTelemetryEvent } from './api';
 import type { TelemetryEvent } from './types';
 
 const EVENT_KEY = 'clmcp_telemetry_events';
@@ -27,6 +28,12 @@ export function trackEvent(
   events.push(event);
   saveEvents(events);
   if (import.meta.env.DEV) console.info('[ui-telemetry]', event);
+}
+
+export function forwardUiTelemetryEvent(name: string, route: string, outcome: string): void {
+  void postUiTelemetryEvent({ name, route, outcome }).catch(() => {
+    // Keep browser-local telemetry durable even if network ingestion fails.
+  });
 }
 
 export function markSignupStarted(): void {

@@ -1,11 +1,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
-import { toErrorMessage } from '../lib/api';
+import { bootstrapSession, toErrorMessage } from '../lib/api';
 import { useToken } from '../lib/token-context';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { getSessionDisplayLabel } from '../lib/session-display';
+import { forwardUiTelemetryEvent, trackEvent } from '../lib/telemetry';
+import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
@@ -13,6 +15,8 @@ import {
   ButtonLink,
   Card,
   DefinitionList,
+  FormField,
+  Input,
   InlineGroup,
   PageHeader,
   StatusBanner,
@@ -27,6 +31,11 @@ export function AccountPage(): React.JSX.Element {
   const hasServerSession = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
   const authStartHref = buildHostedAuthStartHref('/app/account');
+  const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'session_bootstrap' });
+  const [bootstrapAuthorization, setBootstrapAuthorization] = React.useState('');
+  const [bootstrapBusy, setBootstrapBusy] = React.useState(false);
+  const [bootstrapError, setBootstrapError] = React.useState('');
+  const [bootstrapSummary, setBootstrapSummary] = React.useState('');
   const protocolQuery = useQuery({
     queryKey: ['account-mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -87,6 +96,58 @@ export function AccountPage(): React.JSX.Element {
   const showDiagnosticsCard = Boolean(
     sessionError || hasToken || protocolQuery.isError || protocolMismatch,
   );
+  const showBootstrapCard = !hasServerSession || Boolean(sessionError);
+  const bootstrapDisabled =
+    bootstrapBusy ||
+    !bootstrapAuthorization.trim() ||
+    (turnstile.enabled && turnstile.status !== 'verified');
+
+  async function handleBootstrapSession(): Promise<void> {
+    if (bootstrapDisabled) return;
+    trackEvent('browser_session_bootstrap_attempted', {
+      turnstile_required: turnstile.enabled,
+      turnstile_status: turnstile.status,
+    });
+    forwardUiTelemetryEvent(
+      'browser_session_bootstrap_attempted',
+      '/app/account',
+      turnstile.status,
+    );
+    setBootstrapBusy(true);
+    setBootstrapError('');
+    setBootstrapSummary('');
+    try {
+      const response = await bootstrapSession({
+        authorization: bootstrapAuthorization.trim(),
+        turnstileToken: turnstile.token || undefined,
+      });
+      setBootstrapSummary(
+        `Browser session bootstrapped for ${response.userId}. Expires in ${response.expiresInSeconds} seconds.`,
+      );
+      trackEvent('browser_session_bootstrap_succeeded', {
+        user_id_present: Boolean(response.userId),
+        expires_in_seconds: response.expiresInSeconds,
+      });
+      forwardUiTelemetryEvent('browser_session_bootstrap_succeeded', '/app/account', 'success');
+      setBootstrapAuthorization('');
+      await refresh();
+      toast('Browser session bootstrapped.', 'ok');
+    } catch (error) {
+      const message = toErrorMessage(error);
+      trackEvent('browser_session_bootstrap_failed', {
+        turnstile_required: turnstile.enabled,
+        error_message: message,
+      });
+      forwardUiTelemetryEvent('browser_session_bootstrap_failed', '/app/account', 'failed');
+      setBootstrapError(message);
+      toast(message, 'error');
+    } finally {
+      if (turnstile.enabled) {
+        turnstile.refresh();
+      }
+      setBootstrapBusy(false);
+    }
+  }
 
   return (
     <div className="stack">
@@ -201,6 +262,93 @@ export function AccountPage(): React.JSX.Element {
           </InlineGroup>
         </Card>
       </div>
+
+      {showBootstrapCard ? (
+        <Card
+          title="Browser session bootstrap"
+          subtitle="Controlled recovery path for explicitly bootstrapping browser access with a bearer credential."
+        >
+          <DefinitionList
+            entries={[
+              {
+                term: 'Purpose',
+                description:
+                  'Recover browser access without leaving the workspace when a valid bearer credential is already available.',
+              },
+              {
+                term: 'Cloudflare challenge',
+                description: describeTurnstileStatus(turnstile.status, turnstile.error),
+              },
+              {
+                term: 'Blast radius',
+                description:
+                  'Applies only to this browser session and still uses server-side bootstrap validation.',
+              },
+            ]}
+          />
+          {turnstile.enabled ? (
+            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+          ) : null}
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleBootstrapSession();
+            }}
+          >
+            <FormField
+              id="bootstrapAuthorization"
+              label="Authorization header"
+              hint="Paste the full Authorization header value, for example: Bearer eyJ..."
+            >
+              <Input
+                id="bootstrapAuthorization"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={bootstrapAuthorization}
+                onChange={(event) => setBootstrapAuthorization(event.target.value)}
+                placeholder="Bearer ..."
+              />
+            </FormField>
+            <InlineGroup>
+              <Button type="submit" disabled={bootstrapDisabled}>
+                {bootstrapBusy ? 'Bootstrapping...' : 'Bootstrap browser session'}
+              </Button>
+              {turnstile.enabled ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    trackEvent('browser_session_bootstrap_turnstile_refreshed', {
+                      turnstile_status: turnstile.status,
+                    });
+                    forwardUiTelemetryEvent(
+                      'browser_session_bootstrap_turnstile_refreshed',
+                      '/app/account',
+                      turnstile.status,
+                    );
+                    turnstile.refresh();
+                  }}
+                >
+                  Refresh challenge
+                </Button>
+              ) : null}
+              <ButtonLink href={authStartHref} variant="secondary">
+                Use hosted sign-in
+              </ButtonLink>
+            </InlineGroup>
+          </form>
+          <StatusBanner role="alert" message={turnstile.error} type="error" />
+          <StatusBanner role="alert" message={bootstrapError} type="error" />
+          <StatusBanner message={bootstrapSummary} type="ok" />
+          {bootstrapDisabled && turnstile.enabled && turnstile.status !== 'verified' ? (
+            <StatusBanner
+              message="Complete the Cloudflare challenge before bootstrapping browser access."
+              type="info"
+            />
+          ) : null}
+        </Card>
+      ) : null}
 
       {showDiagnosticsCard ? (
         <Card title="Diagnostics" subtitle={diagnosticsSummary} className="account-support-card">

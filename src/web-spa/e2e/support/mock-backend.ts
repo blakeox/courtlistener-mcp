@@ -14,6 +14,14 @@ interface MockUsageSnapshot {
   currentDay: string;
   lastSeenAt: string | null;
   byRoute: Record<string, number>;
+  browserBootstrap: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+    turnstileRefreshed: number;
+    lastOutcome: string | null;
+    lastEventAt: string | null;
+  };
 }
 
 interface MockRuntimeCatalog {
@@ -121,6 +129,14 @@ export async function installSpaMocks(
     currentDay: '2026-04-23',
     lastSeenAt: null,
     byRoute: {},
+    browserBootstrap: {
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      turnstileRefreshed: 0,
+      lastOutcome: null,
+      lastEventAt: null,
+    },
   };
   const runtime = options.runtime;
   const sessionFailure = options.sessionFailure;

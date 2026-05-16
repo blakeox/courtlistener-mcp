@@ -96,6 +96,13 @@ function hasConfiguredValue(record, key) {
   return typeof record?.[key] === 'string' && record[key].trim().length > 0;
 }
 
+function parseConfiguredRoutes(rawValue) {
+  return String(rawValue || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 async function checkEndpoint(baseUrl, path, init = {}) {
   try {
     const res = await fetch(`${baseUrl}${path}`, init);
@@ -233,6 +240,38 @@ async function main() {
       ok('Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
     }
 
+    const asyncJobsKvBinding = Array.isArray(config?.kv_namespaces)
+      ? config.kv_namespaces.find((ns) => ns?.binding === 'ASYNC_JOBS_KV')
+      : null;
+    if (asyncJobsKvBinding) {
+      if (!asyncJobsKvBinding.id || /^0+$/.test(String(asyncJobsKvBinding.id))) {
+        fail('ASYNC_JOBS_KV is configured with a placeholder or missing namespace id.');
+        hasCriticalError = true;
+      } else {
+        ok('ASYNC_JOBS_KV namespace binding is configured.');
+      }
+    } else {
+      warn('ASYNC_JOBS_KV namespace binding is not configured.');
+    }
+
+    const asyncQueueProducer =
+      Array.isArray(config?.queues?.producers) &&
+      config.queues.producers.find((producer) => producer?.binding === 'ASYNC_TOOL_QUEUE');
+    if (asyncQueueProducer) {
+      ok(`ASYNC_TOOL_QUEUE producer binding is configured (${String(asyncQueueProducer.queue)}).`);
+    } else {
+      warn('ASYNC_TOOL_QUEUE producer binding is not configured.');
+    }
+
+    const analyticsBinding =
+      Array.isArray(config?.analytics_engine_datasets) &&
+      config.analytics_engine_datasets.find((dataset) => dataset?.binding === 'ANALYTICS');
+    if (analyticsBinding) {
+      ok(`ANALYTICS dataset binding is configured (${String(analyticsBinding.dataset)}).`);
+    } else {
+      warn('ANALYTICS dataset binding is not configured.');
+    }
+
     const authUiOrigin =
       typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
         ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
@@ -284,6 +323,13 @@ async function main() {
     } else if (trustCfAccessJwt || trustCfAccessHeaders) {
       ok('Cloudflare Access trust flags are explicitly acknowledged for deployment.');
     }
+
+    const turnstileEnforcedRoutes = parseConfiguredRoutes(
+      configuredVars.MCP_TURNSTILE_ENFORCED_ROUTES,
+    );
+    if (turnstileEnforcedRoutes.length > 0) {
+      ok(`Turnstile is enforced for route ids: ${turnstileEnforcedRoutes.join(', ')}.`);
+    }
   }
 
   const secretList = run('wrangler', ['secret', 'list']);
@@ -313,6 +359,14 @@ async function main() {
   const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
   const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
   const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
+  const hasTurnstileSiteKey =
+    secretNames.includes('TURNSTILE_SITE_KEY') ||
+    hasConfiguredValue(configuredVars, 'TURNSTILE_SITE_KEY');
+  const hasTurnstileSecretKey = secretNames.includes('TURNSTILE_SECRET_KEY');
+  const analyticsEnabled = parseBoolean(configuredVars.MCP_CF_ANALYTICS_ENABLED);
+  const turnstileEnforcedRoutes = parseConfiguredRoutes(
+    configuredVars.MCP_TURNSTILE_ENFORCED_ROUTES,
+  );
   const hasOidcClientId =
     secretNames.includes('MCP_AUTH_OIDC_CLIENT_ID') ||
     hasConfiguredValue(configuredVars, 'MCP_AUTH_OIDC_CLIENT_ID');
@@ -331,6 +385,19 @@ async function main() {
     const message =
       'MCP_UI_SESSION_SECRET is missing. UI session auth routes will fail or be unstable.';
     warn(message);
+  }
+
+  if (turnstileEnforcedRoutes.length > 0) {
+    if (!hasTurnstileSiteKey || !hasTurnstileSecretKey) {
+      fail('Turnstile is enforced but TURNSTILE_SITE_KEY and/or TURNSTILE_SECRET_KEY are missing.');
+      hasCriticalError = true;
+    } else {
+      ok('Turnstile secrets are configured for enforced routes.');
+    }
+  }
+
+  if (analyticsEnabled) {
+    ok('MCP_CF_ANALYTICS_ENABLED is set.');
   }
 
   if (hasDedicatedRegistrationTokenSecret) {
@@ -516,6 +583,7 @@ async function main() {
   console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_ID');
   console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_SECRET');
   console.log('  wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
+  console.log('  wrangler secret put TURNSTILE_SECRET_KEY   # when Turnstile is enforced');
   console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
   console.log(
     '  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)',

@@ -17,11 +17,10 @@ import {
 } from '../components/ui';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuth } from '../lib/auth';
-import { getUsage, toErrorMessage } from '../lib/api';
+import { getUsage, getWorkerHealth, toErrorMessage } from '../lib/api';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { useToken } from '../lib/token-context';
-import { WORKSPACE_RECENT_SESSIONS } from '../lib/workspace';
 
 export function WorkspaceDashboardPage(): React.JSX.Element {
   useDocumentTitle('Overview');
@@ -44,6 +43,11 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
     enabled: hasToken,
     retry: false,
   });
+  const healthQuery = useQuery({
+    queryKey: ['workspace-dashboard-health'],
+    queryFn: getWorkerHealth,
+    retry: false,
+  });
 
   const runtimeLabel = !hasToken
     ? 'Awaiting local MCP credential'
@@ -56,6 +60,27 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
   const credentialSummary = hasToken
     ? 'Browser credential loaded'
     : 'Browser credential not loaded';
+  const bootstrapSummary = usageQuery.data
+    ? `${usageQuery.data.browserBootstrap.succeeded} recoveries · ${usageQuery.data.browserBootstrap.failed} failures`
+    : 'No bootstrap telemetry yet';
+  const bootstrapLastOutcome = usageQuery.data?.browserBootstrap.lastOutcome
+    ? `${usageQuery.data.browserBootstrap.lastOutcome} · ${
+        usageQuery.data.browserBootstrap.lastEventAt
+          ? new Date(usageQuery.data.browserBootstrap.lastEventAt).toLocaleString()
+          : 'recent'
+      }`
+    : 'No recent bootstrap outcome';
+  const routeEntries = Object.entries(usageQuery.data?.byRoute ?? {}).sort((left, right) => {
+    if (right[1] !== left[1]) {
+      return right[1] - left[1];
+    }
+    return left[0].localeCompare(right[0]);
+  });
+  const cloudflareSummary = healthQuery.data
+    ? `${healthQuery.data.cloudflare.analytics_enabled ? 'Analytics' : 'No analytics'} · ${
+        healthQuery.data.cloudflare.async_queue_configured ? 'Queue ready' : 'Queue missing'
+      }`
+    : 'Loading Cloudflare posture';
 
   return (
     <div className="stack">
@@ -65,12 +90,12 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
         description="Start research work, check session and runtime posture, and jump into the parts of the workspace that need attention."
         actions={
           <InlineGroup>
-            <ButtonLink to="/app/sessions">Start research</ButtonLink>
-            <ButtonLink to="/app/workflows" variant="secondary">
-              Open workflows
+            <ButtonLink to="/app/playground">Open playground</ButtonLink>
+            <ButtonLink to="/app/account" variant="secondary">
+              Open account
             </ButtonLink>
-            <ButtonLink to="/app/tools" variant="secondary">
-              Open tools
+            <ButtonLink to="/app/usage" variant="secondary">
+              View usage
             </ButtonLink>
             {!authed ? (
               <ButtonLink href={authStartHref} variant="secondary">
@@ -112,68 +137,72 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
               <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
             </MetricCard>
             <MetricCard
-              label="Research Sessions"
-              value="12 active sessions"
-              accent="4 awaiting review"
+              label="Browser Access"
+              value={authed ? 'Session active' : 'Sign-in required'}
+              accent={credentialSummary}
             >
-              <TextLink to="/app/sessions">Open sessions</TextLink>
+              <TextLink to="/app/account">Open account</TextLink>
             </MetricCard>
             <MetricCard
-              label="Human Review Queue"
-              value="3 pending approvals"
-              accent="Review required"
+              label="Cloudflare Controls"
+              value={
+                healthQuery.data?.cloudflare.turnstile_enforced_routes.length
+                  ? `${healthQuery.data.cloudflare.turnstile_enforced_routes.length} gated routes`
+                  : 'No challenge gates'
+              }
+              accent={cloudflareSummary}
             >
-              <TextLink to="/app/review">View queue</TextLink>
+              <TextLink to="/app/observability">View observability</TextLink>
             </MetricCard>
             <MetricCard
               label="Agent Observability"
-              value="342 requests in 24h"
-              accent="812ms avg latency · 1.2M tokens"
+              value={
+                usageQuery.data
+                  ? `${usageQuery.data.totalRequests} total requests`
+                  : 'Usage loading'
+              }
+              accent={bootstrapSummary}
             >
               <TextLink to="/app/observability">View observability</TextLink>
             </MetricCard>
           </div>
 
           <Card
-            title="Recent sessions"
-            subtitle="Keep active, pending-review, and completed work visible from the overview."
+            title="Route activity"
+            subtitle="Keep the real browser and worker activity surface visible from the overview."
           >
-            <div className="table-scroll">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Session</th>
-                    <th>Query / Description</th>
-                    <th>Status</th>
-                    <th>Last Updated</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {WORKSPACE_RECENT_SESSIONS.map((row) => {
-                    const tone =
-                      row[2] === 'Active'
-                        ? 'ok'
-                        : row[2] === 'Awaiting Review'
-                          ? 'warn'
-                          : 'neutral';
-                    return (
-                      <tr key={row.join('-')}>
-                        <td>{row[0]}</td>
-                        <td>{row[1]}</td>
+            {routeEntries.length ? (
+              <div className="table-scroll">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Route</th>
+                      <th>Requests</th>
+                      <th>Posture</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {routeEntries.slice(0, 5).map(([route, count], index) => (
+                      <tr key={route}>
+                        <td>{route}</td>
+                        <td>{count}</td>
                         <td>
-                          <Badge tone={tone}>{row[2]}</Badge>
+                          <Badge tone={index === 0 ? 'warn' : 'neutral'}>
+                            {index === 0 ? 'Highest volume' : 'Observed'}
+                          </Badge>
                         </td>
-                        <td>{row[3]}</td>
                         <td>
-                          <TextLink to="/app/sessions">Open</TextLink>
+                          <TextLink to="/app/usage">Open usage</TextLink>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="muted">No worker-backed route activity has been recorded yet.</p>
+            )}
           </Card>
 
           <Card
@@ -217,8 +246,8 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
               diagnose errors, and understand results.
             </p>
             <InlineGroup>
-              <ButtonLink to="/app/tools" variant="secondary">
-                Build a query
+              <ButtonLink to="/app/playground" variant="secondary">
+                Open playground
               </ButtonLink>
               <ButtonLink to="/app/diagnostics" variant="secondary">
                 Diagnose runtime
@@ -255,6 +284,14 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
                   description: readinessQuery.data
                     ? `${readinessQuery.data.toolCount} tools · ${readinessQuery.data.resourceCount} resources · ${readinessQuery.data.promptCount} prompts`
                     : 'Load a credential to inspect the live MCP surface.',
+                },
+                {
+                  term: 'Bootstrap recovery',
+                  description: bootstrapSummary,
+                },
+                {
+                  term: 'Last bootstrap outcome',
+                  description: bootstrapLastOutcome,
                 },
               ]}
             />

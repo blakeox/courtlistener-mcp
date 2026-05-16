@@ -19,7 +19,9 @@ test.describe('SPA operator console', () => {
       '/auth/start?return_to=%2Fapp',
     );
     await expect(page.getByText('Session not loaded')).toBeVisible();
-    await expect(page.getByText('Browser credential not loaded')).toBeVisible();
+    await expect(
+      page.locator('strong').filter({ hasText: 'Browser credential not loaded' }),
+    ).toBeVisible();
   });
 
   test('clears the session-recovery banner when the stored local credential is removed', async ({
@@ -73,6 +75,14 @@ test.describe('SPA operator console', () => {
         byRoute: {
           '/mcp': 11,
           '/api/session': 6,
+        },
+        browserBootstrap: {
+          attempted: 2,
+          succeeded: 1,
+          failed: 1,
+          turnstileRefreshed: 0,
+          lastOutcome: 'success',
+          lastEventAt: '2026-04-23T20:40:00.000Z',
         },
       },
       runtime: {
