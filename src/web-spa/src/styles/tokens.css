@@ -1,34 +1,47 @@
 /*
- * CourtListener MCP Portal — Design Tokens & Styles
+ * CourtListener MCP Portal — Design Tokens
+ * Tailwind v4 utilities: styles/theme.css (@theme inline). Guide: src/web-spa/DESIGN.md
  *
- * Spacing scale (--space-1 through --space-6):
- *   1 = 4px, 2 = 8px, 3 = 12px, 4 = 16px, 5 = 24px, 6 = 32px
+ * Spacing scale (--space-1 through --space-7):
+ *   1 = 4px, 2 = 8px, 3 = 12px, 4 = 16px, 5 = 24px, 6 = 32px, 7 = 40px
+ *   Half steps: 0-5 = 2px, 1-5 = 6px, 2-5 = 10px, 3-5 = 14px, 4-5 = 18px,
+ *   5-5 = 20px, 6-5 = 28px, 7-5 = 36px
  *
- * Border radius: --radius-sm (8px), --radius-md (12px), --radius-lg (16px)
+ * Border radius: --radius-xs (4px), --radius-sm (8px), --radius-md (12px),
+ *   --radius-md-plus (14px), --radius-lg (16px), --radius-pill (999px)
  *
- * Color tokens: --bg, --surface, --text, --muted, --border, --primary, --danger
+ * Sizes (--size-*): touch targets, icons, layout widths, panel heights
+ * Durations (--duration-*): quick (0.15s), fast (0.2s), medium (0.3s), skeleton (1.5s)
+ * Easing (--easing-*), transitions (--transition-interactive, --transition-surface)
+ * Motion (--motion-*), opacity (--opacity-*), z-index (--z-*)
+ *
+ * Type scale (--text-*): rem-based font sizes for labels, body, headings
+ * Layout (--width-prose-*): max-width constraints for copy blocks
+ * Leading (--leading-*), tracking (--tracking-*), motion (--motion-*)
+ * Z-index (--z-*), opacity (--opacity-*), landing surfaces (--landing-*)
+ *
+ * Accent (--accent-*): interactive blue highlights (links, selection, primary actions)
+ * Font weight: --font-weight-normal (400), --font-weight-semibold (600),
+ *   --font-weight-bold (700), --font-weight-display (800)
+ * Color tokens: --bg, --brand (success/legal green), --danger, --ok
  *   Overridden in [data-theme="dark"] block for dark mode.
  *
  * Breakpoints:
  *   480px  — small phones (reduced padding, full-width buttons)
  *   768px  — tablets (single-column layouts)
- *   980px  — desktop sidebar collapse, mobile menu
+ *   1080px — desktop sidebar collapse, mobile menu (aligned with landing)
  */
 :root {
   --bg: #f5f0e8;
   --bg-soft: #faf7f2;
-  --bg-elevated: #fffdf9;
   --ink: #11253f;
   --ink-muted: #4a6078;
-  --muted: var(--ink-muted);
   --brand: #0a7f5a;
   --brand-deep: #086245;
   --line: #d9c8b1;
   --card: #fffdf9;
-  --panel: var(--card);
   --danger: #b83232;
   --ok: #1f7a4d;
-  --success: var(--ok);
   --shadow: 0 14px 30px rgba(17, 37, 63, 0.14);
   --surface-border: rgba(148, 163, 184, 0.18);
   --surface-border-strong: rgba(148, 163, 184, 0.22);
@@ -38,11 +51,6 @@
   --surface-panel-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   --surface-shadow: 0 24px 54px rgba(15, 23, 42, 0.08);
   --surface-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.35);
-  --surface-radius-xl: 24px;
-  --surface-radius-lg: 20px;
-  --surface-radius-md: 16px;
-  --surface-radius-sm: 14px;
-  --surface-radius-xs: 10px;
   --surface-control-border: #cab8a3;
   --surface-control-bg: #fff;
   --surface-button-bg: rgba(255, 255, 255, 0.9);
@@ -67,8 +75,8 @@
   --surface-status-success-soft-border: #22c55e;
   --surface-status-success-soft-text: #15803d;
   --surface-status-error-soft-bg: rgba(239, 68, 68, 0.15);
-  --surface-active-soft-bg: rgba(10, 127, 90, 0.08);
-  --surface-active-soft-bg-subtle: rgba(10, 127, 90, 0.05);
+  --surface-active-soft-bg: rgba(59, 130, 246, 0.1);
+  --surface-active-soft-bg-subtle: rgba(59, 130, 246, 0.06);
   --surface-token-border: #bfae98;
   --surface-accent-blue: #3b82f6;
   --surface-accent-blue-soft-bg: rgba(59, 130, 246, 0.05);
@@ -83,10 +91,11 @@
   --hero-note-bg: rgba(255, 255, 255, 0.08);
   --hero-note-border: rgba(255, 255, 255, 0.16);
   --hero-note-text: #cbd5e1;
-  --shell-button-radius: 8px;
-  --shell-button-primary-bg: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --shell-button-radius: var(--radius-sm);
+  --shell-button-primary-bg: linear-gradient(135deg, #3b82f6, #2563eb);
   --shell-button-primary-border: rgba(37, 99, 235, 0.7);
   --shell-button-primary-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+  --shell-button-primary-hover-shadow: 0 12px 26px rgba(37, 99, 235, 0.35);
   --shell-button-secondary-bg: rgba(255, 255, 255, 0.88);
   --shell-button-secondary-border: #e2e8f0;
   --shell-button-secondary-text: #0f172a;
@@ -126,36 +135,301 @@
   --shell-account-menu-bg: rgba(255, 255, 255, 0.98);
   --shell-account-menu-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
   --shell-account-menu-text-subtle: #64748b;
-  --shell-focus-ring: rgba(37, 99, 235, 0.34);
+  --shell-focus-ring: rgba(59, 130, 246, 0.45);
+  --space-0-5: 2px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
+  --space-2-5: 10px;
   --space-3: 12px;
+  --space-3-5: 14px;
   --space-4: 16px;
+  --space-4-5: 18px;
   --space-5: 24px;
+  --space-5-5: 20px;
   --space-6: 32px;
+  --space-6-5: 28px;
+  --space-7: 40px;
+  --space-7-5: 36px;
+  --space-8: 64px;
+  --space-9: 80px;
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
+  --radius-md-plus: 14px;
   --radius-lg: 16px;
-  --landing-color-navy-950: #071426;
-  --landing-color-navy-900: #0b1b33;
-  --landing-color-navy-850: #10233f;
-  --landing-color-blue-600: #2563eb;
-  --landing-color-blue-500: #3b82f6;
-  --landing-color-blue-400: #60a5fa;
+  --radius-pill: 999px;
+  --size-border-sm: 1px;
+  --size-border-lg: 2px;
+  --size-border-md: 3px;
+  --size-sr-only: 1px;
+  --size-dot-sm: 6px;
+  --size-dot-md: 8px;
+  --size-icon-sm: 22px;
+  --size-icon-md: 28px;
+  --size-icon-lg: 30px;
+  --size-icon-xl: 40px;
+  --size-icon-2xl: 52px;
+  --size-touch-sm: 44px;
+  --size-touch-md: 48px;
+  --size-touch-lg: 52px;
+  --size-control-min: 40px;
+  --size-field-min: 100px;
+  --size-field-sm-min: 120px;
+  --size-toolbar-min: 36px;
+  --size-toolbar-label-min: 112px;
+  --size-header: 72px;
+  --size-layout-max: 1200px;
+  --size-menu-min-h: 44px;
+  --size-chat-stream-min: 200px;
+  --size-chat-stream-max: 600px;
+  --size-transcript-min: 120px;
+  --size-transcript-max: 360px;
+  --size-transcript-panel-max: 320px;
+  --size-scroll-panel-max: 300px;
+  --size-textarea-max: 150px;
+  --size-modal-max: 480px;
+  --size-table-min: 640px;
+  --size-hero-min: 620px;
+  --size-hero-note-max: 520px;
+  --size-card-stat-min: 148px;
+  --size-skeleton-line: 14px;
+  --size-account-menu: 320px;
+  --size-account-menu-offset: 10px;
+  --size-focus-ring: 3px;
+  --size-focus-offset: 3px;
+  --size-focus-ring-sm: 2px;
+  --size-focus-offset-lg: 4px;
+  --duration-quick: 0.15s;
+  --duration-fast: 0.2s;
+  --duration-medium: 0.3s;
+  --duration-skeleton: 1.5s;
+  --easing-standard: ease;
+  --easing-in-out: ease-in-out;
+  --easing-out: ease-out;
+  --text-3xs: 0.65rem;
+  --text-2xs: 0.68rem;
+  --text-xs: 0.72rem;
+  --text-xs-tight: 0.7rem;
+  --text-sm: 0.74rem;
+  --text-sm-plus: 0.76rem;
+  --text-sm-tight: 0.75rem;
+  --text-base-sm: 0.78rem;
+  --text-base: 0.85rem;
+  --text-base-compact: 0.82rem;
+  --text-base-display: 0.86rem;
+  --text-base-plus: 0.88rem;
+  --text-base-ui: 0.95rem;
+  --text-md-sm: 0.84rem;
+  --text-md: 0.92rem;
+  --text-md-plus: 0.96rem;
+  --text-lg: 1rem;
+  --text-lg-plus: 1.05rem;
+  --text-xl: 1.08rem;
+  --text-title: 1.2rem;
+  --text-2xl: 1.28rem;
+  --text-3xl: 1.35rem;
+  --text-display-sm: 2rem;
+  --text-display-md: 2.75rem;
+  --text-display-lg: 3rem;
+  --text-display-xl: 4.5rem;
+  --text-display-2xl: 5.5rem;
+  --text-display-hero-sm: 2.8rem;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-display: 800;
+  --accent-text: var(--surface-accent-blue-soft-text);
+  --accent-text-muted: #60a5fa;
+  --accent-border: var(--shell-button-primary-border);
+  --accent-soft-bg: var(--surface-active-soft-bg);
+  --accent-primary-bg: var(--shell-button-primary-bg);
+  --accent-primary-fg: var(--surface-button-primary-fg);
+  --shadow-none: none;
+  --space-0: 0;
+  --margin-none: 0;
+  --padding-none: 0;
+  --border-none: 0;
+  --inset-0: 0;
+  --blur-hairline: 0.4px;
+  --blur-xs: 4px;
+  --blur-sm: 12px;
+  --blur-md: 14px;
+  --blur-lg: 18px;
+  --size-grid-dot: 18px;
+  --size-hero-silhouette: 560px;
+  --size-mobile-drawer: 360px;
+  --size-mobile-drawer-sm: 320px;
+  --size-icon-1-3: 1.3rem;
+  --layout-sidebar-min: 280px;
+  --layout-sidebar-max: 312px;
+  --layout-header-flex: 460px;
+  --layout-side-flex: 520px;
+  --layout-hero-col-min: 300px;
+  --layout-field-flex: 140px;
+  --layout-field-fixed: 130px;
+  --layout-dl-label-min: 136px;
+  --layout-dl-label-max: 190px;
+  --width-prose-sm: 36rem;
+  --width-prose-md: 38rem;
+  --width-prose-lg: 40rem;
+  --width-prose-xl: 46rem;
+  --width-prose-2xl: 48rem;
+  --leading-none: 1;
+  --leading-tight: 1.04;
+  --leading-snug: 1.05;
+  --leading-compact: 1.15;
+  --leading-medium: 1.2;
+  --leading-ui: 1.4;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.55;
+  --leading-body: 1.6;
+  --leading-copy: 1.65;
+  --leading-loose: 1.7;
+  --leading-extra: 1.75;
+  --tracking-tighter: -0.04em;
+  --tracking-tight: -0.03em;
+  --tracking-snug: -0.02em;
+  --tracking-subtle: -0.01em;
+  --tracking-wide: 0.04em;
+  --tracking-label: 0.14em;
+  --motion-lift: -1px;
+  --motion-drop-sm: 4px;
+  --motion-drop-md: 10px;
+  --motion-scale-press: 0.98;
+  --motion-brightness-hover: 0.92;
+  --motion-rotate-flip: 180deg;
+  --underline-offset: 2px;
+  --text-case-label: uppercase;
+  --radius-none: 0;
+  --radius-circle: 50%;
+  --size-border-hairline: 1px;
+  --size-full: 100%;
+  --size-bubble-max: 80%;
+  --size-skeleton-shimmer: 200% 100%;
+  --size-skeleton-line-short: 60%;
+  --size-skeleton-height: 1em;
+  --skeleton-pos-start: 200% 0;
+  --skeleton-pos-end: -200% 0;
+  --offset-silhouette-right: -3%;
+  --offset-silhouette-bottom: -4%;
+  --protocol-request-border: color-mix(in srgb, var(--surface-accent-blue) 20%, transparent);
+  --protocol-response-border: color-mix(in srgb, var(--ok) 20%, transparent);
+  --account-menu-trigger-warning-bg: color-mix(
+    in srgb,
+    var(--shell-button-danger-bg) 82%,
+    var(--shell-sidebar-bg) 18%
+  );
+  --account-status-block-bg: color-mix(
+    in srgb,
+    var(--shell-account-menu-bg) 88%,
+    var(--shell-sidebar-link-bg) 12%
+  );
+  --account-status-warning-bg: color-mix(
+    in srgb,
+    var(--shell-button-danger-bg) 26%,
+    var(--shell-account-menu-bg) 74%
+  );
+  --workspace-card-hover-bg: color-mix(in srgb, var(--surface-bg) 82%, var(--surface-panel-bg) 18%);
+  --transition-interactive:
+    transform var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard),
+    filter var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    background var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+  --transition-surface:
+    background-color var(--duration-quick) var(--easing-standard),
+    border-color var(--duration-quick) var(--easing-standard),
+    color var(--duration-quick) var(--easing-standard),
+    box-shadow var(--duration-quick) var(--easing-standard);
+  --transition-color: color var(--duration-fast) var(--easing-standard);
+  --transition-transform: transform var(--duration-fast) var(--easing-standard);
+  --position-offscreen: -9999px;
+  --z-raised: 1;
+  --z-sticky: 10;
+  --z-overlay: 20;
+  --z-backdrop: 39;
+  --z-drawer: 40;
+  --z-toast: 1000;
+  --z-skip-link: 9999;
+  --opacity-disabled: 0.5;
+  --opacity-faded: 0.6;
+  --opacity-muted: 0.7;
+  --opacity-grid: 0.26;
+  --opacity-silhouette: 0.2;
+  --size-viewport-full: 100vh;
+  --size-hero-silhouette-height: 78%;
+  --layout-grid-1: 1fr;
+  --layout-grid-split: 1fr 1fr;
+  --layout-grid-asymmetric: 1.1fr 0.9fr;
+  --layout-grid-asymmetric-wide: 1.15fr 0.85fr;
+  --layout-grid-4: repeat(4, minmax(0, 1fr));
+  --layout-grid-3: repeat(3, minmax(0, 1fr));
+  --layout-grid-2col-app: 1.2fr 1fr;
+  --layout-grid-2col-even: repeat(2, minmax(0, 1fr));
+  --layout-page-hero: minmax(0, 1.2fr) minmax(var(--layout-hero-col-min), 0.8fr);
+  --layout-dl-grid: minmax(var(--layout-dl-label-min), var(--layout-dl-label-max)) 1fr;
+  --flex-auto: 1 1 auto;
+  --flex-equal: 1 1 0;
+  --flex-grow: 1;
+  --flex-none: 0 0 auto;
+  --flex-header: 1 1 var(--layout-header-flex);
+  --flex-side: 0 1 var(--layout-side-flex);
+  --flex-field-grow: 1 1 var(--layout-field-flex);
+  --flex-field-fixed: 0 0 var(--layout-field-fixed);
+  --flex-half: 1 1 calc(50% - var(--space-1));
+  --flex-icon-fixed: 0 0 var(--size-touch-sm);
+  --layout-shell-grid: minmax(var(--layout-sidebar-min), var(--layout-sidebar-max)) minmax(0, 1fr);
+  --card-spotlight-gradient:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.92));
+  --landing-header-bg: rgba(255, 255, 255, 0.94);
+  --landing-accent-soft-bg: rgba(37, 99, 235, 0.08);
+  --landing-accent-soft-border: rgba(37, 99, 235, 0.18);
+  --landing-accent-active-border: rgba(37, 99, 235, 0.26);
+  --landing-glass-bg: rgba(255, 255, 255, 0.04);
+  --landing-glass-border-strong: rgba(255, 255, 255, 0.55);
+  --landing-code-bg: rgba(7, 20, 38, 0.86);
+  --landing-code-border: rgba(148, 163, 184, 0.28);
+  --landing-code-border-strong: rgba(148, 163, 184, 0.32);
+  --landing-code-chip-bg: rgba(15, 23, 42, 0.16);
+  --landing-hero-note-bg: rgba(255, 255, 255, 0.06);
+  --landing-silhouette-highlight: rgba(255, 255, 255, 0.12);
+  --landing-open-source-gradient: linear-gradient(
+    180deg,
+    var(--landing-color-paper) 0%,
+    var(--landing-color-white) 100%
+  );
+  --toast-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --body-bg-warm: #f6c690;
+  --body-bg-cool: #b9dbff;
+  --body-bg-base: #f7f2ea;
+  --body-bg-mid: #f4ede2;
+  --body-bg-end: #f7f3ec;
+  --body-bg-dark-start: #1a1e2e;
+  --body-bg-dark-end: #0f172a;
+  --body-gradient-warm-size: 920px 440px;
+  --body-gradient-cool-size: 780px 380px;
+  --landing-color-blue-600: var(--accent-text);
+  --landing-color-blue-500: var(--surface-accent-blue);
+  --landing-color-blue-400: var(--accent-text-muted);
   --landing-color-white: #ffffff;
-  --landing-color-paper: #f8fafc;
-  --landing-color-text-primary: #0f172a;
-  --landing-color-text-secondary: #475569;
-  --landing-color-text-muted: #64748b;
-  --landing-color-text-inverse: #f8fafc;
-  --landing-color-text-inverse-muted: #cbd5e1;
-  --landing-color-border-light: #e2e8f0;
+  --landing-color-paper: var(--bg-soft);
+  --landing-color-text-primary: var(--ink);
+  --landing-color-text-secondary: var(--shell-footer-text);
+  --landing-color-text-muted: var(--text-subtle);
+  --landing-color-text-inverse: var(--shell-sidebar-text-strong);
+  --landing-color-text-inverse-muted: var(--hero-note-text);
+  --landing-color-border-light: var(--shell-button-secondary-border);
   --landing-color-border-dark: rgba(255, 255, 255, 0.16);
-  --landing-radius-md: 8px;
-  --landing-radius-lg: 12px;
-  --landing-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --landing-shadow-hero-card: 0 24px 60px rgba(0, 0, 0, 0.35);
-  --landing-shadow-button: 0 8px 20px rgba(37, 99, 235, 0.28);
+  --landing-radius-md: var(--radius-sm);
+  --landing-radius-lg: var(--radius-md);
+  --landing-shadow-card: var(--shell-topbar-shadow);
+  --landing-shadow-hero-card: var(--surface-shadow-strong);
+  --landing-shadow-button: var(--shell-button-primary-shadow);
+  --code-syntax-string: #a7f3d0;
+  --code-syntax-muted: #94a3b8;
 }
 [data-theme='dark'] {
   --bg: #1a1e2e;
@@ -196,11 +470,12 @@
   --surface-status-success-soft-border: #22c55e;
   --surface-status-success-soft-text: #86efac;
   --surface-status-error-soft-bg: rgba(239, 68, 68, 0.18);
-  --surface-active-soft-bg: rgba(10, 127, 90, 0.18);
-  --surface-active-soft-bg-subtle: rgba(10, 127, 90, 0.12);
+  --surface-active-soft-bg: rgba(59, 130, 246, 0.18);
+  --surface-active-soft-bg-subtle: rgba(59, 130, 246, 0.1);
   --surface-token-border: rgba(148, 163, 184, 0.4);
   --surface-accent-blue-soft-bg: rgba(59, 130, 246, 0.12);
   --surface-accent-blue-soft-text: #93c5fd;
+  --accent-text-muted: #93c5fd;
   --surface-accent-green-soft-bg: rgba(34, 197, 94, 0.12);
   --surface-accent-green-soft-text: #86efac;
   --surface-skeleton-bg: linear-gradient(90deg, #232838 25%, #2d3548 50%, #232838 75%);
@@ -248,4 +523,14 @@
   --shell-account-menu-bg: rgba(15, 23, 42, 0.96);
   --shell-account-menu-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
   --shell-account-menu-text-subtle: #cbd5e1;
+  --landing-header-bg: var(--shell-topbar-bg);
+  --landing-accent-soft-bg: var(--surface-accent-blue-soft-bg);
+  --landing-accent-soft-border: var(--surface-border);
+  --landing-accent-active-border: var(--shell-sidebar-link-hover-border);
+  --landing-code-border: var(--surface-border);
+  --landing-code-border-strong: var(--surface-border-strong);
+  --landing-code-chip-bg: var(--surface-button-bg);
+  --card-spotlight-gradient:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.88));
 }

@@ -7,6 +7,7 @@ import {
   DefinitionList,
   Eyebrow,
   HeroPanel,
+  PageHeroNote,
   InfoBlock,
   InlineGroup,
   KeyValueList,
@@ -15,7 +16,16 @@ import {
   StatusBanner,
   TextLink,
 } from '../components/ui';
+import { mutedCopyClass } from '../lib/ui-classes';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import {
+  orderedListClass,
+  stackClass,
+  tableClass,
+  tableScrollClass,
+  twoColClass,
+  twoUpGridClass,
+} from '../lib/workspace-classes';
 import { useAuth } from '../lib/auth';
 import { getUsage, getWorkerHealth, toErrorMessage } from '../lib/api';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
@@ -83,7 +93,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
     : 'Loading Cloudflare posture';
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <HeroPanel
         eyebrow="Workspace overview"
         title="Overview"
@@ -105,12 +115,11 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </InlineGroup>
         }
         aside={
-          <div className="page-hero-note">
+          <PageHeroNote
+            title="Operational surface"
+            description="Terminal, MCP, and court research in one workspace with explicit control points."
+          >
             <Eyebrow>Current posture</Eyebrow>
-            <strong className="page-hero-note-title">Operational surface</strong>
-            <p className="page-hero-note-text">
-              Terminal, MCP, and court research in one workspace with explicit control points.
-            </p>
             <KeyValueList
               entries={[
                 { label: 'Session', value: sessionSummary },
@@ -118,7 +127,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
                 { label: 'Runtime', value: runtimeLabel },
               ]}
             />
-          </div>
+          </PageHeroNote>
         }
       />
 
@@ -129,11 +138,11 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
         type="error"
       />
 
-      <div className="two-col">
-        <div className="stack">
-          <div className="two-up-grid">
+      <div className={twoColClass}>
+        <div className={stackClass}>
+          <div className={twoUpGridClass}>
             <MetricCard label="Agent Readiness" value="96 / 100" accent="Excellent">
-              <p className="muted">Your environment is fully agent-ready.</p>
+              <p className={mutedCopyClass}>Your environment is fully agent-ready.</p>
               <TextLink to="/app/diagnostics">Open diagnostics</TextLink>
             </MetricCard>
             <MetricCard
@@ -172,8 +181,8 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
             subtitle="Keep the real browser and worker activity surface visible from the overview."
           >
             {routeEntries.length ? (
-              <div className="table-scroll">
-                <table className="table">
+              <div className={tableScrollClass}>
+                <table className={tableClass}>
                   <thead>
                     <tr>
                       <th>Route</th>
@@ -201,7 +210,9 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
                 </table>
               </div>
             ) : (
-              <p className="muted">No worker-backed route activity has been recorded yet.</p>
+              <p className={mutedCopyClass}>
+                No worker-backed route activity has been recorded yet.
+              </p>
             )}
           </Card>
 
@@ -209,7 +220,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
             title="Credentials"
             subtitle="Bring your own keys. Keep your billing. We never share or use your keys for other users."
           >
-            <div className="two-up-grid">
+            <div className={twoUpGridClass}>
               {[
                 ['Model Provider', 'OpenAI', 'Model: gpt-5.1', 'Status: Verified'],
                 ['AI Gateway', 'Cloudflare AI Gateway', 'BYOK: Enabled', 'Status: Active'],
@@ -229,9 +240,9 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </Card>
         </div>
 
-        <aside className="stack">
+        <aside className={stackClass}>
           <Card title="Provider Status" subtitle="All systems operational">
-            <ul className="ordered">
+            <ul className={orderedListClass}>
               <li>CourtListener API — Connected</li>
               <li>OpenAI — Verified</li>
               <li>Cloudflare AI Gateway — Enabled</li>
@@ -241,7 +252,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </Card>
 
           <Card title="Assistant" subtitle="Operator guidance, not a generic chatbot.">
-            <p className="muted">
+            <p className={mutedCopyClass}>
               Hi! I can help you set up your MCP client, build tool calls from natural language,
               diagnose errors, and understand results.
             </p>
@@ -256,7 +267,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </Card>
 
           <Card title="Security & Privacy" subtitle="Keys, traces, and approvals stay controlled.">
-            <ul className="ordered">
+            <ul className={orderedListClass}>
               <li>Your keys are encrypted and never used for other users.</li>
               <li>You control your keys and can delete them anytime.</li>
               <li>Human review stays visible for trust-sensitive actions.</li>

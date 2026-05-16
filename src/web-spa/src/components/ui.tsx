@@ -1,6 +1,112 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import type { LinkProps, NavLinkProps } from 'react-router-dom';
+import { cn } from '../lib/cn';
+import {
+  badgeClassName,
+  brandLinkClassName,
+  brandLinkCopyClass,
+  brandLinkMarkClass,
+  brandLinkNameClass,
+  brandLinkSubtitleClass,
+  brandLinkTitleRowClass,
+  buttonClassName,
+  cardClass,
+  cardSpotlightClass,
+  cardTitleClass,
+  checkboxFieldClass,
+  checkboxInputClass,
+  comparisonCardBodyClass,
+  comparisonCardClassName,
+  comparisonCardHeaderClassName,
+  comparisonCardTitleClassName,
+  comparisonIconClassName,
+  dlGridClass,
+  emptyStateClass,
+  emptyStateHintClass,
+  emptyStateIconClass,
+  eyebrowLabelClass,
+  featureCardDescriptionClass,
+  featureCardTitleClass,
+  fieldErrorClass,
+  formFieldClassName,
+  hintClass,
+  iconButtonClassName,
+  infoBlockClass,
+  inlineGroupClass,
+  inputControlClass,
+  keyValueListClass,
+  landingButtonClassName,
+  landingFeatureCardDescriptionClass,
+  landingIconWrapClass,
+  landingSectionHeadingClass,
+  landingSectionHeadingCompactClass,
+  landingSectionHeadingDescriptionClass,
+  landingSectionHeadingTitleClass,
+  loadingClass,
+  metaNoteClassName,
+  metricCardAccentClass,
+  modalClass,
+  mutedTextClass,
+  navCardLinkClassName,
+  pageHeaderActionsClass,
+  pageHeaderClass,
+  pageHeaderDescriptionClass,
+  pageHeaderMainClass,
+  pageHeaderMetaClass,
+  pageHeaderSideClass,
+  pageHeaderTitleClass,
+  pageHeroActionsClass,
+  pageHeroAsideClass,
+  pageHeroClass,
+  pageHeroNoteClass,
+  pageHeroNoteTextClass,
+  pageHeroNoteTitleClass,
+  pageHeroDescriptionClass,
+  pageHeroLayoutClass,
+  pageHeroMainClass,
+  pageHeroTitleClass,
+  panelClass,
+  panelInverseClass,
+  pillClassName,
+  rawResponseClass,
+  rawResponseCodeClass,
+  selectControlClass,
+  sessionBadgeClassName,
+  sessionBadgeDotClass,
+  sessionBadgeDotConnectedClass,
+  sessionBadgeToolsClass,
+  skeletonLineClass,
+  skeletonLineShortClass,
+  sectionHeadingDescriptionClass,
+  sectionHeadingTitleClass,
+  skipLinkClassName,
+  statCardValueClass,
+  statusActionsClass,
+  statusBannerClassName,
+  statusPillClassName,
+  stepperActionClass,
+  stepperClass,
+  stepperIconClass,
+  stepperItemClassName,
+  stepperMainClass,
+  tabButtonClassName,
+  textLinkClass,
+  textareaControlClass,
+} from '../lib/ui-classes';
+import {
+  landingPillClass,
+  landingSectionLabelClass,
+  landingStatCardClass,
+  landingStatLabelClass,
+  landingTabButtonClassName,
+  landingTextLinkClass,
+  brandLinkBadgeClass,
+  landingCommandChipClass,
+  landingCodeFormatBadgeClass,
+  landingFeatureCardClass,
+  landingTrustCardClass,
+} from '../lib/landing-classes';
 import { useToast } from './toast-context';
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger';
@@ -15,11 +121,12 @@ export function Card(
     className?: string;
   }>,
 ): React.JSX.Element {
-  const toneClassName = props.tone === 'spotlight' ? 'card-spotlight' : '';
   return (
-    <section className={`ui-card ${toneClassName} ${props.className ?? ''}`.trim()}>
-      {props.title ? <h2>{props.title}</h2> : null}
-      {props.subtitle ? <p className="muted">{props.subtitle}</p> : null}
+    <section
+      className={cn(props.tone === 'spotlight' ? cardSpotlightClass : cardClass, props.className)}
+    >
+      {props.title ? <h2 className={cardTitleClass}>{props.title}</h2> : null}
+      {props.subtitle ? <p className={mutedTextClass}>{props.subtitle}</p> : null}
       {props.children}
     </section>
   );
@@ -31,9 +138,10 @@ export function Panel(
     className?: string;
   }>,
 ): React.JSX.Element {
-  const toneClassName = props.tone === 'inverse' ? 'inverse' : '';
   return (
-    <section className={`panel-card ${toneClassName} ${props.className ?? ''}`.trim()}>
+    <section
+      className={cn(props.tone === 'inverse' ? panelInverseClass : panelClass, props.className)}
+    >
       {props.children}
     </section>
   );
@@ -53,27 +161,23 @@ export function PageHeader(
   }>,
 ): React.JSX.Element {
   return (
-    <section className={['page-header', props.className ?? ''].join(' ').trim()}>
-      <div className="page-header-main">
+    <section className={cn(pageHeaderClass, props.className)}>
+      <div className={pageHeaderMainClass}>
         {props.eyebrow ? (
           <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
         ) : null}
-        <h1 className={props.titleClassName}>{props.title}</h1>
+        <h1 className={cn(pageHeaderTitleClass, props.titleClassName)}>{props.title}</h1>
         {props.description ? (
-          <p
-            className={['page-header-description', props.descriptionClassName ?? '']
-              .join(' ')
-              .trim()}
-          >
+          <p className={cn(pageHeaderDescriptionClass, props.descriptionClassName)}>
             {props.description}
           </p>
         ) : null}
         {props.children}
       </div>
       {props.actions || props.meta ? (
-        <div className="page-header-side">
-          {props.meta ? <div className="page-header-meta">{props.meta}</div> : null}
-          {props.actions ? <div className="page-header-actions">{props.actions}</div> : null}
+        <div className={pageHeaderSideClass}>
+          {props.meta ? <div className={pageHeaderMetaClass}>{props.meta}</div> : null}
+          {props.actions ? <div className={pageHeaderActionsClass}>{props.actions}</div> : null}
         </div>
       ) : null}
     </section>
@@ -92,20 +196,42 @@ export function HeroPanel(
   }>,
 ): React.JSX.Element {
   return (
-    <section className={['page-hero', props.className ?? ''].join(' ').trim()}>
-      <div className="page-hero-layout">
-        <div className="page-hero-main">
+    <section className={cn(pageHeroClass, props.className)}>
+      <div className={pageHeroLayoutClass}>
+        <div className={pageHeroMainClass}>
           {props.eyebrow ? (
             <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
           ) : null}
-          <h1>{props.title}</h1>
-          {props.description ? <p className="page-hero-description">{props.description}</p> : null}
-          {props.actions ? <div className="page-hero-actions">{props.actions}</div> : null}
+          <h1 className={pageHeroTitleClass}>{props.title}</h1>
+          {props.description ? (
+            <p className={pageHeroDescriptionClass}>{props.description}</p>
+          ) : null}
+          {props.actions ? <div className={pageHeroActionsClass}>{props.actions}</div> : null}
           {props.children}
         </div>
-        {props.aside ? <aside className="page-hero-aside">{props.aside}</aside> : null}
+        {props.aside ? <aside className={pageHeroAsideClass}>{props.aside}</aside> : null}
       </div>
     </section>
+  );
+}
+
+export function PageHeroNote(
+  props: React.PropsWithChildren<{
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    className?: string;
+    titleClassName?: string;
+    descriptionClassName?: string;
+  }>,
+): React.JSX.Element {
+  return (
+    <div className={cn(pageHeroNoteClass, props.className)}>
+      <strong className={cn(pageHeroNoteTitleClass, props.titleClassName)}>{props.title}</strong>
+      {props.description ? (
+        <p className={cn(pageHeroNoteTextClass, props.descriptionClassName)}>{props.description}</p>
+      ) : null}
+      {props.children}
+    </div>
   );
 }
 
@@ -114,15 +240,32 @@ export function SectionHeading(
     eyebrow: React.ReactNode;
     title: React.ReactNode;
     description: React.ReactNode;
+    tone?: 'default' | 'landing';
+    compact?: boolean;
     className?: string;
     eyebrowClassName?: string;
   }>,
 ): React.JSX.Element {
+  const isLanding = props.tone === 'landing';
+  const isCompact = props.compact === true;
   return (
-    <div className={props.className}>
+    <div
+      className={cn(
+        isLanding && (isCompact ? landingSectionHeadingCompactClass : landingSectionHeadingClass),
+        props.className,
+      )}
+    >
       <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
-      <h2>{props.title}</h2>
-      <p>{props.description}</p>
+      <h2 className={isLanding ? landingSectionHeadingTitleClass : sectionHeadingTitleClass}>
+        {props.title}
+      </h2>
+      <p
+        className={
+          isLanding ? landingSectionHeadingDescriptionClass : sectionHeadingDescriptionClass
+        }
+      >
+        {props.description}
+      </p>
       {props.children}
     </div>
   );
@@ -142,7 +285,7 @@ export function InfoBlock(
 ): React.JSX.Element {
   const TitleTag = props.titleAs ?? 'strong';
   return (
-    <div className={['info-block', props.className ?? ''].join(' ').trim()}>
+    <div className={cn(infoBlockClass, props.className)}>
       {props.eyebrow ? <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow> : null}
       <TitleTag className={props.titleClassName}>{props.title}</TitleTag>
       {props.description ? <p className={props.descriptionClassName}>{props.description}</p> : null}
@@ -156,17 +299,27 @@ export function FeatureCard(
     icon: React.ReactNode;
     title: React.ReactNode;
     description: React.ReactNode;
+    tone?: 'default' | 'landing';
+    variant?: 'feature' | 'trust';
     className?: string;
     iconClassName?: string;
   }>,
 ): React.JSX.Element {
+  const isLanding = props.tone === 'landing';
+  const landingCardClassName =
+    props.variant === 'trust' ? landingTrustCardClass : landingFeatureCardClass;
   return (
-    <article className={props.className}>
-      <span className={props.iconClassName} aria-hidden="true">
+    <article className={cn(isLanding ? landingCardClassName : undefined, props.className)}>
+      <span
+        className={cn(props.iconClassName ?? (isLanding ? landingIconWrapClass : undefined))}
+        aria-hidden="true"
+      >
         {props.icon}
       </span>
-      <h3>{props.title}</h3>
-      <p>{props.description}</p>
+      <h3 className={featureCardTitleClass}>{props.title}</h3>
+      <p className={isLanding ? landingFeatureCardDescriptionClass : featureCardDescriptionClass}>
+        {props.description}
+      </p>
       {props.children}
     </article>
   );
@@ -176,14 +329,15 @@ export function StatCard(
   props: React.PropsWithChildren<{
     label: React.ReactNode;
     value: React.ReactNode;
+    tone?: 'default' | 'landing';
     className?: string;
     labelClassName?: string;
   }>,
 ): React.JSX.Element {
   return (
-    <article className={props.className}>
+    <article className={cn(props.tone === 'landing' && landingStatCardClass, props.className)}>
       <Eyebrow className={props.labelClassName}>{props.label}</Eyebrow>
-      <strong>{props.value}</strong>
+      <strong className={statCardValueClass}>{props.value}</strong>
       {props.children}
     </article>
   );
@@ -201,7 +355,7 @@ export function MetricCard(
     <Card className={props.className}>
       <Eyebrow>{props.label}</Eyebrow>
       <strong>{props.value}</strong>
-      {props.accent ? <p className="metric-card-accent">{props.accent}</p> : null}
+      {props.accent ? <p className={metricCardAccentClass}>{props.accent}</p> : null}
       {props.children}
     </Card>
   );
@@ -215,7 +369,7 @@ export function KeyValueList(props: {
   className?: string;
 }): React.JSX.Element {
   return (
-    <ul className={['key-value-list', props.className ?? ''].join(' ').trim()}>
+    <ul className={cn(keyValueListClass, props.className)}>
       {props.entries.map((entry) => (
         <li key={`${entry.label}-${entry.value}`}>
           <span>{entry.label}</span>
@@ -237,29 +391,18 @@ export function ComparisonCard(
     className?: string;
   }>,
 ): React.JSX.Element {
-  const sizeClassName = props.size === 'large' ? 'comparison-card-lg' : '';
-  const toneClassName = props.tone === 'mcp' ? 'comparison-card-mcp' : 'comparison-card-plain';
-  const headerSizeClassName = props.size === 'large' ? 'comparison-card-header-lg' : '';
-  const iconSizeClassName = props.size === 'large' ? 'comparison-icon-lg' : '';
-  const titleSizeClassName = props.size === 'large' ? 'comparison-card-title-lg' : '';
+  const size = props.size ?? 'default';
+  const tone = props.tone ?? 'default';
 
   return (
-    <div
-      className={['comparison-card', toneClassName, sizeClassName, props.className ?? '']
-        .join(' ')
-        .trim()}
-    >
-      <div className={['comparison-card-header', headerSizeClassName].join(' ').trim()}>
-        <span className={['comparison-icon', iconSizeClassName].join(' ').trim()}>
-          {props.icon}
-        </span>
-        <strong className={['comparison-card-title', titleSizeClassName].join(' ').trim()}>
-          {props.title}
-        </strong>
+    <div className={comparisonCardClassName(tone, size, props.className)}>
+      <div className={comparisonCardHeaderClassName(size)}>
+        <span className={comparisonIconClassName(size)}>{props.icon}</span>
+        <strong className={comparisonCardTitleClassName(size)}>{props.title}</strong>
         {props.badge}
       </div>
       {props.meta}
-      <div className="comparison-card-body">{props.children}</div>
+      <div className={comparisonCardBodyClass}>{props.children}</div>
     </div>
   );
 }
@@ -270,10 +413,7 @@ export function SkipLink(props: {
   tone?: 'default' | 'landing';
 }): React.JSX.Element {
   return (
-    <a
-      href={props.href}
-      className={`skip-link ${props.tone === 'landing' ? 'skip-link-landing' : ''}`.trim()}
-    >
+    <a href={props.href} className={skipLinkClassName(props.tone ?? 'default')}>
       {props.children}
     </a>
   );
@@ -286,38 +426,11 @@ export function InlineGroup(
     className?: string;
   }>,
 ): React.JSX.Element {
-  const justifyClassName = props.justify === 'between' ? 'between' : '';
-  const gapClassName =
-    props.gap === 'tight' ? 'row-tight' : props.gap === 'spacious' ? 'row-spacious' : '';
   return (
-    <div
-      className={['row', justifyClassName, gapClassName, props.className ?? ''].join(' ').trim()}
-    >
+    <div className={inlineGroupClass(props.justify, props.gap, props.className)}>
       {props.children}
     </div>
   );
-}
-
-function getSizeClassName(size: ButtonSize): string {
-  if (size === 'compact') return 'btn-compact';
-  if (size === 'tiny') return 'btn-tiny';
-  return '';
-}
-
-function getButtonClassName(variant: ButtonVariant, size: ButtonSize, className?: string): string {
-  return `btn ${variant} ${getSizeClassName(size)} ${className ?? ''}`.trim();
-}
-
-function getPillClassName(primary: boolean, className?: string): string {
-  return `pill ${primary ? 'primary' : ''} ${className ?? ''}`.trim();
-}
-
-function getBadgeToneClassName(tone: BadgeTone): string {
-  return tone === 'ok' ? 'active' : tone === 'warn' ? 'warn' : '';
-}
-
-function getBadgeClassName(tone: BadgeTone, className?: string): string {
-  return `chip ${getBadgeToneClassName(tone)} ${className ?? ''}`.trim();
 }
 
 export function Button(
@@ -329,7 +442,7 @@ export function Button(
   const variant = props.variant ?? 'primary';
   const size = props.size ?? 'default';
   return (
-    <button type="button" {...props} className={getButtonClassName(variant, size, props.className)}>
+    <button type="button" {...props} className={buttonClassName(variant, size, props.className)}>
       {props.children}
     </button>
   );
@@ -342,11 +455,7 @@ export function IconButton(
 ): React.JSX.Element {
   const chrome = props.chrome ?? 'boxed';
   return (
-    <button
-      type="button"
-      {...props}
-      className={`icon-btn ${chrome === 'inline' ? 'inline' : ''} ${props.className ?? ''}`.trim()}
-    >
+    <button type="button" {...props} className={iconButtonClassName(chrome, props.className)}>
       {props.children}
     </button>
   );
@@ -377,7 +486,7 @@ type BrandLinkBaseProps = {
   subtitle?: React.ReactNode;
   badge?: React.ReactNode;
   icon?: React.ReactNode;
-  tone?: 'default' | 'landing';
+  tone?: 'default' | 'landing' | 'shell';
   className?: string;
 };
 
@@ -432,8 +541,8 @@ export function TextLink(props: RouterTextLinkProps | AnchorTextLinkProps): Reac
   const tone = props.tone ?? 'default';
   const className =
     tone === 'landing'
-      ? `landing-text-link ${props.className ?? ''}`.trim()
-      : `text-link ${props.className ?? ''}`.trim();
+      ? cn(landingTextLinkClass, props.className)
+      : cn(textLinkClass, props.className);
 
   if ('href' in props) {
     const { tone: _tone, className: _className, children, href, ...anchorProps } = props;
@@ -460,8 +569,8 @@ export function ButtonLink(
   const tone = props.tone ?? 'default';
   const className =
     tone === 'landing'
-      ? `landing-button landing-button-${variant} ${props.className ?? ''}`.trim()
-      : getButtonClassName(variant, size, props.className);
+      ? landingButtonClassName(variant, props.className)
+      : buttonClassName(variant, size, props.className);
 
   if ('href' in props) {
     const {
@@ -498,26 +607,20 @@ export function ButtonLink(
 
 export function BrandLink(props: RouterBrandLinkProps | AnchorBrandLinkProps): React.JSX.Element {
   const tone = props.tone ?? 'default';
-  const className = [
-    'brand-link',
-    tone === 'landing' ? 'brand-link-landing' : 'brand-link-default',
-    props.className ?? '',
-  ]
-    .join(' ')
-    .trim();
+  const className = brandLinkClassName(tone, props.className);
   const content = (
     <>
       {props.icon ? (
-        <span className="brand-link-mark" aria-hidden="true">
+        <span className={brandLinkMarkClass} aria-hidden="true">
           {props.icon}
         </span>
       ) : null}
-      <span className="brand-link-copy">
-        <span className="brand-link-title-row">
-          <span className="brand-link-name">{props.label}</span>
+      <span className={brandLinkCopyClass}>
+        <span className={brandLinkTitleRowClass}>
+          <span className={brandLinkNameClass}>{props.label}</span>
           {props.badge}
         </span>
-        {props.subtitle ? <span className="brand-link-subtitle">{props.subtitle}</span> : null}
+        {props.subtitle ? <span className={brandLinkSubtitleClass}>{props.subtitle}</span> : null}
       </span>
     </>
   );
@@ -560,12 +663,12 @@ export function BrandLink(props: RouterBrandLinkProps | AnchorBrandLinkProps): R
 export function NavCardLink(
   props: RouterNavCardLinkProps | AnchorNavCardLinkProps,
 ): React.JSX.Element {
-  const className = `nav-card-link ${props.className ?? ''}`.trim();
+  const baseClassName = navCardLinkClassName(false, props.className);
 
   if ('href' in props) {
     const { className: _className, children, href, ...anchorProps } = props;
     return (
-      <a {...anchorProps} href={href} className={className}>
+      <a {...anchorProps} href={href} className={baseClassName}>
         {children}
       </a>
     );
@@ -576,7 +679,7 @@ export function NavCardLink(
     <NavLink
       {...navLinkProps}
       to={to}
-      className={({ isActive }) => `${className} ${isActive ? 'active' : ''}`.trim()}
+      className={({ isActive }) => navCardLinkClassName(isActive, props.className)}
     >
       {children}
     </NavLink>
@@ -603,7 +706,7 @@ type AnchorPillLinkProps = PillLinkBaseProps &
 
 export function PillLink(props: RouterPillLinkProps | AnchorPillLinkProps): React.JSX.Element {
   const primary = props.primary ?? false;
-  const className = getPillClassName(primary, props.className);
+  const className = pillClassName(primary, props.className);
 
   if ('href' in props) {
     const { primary: _primary, className: _className, children, href, ...anchorProps } = props;
@@ -627,7 +730,7 @@ export function PillButton(
 ): React.JSX.Element {
   const primary = props.primary ?? false;
   return (
-    <button type="button" {...props} className={getPillClassName(primary, props.className)}>
+    <button type="button" {...props} className={pillClassName(primary, props.className)}>
       {props.children}
     </button>
   );
@@ -649,21 +752,21 @@ export function StatusBanner(props: {
       id={props.id}
       role={role}
       aria-live={role === 'alert' ? 'assertive' : 'polite'}
-      className={`status ${props.type ?? 'info'} ${props.className ?? ''}`.trim()}
+      className={statusBannerClassName(props.type ?? 'info', props.className)}
     >
       {props.title ? <strong>{props.title}</strong> : null}
       {props.message ? props.title ? <> {props.message}</> : props.message : null}
-      {props.children ? <div className="status-actions">{props.children}</div> : null}
+      {props.children ? <div className={statusActionsClass}>{props.children}</div> : null}
     </div>
   );
 }
 
 export function LoadingState(props: { label: string; message?: string }): React.JSX.Element {
   return (
-    <div className="loading" role="status" aria-busy="true" aria-label={props.label}>
-      {props.message ? <p className="muted">{props.message}</p> : null}
-      <div className="skeleton skeleton-line"></div>
-      <div className="skeleton skeleton-line short"></div>
+    <div className={loadingClass} role="status" aria-busy="true" aria-label={props.label}>
+      {props.message ? <p className={mutedTextClass}>{props.message}</p> : null}
+      <div className={skeletonLineClass} />
+      <div className={skeletonLineShortClass} />
     </div>
   );
 }
@@ -672,8 +775,19 @@ export function Eyebrow(props: {
   children: React.ReactNode;
   className?: string;
 }): React.JSX.Element {
+  const className = props.className ?? '';
   return (
-    <span className={`workspace-card-label ${props.className ?? ''}`.trim()}>{props.children}</span>
+    <span
+      className={cn(
+        eyebrowLabelClass,
+        className.includes('landing-pill') && landingPillClass,
+        className.includes('landing-section-label') && landingSectionLabelClass,
+        className.includes('landing-stat-label') && landingStatLabelClass,
+        props.className,
+      )}
+    >
+      {props.children}
+    </span>
   );
 }
 
@@ -684,10 +798,10 @@ export function EmptyState(props: {
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={`empty-state ${props.className ?? ''}`.trim()}>
-      {props.icon ? <div className="empty-state-icon">{props.icon}</div> : null}
+    <div className={cn(emptyStateClass, props.className)}>
+      {props.icon ? <div className={emptyStateIconClass}>{props.icon}</div> : null}
       <div>{props.message}</div>
-      {props.hint ? <div className="empty-state-hint">{props.hint}</div> : null}
+      {props.hint ? <div className={emptyStateHintClass}>{props.hint}</div> : null}
     </div>
   );
 }
@@ -700,7 +814,7 @@ export function DefinitionList(props: {
   }>;
 }): React.JSX.Element {
   return (
-    <dl className="dl-grid">
+    <dl className={dlGridClass}>
       {props.entries.map((entry) => (
         <React.Fragment key={typeof entry.term === 'string' ? entry.term : String(entry.term)}>
           <dt>{entry.term}</dt>
@@ -715,9 +829,7 @@ export function MetaNote(
   props: React.PropsWithChildren<{ size?: 'default' | 'large'; className?: string }>,
 ) {
   return (
-    <div
-      className={`meta-note ${props.size === 'large' ? 'meta-note-lg' : ''} ${props.className ?? ''}`.trim()}
-    >
+    <div className={metaNoteClassName(props.size ?? 'default', props.className)}>
       {props.children}
     </div>
   );
@@ -731,13 +843,13 @@ export function ConnectionBadge(props: {
   className?: string;
 }): React.JSX.Element {
   return (
-    <div
-      className={`session-badge ${props.connected ? 'connected' : ''} ${props.className ?? ''}`.trim()}
-    >
-      <span className="session-badge-dot" />
+    <div className={sessionBadgeClassName(props.connected, props.className)}>
+      <span
+        className={cn(sessionBadgeDotClass, props.connected && sessionBadgeDotConnectedClass)}
+      />
       {props.connected ? props.connectedLabel : props.disconnectedLabel}
       {props.connected && props.meta ? (
-        <span className="session-badge-tools">{props.meta}</span>
+        <span className={sessionBadgeToolsClass}>{props.meta}</span>
       ) : null}
     </div>
   );
@@ -751,7 +863,7 @@ export function StatusPill(props: {
 }): React.JSX.Element {
   const variant = props.variant ?? 'soft';
   return (
-    <span className={`status-pill ${variant} tone-${props.tone} ${props.className ?? ''}`.trim()}>
+    <span className={statusPillClassName(props.tone, variant, props.className)}>
       {props.children}
     </span>
   );
@@ -777,7 +889,7 @@ type AnchorBadgeLinkProps = BadgeLinkBaseProps &
 
 export function BadgeLink(props: RouterBadgeLinkProps | AnchorBadgeLinkProps): React.JSX.Element {
   const tone = props.tone ?? 'neutral';
-  const className = getBadgeClassName(tone, props.className);
+  const className = badgeClassName(tone, props.className);
 
   if ('href' in props) {
     const { tone: _tone, className: _className, children, href, ...anchorProps } = props;
@@ -801,9 +913,10 @@ export const TabButton = React.forwardRef<
   React.ButtonHTMLAttributes<HTMLButtonElement> & {
     controls: string;
     selected: boolean;
+    tone?: 'default' | 'landing';
   }
 >(function TabButton(
-  { controls, selected, className, children, ...buttonProps },
+  { controls, selected, tone, className, children, ...buttonProps },
   ref,
 ): React.JSX.Element {
   return (
@@ -814,7 +927,11 @@ export const TabButton = React.forwardRef<
       aria-selected={selected}
       aria-controls={controls}
       tabIndex={selected ? 0 : -1}
-      className={`tab-btn ${selected ? 'active' : ''} ${className ?? ''}`.trim()}
+      className={
+        tone === 'landing'
+          ? landingTabButtonClassName(selected, className)
+          : tabButtonClassName(selected, className)
+      }
       {...buttonProps}
     >
       {children}
@@ -828,7 +945,22 @@ export function Badge(props: {
   className?: string;
 }): React.JSX.Element {
   const tone = props.tone ?? 'neutral';
-  return <span className={getBadgeClassName(tone, props.className)}>{props.children}</span>;
+  const hookClass = props.className ?? '';
+  const className = cn(
+    hookClass.includes('brand-link-badge') && brandLinkBadgeClass,
+    hookClass.includes('landing-command-chip') && landingCommandChipClass,
+    hookClass.includes('landing-code-format-badge') && landingCodeFormatBadgeClass,
+    !hookClass.includes('brand-link-badge') &&
+      !hookClass.includes('landing-command-chip') &&
+      !hookClass.includes('landing-code-format-badge') &&
+      badgeClassName(tone, props.className),
+    hookClass &&
+      (hookClass.includes('brand-link-badge') ||
+        hookClass.includes('landing-command-chip') ||
+        hookClass.includes('landing-code-format-badge')) &&
+      props.className,
+  );
+  return <span className={className}>{props.children}</span>;
 }
 
 export function FormField(props: {
@@ -846,18 +978,18 @@ export function FormField(props: {
       .join(' ') || undefined;
 
   return (
-    <div className={`field ${props.compact ? 'compact' : ''} ${props.className ?? ''}`.trim()}>
+    <div className={formFieldClassName(props.compact ?? false, props.className)}>
       <label htmlFor={props.id}>{props.label}</label>
       <div aria-describedby={describedBy} aria-invalid={props.error ? true : undefined}>
         {props.children}
       </div>
       {props.hint ? (
-        <div id={`${props.id}-hint`} className="hint">
+        <div id={`${props.id}-hint`} className={hintClass}>
           {props.hint}
         </div>
       ) : null}
       {props.error ? (
-        <div id={`${props.id}-error`} role="alert" className="field-error">
+        <div id={`${props.id}-error`} role="alert" className={fieldErrorClass}>
           {props.error}
         </div>
       ) : null}
@@ -876,9 +1008,9 @@ export function Stepper(props: {
   }>;
 }): React.JSX.Element {
   return (
-    <ol className="stepper" aria-label="Setup progress">
+    <ol className={stepperClass} aria-label="Setup progress">
       {props.steps.map((step, index) => {
-        const cls = step.active
+        const stepState = step.active
           ? 'active'
           : step.complete
             ? 'done'
@@ -887,9 +1019,9 @@ export function Stepper(props: {
               : '';
         const icon = step.complete ? '✓' : `${index + 1}`;
         const content = (
-          <div className="stepper-main">
+          <div className={stepperMainClass}>
             <span
-              className="stepper-icon"
+              className={stepperIconClass}
               aria-label={step.complete ? 'Completed' : `Step ${index + 1}`}
             >
               {icon}
@@ -898,9 +1030,9 @@ export function Stepper(props: {
           </div>
         );
         return (
-          <li key={step.label} className={cls}>
+          <li key={step.label} className={stepperItemClassName(stepState)}>
             {step.to && !step.disabled ? <Link to={step.to}>{content}</Link> : content}
-            {step.action ? <div className="stepper-action">{step.action}</div> : null}
+            {step.action ? <div className={stepperActionClass}>{step.action}</div> : null}
           </li>
         );
       })}
@@ -909,19 +1041,13 @@ export function Stepper(props: {
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>): React.JSX.Element {
-  return <input {...props} className={`input-control ${props.className ?? ''}`.trim()} />;
+  return <input {...props} className={cn(inputControlClass, props.className)} />;
 }
 
 export function Checkbox(
   props: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>,
 ): React.JSX.Element {
-  return (
-    <input
-      type="checkbox"
-      {...props}
-      className={`checkbox-input ${props.className ?? ''}`.trim()}
-    />
-  );
+  return <input type="checkbox" {...props} className={cn(checkboxInputClass, props.className)} />;
 }
 
 export function CheckboxField(
@@ -932,7 +1058,7 @@ export function CheckboxField(
 ): React.JSX.Element {
   const { children, className, ...inputProps } = props;
   return (
-    <label className={`checkbox-field ${className ?? ''}`.trim()}>
+    <label className={cn(checkboxFieldClass, className)}>
       <Checkbox {...inputProps} />
       <span>{children}</span>
     </label>
@@ -940,13 +1066,13 @@ export function CheckboxField(
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>): React.JSX.Element {
-  return <select {...props} className={`select-control ${props.className ?? ''}`.trim()} />;
+  return <select {...props} className={cn(selectControlClass, props.className)} />;
 }
 
 export function Textarea(
   props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
 ): React.JSX.Element {
-  return <textarea {...props} className={`textarea-control ${props.className ?? ''}`.trim()} />;
+  return <textarea {...props} className={cn(textareaControlClass, props.className)} />;
 }
 
 export function CodeSurface(props: {
@@ -971,7 +1097,7 @@ export function CodeSurface(props: {
   }
 
   return (
-    <div className={`raw-response ${props.className ?? ''}`.trim()}>
+    <div className={cn(rawResponseClass, props.className)}>
       {props.title || props.copyable ? (
         <InlineGroup justify="between">
           {props.title ? <strong>{props.title}</strong> : null}
@@ -982,7 +1108,7 @@ export function CodeSurface(props: {
           ) : null}
         </InlineGroup>
       ) : null}
-      <pre className="raw-response-code">
+      <pre className={rawResponseCodeClass}>
         <code>{props.children ?? props.code}</code>
       </pre>
     </div>
@@ -1040,7 +1166,7 @@ export function Modal(props: {
   });
 
   return (
-    <dialog ref={dialogRef} className="modal" aria-label={props.title}>
+    <dialog ref={dialogRef} className={modalClass} aria-label={props.title}>
       <InlineGroup justify="between">
         <h3>{props.title}</h3>
         <IconButton aria-label="Close dialog" onClick={props.onClose}>

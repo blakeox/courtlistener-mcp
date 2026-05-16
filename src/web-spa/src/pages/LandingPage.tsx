@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Badge,
   BrandLink,
-  Button,
   ButtonLink,
   CodeSurface,
   Eyebrow,
@@ -16,8 +15,59 @@ import {
   TabButton,
   TextLink,
 } from '../components/ui';
+import {
+  LandingContainer,
+  LandingFeatureGrid,
+  LandingFooter,
+  LandingFooterBrand,
+  LandingFooterInner,
+  LandingFooterLinks,
+  LandingHeader,
+  LandingHeaderInner,
+  LandingHero,
+  LandingHeroCopy,
+  LandingHeroGrid,
+  LandingHeroNote,
+  LandingHeroText,
+  LandingHeroTitle,
+  LandingHeroVisual,
+  LandingMenuToggle,
+  LandingNav,
+  LandingOpenSourceGrid,
+  LandingOpenSourceStats,
+  LandingPageRoot,
+  LandingSection,
+  LandingSetupLayout,
+  LandingTrustCopy,
+  LandingTrustGrid,
+} from '../components/landing-layout';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
+import {
+  brandLinkBadgeClass,
+  landingCodeArrayClass,
+  landingCodeCardClass,
+  landingCodeFormatBadgeClass,
+  landingCodeKeyClass,
+  landingCodePunctuationClass,
+  landingCodeStringClass,
+  landingCodeTabsClass,
+  landingCommandCaptionClass,
+  landingCommandChipClass,
+  landingCommandRowClass,
+  landingHeroNoteDescriptionClass,
+  landingInlineLinksClass,
+  landingNumberedListClass,
+  landingPillClass,
+  landingSectionLabelClass,
+  landingSetupCopyClass,
+  landingSetupCodeClass,
+  landingSetupPanelClass,
+  landingSetupTabsClass,
+  landingStatLabelClass,
+  landingButtonRowClass,
+  landingFooterStackClass,
+} from '../lib/landing-classes';
 
 const REPOSITORY_URL = 'https://github.com/blakeox/courtlistener-mcp';
 const DOCUMENTATION_URL = `${REPOSITORY_URL}#readme`;
@@ -158,37 +208,30 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
   }, [props.initialSectionId]);
 
   return (
-    <div className="landing-page">
+    <LandingPageRoot>
       <SkipLink href="#landing-main" tone="landing">
         Skip to content
       </SkipLink>
-      <header className="landing-header">
-        <div className="landing-container landing-header-inner">
+      <LandingHeader>
+        <LandingHeaderInner>
           <BrandLink
             to="/"
             tone="landing"
             aria-label="CourtListener MCP home"
             label="CourtListener MCP"
             icon={<ScaleLogoIcon />}
-            badge={<Badge className="brand-link-badge">Beta</Badge>}
+            badge={<Badge className={brandLinkBadgeClass}>Beta</Badge>}
           />
 
-          <Button
-            variant="secondary"
-            size="compact"
-            className="landing-menu-toggle"
+          <LandingMenuToggle
             aria-expanded={navOpen}
             aria-controls="landing-primary-nav"
             onClick={() => setNavOpen((current) => !current)}
           >
             Menu
-          </Button>
+          </LandingMenuToggle>
 
-          <nav
-            id="landing-primary-nav"
-            className={`landing-nav ${navOpen ? 'open' : ''}`.trim()}
-            aria-label="Primary"
-          >
+          <LandingNav id="landing-primary-nav" open={navOpen} aria-label="Primary">
             <TextLink href={DOCUMENTATION_URL} target="_blank" rel="noreferrer" tone="landing">
               Documentation
             </TextLink>
@@ -204,27 +247,23 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
             <ButtonLink to="/get-started" variant="primary" tone="landing">
               Get Started
             </ButtonLink>
-          </nav>
-        </div>
-      </header>
+          </LandingNav>
+        </LandingHeaderInner>
+      </LandingHeader>
 
       <main id="landing-main">
-        <section className="landing-hero">
-          <div className="landing-hero-backdrop" aria-hidden="true">
-            <div className="landing-grid-pattern"></div>
-            <div className="landing-courthouse-silhouette"></div>
-          </div>
-          <div className="landing-container landing-hero-grid">
-            <div className="landing-hero-copy">
-              <Eyebrow className="landing-pill">Model Context Protocol</Eyebrow>
-              <h1>
+        <LandingHero>
+          <LandingHeroGrid>
+            <LandingHeroCopy>
+              <Eyebrow className={landingPillClass}>Model Context Protocol</Eyebrow>
+              <LandingHeroTitle>
                 Connect AI to the Law. <span>Responsibly.</span>
-              </h1>
-              <p className="landing-hero-text">
+              </LandingHeroTitle>
+              <LandingHeroText>
                 CourtListener MCP gives AI systems secure, structured access to U.S. federal court
                 data via the Model Context Protocol.
-              </p>
-              <InlineGroup gap="spacious" className="landing-button-row">
+              </LandingHeroText>
+              <InlineGroup gap="spacious" className={landingButtonRowClass}>
                 <ButtonLink href={authStartHref} variant="primary" tone="landing">
                   Sign in
                 </ButtonLink>
@@ -241,68 +280,68 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   View on GitHub
                 </ButtonLink>
               </InlineGroup>
-              <p className="landing-trust-copy">
+              <LandingTrustCopy>
                 Read-only access · No API key required · Public data only
-              </p>
-            </div>
+              </LandingTrustCopy>
+            </LandingHeroCopy>
 
-            <div className="landing-hero-visual">
+            <LandingHeroVisual>
               <CodePreviewCard />
-              <div className="landing-hero-note">
+              <LandingHeroNote>
                 <ShieldCheckIcon />
                 <InfoBlock
                   title="Structured and defensible"
                   titleAs="strong"
                   description="Built for developer workflows, AI clients, and responsible legal research support."
-                  descriptionClassName="landing-hero-note-description"
+                  descriptionClassName={landingHeroNoteDescriptionClass}
                 />
-              </div>
-            </div>
-          </div>
-        </section>
+              </LandingHeroNote>
+            </LandingHeroVisual>
+          </LandingHeroGrid>
+        </LandingHero>
 
-        <section className="landing-section landing-section-light" id="features">
-          <div className="landing-container">
+        <LandingSection tone="light" id="features">
+          <LandingContainer>
             <SectionHeading
-              className="landing-section-heading"
+              tone="landing"
               eyebrow="Capabilities"
-              eyebrowClassName="landing-section-label"
+              eyebrowClassName={landingSectionLabelClass}
               title="Powerful legal data tools for AI applications"
               description="CourtListener MCP exposes vetted tools for legal research, enabling AI applications to retrieve structured data from federal courts."
             />
 
-            <div className="landing-feature-grid">
+            <LandingFeatureGrid>
               {featureItems.map((feature) => {
                 const Icon = feature.icon;
                 return (
                   <FeatureCard
                     key={feature.title}
-                    className="landing-card landing-feature-card"
+                    tone="landing"
+                    variant="feature"
                     icon={<Icon />}
-                    iconClassName="landing-icon-wrap"
                     title={feature.title}
                     description={feature.description}
                   />
                 );
               })}
-            </div>
-          </div>
-        </section>
+            </LandingFeatureGrid>
+          </LandingContainer>
+        </LandingSection>
 
-        <section className="landing-section" id="setup">
-          <div className="landing-container">
+        <LandingSection id="setup">
+          <LandingContainer>
             <SectionHeading
-              className="landing-section-heading"
+              tone="landing"
               eyebrow="Developer setup"
-              eyebrowClassName="landing-section-label"
+              eyebrowClassName={landingSectionLabelClass}
               title="Add CourtListener MCP to your AI client"
               description="Start from the source checkout workflow below, then register the built MCP server in the client you already use for research or developer workflows."
             />
 
-            <div className="landing-setup-layout">
-              <div className="landing-setup-panel landing-card">
+            <LandingSetupLayout>
+              <div className={landingSetupPanelClass}>
                 <div
-                  className="landing-setup-tabs"
+                  className={landingSetupTabsClass}
                   role="tablist"
                   aria-label="Supported MCP clients"
                 >
@@ -310,7 +349,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                     <TabButton
                       key={client.id}
                       id={setupTabId(client.id)}
-                      className="landing-tab"
+                      tone="landing"
                       controls={setupPanelId(client.id)}
                       selected={activeSetup === client.id}
                       onClick={() => setActiveSetup(client.id)}
@@ -327,16 +366,16 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                     role="tabpanel"
                     aria-labelledby={setupTabId(client.id)}
                     hidden={activeSetup !== client.id}
-                    className="landing-setup-copy"
+                    className={landingSetupCopyClass}
                   >
                     <InfoBlock
                       eyebrow={client.eyebrow}
-                      eyebrowClassName="landing-section-label"
+                      eyebrowClassName={landingSectionLabelClass}
                       title={client.label}
                       titleAs="h3"
                       description={client.description}
                     />
-                    <ol className="landing-numbered-list">
+                    <ol className={landingNumberedListClass}>
                       {client.steps.map((step) => (
                         <li key={step}>{step}</li>
                       ))}
@@ -345,18 +384,18 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                 ))}
               </div>
 
-              <div className="landing-card landing-setup-code">
-                <InlineGroup justify="between" gap="spacious" className="landing-command-row">
+              <div className={landingSetupCodeClass}>
+                <InlineGroup justify="between" gap="spacious" className={landingCommandRowClass}>
                   <div>
                     <InfoBlock
                       eyebrow="Install command"
-                      eyebrowClassName="landing-section-label"
+                      eyebrowClassName={landingSectionLabelClass}
                       title={INSTALL_COMMAND}
                       titleAs="h3"
                       description="The npm package is not published yet, so local stdio setup currently runs from a repository checkout."
-                      descriptionClassName="landing-command-caption"
+                      descriptionClassName={landingCommandCaptionClass}
                     />
-                    <InlineGroup gap="spacious" className="landing-inline-links">
+                    <InlineGroup gap="spacious" className={landingInlineLinksClass}>
                       <TextLink
                         href={DOWNLOAD_ZIP_URL}
                         target="_blank"
@@ -375,48 +414,49 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                       </TextLink>
                     </InlineGroup>
                   </div>
-                  <Badge className="landing-command-chip">MCP server</Badge>
+                  <Badge className={landingCommandChipClass}>MCP server</Badge>
                 </InlineGroup>
                 <CodeSurface code={MCP_CONFIG_SNIPPET}>{renderLandingConfigSnippet()}</CodeSurface>
               </div>
-            </div>
-          </div>
-        </section>
+            </LandingSetupLayout>
+          </LandingContainer>
+        </LandingSection>
 
-        <section className="landing-section landing-section-light" id="trust">
-          <div className="landing-container">
+        <LandingSection tone="light" id="trust">
+          <LandingContainer>
             <SectionHeading
-              className="landing-section-heading"
+              tone="landing"
               eyebrow="Trust and safety"
-              eyebrowClassName="landing-section-label"
+              eyebrowClassName={landingSectionLabelClass}
               title="Designed for responsible legal AI workflows"
               description="This server is meant to support serious research workflows with guardrails that are clear to both developers and legal practitioners."
             />
 
-            <div className="landing-trust-grid">
+            <LandingTrustGrid>
               {trustItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <FeatureCard
                     key={item.title}
-                    className="landing-card landing-trust-card"
+                    tone="landing"
+                    variant="trust"
                     icon={<Icon />}
-                    iconClassName="landing-icon-wrap"
                     title={item.title}
                     description={item.description}
                   />
                 );
               })}
-            </div>
-          </div>
-        </section>
+            </LandingTrustGrid>
+          </LandingContainer>
+        </LandingSection>
 
-        <section className="landing-section landing-open-source" id="open-source">
-          <div className="landing-container landing-open-source-grid">
+        <LandingSection tone="open-source" id="open-source">
+          <LandingOpenSourceGrid>
             <SectionHeading
-              className="landing-section-heading landing-section-heading-compact"
+              tone="landing"
+              compact
               eyebrow="Open source"
-              eyebrowClassName="landing-section-label"
+              eyebrowClassName={landingSectionLabelClass}
               title="Open-source infrastructure for legal AI"
               description="CourtListener MCP is an open-source project built to make legal data more accessible to AI systems through a standard protocol."
             >
@@ -440,67 +480,67 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
               </ButtonLink>
             </SectionHeading>
 
-            <div className="landing-open-source-stats">
+            <LandingOpenSourceStats>
               {openSourceStats.map((stat) => (
                 <StatCard
                   key={stat.label}
-                  className="landing-card landing-stat-card"
+                  tone="landing"
                   label={stat.label}
-                  labelClassName="landing-stat-label"
+                  labelClassName={landingStatLabelClass}
                   value={stat.value}
                 />
               ))}
-            </div>
-          </div>
-        </section>
+            </LandingOpenSourceStats>
+          </LandingOpenSourceGrid>
+        </LandingSection>
       </main>
 
-      <footer className="landing-footer">
-        <InlineGroup
-          justify="between"
-          gap="spacious"
-          className="landing-container landing-footer-inner"
-        >
-          <span className="landing-footer-brand">CourtListener MCP</span>
-          <InlineGroup gap="spacious" className="landing-footer-links">
-            <TextLink href={DOCUMENTATION_URL} target="_blank" rel="noreferrer" tone="landing">
-              Documentation
-            </TextLink>
-            <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
-              GitHub
-            </TextLink>
-            <TextLink href={authStartHref} tone="landing">
-              Sign in
-            </TextLink>
-            <TextLink to="/app/account" tone="landing">
-              Account
-            </TextLink>
-            <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
-              Privacy
-            </TextLink>
-            <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
-              Terms
-            </TextLink>
-            <span>Built with MCP</span>
-            <span>Open-source infrastructure</span>
+      <LandingFooter>
+        <LandingFooterInner>
+          <InlineGroup justify="between" gap="spacious" className={landingFooterStackClass}>
+            <LandingFooterBrand>CourtListener MCP</LandingFooterBrand>
+            <LandingFooterLinks>
+              <InlineGroup gap="spacious">
+                <TextLink href={DOCUMENTATION_URL} target="_blank" rel="noreferrer" tone="landing">
+                  Documentation
+                </TextLink>
+                <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
+                  GitHub
+                </TextLink>
+                <TextLink href={authStartHref} tone="landing">
+                  Sign in
+                </TextLink>
+                <TextLink to="/app/account" tone="landing">
+                  Account
+                </TextLink>
+                <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
+                  Privacy
+                </TextLink>
+                <TextLink href={REPOSITORY_URL} target="_blank" rel="noreferrer" tone="landing">
+                  Terms
+                </TextLink>
+                <span>Built with MCP</span>
+                <span>Open-source infrastructure</span>
+              </InlineGroup>
+            </LandingFooterLinks>
           </InlineGroup>
-        </InlineGroup>
-      </footer>
-    </div>
+        </LandingFooterInner>
+      </LandingFooter>
+    </LandingPageRoot>
   );
 }
 
 function CodePreviewCard(): React.JSX.Element {
   return (
     <CodeSurface
-      className="landing-code-card"
+      className={landingCodeCardClass}
       code={MCP_CONFIG_SNIPPET}
       title={
-        <div className="landing-code-tabs" aria-hidden="true">
+        <div className={landingCodeTabsClass} aria-hidden="true">
           <StatusPill tone="mcp" variant="solid">
             MCP Config
           </StatusPill>
-          <Badge className="landing-code-format-badge">JSON</Badge>
+          <Badge className={landingCodeFormatBadgeClass}>JSON</Badge>
         </div>
       }
     >
@@ -512,40 +552,40 @@ function CodePreviewCard(): React.JSX.Element {
 function renderLandingConfigSnippet(): React.JSX.Element {
   return (
     <>
-      <span className="landing-code-punctuation">{'{'}</span>
+      <span className={landingCodePunctuationClass}>{'{'}</span>
       {'\n'}
       {'  '}
-      <span className="landing-code-key">"mcpServers"</span>
-      <span className="landing-code-punctuation">: {'{'}</span>
+      <span className={landingCodeKeyClass}>"mcpServers"</span>
+      <span className={landingCodePunctuationClass}>: {'{'}</span>
       {'\n'}
       {'    '}
-      <span className="landing-code-key">"courtlistener"</span>
-      <span className="landing-code-punctuation">: {'{'}</span>
+      <span className={landingCodeKeyClass}>"courtlistener"</span>
+      <span className={landingCodePunctuationClass}>: {'{'}</span>
       {'\n'}
       {'      '}
-      <span className="landing-code-key">"command"</span>
-      <span className="landing-code-punctuation">:</span>{' '}
-      <span className="landing-code-string">"node"</span>
-      <span className="landing-code-punctuation">,</span>
+      <span className={landingCodeKeyClass}>"command"</span>
+      <span className={landingCodePunctuationClass}>:</span>{' '}
+      <span className={landingCodeStringClass}>"node"</span>
+      <span className={landingCodePunctuationClass}>,</span>
       {'\n'}
       {'      '}
-      <span className="landing-code-key">"args"</span>
-      <span className="landing-code-punctuation">:</span>{' '}
-      <span className="landing-code-array">["dist/index.js"]</span>
-      <span className="landing-code-punctuation">,</span>
+      <span className={landingCodeKeyClass}>"args"</span>
+      <span className={landingCodePunctuationClass}>:</span>{' '}
+      <span className={landingCodeArrayClass}>["dist/index.js"]</span>
+      <span className={landingCodePunctuationClass}>,</span>
       {'\n'}
       {'      '}
-      <span className="landing-code-key">"cwd"</span>
-      <span className="landing-code-punctuation">:</span>{' '}
-      <span className="landing-code-string">"/path/to/courtlistener-mcp"</span>
+      <span className={landingCodeKeyClass}>"cwd"</span>
+      <span className={landingCodePunctuationClass}>:</span>{' '}
+      <span className={landingCodeStringClass}>"/path/to/courtlistener-mcp"</span>
       {'\n'}
       {'    '}
-      <span className="landing-code-punctuation">{'}'}</span>
+      <span className={landingCodePunctuationClass}>{'}'}</span>
       {'\n'}
       {'  '}
-      <span className="landing-code-punctuation">{'}'}</span>
+      <span className={landingCodePunctuationClass}>{'}'}</span>
       {'\n'}
-      <span className="landing-code-punctuation">{'}'}</span>
+      <span className={landingCodePunctuationClass}>{'}'}</span>
     </>
   );
 }

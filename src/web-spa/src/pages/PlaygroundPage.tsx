@@ -6,6 +6,60 @@ import { markFirstMcpSuccess, trackEvent } from '../lib/telemetry';
 import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useToken } from '../lib/token-context';
 import { useToast } from '../components/Toast';
+import {
+  asyncJobDetailClass,
+  asyncJobHeadingClass,
+  asyncJobItemClassName,
+  asyncJobItemHeaderClass,
+  asyncJobListClass,
+  asyncJobMetaClass,
+  asyncJobResultClass,
+  chatComparisonItemClass,
+  chatControlActionClass,
+  chatControlFixedClass,
+  chatControlGrowClass,
+  chatControlsRowClass,
+  chatEmptyStateClass,
+  chatInputRowClass,
+  chatInputTextareaClass,
+  chatSendBtnClass,
+  chatStreamClass,
+  chatUserBubbleClass,
+  chatUserRowClass,
+  comparePresetsClass,
+  comparisonGridClass,
+  comparisonGridWideClass,
+  comparisonLatencyClass,
+  comparisonSummaryClass,
+  gridCompactClass,
+  mdHeadingLgClass,
+  mdHeadingMdClass,
+  mdHeadingSmClass,
+  mdParagraphClass,
+  playgroundModeSummaryClass,
+  protocolEntryClassName,
+  protocolEntryHeadingClassName,
+  protocolEntryPayloadClass,
+  protocolEntryTimeClass,
+  protocolLogClass,
+  recentPromptsClass,
+  toolCatalogDescriptionClass,
+  toolCatalogGridClass,
+  toolCatalogGroupClass,
+  toolCatalogHeadingClass,
+  toolCatalogHintClass,
+  toolCatalogItemClass,
+  toolCatalogNameClass,
+  toolCatalogWrapClass,
+  transcriptEntryActionClass,
+  transcriptEntryBodyClass,
+  transcriptEntryClassName,
+  transcriptEntryHeaderClass,
+  transcriptEntryRoleClass,
+  transcriptEntryTimeClass,
+  transcriptPanelClass,
+} from '../lib/playground-classes';
+import { stackClass, turnstileWrapClass, twoColClass } from '../lib/workspace-classes';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
 import { useAutoScroll } from '../hooks/useAutoScroll';
@@ -33,6 +87,7 @@ import {
   EmptyState,
   FormField,
   HeroPanel,
+  PageHeroNote,
   IconButton,
   InlineGroup,
   Input,
@@ -45,6 +100,15 @@ import {
   Textarea,
   TextLink,
 } from '../components/ui';
+import {
+  hintClass,
+  hintInlineClass,
+  hintTightClass,
+  metaNoteDetailClass,
+  monoClass,
+  mutedCopyClass,
+  tabsClass,
+} from '../lib/ui-classes';
 
 /** Extract a human-readable message from any rejection reason (Error, ApiError, or unknown). */
 function reasonMessage(reason: unknown): string {
@@ -788,21 +852,21 @@ function renderMarkdown(text: string): React.JSX.Element {
     if (line.startsWith('### ')) {
       flushList();
       elements.push(
-        <h4 key={i} className="md-heading md-heading-sm">
+        <h4 key={i} className={mdHeadingSmClass}>
           {inlineFormat(line.slice(4))}
         </h4>,
       );
     } else if (line.startsWith('## ')) {
       flushList();
       elements.push(
-        <h3 key={i} className="md-heading md-heading-md">
+        <h3 key={i} className={mdHeadingMdClass}>
           {inlineFormat(line.slice(3))}
         </h3>,
       );
     } else if (line.startsWith('# ')) {
       flushList();
       elements.push(
-        <h2 key={i} className="md-heading md-heading-lg">
+        <h2 key={i} className={mdHeadingLgClass}>
           {inlineFormat(line.slice(2))}
         </h2>,
       );
@@ -814,7 +878,7 @@ function renderMarkdown(text: string): React.JSX.Element {
       flushList();
       if (line.trim()) {
         elements.push(
-          <p key={i} className="md-paragraph">
+          <p key={i} className={mdParagraphClass}>
             {inlineFormat(line)}
           </p>,
         );
@@ -890,16 +954,16 @@ const ToolCatalogPanel = React.memo(function ToolCatalogPanel({
         {expanded ? 'Hide catalog' : 'Show all tools'}
       </Button>
       {expanded && (
-        <div className="tool-catalog-wrap">
+        <div className={toolCatalogWrapClass}>
           {groupedTools.map((group) => (
-            <div key={group.category} className="tool-catalog-group">
-              <h4 className="tool-catalog-heading">{group.category}</h4>
-              <div className="tool-catalog-grid">
+            <div key={group.category} className={toolCatalogGroupClass}>
+              <h4 className={toolCatalogHeadingClass}>{group.category}</h4>
+              <div className={toolCatalogGridClass}>
                 {group.tools.map((t) => (
-                  <div key={t.name} className="tool-catalog-item">
-                    <code className="tool-catalog-name">{t.name}</code>
-                    <span className="tool-catalog-description">{t.description}</span>
-                    {t.argHint && <span className="tool-catalog-hint">({t.argHint})</span>}
+                  <div key={t.name} className={toolCatalogItemClass}>
+                    <code className={toolCatalogNameClass}>{t.name}</code>
+                    <span className={toolCatalogDescriptionClass}>{t.description}</span>
+                    {t.argHint && <span className={toolCatalogHintClass}>({t.argHint})</span>}
                   </div>
                 ))}
               </div>
@@ -1446,8 +1510,8 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   return (
-    <div className="stack">
-      <div className="two-col">
+    <div className={stackClass}>
+      <div className={twoColClass}>
         <Card title="Connect MCP session" subtitle="Step 1: initialize a session on /mcp.">
           <InlineGroup>
             <Button id="connectBtn" disabled={connecting || tokenMissing} onClick={connect}>
@@ -1479,7 +1543,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   : 'Schema unavailable for this tool.'
               }
             >
-              <div className="tabs" role="tablist" aria-label="Arguments mode">
+              <div className={tabsClass} role="tablist" aria-label="Arguments mode">
                 <TabButton
                   id={schemaArgsTabId}
                   ref={(node) => {
@@ -1513,7 +1577,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
               aria-labelledby={schemaArgsTabId}
               hidden={argsMode !== 'schema' || !hasSchemaFields}
             >
-              <div className="grid-compact">
+              <div className={gridCompactClass}>
                 {schemaFields.map((field) => (
                   <FormField
                     key={field.name}
@@ -1534,7 +1598,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                     ) : field.type === 'array' || field.type === 'object' ? (
                       <Textarea
                         id={`arg-${field.name}`}
-                        className="mono"
+                        className={monoClass}
                         rows={3}
                         value={
                           typeof schemaValues[field.name] === 'string'
@@ -1582,7 +1646,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
               >
                 <Textarea
                   id="chatArguments"
-                  className="mono"
+                  className={monoClass}
                   rows={8}
                   value={rawArguments}
                   onChange={(event) => setRawArguments(event.target.value)}
@@ -1605,7 +1669,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             <Button id="sendBtn" type="submit" disabled={sending || tokenMissing}>
               {sending ? `Sending... (${elapsed}s)` : 'Send'}
             </Button>
-            <span className="hint hint-inline">⌘/Ctrl+Enter</span>
+            <span className={hintInlineClass}>⌘/Ctrl+Enter</span>
             <StatusBanner
               id="chatStatus"
               message={chatStatus.status}
@@ -1655,7 +1719,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           </InlineGroup>
         </FormField>
         {selectedJobId ? (
-          <p className="hint hint-tight">
+          <p className={hintTightClass}>
             Deep link: <code>/app/playground?jobId={selectedJobId}</code>
           </p>
         ) : null}
@@ -1665,13 +1729,13 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           type={operatorStatus.statusType}
         />
         {operatorBackoff.blocked ? (
-          <p className="hint" role="status">
+          <p className={hintClass} role="status">
             Rate limited ({operatorBackoff.secondsLeft}s). Wait for the timer, then retry
             status/cancel/result actions.
           </p>
         ) : null}
 
-        <div className="async-job-list">
+        <div className={asyncJobListClass}>
           {trackedJobList.length === 0 ? (
             <EmptyState message="No async jobs tracked yet. Enable async mode and send a tool call." />
           ) : (
@@ -1684,13 +1748,13 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   size="compact"
                   aria-pressed={selectedJobId === entry.job.id}
                   onClick={() => setDeepLinkedJob(entry.job.id)}
-                  className={`async-job-item ${selectedJobId === entry.job.id ? 'active' : ''}`.trim()}
+                  className={asyncJobItemClassName(selectedJobId === entry.job.id)}
                 >
-                  <div className="async-job-item-header">
+                  <div className={asyncJobItemHeaderClass}>
                     <strong>{entry.job.id}</strong>
                     <StatusPill tone={asyncStatusTone(entry.job.status)}>{meta.label}</StatusPill>
                   </div>
-                  <div className="hint">
+                  <div className={hintClass}>
                     {entry.job.toolName} • attempts {entry.job.attempts.current}/
                     {entry.job.attempts.max}
                   </div>
@@ -1701,22 +1765,22 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         </div>
 
         {selectedJobId ? (
-          <div className="async-job-detail">
-            <h4 className="async-job-heading">Job detail: {selectedJobId}</h4>
+          <div className={asyncJobDetailClass}>
+            <h4 className={asyncJobHeadingClass}>Job detail: {selectedJobId}</h4>
             {selectedTrackedJob ? (
               <>
-                <InlineGroup className="async-job-meta">
+                <InlineGroup className={asyncJobMetaClass}>
                   <StatusPill tone={asyncStatusTone(selectedTrackedJob.job.status)}>
                     {ASYNC_STATUS_META[selectedTrackedJob.job.status].label}
                   </StatusPill>
-                  <span className="hint">
+                  <span className={hintClass}>
                     {ASYNC_STATUS_META[selectedTrackedJob.job.status].summary}
                   </span>
                   {selectedTrackedJob.job.cancellationRequested ? (
-                    <span className="hint">Cancellation requested.</span>
+                    <span className={hintClass}>Cancellation requested.</span>
                   ) : null}
                 </InlineGroup>
-                <p className="hint">
+                <p className={hintClass}>
                   Created {selectedTrackedJob.job.createdAt} • Updated{' '}
                   {selectedTrackedJob.job.updatedAt} • Expires {selectedTrackedJob.job.expiresAt}
                 </p>
@@ -1767,19 +1831,19 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                     code={
                       selectedTrackedJob.latestError ?? selectedTrackedJob.job.error?.message ?? ''
                     }
-                    className="mono async-job-result"
+                    className={asyncJobResultClass}
                   />
                 ) : null}
                 {'latestResult' in selectedTrackedJob ? (
                   <CodeSurface
                     code={JSON.stringify(selectedTrackedJob.latestResult, null, 2)}
-                    className="mono async-job-result"
+                    className={asyncJobResultClass}
                   />
                 ) : null}
               </>
             ) : (
               <InlineGroup>
-                <p className="hint">No local snapshot yet for this job ID.</p>
+                <p className={hintClass}>No local snapshot yet for this job ID.</p>
                 <Button
                   type="button"
                   variant="secondary"
@@ -1983,7 +2047,7 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       {/* Presets */}
       <Card
         title="AI Chat — MCP vs Plain AI"
@@ -1991,10 +2055,10 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       >
         {turnstile.enabled ? (
           <>
-            <p className="muted">
+            <p className={mutedCopyClass}>
               Cloudflare Turnstile protects hosted browser AI access on this worker.
             </p>
-            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+            <div className={turnstileWrapClass} ref={turnstile.containerRef} />
             <InlineGroup gap="tight">
               <Badge tone={turnstile.status === 'verified' ? 'ok' : 'neutral'}>
                 {describeTurnstileStatus(turnstile.status, turnstile.error)}
@@ -2014,8 +2078,8 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           ))}
         </InlineGroup>
         {recentPrompts.length > 0 && (
-          <div className="recent-prompts">
-            <div className="hint">Recent prompts</div>
+          <div className={recentPromptsClass}>
+            <div className={hintClass}>Recent prompts</div>
             <InlineGroup gap="tight">
               {recentPrompts.map((prompt) => (
                 <Button
@@ -2034,10 +2098,10 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       </Card>
 
       {/* Chat thread */}
-      <div className="chat-stream">
+      <div className={chatStreamClass}>
         {messages.length === 0 && (
           <EmptyState
-            className="chat-empty-state"
+            className={chatEmptyStateClass}
             icon="💬"
             message="Start a conversation! Ask a legal question and see how MCP-powered AI compares to a plain LLM."
             hint="Try a preset above or type your own question below."
@@ -2046,8 +2110,8 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         {messages.map((msg) => {
           if (msg.role === 'user') {
             return (
-              <div key={msg.id} className="chat-user-row">
-                <div className="chat-user-bubble">{msg.prompt}</div>
+              <div key={msg.id} className={chatUserRowClass}>
+                <div className={chatUserBubbleClass}>{msg.prompt}</div>
               </div>
             );
           }
@@ -2056,8 +2120,8 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           }
           if (msg.role === 'comparison') {
             return (
-              <div key={msg.id} className="chat-comparison-item">
-                <div className="comparison-grid">
+              <div key={msg.id} className={chatComparisonItemClass}>
+                <div className={comparisonGridClass}>
                   <ComparisonCard
                     icon="🔌"
                     title="With MCP Tools"
@@ -2073,7 +2137,7 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                           <span aria-hidden="true">🔧</span>
                           <strong>{msg.mcpTool}</strong>
                           {msg.mcpToolReason ? (
-                            <span className="meta-note-detail">{msg.mcpToolReason}</span>
+                            <span className={metaNoteDetailClass}>{msg.mcpToolReason}</span>
                           ) : null}
                           {msg.mcpFallback ? <Badge tone="warn">Fallback</Badge> : null}
                         </MetaNote>
@@ -2095,7 +2159,7 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   </ComparisonCard>
                 </div>
                 {msg.latencyMs != null && (
-                  <div className="comparison-latency">⏱ {msg.latencyMs}ms</div>
+                  <div className={comparisonLatencyClass}>⏱ {msg.latencyMs}ms</div>
                 )}
               </div>
             );
@@ -2113,8 +2177,8 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             void sendAiChat();
           }}
         >
-          <InlineGroup className="chat-controls-row">
-            <FormField id="ai-chat-tool" label="MCP Tool" compact className="chat-control-grow">
+          <InlineGroup className={chatControlsRowClass}>
+            <FormField id="ai-chat-tool" label="MCP Tool" compact className={chatControlGrowClass}>
               <ToolSelect
                 id="ai-chat-tool"
                 value={aiToolName}
@@ -2123,7 +2187,12 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                 tools={tools}
               />
             </FormField>
-            <FormField id="ai-chat-mode" label="Cost mode" compact className="chat-control-fixed">
+            <FormField
+              id="ai-chat-mode"
+              label="Cost mode"
+              compact
+              className={chatControlFixedClass}
+            >
               <Select
                 id="ai-chat-mode"
                 value={aiMode}
@@ -2134,14 +2203,14 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
               </Select>
             </FormField>
             {chatHistory.length > 0 && (
-              <div className="chat-control-action">
+              <div className={chatControlActionClass}>
                 <Button variant="secondary" size="tiny" onClick={clearConversation}>
                   🗑 Clear ({chatHistory.length / 2} turn{chatHistory.length > 2 ? 's' : ''})
                 </Button>
               </div>
             )}
           </InlineGroup>
-          <div className="chat-input-row">
+          <div className={chatInputRowClass}>
             <Textarea
               id="aiChatPrompt"
               rows={2}
@@ -2152,9 +2221,9 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   ? 'Ask a follow-up question...'
                   : 'Ask a legal research question...'
               }
-              className="chat-input-textarea"
+              className={chatInputTextareaClass}
             />
-            <Button type="submit" disabled={aiRunning} className="chat-send-btn">
+            <Button type="submit" disabled={aiRunning} className={chatSendBtnClass}>
               {aiRunning ? `${elapsed}s...` : 'Send'}
             </Button>
           </div>
@@ -2303,12 +2372,12 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <Card
         title="Side-by-Side Comparison"
         subtitle="Send the same prompt with and without MCP tools to see the difference real-time legal data makes."
       >
-        <InlineGroup gap="tight" className="compare-presets">
+        <InlineGroup gap="tight" className={comparePresetsClass}>
           {AI_PRESETS.slice(0, 4).map((p) => (
             <Button key={p.label} variant="secondary" size="compact" onClick={() => applyPreset(p)}>
               {p.icon} {p.label}
@@ -2350,7 +2419,7 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       </Card>
 
       {results.length === 2 && (
-        <div className="comparison-grid comparison-grid-wide">
+        <div className={comparisonGridWideClass}>
           {results.map((r) => (
             <ComparisonCard
               key={r.label}
@@ -2371,7 +2440,9 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
                   <MetaNote size="large">
                     <span aria-hidden="true">🔧</span>
                     <strong>{r.tool}</strong>
-                    {r.toolReason ? <span className="meta-note-detail">{r.toolReason}</span> : null}
+                    {r.toolReason ? (
+                      <span className={metaNoteDetailClass}>{r.toolReason}</span>
+                    ) : null}
                   </MetaNote>
                 ) : undefined
               }
@@ -2384,7 +2455,7 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
       {results.length === 2 && (
         <Card title="What this shows">
-          <p className="comparison-summary">
+          <p className={comparisonSummaryClass}>
             <strong>With MCP:</strong> The AI queried CourtListener&apos;s live database via the
             Model Context Protocol, retrieving real case data, citations, and metadata before
             generating its response.
@@ -2421,8 +2492,6 @@ const TranscriptEntry = React.memo(
   }): React.JSX.Element {
     const [copied, setCopied] = React.useState(false);
     const style = ROLE_STYLES[item.role] || ROLE_STYLES.system;
-    const roleClassName = ROLE_STYLES[item.role] ? item.role : 'system';
-
     function copyText(): void {
       void navigator.clipboard.writeText(item.text).then(() => {
         setCopied(true);
@@ -2438,14 +2507,14 @@ const TranscriptEntry = React.memo(
     );
 
     return (
-      <div className={`line transcript-entry ${roleClassName}`.trim()}>
-        <InlineGroup gap="tight" className="transcript-entry-header">
+      <div className={transcriptEntryClassName(item.role)}>
+        <InlineGroup gap="tight" className={transcriptEntryHeaderClass}>
           <span>{style.icon}</span>
-          <strong className="transcript-entry-role">{item.role}</strong>
-          <span className="transcript-entry-time">{item.at.split('T')[1]?.split('.')[0]}</span>
+          <strong className={transcriptEntryRoleClass}>{item.role}</strong>
+          <span className={transcriptEntryTimeClass}>{item.at.split('T')[1]?.split('.')[0]}</span>
           <IconButton
             chrome="inline"
-            className="transcript-entry-action"
+            className={transcriptEntryActionClass}
             onClick={copyText}
             title="Copy to clipboard"
             aria-label="Copy to clipboard"
@@ -2458,7 +2527,7 @@ const TranscriptEntry = React.memo(
             </Button>
           )}
         </InlineGroup>
-        <div className="transcript-entry-body">{bodyContent}</div>
+        <div className={transcriptEntryBodyClass}>{bodyContent}</div>
       </div>
     );
   },
@@ -2487,14 +2556,16 @@ function ProtocolInspector(): React.JSX.Element {
         </Button>
       </InlineGroup>
       {expanded && (
-        <div className="protocol-log">
+        <div className={protocolLogClass}>
           {protocolLog.map((entry, i) => (
-            <div key={i} className={`protocol-entry ${entry.direction}`.trim()}>
-              <div className={`protocol-entry-heading ${entry.direction}`.trim()}>
+            <div key={i} className={protocolEntryClassName(entry.direction)}>
+              <div className={protocolEntryHeadingClassName(entry.direction)}>
                 {entry.direction === 'request' ? '→ REQUEST' : '← RESPONSE'}{' '}
-                <span className="protocol-entry-time">{entry.at.split('T')[1]?.split('.')[0]}</span>
+                <span className={protocolEntryTimeClass}>
+                  {entry.at.split('T')[1]?.split('.')[0]}
+                </span>
               </div>
-              <pre className="mono protocol-entry-payload">
+              <pre className={protocolEntryPayloadClass}>
                 {JSON.stringify(entry.payload, null, 2)}
               </pre>
             </div>
@@ -2636,7 +2707,7 @@ function PlaygroundContent(): React.JSX.Element {
     mcpSessionId.length > 0 ? `Session ${mcpSessionId.slice(0, 8)}…` : 'No active MCP session';
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <HeroPanel
         eyebrow="Operator workspace"
         title="Playground"
@@ -2655,12 +2726,10 @@ function PlaygroundContent(): React.JSX.Element {
           </InlineGroup>
         }
         aside={
-          <div className="page-hero-note">
-            <strong className="page-hero-note-title">Live workspace posture</strong>
-            <p className="page-hero-note-text">
-              Use AI Chat for guided research, Compare for quality checks, and Raw MCP Console when
-              you need direct protocol control.
-            </p>
+          <PageHeroNote
+            title="Live workspace posture"
+            description="Use AI Chat for guided research, Compare for quality checks, and Raw MCP Console when you need direct protocol control."
+          >
             <KeyValueList
               entries={[
                 { label: 'Session', value: sessionLabel },
@@ -2668,7 +2737,7 @@ function PlaygroundContent(): React.JSX.Element {
                 { label: 'Active tab', value: activeTabLabel },
               ]}
             />
-          </div>
+          </PageHeroNote>
         }
       />
 
@@ -2697,7 +2766,7 @@ function PlaygroundContent(): React.JSX.Element {
         />
       )}
 
-      <InlineGroup className="playground-mode-summary">
+      <InlineGroup className={playgroundModeSummaryClass}>
         <ConnectionBadge
           connected={mcpSessionId.length > 0}
           connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
@@ -2707,7 +2776,7 @@ function PlaygroundContent(): React.JSX.Element {
       </InlineGroup>
 
       <div
-        className="tabs"
+        className={tabsClass}
         role="tablist"
         aria-label="Playground mode"
         aria-orientation="horizontal"
@@ -2770,7 +2839,7 @@ function PlaygroundContent(): React.JSX.Element {
       {/* Transcript for Raw MCP Console */}
       {activeTab === 'raw' && (
         <Card title="Transcript">
-          <div className="transcript mono" ref={transcriptRef}>
+          <div className={transcriptPanelClass} ref={transcriptRef}>
             {transcript.length === 0 ? (
               <EmptyState icon="📋" message="No messages yet. Connect and call a tool above." />
             ) : null}
@@ -2798,7 +2867,7 @@ function PlaygroundContent(): React.JSX.Element {
           title="Raw MCP Response"
           subtitle="Debug: what the MCP tool returned before AI processing."
         >
-          <CodeSurface code={lastRawMcp} className="mono" />
+          <CodeSurface code={lastRawMcp} className={monoClass} />
         </Card>
       ) : null}
     </div>

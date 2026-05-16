@@ -23,6 +23,53 @@ import {
   getWorkspaceSecondaryNavSections,
   getWorkspaceMeta,
 } from '../lib/workspace-shell';
+import {
+  accountMenuActionClass,
+  accountMenuClass,
+  accountMenuPanelClassName,
+  accountMenuPrimaryClass,
+  accountMenuTriggerBadgeClass,
+  accountMenuTriggerClassName,
+  accountMenuTriggerIconClass,
+  accountStatusBlockClass,
+  accountStatusDetailClass,
+  accountStatusEyebrowClass,
+  accountStatusTitleClass,
+  appSidebarBrandBlockClass,
+  appSidebarBrandMarkClass,
+  appSidebarHeaderClass,
+  menuGroupClassName,
+  menuGroupDisclosureClass,
+  menuGroupHeaderClass,
+  menuGroupLabelClassName,
+  menuGroupToggleIconClass,
+  mobileMenuBtnClass,
+  mobileSidebarBackdropClass,
+  mobileSidebarCloseClass,
+  navCardLinkMetaClass,
+  navCardLinkTextClass,
+  shellMainColumnClass,
+  shellMenuClass,
+  sidebarSecondaryLabelClassName,
+  sidebarSecondaryLinksClassName,
+  sidebarSecondaryNavLinkClassName,
+  sidebarSecondarySectionClassName,
+  srOnlyClass,
+  themeToggleButtonClass,
+  themeToggleIconClass,
+  topActionsUtilityClass,
+  topbarActionsClass,
+  topbarContextClass,
+  topbarContextDescriptionClass,
+  topbarContextShellClass,
+  topbarContextValueClass,
+  workspaceContentClass,
+  workspaceMainLayoutClass,
+  workspaceShellClass,
+  workspaceSidebarClassName,
+  workspaceStatusStackClass,
+  workspaceTopbarClass,
+} from '../lib/shell-classes';
 
 const LEGACY_SIDEBAR_COLLAPSED_STORAGE_KEY = 'clmcp_workspace_sidebar_collapsed';
 const DESKTOP_NAV_MEDIA_QUERY = '(min-width: 1101px)';
@@ -316,8 +363,8 @@ export function Shell(
   ) => {
     const content = (
       <>
-        <span className="nav-card-link-text">{item.label}</span>
-        {item.external ? <span className="nav-card-link-meta">New tab</span> : null}
+        <span className={navCardLinkTextClass}>{item.label}</span>
+        {item.external ? <span className={navCardLinkMetaClass}>New tab</span> : null}
       </>
     );
 
@@ -343,13 +390,13 @@ export function Shell(
   };
 
   return (
-    <div className="workspace-shell">
+    <div className={workspaceShellClass}>
       <SkipLink href="#main-content">Skip to content</SkipLink>
-      <div className="workspace-main-layout">
+      <div className={workspaceMainLayoutClass}>
         {sidebarOpen ? (
           <button
             type="button"
-            className="mobile-sidebar-backdrop"
+            className={mobileSidebarBackdropClass}
             aria-label="Close navigation menu"
             onClick={() => setSidebarOpen(false)}
           />
@@ -357,106 +404,98 @@ export function Shell(
         <aside
           id="primary-navigation"
           ref={sidebarRef}
-          className={`workspace-sidebar ${sidebarOpen ? 'open' : ''}`.trim()}
+          className={workspaceSidebarClassName(sidebarOpen)}
         >
-          <div className="app-sidebar-header">
-            <div className="app-sidebar-brand-block">
+          <div className={appSidebarHeaderClass}>
+            <div className={appSidebarBrandBlockClass}>
               <BrandLink
                 to="/app"
+                tone="shell"
                 label="CourtListener MCP"
                 subtitle="Operator workspace"
-                icon={<span className="app-sidebar-brand-mark">CL</span>}
+                icon={<span className={appSidebarBrandMarkClass}>CL</span>}
               />
             </div>
             <Button
               variant="secondary"
               size="compact"
-              className="mobile-sidebar-close"
+              className={mobileSidebarCloseClass}
               onClick={() => setSidebarOpen(false)}
               aria-label="Close navigation menu"
             >
               Close
             </Button>
           </div>
-          <div className="menu">
-            {navGroups.map((group) => (
-              <div
-                key={group.id}
-                className={`menu-group ${
-                  group.items.some((item) => isRouteMatch(item.to, item.external))
-                    ? 'menu-group-active'
-                    : ''
-                }`.trim()}
-              >
-                <div className="menu-group-header">
+          <div className={shellMenuClass}>
+            {navGroups.map((group) => {
+              const groupActive = group.items.some((item) => isRouteMatch(item.to, item.external));
+              return (
+                <div key={group.id} className={menuGroupClassName(groupActive)}>
+                  <div className={menuGroupHeaderClass}>
+                    {(() => {
+                      const isGroupExpanded = groupActive || expandedGroups[group.id] === true;
+
+                      return group.collapsible && !isDesktopNav ? (
+                        <button
+                          type="button"
+                          className={menuGroupDisclosureClass}
+                          aria-expanded={isGroupExpanded}
+                          aria-label={`${isGroupExpanded ? 'Collapse' : 'Expand'} ${group.label} section`}
+                          onClick={() =>
+                            setExpandedGroups((previous) => ({
+                              ...previous,
+                              [group.id]: previous[group.id] !== true,
+                            }))
+                          }
+                        >
+                          <span className={menuGroupLabelClassName(groupActive)}>
+                            {group.label}
+                          </span>
+                          <span className={menuGroupToggleIconClass} aria-hidden="true">
+                            {isGroupExpanded ? '▾' : '▸'}
+                          </span>
+                        </button>
+                      ) : (
+                        <p className={menuGroupLabelClassName(groupActive)}>{group.label}</p>
+                      );
+                    })()}
+                  </div>
                   {(() => {
-                    const isGroupExpanded =
+                    const groupExpanded =
+                      isDesktopNav ||
+                      !group.collapsible ||
                       group.items.some((item) => isRouteMatch(item.to, item.external)) ||
                       expandedGroups[group.id] === true;
+                    const visibleItems = groupExpanded ? group.items : [];
 
-                    return group.collapsible && !isDesktopNav ? (
-                      <button
-                        type="button"
-                        className="menu-group-disclosure"
-                        aria-expanded={isGroupExpanded}
-                        aria-label={`${isGroupExpanded ? 'Collapse' : 'Expand'} ${group.label} section`}
-                        onClick={() =>
-                          setExpandedGroups((previous) => ({
-                            ...previous,
-                            [group.id]: previous[group.id] !== true,
-                          }))
-                        }
-                      >
-                        <span className="menu-group-label">{group.label}</span>
-                        <span className="menu-group-toggle-icon" aria-hidden="true">
-                          {isGroupExpanded ? '▾' : '▸'}
-                        </span>
-                      </button>
-                    ) : (
-                      <p className="menu-group-label">{group.label}</p>
+                    return (
+                      <>
+                        {visibleItems.map((item) =>
+                          renderWorkspaceLink(item, { end: item.to === '/app' }),
+                        )}
+                      </>
                     );
                   })()}
                 </div>
-                {(() => {
-                  const groupExpanded =
-                    isDesktopNav ||
-                    !group.collapsible ||
-                    group.items.some((item) => isRouteMatch(item.to, item.external)) ||
-                    expandedGroups[group.id] === true;
-                  const visibleItems = groupExpanded ? group.items : [];
-
-                  return (
-                    <>
-                      {visibleItems.map((item) =>
-                        renderWorkspaceLink(item, { end: item.to === '/app' }),
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            ))}
+              );
+            })}
           </div>
           {secondaryNavSections.map((section) => (
-            <div
-              key={section.id}
-              className={`sidebar-secondary-section sidebar-${section.variant}`.trim()}
-            >
-              <p className={`sidebar-secondary-label sidebar-${section.variant}-label`.trim()}>
-                {section.label}
-              </p>
-              <div className={`sidebar-secondary-links sidebar-${section.variant}-links`.trim()}>
+            <div key={section.id} className={sidebarSecondarySectionClassName(section.variant)}>
+              <p className={sidebarSecondaryLabelClassName(section.variant)}>{section.label}</p>
+              <div className={sidebarSecondaryLinksClassName(section.variant)}>
                 {section.items.map((item) =>
                   renderWorkspaceLink(item, {
-                    className: `sidebar-secondary-link ${section.variant}-nav-link`,
+                    className: sidebarSecondaryNavLinkClassName(section.variant),
                   }),
                 )}
               </div>
             </div>
           ))}
         </aside>
-        <div className="shell-main-column">
+        <div className={shellMainColumnClass}>
           {!online || showRecoveryBanner ? (
-            <div className="workspace-status-stack">
+            <div className={workspaceStatusStackClass}>
               {!online && (
                 <StatusBanner message="You're offline — changes may not save." type="warn" />
               )}
@@ -483,19 +522,21 @@ export function Shell(
               ) : null}
             </div>
           ) : null}
-          <header className="workspace-topbar">
-            <div className="topbar-context-shell" aria-label="Current workspace route">
-              <div className="topbar-context">
-                <strong className="topbar-context-value">{currentWorkspace.label}</strong>
-                <span className="topbar-context-description">{currentWorkspace.description}</span>
+          <header className={workspaceTopbarClass}>
+            <div className={topbarContextShellClass} aria-label="Current workspace route">
+              <div className={topbarContextClass}>
+                <strong className={topbarContextValueClass}>{currentWorkspace.label}</strong>
+                <span className={topbarContextDescriptionClass}>
+                  {currentWorkspace.description}
+                </span>
               </div>
             </div>
-            <div className="topbar-actions" role="group" aria-label="Workspace utilities">
-              <InlineGroup className="top-actions top-actions-utility">
+            <div className={topbarActionsClass} role="group" aria-label="Workspace utilities">
+              <InlineGroup className={topActionsUtilityClass}>
                 <Button
                   variant="secondary"
                   size="compact"
-                  className="mobile-menu-btn toolbar-button toolbar-utility-button"
+                  className={mobileMenuBtnClass}
                   onClick={() => setSidebarOpen((value) => !value)}
                   aria-label="Toggle navigation menu"
                   aria-expanded={sidebarOpen}
@@ -506,24 +547,25 @@ export function Shell(
                 <Button
                   variant="secondary"
                   size="compact"
-                  className="toolbar-button toolbar-utility-button theme-toggle"
+                  className={themeToggleButtonClass}
                   onClick={toggleTheme}
                   aria-label={`Switch to ${scheme === 'light' ? 'dark' : 'light'} mode`}
                 >
-                  <span className="theme-toggle-icon" aria-hidden="true">
+                  <span className={themeToggleIconClass} aria-hidden="true">
                     {scheme === 'light' ? '☾' : '☀'}
                   </span>
-                  <span className="sr-only">
+                  <span className={srOnlyClass}>
                     Switch to {scheme === 'light' ? 'dark' : 'light'} mode
                   </span>
                 </Button>
-                <div className="account-menu" ref={accountMenuRef}>
+                <div className={accountMenuClass} ref={accountMenuRef}>
                   <Button
                     variant="secondary"
                     size="compact"
-                    className={`toolbar-button account-menu-trigger ${
-                      showRecoveryBanner ? 'warning' : ''
-                    } ${accountMenuOpen ? 'open' : ''}`.trim()}
+                    className={accountMenuTriggerClassName({
+                      open: accountMenuOpen,
+                      warning: showRecoveryBanner,
+                    })}
                     aria-label={
                       showRecoveryBanner ? 'Account — action needed' : accountTriggerLabel
                     }
@@ -537,12 +579,12 @@ export function Shell(
                     }
                   >
                     {showRecoveryBanner ? (
-                      <span className="account-menu-trigger-badge" aria-hidden="true">
+                      <span className={accountMenuTriggerBadgeClass} aria-hidden="true">
                         !
                       </span>
                     ) : null}
                     <span>{accountTriggerLabel}</span>
-                    <span className="account-menu-trigger-icon" aria-hidden="true">
+                    <span className={accountMenuTriggerIconClass} aria-hidden="true">
                       ▾
                     </span>
                   </Button>
@@ -550,23 +592,23 @@ export function Shell(
                     <div
                       id="account-panel"
                       ref={accountMenuPanelRef}
-                      className={`account-menu-panel ${showRecoveryBanner ? 'warning' : ''}`.trim()}
+                      className={accountMenuPanelClassName(showRecoveryBanner)}
                       role="group"
                       aria-label="Account panel"
                     >
-                      <div className="account-status-block" role="status" aria-live="polite">
-                        <p className="account-status-eyebrow">{accountStatusEyebrow}</p>
-                        <p className="account-status-title">{accountStatusTitle}</p>
-                        <p className="account-status-detail">{accountStatusDetail}</p>
+                      <div className={accountStatusBlockClass} role="status" aria-live="polite">
+                        <p className={accountStatusEyebrowClass}>{accountStatusEyebrow}</p>
+                        <p className={accountStatusTitleClass}>{accountStatusTitle}</p>
+                        <p className={accountStatusDetailClass}>{accountStatusDetail}</p>
                       </div>
-                      <div className="account-menu-primary">
+                      <div className={accountMenuPrimaryClass}>
                         {loading ? null : authed ? (
                           <>
                             <ButtonLink
                               to="/app/account"
                               variant="primary"
                               size="compact"
-                              className="account-menu-action"
+                              className={accountMenuActionClass}
                             >
                               Open account
                             </ButtonLink>
@@ -574,7 +616,7 @@ export function Shell(
                               to="/app/credentials"
                               variant="secondary"
                               size="compact"
-                              className="account-menu-action"
+                              className={accountMenuActionClass}
                             >
                               Open credentials
                             </ButtonLink>
@@ -582,7 +624,7 @@ export function Shell(
                               id="logoutBtn"
                               variant="secondary"
                               size="compact"
-                              className="account-menu-action"
+                              className={accountMenuActionClass}
                               onClick={handleLogout}
                             >
                               Log out
@@ -594,7 +636,7 @@ export function Shell(
                               href={authStartHref}
                               variant="primary"
                               size="compact"
-                              className="account-menu-action"
+                              className={accountMenuActionClass}
                             >
                               {showRecoveryBanner ? 'Sign in to recover account' : 'Sign in'}
                             </ButtonLink>
@@ -602,7 +644,7 @@ export function Shell(
                               to="/app/account"
                               variant="secondary"
                               size="compact"
-                              className="account-menu-action"
+                              className={accountMenuActionClass}
                             >
                               Open account
                             </ButtonLink>
@@ -615,7 +657,7 @@ export function Shell(
               </InlineGroup>
             </div>
           </header>
-          <main id="main-content" ref={mainRef} tabIndex={-1} className="workspace-content">
+          <main id="main-content" ref={mainRef} tabIndex={-1} className={workspaceContentClass}>
             {props.children}
           </main>
         </div>

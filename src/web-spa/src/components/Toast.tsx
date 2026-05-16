@@ -1,4 +1,5 @@
 import React from 'react';
+import { toastClassName, toastContainerClass, toastDismissClass } from '../lib/toast-classes';
 import { IconButton } from './ui';
 import { ToastContext } from './toast-context';
 
@@ -36,13 +37,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-container" aria-live="polite" role="status">
+      <div className={toastContainerClass} aria-live="polite" role="status">
         {items.map((item) => (
-          <div key={item.id} className={`toast toast-${item.type}`}>
+          <div key={item.id} className={toastClassName(item.type)}>
             <span>{item.message}</span>
             <IconButton
               chrome="inline"
-              className="toast-dismiss"
+              className={toastDismissClass}
               onClick={() => setItems((prev) => prev.filter((t) => t.id !== item.id))}
               aria-label="Dismiss notification"
             >
