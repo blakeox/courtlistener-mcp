@@ -9,6 +9,9 @@ interface TestEnv {
   MCP_UI_SESSION_SECRET?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  MCP_TURNSTILE_ENFORCED_ROUTES?: string;
 }
 
 function jsonError(
@@ -112,6 +115,7 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
     },
     workerDurableRuntime: {
       consumeBrowserBootstrapHandoff: async () => ({ kind: 'ok', value: true }),
+      recordUserUiEvent: async () => undefined,
     },
     getCachedSessionTopology: () => ({
       version: 'v2',
@@ -123,6 +127,8 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
     getWorkerLatencySnapshot: () => ({ routes: {} }),
     getUsageSnapshot: async () => ({ userId: 'user-1', count: 3 }),
     now: () => 1700000000000,
+    getClientIdentifier: () => '127.0.0.1',
+    recordTurnstileVerdict: () => undefined,
     ...overrides,
   };
 }
@@ -183,6 +189,12 @@ describe('handleWorkerCoreRoutes', () => {
         },
       },
     });
+    assert.deepEqual(payload.cloudflare, {
+      analytics_enabled: false,
+      async_queue_configured: false,
+      async_jobs_kv_configured: false,
+      turnstile_enforced_routes: [],
+    });
   });
 
   it('returns session status through the core route layer', async () => {
@@ -196,6 +208,20 @@ describe('handleWorkerCoreRoutes', () => {
     assert.deepEqual(payload.user, { id: 'user-1' });
     assert.equal(payload.session_authenticated, true);
     assert.equal(payload.bearer_authenticated, true);
+    assert.equal(payload.turnstile_site_key, null);
+  });
+
+  it('returns turnstile site key in session payload when configured', async () => {
+    const response = await handleWorkerCoreRoutes(
+      {
+        ...buildContext('/api/session'),
+        env: { TURNSTILE_SITE_KEY: 'site-key-1' },
+      },
+      buildDeps(),
+    );
+    const payload = (await response?.json()) as Record<string, unknown>;
+
+    assert.equal(payload.turnstile_site_key, 'site-key-1');
   });
 
   it('does not report a healthy browser session when only bearer auth is available', async () => {
@@ -342,6 +368,164 @@ describe('handleWorkerCoreRoutes', () => {
       response?.headers.get('access-control-allow-origin'),
       'https://auth.courtlistenermcp.blakeoxford.com',
     );
+  });
+
+  it('blocks bootstrap when Turnstile is enforced and token is missing', async () => {
+    const request = new Request('https://worker.example/api/session/bootstrap', {
+      method: 'POST',
+    });
+
+    const response = await handleWorkerCoreRoutes(
+      {
+        request,
+        url: new URL(request.url),
+        origin: null,
+        allowedOrigins: ['https://chatgpt.com'],
+        env: {
+          MCP_UI_SESSION_SECRET: 'session-secret',
+          TURNSTILE_SITE_KEY: 'site-key-1',
+          TURNSTILE_SECRET_KEY: 'secret-key-1',
+          MCP_TURNSTILE_ENFORCED_ROUTES: 'session_bootstrap',
+        },
+        ctx: {} as ExecutionContext,
+        pathname: '/api/session/bootstrap',
+        requestMethod: 'POST',
+        mcpPath: false,
+      },
+      buildDeps(),
+    );
+
+    assert.equal(response?.status, 403);
+    const payload = (await response?.json()) as { error_code?: string };
+    assert.equal(payload.error_code, 'turnstile_token_missing');
+  });
+
+  it('accepts allowlisted UI telemetry events and records them to the telemetry sink', async () => {
+    const request = new Request('https://worker.example/api/telemetry', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://chatgpt.com',
+      },
+      body: JSON.stringify({
+        name: 'browser_session_bootstrap_succeeded',
+        route: '/app/account',
+        outcome: 'success',
+      }),
+    });
+    const recorded: Array<{
+      eventName: string;
+      userId: string | null;
+      route: string;
+      outcome: string;
+    }> = [];
+
+    const response = await handleWorkerCoreRoutes(
+      {
+        request,
+        url: new URL(request.url),
+        origin: 'https://chatgpt.com',
+        allowedOrigins: ['https://chatgpt.com'],
+        env: {},
+        ctx: {} as ExecutionContext,
+        pathname: '/api/telemetry',
+        requestMethod: 'POST',
+        mcpPath: false,
+      },
+      buildDeps({
+        recordUiEvent: (eventName, userId, route, outcome) => {
+          recorded.push({ eventName, userId, route, outcome });
+        },
+      }),
+    );
+
+    assert.equal(response?.status, 200);
+    assert.deepEqual(await response?.json(), { ok: true });
+    assert.deepEqual(recorded, [
+      {
+        eventName: 'browser_session_bootstrap_succeeded',
+        userId: 'user-1',
+        route: '/app/account',
+        outcome: 'success',
+      },
+    ]);
+  });
+
+  it('rejects non-allowlisted UI telemetry events', async () => {
+    const request = new Request('https://worker.example/api/telemetry', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'not_allowed',
+        route: '/app/account',
+        outcome: 'success',
+      }),
+    });
+
+    const response = await handleWorkerCoreRoutes(
+      {
+        request,
+        url: new URL(request.url),
+        origin: null,
+        allowedOrigins: ['https://chatgpt.com'],
+        env: {},
+        ctx: {} as ExecutionContext,
+        pathname: '/api/telemetry',
+        requestMethod: 'POST',
+        mcpPath: false,
+      },
+      buildDeps(),
+    );
+
+    assert.equal(response?.status, 400);
+    assert.deepEqual(await response?.json(), {
+      error: 'Telemetry event is not allowed.',
+      error_code: 'invalid_event_name',
+    });
+  });
+
+  it('returns usage snapshots with browser bootstrap analytics', async () => {
+    const response = await handleWorkerCoreRoutes(
+      buildContext('/api/usage'),
+      buildDeps({
+        getUsageSnapshot: async () => ({
+          userId: 'user-1',
+          totalRequests: 17,
+          dailyRequests: 4,
+          currentDay: '2026-03-05',
+          lastSeenAt: '2026-03-05T12:00:00.000Z',
+          byRoute: { '/mcp': 11 },
+          browserBootstrap: {
+            attempted: 2,
+            succeeded: 1,
+            failed: 1,
+            turnstileRefreshed: 3,
+            lastOutcome: 'success',
+            lastEventAt: '2026-03-05T11:59:00.000Z',
+          },
+        }),
+      }),
+    );
+
+    assert.equal(response?.status, 200);
+    assert.deepEqual(await response?.json(), {
+      userId: 'user-1',
+      totalRequests: 17,
+      dailyRequests: 4,
+      currentDay: '2026-03-05',
+      lastSeenAt: '2026-03-05T12:00:00.000Z',
+      byRoute: { '/mcp': 11 },
+      browserBootstrap: {
+        attempted: 2,
+        succeeded: 1,
+        failed: 1,
+        turnstileRefreshed: 3,
+        lastOutcome: 'success',
+        lastEventAt: '2026-03-05T11:59:00.000Z',
+      },
+    });
   });
 
   it('clears UI session cookies on POST /api/logout when CSRF is valid', async () => {

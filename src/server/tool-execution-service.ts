@@ -8,6 +8,7 @@ import { MiddlewareFactory, RequestContext } from '../infrastructure/middleware-
 import { getPrincipalContext } from '../infrastructure/principal-context.js';
 import { ServerConfig } from '../types.js';
 import {
+  type AsyncExecutionDirective,
   AsyncToolWorkflowOrchestrator,
   createAsyncEnvelope,
   isAsyncControlToolName,
@@ -20,10 +21,22 @@ export interface ToolExecutionService {
   execute(request: CallToolRequest, requestId: string): Promise<CallToolResult>;
 }
 
+interface AsyncWorkflowController {
+  isEnabled(): boolean;
+  handleControlToolCall(request: CallToolRequest): Promise<CallToolResult>;
+  enqueueToolCall(params: {
+    request: CallToolRequest;
+    requestId: string;
+    userId?: string;
+    directive: AsyncExecutionDirective;
+    execute?: (request: CallToolRequest, requestId: string) => Promise<CallToolResult>;
+  }): Promise<CallToolResult> | CallToolResult;
+}
+
 interface DirectToolExecutionServiceParams {
   toolRegistry: ToolHandlerRegistry;
   logger: Logger;
-  asyncWorkflow?: AsyncToolWorkflowOrchestrator;
+  asyncWorkflow?: AsyncWorkflowController;
 }
 
 interface MiddlewareToolExecutionServiceParams extends DirectToolExecutionServiceParams {
@@ -77,7 +90,8 @@ export function createDirectToolExecutionService(
   params: DirectToolExecutionServiceParams,
 ): ToolExecutionService {
   const { toolRegistry, logger } = params;
-  const asyncWorkflow = params.asyncWorkflow ?? new AsyncToolWorkflowOrchestrator(logger);
+  const asyncWorkflow: AsyncWorkflowController =
+    params.asyncWorkflow ?? new AsyncToolWorkflowOrchestrator(logger);
 
   return {
     execute: async (request, requestId) => {
@@ -101,7 +115,7 @@ export function createDirectToolExecutionService(
           );
         }
 
-        return asyncWorkflow.enqueueToolCall({
+        return await asyncWorkflow.enqueueToolCall({
           request: parsedRequest.request,
           requestId,
           directive: parsedRequest.directive,
@@ -128,7 +142,7 @@ export function createMiddlewareToolExecutionService(
   params: MiddlewareToolExecutionServiceParams,
 ): ToolExecutionService {
   const { toolRegistry, logger, metrics, middlewareFactory, config, cache, sampling } = params;
-  const asyncWorkflow =
+  const asyncWorkflow: AsyncWorkflowController =
     params.asyncWorkflow ??
     new AsyncToolWorkflowOrchestrator(logger, {
       ...config.asyncExecution,
@@ -221,7 +235,7 @@ export function createMiddlewareToolExecutionService(
           );
         }
 
-        return asyncWorkflow.enqueueToolCall({
+        return await asyncWorkflow.enqueueToolCall({
           request: parsedRequest.request,
           requestId,
           directive: parsedRequest.directive,

@@ -19,6 +19,10 @@
    - `MCP_UI_SESSION_SECRET` for Worker-owned browser auth/session signing
    - `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` so DCR management tokens do not reuse
      UI session or API-key material
+   - if Turnstile is enforced, both `TURNSTILE_SITE_KEY` and
+     `TURNSTILE_SECRET_KEY`
+   - if Cloudflare analytics emission is enabled,
+     `MCP_CF_ANALYTICS_ENABLED=true`
 5. Confirm runtime parity inputs:
    - `MCP_ALLOWED_ORIGINS` aligned with expected browser clients
    - session secret configured (`MCP_UI_SESSION_SECRET`)
@@ -38,6 +42,10 @@
      `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`
    - remove deprecated `MCP_AUTH_UI_ORIGIN`; Worker-owned hosted auth is
      same-origin only
+   - if queue-backed async execution is enabled, bind both `ASYNC_TOOL_QUEUE`
+     and `ASYNC_JOBS_KV`
+   - if Turnstile is enforced, set `MCP_TURNSTILE_ENFORCED_ROUTES` explicitly
+     (current route ids: `session_bootstrap`, `ai_chat`)
 
 ## Post-deploy verification
 

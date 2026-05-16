@@ -16,6 +16,12 @@ export interface CreateWorkerObservabilityRuntimeDeps {
   doOutlierScoreThreshold: number;
   doOutlierMinSamples: number;
   resolveWorkerMcpSessionTopologyV2: (env: Env) => WorkerMcpSessionTopologyV2;
+  onRouteLatencyRecorded?: (route: string, elapsedMs: number) => void;
+  onDurableObjectLatencyRecorded?: (
+    dimension: DurableObjectLatencyDimension,
+    elapsedMs: number,
+  ) => void;
+  onDurableObjectUnavailable?: (dimension: DurableObjectLatencyDimension) => void;
 }
 
 export interface WorkerObservabilityRuntime<TEnv extends Env> {
@@ -118,6 +124,7 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
       const stats = workerRouteLatency.get(routeKey);
       if (stats) {
         recordLatency(stats, elapsedMs);
+        deps.onRouteLatencyRecorded?.(routeKey, elapsedMs);
         return;
       }
 
@@ -129,14 +136,18 @@ export function createWorkerObservabilityRuntime<TEnv extends Env>(
         lastMs: durationMs,
         unavailableCount: 0,
       });
+      deps.onRouteLatencyRecorded?.(routeKey, durationMs);
+      return;
     },
 
     recordDurableObjectLatency(dimension: DurableObjectLatencyDimension, elapsedMs: number): void {
       recordLatency(durableObjectLatency[dimension], elapsedMs);
+      deps.onDurableObjectLatencyRecorded?.(dimension, elapsedMs);
     },
 
     recordDurableObjectUnavailable(dimension: DurableObjectLatencyDimension): void {
       durableObjectLatency[dimension].unavailableCount += 1;
+      deps.onDurableObjectUnavailable?.(dimension);
     },
 
     getCachedAllowedOrigins(

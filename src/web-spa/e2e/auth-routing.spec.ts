@@ -96,7 +96,9 @@ test.describe('SPA auth routing and recovery', () => {
 
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.getByText('Legacy overview route.')).toBeVisible();
-    await expect(page.getByText('Browser credential loaded')).toBeVisible();
+    await expect(
+      page.locator('strong').filter({ hasText: 'Browser credential loaded' }),
+    ).toBeVisible();
     await expect(page.locator('strong').filter({ hasText: 'Runtime ready' })).toBeVisible();
   });
 

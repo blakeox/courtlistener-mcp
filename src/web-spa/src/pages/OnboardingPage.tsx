@@ -4,6 +4,7 @@ import { toErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToken } from '../lib/token-context';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
+import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToast } from '../components/Toast';
 import {
@@ -27,6 +28,7 @@ export function OnboardingPage(): React.JSX.Element {
   const { token, clear } = useToken();
   const { toast } = useToast();
   const authStartHref = buildHostedAuthStartHref();
+  const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'session_bootstrap' });
 
   const authed = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
@@ -63,6 +65,20 @@ export function OnboardingPage(): React.JSX.Element {
       done: hasToken,
       href: '/app/credentials',
       action: 'Review credential tools',
+    },
+    {
+      key: 'turnstile',
+      label: turnstile.enabled
+        ? 'Complete Cloudflare challenge for protected browser routes'
+        : 'Cloudflare challenge not required',
+      done: !turnstile.enabled || turnstile.status === 'verified',
+      action: turnstile.enabled ? (
+        <Button variant="secondary" onClick={() => turnstile.refresh()}>
+          Refresh challenge
+        </Button>
+      ) : (
+        <Badge tone="ok">Not required</Badge>
+      ),
     },
     {
       key: 'runtime',
@@ -102,6 +118,7 @@ export function OnboardingPage(): React.JSX.Element {
     ? 'Local diagnostic credential loaded'
     : 'No local diagnostic credential';
   const runtimeSummary = hasMcpSuccess ? 'Runtime ready' : 'Readiness checks pending';
+  const turnstileSummary = describeTurnstileStatus(turnstile.status, turnstile.error);
 
   return (
     <div className="stack">
@@ -163,6 +180,10 @@ export function OnboardingPage(): React.JSX.Element {
               description: authed ? '✓ Signed in' : '⚠ Sign in required',
             },
             {
+              term: 'Cloudflare challenge',
+              description: turnstileSummary,
+            },
+            {
               term: 'Local MCP credential',
               description: hasToken
                 ? '✓ Loaded for direct runtime probes'
@@ -198,6 +219,30 @@ export function OnboardingPage(): React.JSX.Element {
             Clear local credential
           </Button>
         </InlineGroup>
+      </Card>
+
+      <Card
+        title="Cloudflare challenge"
+        subtitle="Protected browser flows use Turnstile when the worker exposes a site key. Verify it here before testing bootstrap and AI endpoints."
+      >
+        {turnstile.enabled ? (
+          <>
+            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+            <InlineGroup>
+              <Badge tone={turnstile.status === 'verified' ? 'ok' : 'neutral'}>
+                {turnstileSummary}
+              </Badge>
+              <Button variant="secondary" onClick={() => turnstile.refresh()}>
+                Refresh challenge
+              </Button>
+            </InlineGroup>
+            <StatusBanner role="alert" message={turnstile.error} type="error" />
+          </>
+        ) : (
+          <p className="muted">
+            This worker is not currently enforcing Turnstile for browser bootstrap checks.
+          </p>
+        )}
       </Card>
 
       <Card

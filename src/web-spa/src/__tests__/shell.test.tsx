@@ -215,7 +215,7 @@ describe('Shell', () => {
     renderShell('/app/playground');
 
     expect(screen.getByRole('button', { name: /toggle navigation menu/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Account' }).length).toBeGreaterThan(0);
   });
 
   it('closes the mobile drawer and restores body scrolling when the viewport returns to desktop', async () => {
@@ -283,7 +283,7 @@ describe('Shell', () => {
       screen.queryByRole('button', { name: 'Expand Operate section' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Expand Setup section' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Diagnostics' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Diagnostics' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: 'Readiness' })).not.toBeInTheDocument();
   });
 
@@ -292,14 +292,20 @@ describe('Shell', () => {
     renderShell('/app/playground');
 
     expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Diagnostics' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Account' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: /Docs/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand Setup section' }));
 
-    expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Diagnostics' })[0]).toHaveAttribute(
+      'href',
+      '/app/diagnostics',
+    );
+    expect(screen.getAllByRole('link', { name: 'Account' })[0]).toHaveAttribute(
+      'href',
+      '/app/account',
+    );
     expect(screen.getByRole('link', { name: /Docs/i })).toHaveAttribute(
       'href',
       'https://github.com/blakeox/courtlistener-mcp#readme',
@@ -316,8 +322,14 @@ describe('Shell', () => {
 
     expect(groupLabels).toEqual(['Home', 'Work', 'Operate']);
     expect(screen.getByText('Setup & help')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Diagnostics' })[0]).toHaveAttribute(
+      'href',
+      '/app/diagnostics',
+    );
+    expect(screen.getByRole('link', { name: /Docs/i })).toHaveAttribute(
+      'href',
+      'https://github.com/blakeox/courtlistener-mcp#readme',
+    );
   });
 
   it('keeps docs access out of the topbar and inside setup navigation', () => {
@@ -375,7 +387,7 @@ describe('Shell', () => {
   it('opens the account menu with a status block above the primary action', async () => {
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Account' })[0]);
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
     expect(accountMenu).toBeInTheDocument();
@@ -398,7 +410,7 @@ describe('Shell', () => {
   it('returns focus to the account trigger when the panel closes with escape', async () => {
     renderShell('/app/playground');
 
-    const accountTrigger = screen.getByRole('button', { name: 'Account' });
+    const accountTrigger = screen.getAllByRole('button', { name: 'Account' })[0];
     fireEvent.click(accountTrigger);
     fireEvent.keyDown(window, { key: 'Escape' });
 
@@ -411,7 +423,7 @@ describe('Shell', () => {
   it('returns focus to the account trigger when the panel closes from an outside click', async () => {
     renderShell('/app/playground');
 
-    const accountTrigger = screen.getByRole('button', { name: 'Account' });
+    const accountTrigger = screen.getAllByRole('button', { name: 'Account' })[0];
     fireEvent.click(accountTrigger);
     fireEvent.mouseDown(document.body);
 
@@ -429,7 +441,7 @@ describe('Shell', () => {
     });
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Account' })[0]);
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
     fireEvent.click(within(accountMenu).getByRole('link', { name: 'Open account' }));
@@ -454,7 +466,7 @@ describe('Shell', () => {
 
     renderShell('/app/playground');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Account' })[0]);
 
     const accountMenu = screen.getByRole('group', { name: 'Account panel' });
     expect(within(accountMenu).getByText(/signed in as operator@example.com/i)).toBeInTheDocument();
@@ -491,8 +503,8 @@ describe('Shell', () => {
 
     renderShell('/app/account');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Account' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Log out' })[0]);
 
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalledTimes(1);

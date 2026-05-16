@@ -19,9 +19,42 @@ vi.mock('../lib/api', () => ({
     currentDay: '2026-03-05',
     lastSeenAt: null,
     byRoute: {},
+    browserBootstrap: {
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      turnstileRefreshed: 0,
+      lastOutcome: null,
+      lastEventAt: null,
+    },
+  }),
+  getWorkerHealth: vi.fn().mockResolvedValue({
+    status: 'ok',
+    service: 'courtlistener-mcp',
+    transport: 'cloudflare-agents-streamable-http',
+    cloudflare: {
+      analytics_enabled: true,
+      async_queue_configured: true,
+      async_jobs_kv_configured: true,
+      turnstile_enforced_routes: [],
+    },
+    metrics: { latency_ms: {} },
+    session_topology: {
+      version: 'v1',
+      shard_count: 4,
+      idle_ttl_ms: 1800000,
+      absolute_ttl_ms: 43200000,
+      eviction_sweep_limit: 100,
+    },
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
+  bootstrapSession: vi.fn().mockResolvedValue({
+    ok: true,
+    userId: 'u1',
+    expiresInSeconds: 43200,
+  }),
+  postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
   createKey: vi.fn().mockResolvedValue({
     message: 'ok',
     api_key: {
@@ -56,6 +89,7 @@ vi.mock('../lib/hosted-auth', () => ({
 // Mock telemetry
 vi.mock('../lib/telemetry', () => ({
   trackEvent: vi.fn(),
+  forwardUiTelemetryEvent: vi.fn(),
   markSignupStarted: vi.fn(),
   markFirstMcpSuccess: vi.fn(),
 }));
@@ -73,6 +107,18 @@ vi.mock('../lib/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('../lib/turnstile', () => ({
+  describeTurnstileStatus: vi.fn((status: string, error: string) => error || status),
+  useTurnstileToken: vi.fn().mockReturnValue({
+    enabled: false,
+    status: 'disabled',
+    token: '',
+    error: '',
+    containerRef: { current: null },
+    refresh: vi.fn(),
+  }),
+}));
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={createTestQueryClient()}>
@@ -84,6 +130,21 @@ function Wrapper({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   );
 }
+
+beforeEach(async () => {
+  const turnstile = await import('../lib/turnstile');
+  vi.mocked(turnstile.describeTurnstileStatus).mockImplementation(
+    (status: string, error: string) => error || status,
+  );
+  vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+    enabled: false,
+    status: 'disabled',
+    token: '',
+    error: '',
+    containerRef: { current: null },
+    refresh: vi.fn(),
+  });
+});
 
 describe('HostedAuthRedirectPage', () => {
   beforeEach(() => {
@@ -135,6 +196,34 @@ describe('OnboardingPage', () => {
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
     expect(screen.getAllByText(/browser access ready/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders the Cloudflare challenge surface when Turnstile is configured', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'tok-1',
+      error: '',
+      containerRef: { current: null },
+      refresh: vi.fn(),
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+
+    const { OnboardingPage } = await import('../pages/OnboardingPage');
+    render(<OnboardingPage />, { wrapper: Wrapper });
+
+    expect(screen.getAllByText('Cloudflare challenge').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/challenge verified/i).length).toBeGreaterThan(0);
   });
 
   it('shows loading skeleton while checking browser access posture', async () => {
@@ -397,6 +486,14 @@ describe('AccountPage', () => {
       currentDay: '2026-03-05',
       lastSeenAt: null,
       byRoute: {},
+      browserBootstrap: {
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        turnstileRefreshed: 0,
+        lastOutcome: null,
+        lastEventAt: null,
+      },
     });
     vi.mocked(api.mcpCall).mockResolvedValue({ body: {}, sessionId: 'sid' });
   });
@@ -567,6 +664,212 @@ describe('AccountPage', () => {
     expect(screen.getByRole('link', { name: 'Open observability' })).toHaveAttribute(
       'href',
       '/app/observability',
+    );
+  });
+
+  it('shows manual browser bootstrap controls when browser access is signed out', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValue({
+      session: { authenticated: false, user: null, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'turnstile-token',
+      error: '',
+      containerRef: { current: null },
+      refresh: vi.fn(),
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Browser session bootstrap')).toBeTruthy();
+    expect(screen.getByLabelText('Authorization header')).toBeTruthy();
+    expect(
+      screen.getAllByRole('button', { name: /bootstrap browser session/i }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('bootstraps browser access from the account page and refreshes session state', async () => {
+    const auth = await import('../lib/auth');
+    const refreshMock = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(auth.useAuth).mockReturnValue({
+      session: { authenticated: false, user: null, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: refreshMock,
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    const refreshTurnstileMock = vi.fn();
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'turnstile-token',
+      error: '',
+      containerRef: { current: null },
+      refresh: refreshTurnstileMock,
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+    const api = await import('../lib/api');
+    const telemetry = await import('../lib/telemetry');
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getByLabelText('Authorization header'), {
+      target: { value: 'Bearer header.payload.signature' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: /bootstrap browser session/i })[0]);
+
+    await waitFor(() => {
+      expect(vi.mocked(api.bootstrapSession)).toHaveBeenCalledWith({
+        authorization: 'Bearer header.payload.signature',
+        turnstileToken: 'turnstile-token',
+      });
+      expect(vi.mocked(telemetry.trackEvent)).toHaveBeenCalledWith(
+        'browser_session_bootstrap_attempted',
+        expect.objectContaining({
+          turnstile_required: true,
+          turnstile_status: 'verified',
+        }),
+      );
+      expect(vi.mocked(telemetry.trackEvent)).toHaveBeenCalledWith(
+        'browser_session_bootstrap_succeeded',
+        expect.objectContaining({
+          user_id_present: true,
+          expires_in_seconds: 43200,
+        }),
+      );
+      expect(refreshMock).toHaveBeenCalledTimes(1);
+      expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/browser session bootstrapped for u1/i)).toBeTruthy();
+    });
+  });
+
+  it('refreshes the Turnstile widget after AI chat sends', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    const refreshTurnstileMock = vi.fn();
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'tok-1',
+      error: '',
+      containerRef: { current: null },
+      refresh: refreshTurnstileMock,
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getAllByPlaceholderText(/ask a legal research question/i)[0], {
+      target: { value: 'Find recent ADA accessibility cases' },
+    });
+    fireEvent.click(screen.getAllByText('Send')[0]);
+
+    await waitFor(() => {
+      expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('blocks manual bootstrap until the Cloudflare challenge is verified', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValue({
+      session: { authenticated: false, user: null, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'ready',
+      token: '',
+      error: '',
+      containerRef: { current: null },
+      refresh: vi.fn(),
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge ready');
+    const api = await import('../lib/api');
+    const telemetry = await import('../lib/telemetry');
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getByLabelText('Authorization header'), {
+      target: { value: 'Bearer header.payload.signature' },
+    });
+
+    const bootstrapButton = screen.getAllByRole('button', {
+      name: /bootstrap browser session/i,
+    })[0];
+    expect(bootstrapButton.getAttribute('disabled')).not.toBeNull();
+    expect(vi.mocked(api.bootstrapSession)).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByText(/complete the cloudflare challenge before bootstrapping browser access/i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(vi.mocked(telemetry.trackEvent)).not.toHaveBeenCalledWith(
+      'browser_session_bootstrap_attempted',
+      expect.anything(),
+    );
+  });
+
+  it('tracks challenge refresh requests from the bootstrap card', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValue({
+      session: { authenticated: false, user: null, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const refreshTurnstileMock = vi.fn();
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'ready',
+      token: '',
+      error: '',
+      containerRef: { current: null },
+      refresh: refreshTurnstileMock,
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge ready');
+    const telemetry = await import('../lib/telemetry');
+
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getAllByRole('button', { name: /refresh challenge/i }).at(-1)!);
+
+    expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(telemetry.trackEvent)).toHaveBeenCalledWith(
+      'browser_session_bootstrap_turnstile_refreshed',
+      expect.objectContaining({
+        turnstile_status: 'ready',
+      }),
     );
   });
 
@@ -761,6 +1064,72 @@ describe('PlaygroundPage', () => {
     render(<PlaygroundPage />, { wrapper: Wrapper });
     expect(screen.getByPlaceholderText(/ask a legal research question/i)).toBeInTheDocument();
     expect(screen.getByText('Send')).toBeInTheDocument();
+  });
+
+  it('renders challenge controls for AI chat when Turnstile is configured', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'tok-1',
+      error: '',
+      containerRef: { current: null },
+      refresh: vi.fn(),
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    expect(
+      screen.getByText(/cloudflare turnstile protects hosted browser ai access/i),
+    ).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /refresh challenge/i }).length).toBeGreaterThan(0);
+  });
+
+  it('blocks AI chat submission until the challenge is verified', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'ready',
+      token: '',
+      error: '',
+      containerRef: { current: null },
+      refresh: vi.fn(),
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge ready');
+
+    const api = await import('../lib/api');
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getAllByPlaceholderText(/ask a legal research question/i)[0], {
+      target: { value: 'Find recent ADA accessibility cases' },
+    });
+    fireEvent.click(screen.getAllByText('Send')[0]);
+
+    expect(
+      await screen.findByText(/complete the cloudflare challenge before using ai chat/i),
+    ).toBeTruthy();
+    expect(vi.mocked(api.aiChat)).not.toHaveBeenCalled();
   });
 
   it('Compare tab panel is hidden when not active', async () => {

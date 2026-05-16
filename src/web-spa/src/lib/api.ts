@@ -1,5 +1,18 @@
 import { z } from 'zod';
-import type { ApiError, AuthSessionResponse, UsageSnapshotResponse } from './types';
+import type {
+  ApiError,
+  AuthSessionResponse,
+  SessionBootstrapResponse,
+  UiTelemetryIngestRequest,
+  UsageSnapshotResponse,
+  WorkerHealthResponse,
+} from './types';
+
+declare global {
+  interface Window {
+    __clmcpTurnstileToken?: string;
+  }
+}
 
 export const sessionSchema = z.object({
   authenticated: z.boolean(),
@@ -10,7 +23,7 @@ export const sessionSchema = z.object({
       displayName: z.string().optional(),
     })
     .nullable(),
-  turnstile_site_key: z.string().optional(),
+  turnstile_site_key: z.string().nullable().optional(),
 });
 
 const aiChatSchema = z.object({
@@ -31,6 +44,36 @@ export const usageSnapshotSchema = z.object({
   currentDay: z.string(),
   lastSeenAt: z.string().nullable(),
   byRoute: z.record(z.string(), z.number()),
+  browserBootstrap: z.object({
+    attempted: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    turnstileRefreshed: z.number(),
+    lastOutcome: z.string().nullable(),
+    lastEventAt: z.string().nullable(),
+  }),
+});
+
+export const workerHealthSchema = z.object({
+  status: z.literal('ok'),
+  service: z.literal('courtlistener-mcp'),
+  transport: z.literal('cloudflare-agents-streamable-http'),
+  cloudflare: z.object({
+    analytics_enabled: z.boolean(),
+    async_queue_configured: z.boolean(),
+    async_jobs_kv_configured: z.boolean(),
+    turnstile_enforced_routes: z.array(z.string()),
+  }),
+  metrics: z.object({
+    latency_ms: z.unknown(),
+  }),
+  session_topology: z.object({
+    version: z.string(),
+    shard_count: z.number(),
+    idle_ttl_ms: z.number(),
+    absolute_ttl_ms: z.number(),
+    eviction_sweep_limit: z.number(),
+  }),
 });
 
 function readCookie(name: string): string {
@@ -40,6 +83,28 @@ function readCookie(name: string): string {
     .map((chunk) => chunk.trim())
     .find((chunk) => chunk.startsWith(key));
   return entry ? decodeURIComponent(entry.slice(key.length)) : '';
+}
+
+function resolveTurnstileToken(explicitToken?: string): string {
+  if (typeof explicitToken === 'string' && explicitToken.trim()) {
+    return explicitToken.trim();
+  }
+  if (typeof window !== 'undefined' && typeof window.__clmcpTurnstileToken === 'string') {
+    return window.__clmcpTurnstileToken.trim();
+  }
+  return '';
+}
+
+function consumeTurnstileToken(expectedToken?: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (
+    typeof window.__clmcpTurnstileToken === 'string' &&
+    (!expectedToken || window.__clmcpTurnstileToken.trim() === expectedToken)
+  ) {
+    delete window.__clmcpTurnstileToken;
+  }
 }
 
 async function parseBody<T>(response: Response): Promise<T | null> {
@@ -106,8 +171,47 @@ export async function getUsage(): Promise<UsageSnapshotResponse> {
   return usageSnapshotSchema.parse(payload);
 }
 
+export async function getWorkerHealth(): Promise<WorkerHealthResponse> {
+  const payload = await request<unknown>('/health');
+  return workerHealthSchema.parse(payload);
+}
+
 export async function logout(): Promise<void> {
   await request('/api/logout', { method: 'POST' });
+}
+
+export async function postUiTelemetryEvent(event: UiTelemetryIngestRequest): Promise<void> {
+  await request('/api/telemetry', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(event),
+  });
+}
+
+export async function bootstrapSession(args: {
+  authorization: string;
+  turnstileToken?: string;
+}): Promise<SessionBootstrapResponse> {
+  const headers = new Headers({
+    authorization: args.authorization,
+  });
+  const turnstileToken = resolveTurnstileToken(args.turnstileToken);
+  if (turnstileToken) {
+    headers.set('cf-turnstile-response', turnstileToken);
+  }
+
+  try {
+    return (await request<unknown>('/api/session/bootstrap', {
+      method: 'POST',
+      headers,
+    })) as SessionBootstrapResponse;
+  } finally {
+    if (turnstileToken) {
+      consumeTurnstileToken(turnstileToken);
+    }
+  }
 }
 
 export async function mcpCall<T>(
@@ -211,13 +315,25 @@ export async function aiChat(args: {
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;
   history?: Array<{ role: string; content: string }>;
+  turnstileToken?: string;
 }): Promise<z.infer<typeof aiChatSchema>> {
-  const payload = await request<unknown>('/api/ai-chat', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(args),
-  });
-  return aiChatSchema.parse(payload);
+  const headers = new Headers({ 'content-type': 'application/json' });
+  const turnstileToken = resolveTurnstileToken(args.turnstileToken);
+  if (turnstileToken) {
+    headers.set('cf-turnstile-response', turnstileToken);
+  }
+  try {
+    const payload = await request<unknown>('/api/ai-chat', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(args),
+    });
+    return aiChatSchema.parse(payload);
+  } finally {
+    if (turnstileToken) {
+      consumeTurnstileToken(turnstileToken);
+    }
+  }
 }
 
 const aiPlainSchema = z.object({
