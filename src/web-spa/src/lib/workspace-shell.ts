@@ -24,12 +24,6 @@ export interface WorkspaceSecondaryNavSection {
 
 export const WORKSPACE_DOCS_URL = 'https://github.com/blakeox/courtlistener-mcp#readme';
 
-const WORKSPACE_SETUP_LINKS: WorkspaceLink[] = [
-  { label: 'Download', shortLabel: 'DL', to: '/app/download' },
-  { label: 'Connect', shortLabel: 'CN', to: '/app/connect' },
-  { label: 'Docs', shortLabel: 'DC', to: WORKSPACE_DOCS_URL, external: true },
-];
-
 const WORKSPACE_UTILITY_LINKS: WorkspaceLink[] = [
   { label: 'Account', shortLabel: 'AC', to: '/app/account' },
   { label: 'Credentials', shortLabel: 'CR', to: '/app/credentials' },
@@ -47,18 +41,16 @@ export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
     collapsible: true,
     secondaryExpandLabel: 'Show setup links',
     secondaryCollapseLabel: 'Hide setup links',
-    items: WORKSPACE_SETUP_LINKS,
+    items: [
+      { label: 'Diagnostics', shortLabel: 'DG', to: '/app/diagnostics' },
+      { label: 'Account', shortLabel: 'AC', to: '/app/account' },
+      { label: 'Docs', shortLabel: 'DC', to: WORKSPACE_DOCS_URL, external: true },
+    ],
   },
   {
     id: 'work',
     label: 'Work',
-    items: [
-      { label: 'Playground', shortLabel: 'PG', to: '/app/playground' },
-      { label: 'Sessions', shortLabel: 'SS', to: '/app/sessions' },
-      { label: 'Workflows', shortLabel: 'WF', to: '/app/workflows' },
-      { label: 'Tools', shortLabel: 'TL', to: '/app/tools' },
-      { label: 'Review', shortLabel: 'RV', to: '/app/review' },
-    ],
+    items: [{ label: 'Playground', shortLabel: 'PG', to: '/app/playground' }],
   },
   {
     id: 'operate',
@@ -85,7 +77,10 @@ export const WORKSPACE_SECONDARY_NAV_SECTIONS: WorkspaceSecondaryNavSection[] = 
     id: 'setup-help',
     label: 'Setup & help',
     variant: 'support',
-    items: WORKSPACE_SETUP_LINKS,
+    items: [
+      { label: 'Diagnostics', shortLabel: 'DG', to: '/app/diagnostics' },
+      { label: 'Docs', shortLabel: 'DC', to: WORKSPACE_DOCS_URL, external: true },
+    ],
   },
 ];
 
@@ -111,22 +106,22 @@ export function getWorkspaceSecondaryNavSections(
 
 const WORKSPACE_PATH_META = [
   { path: '/app', label: 'Overview', description: 'Review workspace activity and next steps.' },
-  { path: '/app/download', label: 'Download', description: 'Install locally.' },
-  { path: '/app/connect', label: 'Connect', description: 'Attach a client.' },
+  { path: '/app/download', label: 'Diagnostics', description: 'Legacy install route.' },
+  { path: '/app/connect', label: 'Playground', description: 'Legacy connect route.' },
   { path: '/app/playground', label: 'Playground', description: 'Test tools.' },
-  { path: '/app/sessions', label: 'Sessions', description: 'Track research.' },
-  { path: '/app/workflows', label: 'Workflows', description: 'Start from templates.' },
-  { path: '/app/tools', label: 'Tools', description: 'Compose tool calls.' },
-  { path: '/app/review', label: 'Review', description: 'Approve actions.' },
+  { path: '/app/sessions', label: 'Overview', description: 'Legacy sessions route.' },
+  { path: '/app/workflows', label: 'Playground', description: 'Legacy workflows route.' },
+  { path: '/app/tools', label: 'Playground', description: 'Legacy tools route.' },
+  { path: '/app/review', label: 'Overview', description: 'Legacy review route.' },
   { path: '/app/usage', label: 'Usage', description: 'Inspect activity.' },
   { path: '/app/observability', label: 'Observability', description: 'Monitor health.' },
   { path: '/app/diagnostics', label: 'Diagnostics', description: 'Inspect protocol state.' },
   { path: '/app/readiness', label: 'Diagnostics', description: 'Legacy diagnostics route.' },
-  { path: '/app/credentials', label: 'Credentials', description: 'Manage providers.' },
+  { path: '/app/credentials', label: 'Account', description: 'Legacy credentials route.' },
   { path: '/app/account', label: 'Account', description: 'Manage access and recovery.' },
   { path: '/app/session', label: 'Account', description: 'Legacy account route.' },
   { path: '/app/control-center', label: 'Overview', description: 'Legacy overview route.' },
-  { path: '/app/docs', label: 'Docs', description: 'Install and troubleshoot.' },
+  { path: '/app/docs', label: 'Docs', description: 'Open repository docs.' },
 ];
 
 export function getWorkspaceMeta(pathname: string): { label: string; description: string } {

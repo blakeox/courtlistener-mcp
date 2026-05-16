@@ -73,6 +73,7 @@ test.describe('SPA real auth flow', () => {
         method: 'POST',
         headers: {
           authorization: 'Bearer header.payload.signature',
+          'cf-turnstile-response': 'test-turnstile-token',
         },
         credentials: 'same-origin',
       });

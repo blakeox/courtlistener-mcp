@@ -3,6 +3,9 @@ type AiUiRouteEnv = {
     run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   CLOUDFLARE_AI_MODEL?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  MCP_TURNSTILE_ENFORCED_ROUTES?: string;
 };
 
 interface UiApiAuthResult {
@@ -54,6 +57,8 @@ export interface HandleWorkerAiUiRoutesDeps<TEnv extends AiUiRouteEnv, TCtx> {
   defaultCfAiModelCheap: string;
   cheapModeMaxTokens: number;
   balancedModeMaxTokens: number;
+  getClientIdentifier?: (request: Request) => string;
+  recordTurnstileVerdict?: (routeId: string, outcome: 'passed' | 'failed' | 'not_enforced') => void;
 }
 
 export interface HandleWorkerAiUiRoutesParams<TEnv extends AiUiRouteEnv, TCtx> {
@@ -85,6 +90,25 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
     if (authResult.authType === 'session') {
       const csrfError = deps.requireCsrfToken(request);
       if (csrfError) return csrfError;
+    }
+
+    const { verifyTurnstileForRoute } = await import('./worker-turnstile.js');
+    const turnstile = await verifyTurnstileForRoute(
+      request,
+      env,
+      'ai_chat',
+      deps.getClientIdentifier ? deps.getClientIdentifier(request) : null,
+    );
+    deps.recordTurnstileVerdict?.(
+      'ai_chat',
+      turnstile.enforced ? (turnstile.success ? 'passed' : 'failed') : 'not_enforced',
+    );
+    if (!turnstile.success) {
+      return deps.jsonError(
+        turnstile.reason || 'Turnstile verification failed.',
+        turnstile.errorCode === 'turnstile_verification_unavailable' ? 503 : 403,
+        turnstile.errorCode || 'turnstile_verification_failed',
+      );
     }
 
     const body = await deps.parseJsonBody<{

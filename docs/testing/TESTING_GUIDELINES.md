@@ -149,6 +149,9 @@ npm run test:coverage
 # Run the targeted SPA auth/browser-facing Vitest suite
 npm run test:spa:auth
 
+# Run a focused SPA Vitest slice under the real SPA config
+pnpm run test:spa:focus -- src/web-spa/src/__tests__/shell.test.tsx
+
 # Run the browser-based SPA harness against the local Vite app
 npm run test:spa:e2e
 
@@ -176,6 +179,9 @@ npm run coverage:check
 - CI now enforces `npm run test:spa:auth`, the default `npm run test` /
   `npm run test:all` include the targeted SPA auth/browser suites, and the auth
   release gate also runs `npm run test:spa:e2e:auth`
+- For focused SPA work, prefer `pnpm run test:spa:focus -- <file...>` over
+  root-level `vitest` commands so `src/web-spa/vitest.config.ts` and
+  `vitest.setup.ts` always apply
 - `npm run test:spa:e2e` runs Playwright against the real local Vite SPA; the
   auth suite mostly mocks `/api/*` and `/mcp` for deterministic browser
   coverage, but now also includes a real local worker-route auth/session/logout

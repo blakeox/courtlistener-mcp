@@ -19,6 +19,10 @@ export const spaAuthPlaywrightSpecs = Object.freeze([
 ]);
 
 export function buildSpaAuthVitestCommand() {
+  return buildSpaVitestCommand(spaAuthVitestFiles);
+}
+
+export function buildSpaVitestCommand(filesOrArgs = []) {
   return [
     'pnpm',
     'exec',
@@ -26,7 +30,7 @@ export function buildSpaAuthVitestCommand() {
     'run',
     '--config',
     'src/web-spa/vitest.config.ts',
-    ...spaAuthVitestFiles,
+    ...filesOrArgs,
   ];
 }
 

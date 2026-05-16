@@ -74,6 +74,14 @@ test.describe('SPA operator console', () => {
           '/mcp': 11,
           '/api/session': 6,
         },
+        browserBootstrap: {
+          attempted: 2,
+          succeeded: 1,
+          failed: 1,
+          turnstileRefreshed: 0,
+          lastOutcome: 'success',
+          lastEventAt: '2026-04-23T20:40:00.000Z',
+        },
       },
       runtime: {
         sessionId: 'mcp-session-e2e',

@@ -13,6 +13,10 @@ Cloudflare Workers OAuth, structured logging, caching, and CI testing.
   remote OAuth
 - Hosted MCP OAuth transport via Cloudflare Workers OAuth Provider
 - Worker-owned browser auth handoff for hosted sign-in and approval
+- Optional queue-backed async MCP jobs for durable hosted execution
+- Optional Cloudflare Analytics Engine telemetry for route, DO, Turnstile, and
+  async job signals
+- Optional Turnstile enforcement on session bootstrap and AI chat routes
 - Built-in health checks and metrics endpoints for operations
 - Prebuilt MCP client config examples in [`configs/`](./configs)
 
@@ -307,6 +311,9 @@ Endpoints after deploy:
   now shipped.
 - ✅ **Validation safety pass**: `pnpm run test:spa`, `pnpm run build`, and
   `pnpm run typecheck` are the required UX-wave release gate.
+- ✅ **Focused SPA rule**: use `pnpm run test:spa:focus -- <file...>` for
+  targeted browser-auth/UI checks so the real SPA Vitest config and setup are
+  always applied.
 - **Control Center** (`/app/control-center`): live session/auth/key/runtime
   posture with a guided MCP checklist.
 - **Protocol explorer**: initialize/tool/resource/prompt discovery surfaced
@@ -473,6 +480,8 @@ pnpm run test:integration
 pnpm exec playwright install chromium
 # default repository gate: unit + integration + targeted SPA auth Vitest + auth Playwright
 pnpm test
+# focused SPA slice under the supported SPA Vitest config
+pnpm run test:spa:focus -- src/web-spa/src/__tests__/shell.test.tsx
 pnpm run coverage
 pnpm run coverage:check
 ```

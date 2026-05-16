@@ -6,6 +6,14 @@ import type {
   WorkerUiSessionRuntime,
   WorkerUiSessionRuntimeEnv,
 } from './worker-ui-session-runtime.js';
+import { getTurnstileSiteKey, verifyTurnstileForRoute } from './worker-turnstile.js';
+
+function parseCsv(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
 
 interface WorkerCoreRouteContext<TEnv> {
   request: Request;
@@ -26,6 +34,13 @@ interface SessionSnapshot {
   absoluteTtlMs: number;
   evictionSweepLimit: number;
 }
+
+const ALLOWED_UI_TELEMETRY_EVENTS = new Set([
+  'browser_session_bootstrap_attempted',
+  'browser_session_bootstrap_succeeded',
+  'browser_session_bootstrap_failed',
+  'browser_session_bootstrap_turnstile_refreshed',
+]);
 
 export interface HandleWorkerCoreRoutesDeps<
   TEnv extends WorkerUiSessionRuntimeEnv & WorkerDurableRuntimeEnv,
@@ -48,6 +63,14 @@ export interface HandleWorkerCoreRoutesDeps<
   getUsageSnapshot: (env: TEnv, userId: string) => Promise<unknown | null>;
   workerDurableRuntime: WorkerDurableRuntime<TEnv>;
   now: () => number;
+  getClientIdentifier?: (request: Request) => string;
+  recordTurnstileVerdict?: (routeId: string, outcome: 'passed' | 'failed' | 'not_enforced') => void;
+  recordUiEvent?: (
+    eventName: string,
+    userId: string | null,
+    route: string,
+    outcome: string,
+  ) => void;
 }
 
 export async function handleWorkerCoreRoutes<
@@ -64,7 +87,8 @@ export async function handleWorkerCoreRoutes<
       pathname === '/api/session' ||
       pathname === '/api/session/bootstrap' ||
       pathname === '/api/logout' ||
-      pathname === '/api/usage')
+      pathname === '/api/usage' ||
+      pathname === '/api/telemetry')
   ) {
     if (!deps.isAllowedOrigin(origin, allowedOrigins)) {
       return new Response('Forbidden origin', { status: 403 });
@@ -104,7 +128,15 @@ export async function handleWorkerCoreRoutes<
   if (pathname === '/health') {
     const sessionTopology = deps.getCachedSessionTopology(env);
     return deps.jsonResponse(
-      buildWorkerHealthPayload(sessionTopology, deps.getWorkerLatencySnapshot()),
+      buildWorkerHealthPayload(sessionTopology, deps.getWorkerLatencySnapshot(), {
+        analyticsEnabled:
+          (env as { MCP_CF_ANALYTICS_ENABLED?: string }).MCP_CF_ANALYTICS_ENABLED === 'true',
+        asyncQueueConfigured: Boolean('ASYNC_TOOL_QUEUE' in env && env.ASYNC_TOOL_QUEUE),
+        asyncJobsKvConfigured: Boolean('ASYNC_JOBS_KV' in env && env.ASYNC_JOBS_KV),
+        turnstileEnforcedRoutes: parseCsv(
+          (env as { MCP_TURNSTILE_ENFORCED_ROUTES?: string }).MCP_TURNSTILE_ENFORCED_ROUTES,
+        ),
+      }),
     );
   }
 
@@ -146,6 +178,7 @@ export async function handleWorkerCoreRoutes<
         auth_backend: 'cloudflare_oauth',
         session_authenticated: Boolean(sessionUser),
         bearer_authenticated: Boolean(bearerUserId),
+        turnstile_site_key: getTurnstileSiteKey(env as Parameters<typeof getTurnstileSiteKey>[0]),
       }),
       origin,
       allowedOrigins,
@@ -169,6 +202,28 @@ export async function handleWorkerCoreRoutes<
       );
     if (bootstrapRateLimited) {
       return deps.withCors(bootstrapRateLimited, origin, allowedOrigins);
+    }
+
+    const turnstile = await verifyTurnstileForRoute(
+      request,
+      env as Parameters<typeof verifyTurnstileForRoute>[1],
+      'session_bootstrap',
+      deps.getClientIdentifier ? deps.getClientIdentifier(request) : null,
+    );
+    deps.recordTurnstileVerdict?.(
+      'session_bootstrap',
+      turnstile.enforced ? (turnstile.success ? 'passed' : 'failed') : 'not_enforced',
+    );
+    if (!turnstile.success) {
+      return deps.withCors(
+        deps.jsonError(
+          turnstile.reason || 'Turnstile verification failed.',
+          turnstile.errorCode === 'turnstile_verification_unavailable' ? 503 : 403,
+          turnstile.errorCode || 'turnstile_verification_failed',
+        ),
+        origin,
+        allowedOrigins,
+      );
     }
 
     const sessionSecret = deps.workerUiSessionRuntime.getUiSessionSecret(env);
@@ -222,6 +277,73 @@ export async function handleWorkerCoreRoutes<
       200,
       headers,
     );
+  }
+
+  if (pathname === '/api/telemetry') {
+    if (requestMethod !== 'POST') {
+      return deps.withCors(
+        deps.jsonError('Method not allowed', 405, 'method_not_allowed'),
+        origin,
+        allowedOrigins,
+      );
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return deps.withCors(
+        deps.jsonError('Telemetry payload must be valid JSON.', 400, 'invalid_json'),
+        origin,
+        allowedOrigins,
+      );
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      return deps.withCors(
+        deps.jsonError('Telemetry payload must be an object.', 400, 'invalid_payload'),
+        origin,
+        allowedOrigins,
+      );
+    }
+
+    const eventName =
+      typeof (payload as { name?: unknown }).name === 'string'
+        ? (payload as { name: string }).name.trim()
+        : '';
+    const route =
+      typeof (payload as { route?: unknown }).route === 'string'
+        ? (payload as { route: string }).route.trim()
+        : '';
+    const outcome =
+      typeof (payload as { outcome?: unknown }).outcome === 'string'
+        ? (payload as { outcome: string }).outcome.trim()
+        : '';
+
+    if (!eventName || !ALLOWED_UI_TELEMETRY_EVENTS.has(eventName)) {
+      return deps.withCors(
+        deps.jsonError('Telemetry event is not allowed.', 400, 'invalid_event_name'),
+        origin,
+        allowedOrigins,
+      );
+    }
+
+    if (!route || route.length > 128 || !outcome || outcome.length > 64) {
+      return deps.withCors(
+        deps.jsonError('Telemetry route or outcome is invalid.', 400, 'invalid_event_payload'),
+        origin,
+        allowedOrigins,
+      );
+    }
+
+    const sessionState = await deps.workerUiSessionRuntime.resolveUiSession(request, env);
+    const userId = sessionState.kind === 'authenticated' ? sessionState.userId : null;
+    deps.recordUiEvent?.(eventName, userId, route, outcome);
+    if (userId) {
+      await deps.workerDurableRuntime.recordUserUiEvent(env, userId, eventName, outcome);
+    }
+
+    return deps.withCors(deps.jsonResponse({ ok: true }), origin, allowedOrigins);
   }
 
   if (pathname === '/api/logout') {

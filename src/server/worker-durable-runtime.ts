@@ -9,6 +9,7 @@ import type {
   AuthFailureLimiterRequestBody,
   AuthFailureLimiterResponseBody,
   AuthFailureState,
+  BrowserBootstrapUsageSummary,
   BrowserBootstrapConsumeRequestBody,
   BrowserBootstrapConsumeResponseBody,
   DurableObjectLatencyDimension,
@@ -117,6 +118,12 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     env: TEnv,
     userId: string,
     metadata?: { route?: string; method?: string },
+  ) => Promise<void>;
+  recordUserUiEvent: (
+    env: TEnv,
+    userId: string,
+    eventName: string,
+    outcome: string,
   ) => Promise<void>;
   validateSessionRequest: (request: Request, env: TEnv, nowMs: number) => Promise<Response | null>;
   finalizeSessionResponse: (
@@ -471,6 +478,24 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         });
       } catch {
         // Usage accounting should not take down otherwise healthy request paths.
+      }
+    },
+
+    async recordUserUiEvent(env, userId, eventName, outcome) {
+      const stub = getUsageStub(env, userId);
+      try {
+        await stub.fetch('https://auth-failure-limiter/internal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'usage_record_ui_event',
+            nowMs: deps.now(),
+            eventName,
+            outcome,
+          } satisfies UsageCounterRequestBody),
+        });
+      } catch {
+        // UI telemetry accounting should not take down otherwise healthy request paths.
       }
     },
 
@@ -1059,12 +1084,25 @@ export class AuthFailureLimiterDO {
       const dayCountKey = 'usage_today_count';
       const lastSeenKey = 'usage_last_seen_at_ms';
       const byRouteKey = 'usage_by_route';
+      const browserBootstrapKey = 'usage_browser_bootstrap';
+
+      const defaultBrowserBootstrap: BrowserBootstrapUsageSummary = {
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        turnstileRefreshed: 0,
+        lastOutcome: null,
+        lastEventAt: null,
+      };
 
       let totalRequests = (await this.state.storage.get<number>(totalKey)) ?? 0;
       const storedDayDate = (await this.state.storage.get<string>(dayDateKey)) ?? nowDate;
       let todayRequests = (await this.state.storage.get<number>(dayCountKey)) ?? 0;
       let byRoute = ((await this.state.storage.get<Record<string, number>>(byRouteKey)) ??
         {}) as Record<string, number>;
+      const browserBootstrap = ((await this.state.storage.get<BrowserBootstrapUsageSummary>(
+        browserBootstrapKey,
+      )) ?? defaultBrowserBootstrap) as BrowserBootstrapUsageSummary;
 
       const activeDayDate = storedDayDate === nowDate ? storedDayDate : nowDate;
       if (storedDayDate !== nowDate) {
@@ -1094,11 +1132,53 @@ export class AuthFailureLimiterDO {
       return Response.json({
         userId: '',
         totalRequests,
-        todayRequests,
-        todayDate: activeDayDate,
-        lastSeenAtMs,
+        dailyRequests: todayRequests,
+        currentDay: activeDayDate,
+        lastSeenAt: lastSeenAtMs ? new Date(lastSeenAtMs).toISOString() : null,
         byRoute,
+        browserBootstrap,
       } satisfies UsageCounterResponseBody);
+    }
+
+    if (body.action === 'usage_record_ui_event') {
+      const browserBootstrapKey = 'usage_browser_bootstrap';
+      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
+      const existing = ((await this.state.storage.get<BrowserBootstrapUsageSummary>(
+        browserBootstrapKey,
+      )) ?? {
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        turnstileRefreshed: 0,
+        lastOutcome: null,
+        lastEventAt: null,
+      }) as BrowserBootstrapUsageSummary;
+      const eventName =
+        typeof body.eventName === 'string' && body.eventName.trim().length > 0
+          ? body.eventName.trim()
+          : '';
+      const outcome =
+        typeof body.outcome === 'string' && body.outcome.trim().length > 0
+          ? body.outcome.trim()
+          : null;
+
+      const next: BrowserBootstrapUsageSummary = {
+        ...existing,
+        lastOutcome: outcome,
+        lastEventAt: new Date(nowMs).toISOString(),
+      };
+      if (eventName === 'browser_session_bootstrap_attempted') {
+        next.attempted += 1;
+      } else if (eventName === 'browser_session_bootstrap_succeeded') {
+        next.succeeded += 1;
+      } else if (eventName === 'browser_session_bootstrap_failed') {
+        next.failed += 1;
+      } else if (eventName === 'browser_session_bootstrap_turnstile_refreshed') {
+        next.turnstileRefreshed += 1;
+      }
+
+      await this.state.storage.put(browserBootstrapKey, next);
+      return Response.json({ ok: true });
     }
 
     if (body.action === 'quota_increment_check') {

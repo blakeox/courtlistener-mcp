@@ -10,6 +10,12 @@ export interface WorkerHealthPayload {
   status: 'ok';
   service: 'courtlistener-mcp';
   transport: 'cloudflare-agents-streamable-http';
+  cloudflare: {
+    analytics_enabled: boolean;
+    async_queue_configured: boolean;
+    async_jobs_kv_configured: boolean;
+    turnstile_enforced_routes: string[];
+  };
   metrics: {
     latency_ms: unknown;
   };
@@ -25,11 +31,23 @@ export interface WorkerHealthPayload {
 export function buildWorkerHealthPayload(
   sessionTopology: SessionSnapshot,
   latencySnapshot: unknown,
+  cloudflareState: {
+    analyticsEnabled: boolean;
+    asyncQueueConfigured: boolean;
+    asyncJobsKvConfigured: boolean;
+    turnstileEnforcedRoutes: string[];
+  },
 ): WorkerHealthPayload {
   return {
     status: 'ok',
     service: 'courtlistener-mcp',
     transport: 'cloudflare-agents-streamable-http',
+    cloudflare: {
+      analytics_enabled: cloudflareState.analyticsEnabled,
+      async_queue_configured: cloudflareState.asyncQueueConfigured,
+      async_jobs_kv_configured: cloudflareState.asyncJobsKvConfigured,
+      turnstile_enforced_routes: cloudflareState.turnstileEnforcedRoutes,
+    },
     metrics: {
       latency_ms: latencySnapshot,
     },
