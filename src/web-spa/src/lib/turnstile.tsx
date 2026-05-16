@@ -127,7 +127,7 @@ export function useTurnstileToken(
     }
 
     let cancelled = false;
-    setStatus(token ? 'verified' : 'loading');
+    setStatus(tokenRef.current ? 'verified' : 'loading');
     setError('');
 
     async function mountWidget(): Promise<void> {
@@ -162,7 +162,7 @@ export function useTurnstileToken(
             setError('Cloudflare challenge failed. Refresh and retry.');
           },
         });
-        if (!token) {
+        if (!tokenRef.current) {
           setStatus('ready');
         }
       } catch (mountError) {

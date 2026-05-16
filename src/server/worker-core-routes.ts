@@ -260,22 +260,18 @@ export async function handleWorkerCoreRoutes<
       );
     }
 
-    const headers = sessionState.headers;
-    if (origin && deps.isAllowedOrigin(origin, allowedOrigins)) {
-      const corsHeaders = deps.buildCorsHeaders(origin, allowedOrigins);
-      for (const [key, value] of corsHeaders.entries()) {
-        headers.set(key, value);
-      }
-    }
-
-    return deps.jsonResponse(
-      {
-        ok: true,
-        userId: identity.userId,
-        expiresInSeconds: sessionState.expiresInSeconds,
-      },
-      200,
-      headers,
+    return deps.withCors(
+      deps.jsonResponse(
+        {
+          ok: true,
+          userId: identity.userId,
+          expiresInSeconds: sessionState.expiresInSeconds,
+        },
+        200,
+        sessionState.headers,
+      ),
+      origin,
+      allowedOrigins,
     );
   }
 
@@ -286,6 +282,11 @@ export async function handleWorkerCoreRoutes<
         origin,
         allowedOrigins,
       );
+    }
+
+    const csrfError = deps.workerUiSessionRuntime.requireCsrfToken(request);
+    if (csrfError) {
+      return deps.withCors(csrfError, origin, allowedOrigins);
     }
 
     let payload: unknown;
