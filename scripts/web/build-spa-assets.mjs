@@ -2,7 +2,7 @@
 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +14,11 @@ const outputFile = resolve(repoRoot, 'src/web/spa-assets.ts');
 const DEFAULT_JS_BUDGET_BYTES = 790_000;
 /** Align with ci:check:design-system production CSS cap (92 KiB). */
 const DEFAULT_CSS_BUDGET_BYTES = 92 * 1024;
+const MIN_VITE_NODE_MAJOR = 20;
+
+function nodeMajorVersion() {
+  return Number.parseInt(process.versions.node.split('.')[0], 10);
+}
 
 function readBudget(envName, defaultValue) {
   const raw = process.env[envName];
@@ -45,6 +50,19 @@ function loadManifest() {
 }
 
 function main() {
+  if (nodeMajorVersion() < MIN_VITE_NODE_MAJOR) {
+    if (!existsSync(outputFile)) {
+      throw new Error(
+        `Node ${process.versions.node} cannot run the Vite SPA build (requires Node ${MIN_VITE_NODE_MAJOR}+). ` +
+          'Commit src/web/spa-assets.ts or build on a newer Node version.',
+      );
+    }
+    console.log(
+      `Skipping Vite SPA build on Node ${process.versions.node}; using committed src/web/spa-assets.ts.`,
+    );
+    return;
+  }
+
   rmSync(outDir, { recursive: true, force: true });
   runBuild();
 
