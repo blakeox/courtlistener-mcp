@@ -136,7 +136,7 @@ const buttonBase = cn(
 );
 
 export function buttonClassName(
-  variant: 'primary' | 'secondary' | 'danger',
+  variant: 'primary' | 'secondary' | 'danger' | 'ghost',
   size: 'default' | 'compact' | 'tiny',
   className?: string,
 ): string {
@@ -148,6 +148,12 @@ export function buttonClassName(
       'secondary border-[color:var(--shell-button-secondary-border)] bg-[color:var(--shell-button-secondary-bg)] text-[color:var(--shell-button-secondary-text)] shadow-none',
     variant === 'danger' &&
       'danger border-[color:var(--shell-button-danger-border)] bg-[color:var(--shell-button-danger-bg)] text-[color:var(--shell-button-danger-text)] shadow-none',
+    variant === 'ghost' &&
+      cn(
+        'ghost border-transparent bg-transparent shadow-none text-[color:var(--shell-account-menu-text-subtle)]',
+        'hover:border-[color:var(--shell-button-secondary-border)] hover:bg-[color:var(--shell-button-secondary-bg)] hover:text-[color:var(--shell-button-secondary-text)]',
+        'focus-visible:border-[color:var(--shell-button-secondary-border)] focus-visible:bg-[color:var(--shell-button-secondary-bg)] focus-visible:text-[color:var(--shell-button-secondary-text)]',
+      ),
     size === 'compact' && 'btn-compact text-base px-(--space-3) py-(--space-2)',
     size === 'tiny' &&
       'btn-tiny rounded-portal-sm px-(--space-2) py-(--space-1) text-[length:var(--text-base-sm)]',

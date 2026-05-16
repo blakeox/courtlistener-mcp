@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '../components/Toast';
-import { brandLinkBadgeClass, landingStatLabelClass } from '../lib/landing-classes';
 import { infoBlockClass, monoClass, tokenKeyClass } from '../lib/ui-classes';
 import {
   Badge,
@@ -96,7 +95,7 @@ describe('SectionHeading', () => {
       <SectionHeading
         tone="landing"
         eyebrow="Capabilities"
-        eyebrowClassName="landing-section-label"
+        eyebrowVariant="section-label"
         title="Powerful legal data tools"
         description="Structured legal research for AI workflows."
       >
@@ -135,7 +134,7 @@ describe('BrandLink', () => {
           tone="landing"
           label="CourtListener MCP"
           icon="⚖️"
-          badge={<Badge className={brandLinkBadgeClass}>Beta</Badge>}
+          badge={<Badge variant="brand-link">Beta</Badge>}
         />
       </MemoryRouter>,
     );
@@ -311,14 +310,7 @@ describe('FeatureCard', () => {
 
 describe('StatCard', () => {
   it('renders the shared label/value card shell', () => {
-    render(
-      <StatCard
-        tone="landing"
-        label="License"
-        labelClassName={landingStatLabelClass}
-        value="MIT"
-      />,
-    );
+    render(<StatCard tone="landing" label="License" labelVariant="stat-label" value="MIT" />);
     expect(screen.getByText('License')).toHaveClass('landing-stat-label');
     expect(screen.getByText('MIT')).toBeInTheDocument();
     expect(screen.getByRole('article')).toHaveClass('landing-stat-card');
