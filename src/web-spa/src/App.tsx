@@ -10,7 +10,8 @@ import { AccountPage } from './pages/AccountPage';
 import { HostedAuthRedirectPage } from './pages/HostedAuthRedirectPage';
 import { LandingPage } from './pages/LandingPage';
 import { WorkspaceDashboardPage } from './pages/WorkspaceDashboardPage';
-import { WorkspaceSectionPage } from './pages/WorkspaceSectionPage';
+import { UsagePage } from './pages/UsagePage';
+import { ObservabilityPage } from './pages/ObservabilityPage';
 import { useAuth } from './lib/auth';
 import { TokenProvider, useToken } from './lib/token-context';
 import { ToastProvider } from './components/Toast';
@@ -99,31 +100,22 @@ function AppContent(): React.JSX.Element {
             <Route path="/app/login" element={<HostedAuthRedirectPage />} />
             <Route path="/app/reset-password" element={<HostedAuthRedirectPage />} />
             <Route path="/app/onboarding" element={<Navigate to="/app" replace />} />
-            <Route path="/app/download" element={<WorkspaceSectionPage sectionKey="download" />} />
-            <Route path="/app/connect" element={<WorkspaceSectionPage sectionKey="connect" />} />
+            <Route path="/app/download" element={<Navigate to="/app/diagnostics" replace />} />
+            <Route path="/app/connect" element={<Navigate to="/app/playground" replace />} />
             <Route path="/app/playground" element={<PlaygroundPage />} />
-            <Route path="/app/sessions" element={<WorkspaceSectionPage sectionKey="sessions" />} />
-            <Route
-              path="/app/workflows"
-              element={<WorkspaceSectionPage sectionKey="workflows" />}
-            />
-            <Route path="/app/tools" element={<WorkspaceSectionPage sectionKey="tools" />} />
-            <Route path="/app/review" element={<WorkspaceSectionPage sectionKey="review" />} />
-            <Route path="/app/usage" element={<WorkspaceSectionPage sectionKey="usage" />} />
-            <Route
-              path="/app/observability"
-              element={<WorkspaceSectionPage sectionKey="observability" />}
-            />
+            <Route path="/app/sessions" element={<Navigate to="/app" replace />} />
+            <Route path="/app/workflows" element={<Navigate to="/app/playground" replace />} />
+            <Route path="/app/tools" element={<Navigate to="/app/playground" replace />} />
+            <Route path="/app/review" element={<Navigate to="/app" replace />} />
+            <Route path="/app/usage" element={<UsagePage />} />
+            <Route path="/app/observability" element={<ObservabilityPage />} />
             <Route path="/app/diagnostics" element={<OnboardingPage />} />
             <Route path="/app/readiness" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route
-              path="/app/credentials"
-              element={<WorkspaceSectionPage sectionKey="credentials" />}
-            />
+            <Route path="/app/credentials" element={<Navigate to="/app/account" replace />} />
             <Route path="/app/account" element={<AccountPage />} />
             <Route path="/app/session" element={<Navigate to="/app/account" replace />} />
             <Route path="/app/keys" element={<Navigate to="/app/credentials" replace />} />
-            <Route path="/app/docs" element={<WorkspaceSectionPage sectionKey="docs" />} />
+            <Route path="/app/docs" element={<Navigate to="/app/diagnostics" replace />} />
             <Route path="*" element={smartRedirectElement} />
           </Routes>
         </React.Suspense>

@@ -16,10 +16,22 @@ describe('buildWorkerHealthPayload', () => {
         evictionSweepLimit: 64,
       },
       { routes: { '/health': { count: 1 } } },
+      {
+        analyticsEnabled: true,
+        asyncQueueConfigured: true,
+        asyncJobsKvConfigured: true,
+        turnstileEnforcedRoutes: ['session_bootstrap', 'ai_chat'],
+      },
     );
 
     assert.equal(payload.status, 'ok');
     assert.equal(payload.service, 'courtlistener-mcp');
+    assert.deepEqual(payload.cloudflare, {
+      analytics_enabled: true,
+      async_queue_configured: true,
+      async_jobs_kv_configured: true,
+      turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
+    });
     assert.deepEqual(payload.metrics, { latency_ms: { routes: { '/health': { count: 1 } } } });
     assert.deepEqual(payload.session_topology, {
       version: 'v2',

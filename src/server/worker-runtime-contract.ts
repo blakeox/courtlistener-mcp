@@ -16,6 +16,7 @@ export interface Env {
   MCP_UI_PUBLIC_ORIGIN?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
+  MCP_TURNSTILE_ENFORCED_ROUTES?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_MAX?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS?: string;
@@ -55,9 +56,13 @@ export interface Env {
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_CF_ANALYTICS_ENABLED?: string;
   MCP_OBJECT: DurableObjectNamespace;
   AUTH_FAILURE_LIMITER: DurableObjectNamespace;
   OAUTH_KV: KVNamespace;
+  ASYNC_JOBS_KV?: KVNamespace;
+  ASYNC_TOOL_QUEUE?: Queue<import('./worker-async-queue-runtime.js').AsyncJobMessage>;
+  ANALYTICS?: AnalyticsEngineDataset;
   OAUTH_PROVIDER?: OAuthHelpers;
   AI?: {
     run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
@@ -147,19 +152,31 @@ export interface BrowserBootstrapConsumeResponseBody {
 }
 
 export interface UsageCounterRequestBody {
-  action: 'usage_increment' | 'usage_get';
+  action: 'usage_increment' | 'usage_get' | 'usage_record_ui_event';
   nowMs: number;
   route?: string;
   method?: string;
+  eventName?: string;
+  outcome?: string;
+}
+
+export interface BrowserBootstrapUsageSummary {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  turnstileRefreshed: number;
+  lastOutcome: string | null;
+  lastEventAt: string | null;
 }
 
 export interface UsageCounterResponseBody {
   userId: string;
   totalRequests: number;
-  todayRequests: number;
-  todayDate: string;
-  lastSeenAtMs: number | null;
+  dailyRequests: number;
+  currentDay: string;
+  lastSeenAt: string | null;
   byRoute: Record<string, number>;
+  browserBootstrap: BrowserBootstrapUsageSummary;
 }
 
 export type McpSessionLifecycleAction =

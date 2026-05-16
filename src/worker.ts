@@ -62,6 +62,7 @@ import {
   createWorkerObservabilityRuntime,
   type WorkerObservabilityRuntime,
 } from './server/worker-observability-runtime.js';
+import { createCloudflareTelemetryRuntime } from './server/worker-cloudflare-telemetry-runtime.js';
 import {
   aiToolArguments,
   aiToolFromPrompt,
@@ -70,6 +71,10 @@ import {
   isPlainObject,
   type WorkerMcpAiRuntime,
 } from './server/worker-mcp-ai-runtime.js';
+import {
+  CloudflareAsyncQueueWorkflow,
+  processAsyncQueueMessage,
+} from './server/worker-async-queue-runtime.js';
 import { createWorkerLegacyFetchHandler } from './server/worker-request-runtime.js';
 import {
   handleWorkerOAuthEntrypoint,
@@ -166,7 +171,24 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
     const logger = container.get<Logger>('logger');
     const metrics = container.get<MetricsCollector>('metrics');
     const enhancedMetadata = buildEnhancedMetadata();
-    const toolExecutionService = createDirectToolExecutionService({ toolRegistry, logger });
+    const queueBackedAsyncWorkflow =
+      env.ASYNC_TOOL_QUEUE && env.ASYNC_JOBS_KV
+        ? new CloudflareAsyncQueueWorkflow(env, {
+            logger,
+            recordLatencyMetric: (metric, durationMs) => {
+              metrics.recordLatencyMetric(metric, durationMs);
+            },
+            recordCostGuardrail: (metric, value, threshold) => {
+              metrics.recordCostGuardrail(`async.${metric}`, value, threshold);
+            },
+            onAsyncJobUpdate: cloudflareTelemetryRuntime.recordAsyncJobUpdate,
+          })
+        : undefined;
+    const toolExecutionService = createDirectToolExecutionService({
+      toolRegistry,
+      logger,
+      ...(queueBackedAsyncWorkflow ? { asyncWorkflow: queueBackedAsyncWorkflow } : {}),
+    });
 
     // Wire all existing MCP protocol handlers onto the low-level Server
     // that lives inside McpServer.  Because we never call
@@ -228,6 +250,7 @@ export { AuthFailureLimiterDO };
 const mcpStreamableHandler = CourtListenerMCP.serve('/mcp');
 const mcpSseCompatibilityHandler = CourtListenerMCP.serve('/sse');
 const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set(SUPPORTED_MCP_PROTOCOL_VERSION_LIST);
+const cloudflareTelemetryRuntime = createCloudflareTelemetryRuntime<Env>();
 
 async function parseJsonBody<T>(request: Request): Promise<T | null> {
   try {
@@ -259,6 +282,12 @@ const workerObservabilityRuntime: WorkerObservabilityRuntime<Env> =
     doOutlierScoreThreshold: WORKER_DO_OUTLIER_SCORE_THRESHOLD,
     doOutlierMinSamples: WORKER_DO_OUTLIER_MIN_SAMPLES,
     resolveWorkerMcpSessionTopologyV2,
+    onRouteLatencyRecorded: (route, elapsedMs) =>
+      cloudflareTelemetryRuntime.recordRouteLatency(route, elapsedMs),
+    onDurableObjectLatencyRecorded: (dimension, elapsedMs) =>
+      cloudflareTelemetryRuntime.recordDurableObjectLatency(dimension, elapsedMs),
+    onDurableObjectUnavailable: (dimension) =>
+      cloudflareTelemetryRuntime.recordDurableObjectUnavailable(dimension),
   });
 
 const workerDurableRuntime = createWorkerDurableRuntime<Env>({
@@ -318,6 +347,8 @@ const workerDelegatedRouteDeps = {
   defaultCfAiModelCheap: DEFAULT_CF_AI_MODEL_CHEAP,
   cheapModeMaxTokens: CHEAP_MODE_MAX_TOKENS,
   balancedModeMaxTokens: BALANCED_MODE_MAX_TOKENS,
+  getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
+  recordTurnstileVerdict: cloudflareTelemetryRuntime.recordTurnstileVerdict,
   spaJs: SPA_JS,
   spaCss: SPA_CSS,
   spaBuildId: SPA_BUILD_ID,
@@ -331,7 +362,6 @@ const workerDelegatedRouteDeps = {
   getOAuthHelpers: (env: Env) => getOAuthHelpersRef(env),
   buildHostedOAuthCompletionDetails,
   resolveGrantedScopes,
-  getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
   getAuthRouteRateLimitedResponse: workerDurableRuntime.getAuthRouteRateLimitedResponse,
   now: () => Date.now(),
   mcpBoundaryPolicy: {
@@ -369,6 +399,9 @@ const workerCoreRouteDeps = {
   getWorkerLatencySnapshot: workerObservabilityRuntime.getWorkerLatencySnapshot,
   getUsageSnapshot: workerDurableRuntime.getUserUsageSnapshot,
   now: () => Date.now(),
+  getClientIdentifier: workerObservabilityRuntime.getClientIdentifier,
+  recordTurnstileVerdict: cloudflareTelemetryRuntime.recordTurnstileVerdict,
+  recordUiEvent: cloudflareTelemetryRuntime.recordUiEvent,
 } satisfies HandleWorkerCoreRoutesDeps<Env>;
 
 const handleLegacyWorkerFetch = createWorkerLegacyFetchHandler<Env>({
@@ -416,6 +449,7 @@ getOAuthHelpersRef = getOAuthHelpers;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    cloudflareTelemetryRuntime.setCurrentEnv(env);
     const url = new URL(request.url);
     // Capture the request origin so the OAuthProvider's onError callback
     // builds resource_metadata URLs relative to the domain the client used
@@ -459,5 +493,30 @@ export default {
       getAuthRouteRateLimitedResponse: workerDurableRuntime.getAuthRouteRateLimitedResponse,
       now: () => Date.now(),
     });
+  },
+  async queue(
+    batch: MessageBatch<import('./server/worker-async-queue-runtime.js').AsyncJobMessage>,
+    env: Env,
+  ): Promise<void> {
+    cloudflareTelemetryRuntime.setCurrentEnv(env);
+    bootstrapServices();
+    const toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
+    const logger = container.get<Logger>('logger');
+
+    for (const message of batch.messages) {
+      await processAsyncQueueMessage({
+        env,
+        logger,
+        message: message.body,
+        execute: async (request, requestId, userId) =>
+          await toolRegistry.execute(request, {
+            logger,
+            requestId,
+            ...(userId ? { userId } : {}),
+          }),
+        onAsyncJobUpdate: cloudflareTelemetryRuntime.recordAsyncJobUpdate,
+      });
+      message.ack();
+    }
   },
 };

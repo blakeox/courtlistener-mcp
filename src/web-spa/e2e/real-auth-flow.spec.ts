@@ -73,6 +73,7 @@ test.describe('SPA real auth flow', () => {
         method: 'POST',
         headers: {
           authorization: 'Bearer header.payload.signature',
+          'cf-turnstile-response': 'test-turnstile-token',
         },
         credentials: 'same-origin',
       });
@@ -105,8 +106,8 @@ test.describe('SPA real auth flow', () => {
 
     await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Account access', level: 2 })).toBeVisible();
-    await expect(page.getByText('operator-real').first()).toBeVisible();
     await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
 

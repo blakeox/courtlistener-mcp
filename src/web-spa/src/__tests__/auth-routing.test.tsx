@@ -23,6 +23,33 @@ vi.mock('../lib/api', () => ({
     currentDay: '2026-03-05',
     lastSeenAt: null,
     byRoute: {},
+    browserBootstrap: {
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      turnstileRefreshed: 0,
+      lastOutcome: null,
+      lastEventAt: null,
+    },
+  }),
+  getWorkerHealth: vi.fn().mockResolvedValue({
+    status: 'ok',
+    service: 'courtlistener-mcp',
+    transport: 'cloudflare-agents-streamable-http',
+    cloudflare: {
+      analytics_enabled: true,
+      async_queue_configured: true,
+      async_jobs_kv_configured: true,
+      turnstile_enforced_routes: [],
+    },
+    metrics: { latency_ms: {} },
+    session_topology: {
+      version: 'v1',
+      shard_count: 4,
+      idle_ttl_ms: 1800000,
+      absolute_ttl_ms: 43200000,
+      eviction_sweep_limit: 100,
+    },
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
@@ -121,9 +148,7 @@ describe('App auth routing', () => {
 
   it('redirects /app/keys to the credentials page', async () => {
     renderApp('/app/keys');
-    expect(
-      await screen.findByRole('heading', { name: 'Credentials & Providers', level: 1 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Account', level: 1 })).toBeInTheDocument();
   });
 
   it('renders the public landing page on /', async () => {

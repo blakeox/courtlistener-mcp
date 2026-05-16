@@ -1,7 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { mcpCall, aiChat, aiPlain, toErrorMessage } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { markFirstMcpSuccess, trackEvent } from '../lib/telemetry';
+import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useToken } from '../lib/token-context';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -1811,7 +1813,9 @@ interface ChatMessage {
 }
 
 function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
+  const { session } = useAuth();
   const { token, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
+  const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'ai_chat' });
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
   const [aiToolName, setAiToolName] = React.useState('auto');
   const [aiPrompt, setAiPrompt] = React.useState('');
@@ -1881,6 +1885,10 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   async function sendAiChat(): Promise<void> {
+    if (turnstile.enabled && turnstile.status !== 'verified') {
+      aiStatus.setError('Complete the Cloudflare challenge before using AI chat.');
+      return;
+    }
     if (!aiPrompt.trim()) {
       aiStatus.setError('Enter a prompt.');
       return;
@@ -1905,6 +1913,7 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
           toolName: aiToolName,
           mode: aiMode,
           history: chatHistory,
+          turnstileToken: turnstile.token || undefined,
         }),
         aiPlain({ message: currentPrompt, mode: aiMode, history: chatHistory }),
       ]);
@@ -1964,6 +1973,9 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       }
     } finally {
       if (!cancelledRef.current) {
+        if (turnstile.enabled) {
+          turnstile.refresh();
+        }
         setAiRunning(false);
         setStep(null);
       }
@@ -1977,6 +1989,23 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         title="AI Chat — MCP vs Plain AI"
         subtitle="Every message is sent to both the MCP-powered AI and a plain LLM side-by-side. Multi-turn conversation supported."
       >
+        {turnstile.enabled ? (
+          <>
+            <p className="muted">
+              Cloudflare Turnstile protects hosted browser AI access on this worker.
+            </p>
+            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+            <InlineGroup gap="tight">
+              <Badge tone={turnstile.status === 'verified' ? 'ok' : 'neutral'}>
+                {describeTurnstileStatus(turnstile.status, turnstile.error)}
+              </Badge>
+              <Button variant="secondary" size="compact" onClick={() => turnstile.refresh()}>
+                Refresh challenge
+              </Button>
+            </InlineGroup>
+            <StatusBanner role="alert" message={turnstile.error} type="error" />
+          </>
+        ) : null}
         <InlineGroup gap="tight">
           {AI_PRESETS.map((p) => (
             <Button key={p.label} variant="secondary" size="compact" onClick={() => applyPreset(p)}>
@@ -2150,7 +2179,9 @@ interface CompareResult {
 }
 
 function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
+  const { session } = useAuth();
   const { token, mcpSessionId, setMcpSessionId } = usePlayground();
+  const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'ai_chat' });
   const [prompt, setPrompt] = React.useState(
     'What are the leading Supreme Court cases about free speech in schools?',
   );
@@ -2178,69 +2209,97 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   async function runComparison(): Promise<void> {
+    if (turnstile.enabled && turnstile.status !== 'verified') {
+      setResults([
+        {
+          label: 'With MCP Tools',
+          response: 'Error: Complete the Cloudflare challenge before running AI comparison.',
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: true,
+        },
+        {
+          label: 'Without MCP (LLM Only)',
+          response: 'Challenge gating applies only to the MCP-backed request in this comparison.',
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: false,
+        },
+      ]);
+      return;
+    }
     if (!prompt.trim()) return;
     const currentPrompt = prompt.trim();
     setRunning(true);
     setResults([]);
 
-    // Fire both requests in parallel
-    const [mcpResult, plainResult] = await Promise.allSettled([
-      aiChat({
-        message: currentPrompt,
-        mcpToken: token || undefined,
-        mcpSessionId: mcpSessionId || undefined,
-        toolName: aiToolName,
-        mode: aiMode,
-      }),
-      aiPlain({ message: currentPrompt, mode: aiMode }),
-    ]);
+    try {
+      // Fire both requests in parallel
+      const [mcpResult, plainResult] = await Promise.allSettled([
+        aiChat({
+          message: currentPrompt,
+          mcpToken: token || undefined,
+          mcpSessionId: mcpSessionId || undefined,
+          toolName: aiToolName,
+          mode: aiMode,
+          turnstileToken: turnstile.token || undefined,
+        }),
+        aiPlain({ message: currentPrompt, mode: aiMode }),
+      ]);
 
-    if (cancelledRef.current) return;
+      if (cancelledRef.current) return;
 
-    const newResults: CompareResult[] = [];
+      const newResults: CompareResult[] = [];
 
-    if (mcpResult.status === 'fulfilled') {
-      const r = mcpResult.value;
-      if (r.session_id) setMcpSessionId(r.session_id);
-      newResults.push({
-        label: 'With MCP Tools',
-        response: r.ai_response,
-        latencyMs: 0, // We'll use the wall time below
-        tool: r.tool,
-        toolReason: r.tool_reason,
-        mode: r.mode,
-        hasMcp: true,
-      });
-    } else {
-      newResults.push({
-        label: 'With MCP Tools',
-        response: `Error: ${reasonMessage(mcpResult.reason)}`,
-        latencyMs: 0,
-        mode: aiMode,
-        hasMcp: true,
-      });
+      if (mcpResult.status === 'fulfilled') {
+        const r = mcpResult.value;
+        if (r.session_id) setMcpSessionId(r.session_id);
+        newResults.push({
+          label: 'With MCP Tools',
+          response: r.ai_response,
+          latencyMs: 0, // We'll use the wall time below
+          tool: r.tool,
+          toolReason: r.tool_reason,
+          mode: r.mode,
+          hasMcp: true,
+        });
+      } else {
+        newResults.push({
+          label: 'With MCP Tools',
+          response: `Error: ${reasonMessage(mcpResult.reason)}`,
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: true,
+        });
+      }
+
+      if (plainResult.status === 'fulfilled') {
+        newResults.push({
+          label: 'Without MCP (LLM Only)',
+          response: plainResult.value.ai_response,
+          latencyMs: 0,
+          mode: plainResult.value.mode,
+          hasMcp: false,
+        });
+      } else {
+        newResults.push({
+          label: 'Without MCP (LLM Only)',
+          response: `Error: ${reasonMessage(plainResult.reason)}`,
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: false,
+        });
+      }
+
+      setResults(newResults);
+    } finally {
+      if (!cancelledRef.current) {
+        if (turnstile.enabled) {
+          turnstile.refresh();
+        }
+        setRunning(false);
+      }
     }
-
-    if (plainResult.status === 'fulfilled') {
-      newResults.push({
-        label: 'Without MCP (LLM Only)',
-        response: plainResult.value.ai_response,
-        latencyMs: 0,
-        mode: plainResult.value.mode,
-        hasMcp: false,
-      });
-    } else {
-      newResults.push({
-        label: 'Without MCP (LLM Only)',
-        response: `Error: ${reasonMessage(plainResult.reason)}`,
-        latencyMs: 0,
-        mode: aiMode,
-        hasMcp: false,
-      });
-    }
-
-    setResults(newResults);
-    setRunning(false);
   }
 
   return (
