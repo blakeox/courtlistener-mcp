@@ -317,8 +317,9 @@ export async function aiChat(args: {
   history?: Array<{ role: string; content: string }>;
   turnstileToken?: string;
 }): Promise<z.infer<typeof aiChatSchema>> {
+  const { turnstileToken: explicitToken, ...body } = args;
   const headers = new Headers({ 'content-type': 'application/json' });
-  const turnstileToken = resolveTurnstileToken(args.turnstileToken);
+  const turnstileToken = resolveTurnstileToken(explicitToken);
   if (turnstileToken) {
     headers.set('cf-turnstile-response', turnstileToken);
   }
@@ -326,7 +327,7 @@ export async function aiChat(args: {
     const payload = await request<unknown>('/api/ai-chat', {
       method: 'POST',
       headers,
-      body: JSON.stringify(args),
+      body: JSON.stringify(body),
     });
     return aiChatSchema.parse(payload);
   } finally {
