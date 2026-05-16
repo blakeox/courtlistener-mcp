@@ -85,8 +85,6 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
     if (authResult instanceof Response) {
       return authResult;
     }
-    const aiChatQuota = await deps.applyAiChatLifetimeQuota(env, authResult.userId);
-    if (aiChatQuota) return aiChatQuota;
     if (authResult.authType === 'session') {
       const csrfError = deps.requireCsrfToken(request);
       if (csrfError) return csrfError;
@@ -110,6 +108,9 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
         turnstile.errorCode || 'turnstile_verification_failed',
       );
     }
+
+    const aiChatQuota = await deps.applyAiChatLifetimeQuota(env, authResult.userId);
+    if (aiChatQuota) return aiChatQuota;
 
     const body = await deps.parseJsonBody<{
       message?: string;

@@ -31,6 +31,7 @@ describe('web-spa api surface', () => {
     } else {
       delete (globalThis as Record<string, unknown>).document;
     }
+    delete (globalThis as { window?: Window }).window;
   });
 
   it('does not export removed browser-form auth helpers', () => {
@@ -182,6 +183,49 @@ describe('web-spa api surface', () => {
     assert.equal(authHeader, 'Bearer token-123');
     assert.equal(turnstileHeader, 'turnstile-token-xyz');
     assert.equal(response.ok, true);
+  });
+
+  it('bootstrapSession consumes the global turnstile token after a protected request', async () => {
+    (globalThis as { window?: Window }).window = {
+      __clmcpTurnstileToken: 'turnstile-token-xyz',
+    } as Window;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: true, userId: 'u1', expiresInSeconds: 10 }), {
+        status: 200,
+      })) as typeof fetch;
+
+    await api.bootstrapSession({
+      authorization: 'Bearer token-123',
+      turnstileToken: 'turnstile-token-xyz',
+    });
+
+    assert.equal(globalThis.window?.__clmcpTurnstileToken, undefined);
+  });
+
+  it('aiChat consumes the global turnstile token after a protected request', async () => {
+    (globalThis as { window?: Window }).window = {
+      __clmcpTurnstileToken: 'turnstile-token-xyz',
+    } as Window;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          test_mode: false,
+          fallback_used: false,
+          mode: 'cheap',
+          tool: 'search_cases',
+          session_id: 'sid',
+          ai_response: 'resp',
+          mcp_result: {},
+        }),
+        { status: 200 },
+      )) as typeof fetch;
+
+    await api.aiChat({
+      message: 'hello',
+      turnstileToken: 'turnstile-token-xyz',
+    });
+
+    assert.equal(globalThis.window?.__clmcpTurnstileToken, undefined);
   });
 
   it('postUiTelemetryEvent posts the allowlisted browser telemetry payload', async () => {

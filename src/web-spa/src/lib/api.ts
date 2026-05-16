@@ -95,6 +95,18 @@ function resolveTurnstileToken(explicitToken?: string): string {
   return '';
 }
 
+function consumeTurnstileToken(expectedToken?: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (
+    typeof window.__clmcpTurnstileToken === 'string' &&
+    (!expectedToken || window.__clmcpTurnstileToken.trim() === expectedToken)
+  ) {
+    delete window.__clmcpTurnstileToken;
+  }
+}
+
 async function parseBody<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -190,10 +202,16 @@ export async function bootstrapSession(args: {
     headers.set('cf-turnstile-response', turnstileToken);
   }
 
-  return (await request<unknown>('/api/session/bootstrap', {
-    method: 'POST',
-    headers,
-  })) as SessionBootstrapResponse;
+  try {
+    return (await request<unknown>('/api/session/bootstrap', {
+      method: 'POST',
+      headers,
+    })) as SessionBootstrapResponse;
+  } finally {
+    if (turnstileToken) {
+      consumeTurnstileToken(turnstileToken);
+    }
+  }
 }
 
 export async function mcpCall<T>(
@@ -304,12 +322,18 @@ export async function aiChat(args: {
   if (turnstileToken) {
     headers.set('cf-turnstile-response', turnstileToken);
   }
-  const payload = await request<unknown>('/api/ai-chat', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(args),
-  });
-  return aiChatSchema.parse(payload);
+  try {
+    const payload = await request<unknown>('/api/ai-chat', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(args),
+    });
+    return aiChatSchema.parse(payload);
+  } finally {
+    if (turnstileToken) {
+      consumeTurnstileToken(turnstileToken);
+    }
+  }
 }
 
 const aiPlainSchema = z.object({

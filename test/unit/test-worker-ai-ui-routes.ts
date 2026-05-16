@@ -142,4 +142,40 @@ describe('handleWorkerAiUiRoutes', () => {
     const payload = (await response.json()) as { error_code?: string };
     assert.equal(payload.error_code, 'turnstile_token_missing');
   });
+
+  it('checks Turnstile before mutating hosted AI chat quota', async () => {
+    let quotaCalls = 0;
+    const request = new Request('https://example.com/api/ai-chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'hello world' }),
+    });
+
+    const response = await handleWorkerAiUiRoutes({
+      context: {
+        request,
+        url: new URL(request.url),
+        origin: 'https://example.com',
+        allowedOrigins: ['https://example.com'],
+        env: {
+          TURNSTILE_SITE_KEY: 'site-key-1',
+          TURNSTILE_SECRET_KEY: 'secret-key-1',
+          MCP_TURNSTILE_ENFORCED_ROUTES: 'ai_chat',
+        },
+        ctx: {},
+      },
+      deps: buildDeps({
+        applyAiChatLifetimeQuota: async () => {
+          quotaCalls += 1;
+          return null;
+        },
+      }),
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 403);
+    assert.equal(quotaCalls, 0);
+    const payload = (await response.json()) as { error_code?: string };
+    assert.equal(payload.error_code, 'turnstile_token_missing');
+  });
 });

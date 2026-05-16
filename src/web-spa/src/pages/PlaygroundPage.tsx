@@ -1973,6 +1973,9 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       }
     } finally {
       if (!cancelledRef.current) {
+        if (turnstile.enabled) {
+          turnstile.refresh();
+        }
         setAiRunning(false);
         setStep(null);
       }
@@ -2230,65 +2233,73 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     setRunning(true);
     setResults([]);
 
-    // Fire both requests in parallel
-    const [mcpResult, plainResult] = await Promise.allSettled([
-      aiChat({
-        message: currentPrompt,
-        mcpToken: token || undefined,
-        mcpSessionId: mcpSessionId || undefined,
-        toolName: aiToolName,
-        mode: aiMode,
-        turnstileToken: turnstile.token || undefined,
-      }),
-      aiPlain({ message: currentPrompt, mode: aiMode }),
-    ]);
+    try {
+      // Fire both requests in parallel
+      const [mcpResult, plainResult] = await Promise.allSettled([
+        aiChat({
+          message: currentPrompt,
+          mcpToken: token || undefined,
+          mcpSessionId: mcpSessionId || undefined,
+          toolName: aiToolName,
+          mode: aiMode,
+          turnstileToken: turnstile.token || undefined,
+        }),
+        aiPlain({ message: currentPrompt, mode: aiMode }),
+      ]);
 
-    if (cancelledRef.current) return;
+      if (cancelledRef.current) return;
 
-    const newResults: CompareResult[] = [];
+      const newResults: CompareResult[] = [];
 
-    if (mcpResult.status === 'fulfilled') {
-      const r = mcpResult.value;
-      if (r.session_id) setMcpSessionId(r.session_id);
-      newResults.push({
-        label: 'With MCP Tools',
-        response: r.ai_response,
-        latencyMs: 0, // We'll use the wall time below
-        tool: r.tool,
-        toolReason: r.tool_reason,
-        mode: r.mode,
-        hasMcp: true,
-      });
-    } else {
-      newResults.push({
-        label: 'With MCP Tools',
-        response: `Error: ${reasonMessage(mcpResult.reason)}`,
-        latencyMs: 0,
-        mode: aiMode,
-        hasMcp: true,
-      });
+      if (mcpResult.status === 'fulfilled') {
+        const r = mcpResult.value;
+        if (r.session_id) setMcpSessionId(r.session_id);
+        newResults.push({
+          label: 'With MCP Tools',
+          response: r.ai_response,
+          latencyMs: 0, // We'll use the wall time below
+          tool: r.tool,
+          toolReason: r.tool_reason,
+          mode: r.mode,
+          hasMcp: true,
+        });
+      } else {
+        newResults.push({
+          label: 'With MCP Tools',
+          response: `Error: ${reasonMessage(mcpResult.reason)}`,
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: true,
+        });
+      }
+
+      if (plainResult.status === 'fulfilled') {
+        newResults.push({
+          label: 'Without MCP (LLM Only)',
+          response: plainResult.value.ai_response,
+          latencyMs: 0,
+          mode: plainResult.value.mode,
+          hasMcp: false,
+        });
+      } else {
+        newResults.push({
+          label: 'Without MCP (LLM Only)',
+          response: `Error: ${reasonMessage(plainResult.reason)}`,
+          latencyMs: 0,
+          mode: aiMode,
+          hasMcp: false,
+        });
+      }
+
+      setResults(newResults);
+    } finally {
+      if (!cancelledRef.current) {
+        if (turnstile.enabled) {
+          turnstile.refresh();
+        }
+        setRunning(false);
+      }
     }
-
-    if (plainResult.status === 'fulfilled') {
-      newResults.push({
-        label: 'Without MCP (LLM Only)',
-        response: plainResult.value.ai_response,
-        latencyMs: 0,
-        mode: plainResult.value.mode,
-        hasMcp: false,
-      });
-    } else {
-      newResults.push({
-        label: 'Without MCP (LLM Only)',
-        response: `Error: ${reasonMessage(plainResult.reason)}`,
-        latencyMs: 0,
-        mode: aiMode,
-        hasMcp: false,
-      });
-    }
-
-    setResults(newResults);
-    setRunning(false);
   }
 
   return (

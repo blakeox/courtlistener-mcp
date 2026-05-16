@@ -10,6 +10,7 @@ export interface TurnstileVerificationResult {
   siteKey: string | null;
   errorCode?: string;
   reason?: string;
+  action?: string;
 }
 
 function parseCsvSet(raw: string | undefined): Set<string> {
@@ -92,8 +93,19 @@ export async function verifyTurnstileForRoute<TEnv extends TurnstileRuntimeEnv>(
     const payload = (await response.json()) as {
       success?: boolean;
       'error-codes'?: string[];
+      action?: string;
     };
     if (payload.success === true) {
+      if (payload.action !== routeId) {
+        return {
+          enforced: true,
+          success: false,
+          siteKey,
+          errorCode: 'turnstile_action_mismatch',
+          reason: `Turnstile token action ${payload.action || 'unknown'} does not match ${routeId}.`,
+          ...(payload.action ? { action: payload.action } : {}),
+        };
+      }
       return { enforced: true, success: true, siteKey };
     }
     return {
@@ -102,6 +114,7 @@ export async function verifyTurnstileForRoute<TEnv extends TurnstileRuntimeEnv>(
       siteKey,
       errorCode: payload['error-codes']?.[0] || 'turnstile_verification_failed',
       reason: 'Turnstile verification failed.',
+      ...(payload.action ? { action: payload.action } : {}),
     };
   } catch (error) {
     return {

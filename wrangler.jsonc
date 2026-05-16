@@ -18,10 +18,6 @@
       "binding": "OAUTH_KV",
       "id": "56b997590e3344c98bf6875ae8b522c0",
     },
-    {
-      "binding": "ASYNC_JOBS_KV",
-      "id": "00000000000000000000000000000000",
-    },
   ],
   "analytics_engine_datasets": [
     {

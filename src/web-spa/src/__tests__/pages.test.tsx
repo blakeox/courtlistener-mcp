@@ -710,13 +710,14 @@ describe('AccountPage', () => {
       logout: vi.fn(),
     });
     const turnstile = await import('../lib/turnstile');
+    const refreshTurnstileMock = vi.fn();
     vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
       enabled: true,
       status: 'verified',
       token: 'turnstile-token',
       error: '',
       containerRef: { current: null },
-      refresh: vi.fn(),
+      refresh: refreshTurnstileMock,
     });
     vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
     const api = await import('../lib/api');
@@ -750,7 +751,43 @@ describe('AccountPage', () => {
         }),
       );
       expect(refreshMock).toHaveBeenCalledTimes(1);
+      expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
       expect(screen.getByText(/browser session bootstrapped for u1/i)).toBeTruthy();
+    });
+  });
+
+  it('refreshes the Turnstile widget after AI chat sends', async () => {
+    const auth = await import('../lib/auth');
+    vi.mocked(auth.useAuth).mockReturnValueOnce({
+      session: { authenticated: true, user: { id: 'u1' }, turnstile_site_key: 'site-key-1' },
+      loading: false,
+      sessionReady: true,
+      sessionError: '',
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+    const turnstile = await import('../lib/turnstile');
+    const refreshTurnstileMock = vi.fn();
+    vi.mocked(turnstile.useTurnstileToken).mockReturnValue({
+      enabled: true,
+      status: 'verified',
+      token: 'tok-1',
+      error: '',
+      containerRef: { current: null },
+      refresh: refreshTurnstileMock,
+    });
+    vi.mocked(turnstile.describeTurnstileStatus).mockReturnValue('Challenge verified');
+
+    const { PlaygroundPage } = await import('../pages/PlaygroundPage');
+    render(<PlaygroundPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getAllByPlaceholderText(/ask a legal research question/i)[0], {
+      target: { value: 'Find recent ADA accessibility cases' },
+    });
+    fireEvent.click(screen.getAllByText('Send')[0]);
+
+    await waitFor(() => {
+      expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
     });
   });
 

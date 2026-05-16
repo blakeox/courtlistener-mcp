@@ -142,6 +142,9 @@ export function AccountPage(): React.JSX.Element {
       setBootstrapError(message);
       toast(message, 'error');
     } finally {
+      if (turnstile.enabled) {
+        turnstile.refresh();
+      }
       setBootstrapBusy(false);
     }
   }
