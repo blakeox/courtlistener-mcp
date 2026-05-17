@@ -9,8 +9,7 @@ export const eyebrowLabelClass = cn(
 
 /** Keep `text-link` after utilities — tailwind-merge drops it if listed before `text-accent`. */
 export const textLinkClass = cn(
-  'font-semibold text-[color:var(--accent)] underline decoration-[color:var(--shell-focus-ring)] underline-offset-2 transition-colors',
-  'text-link',
+  'text-link font-semibold text-accent underline decoration-[color:var(--shell-focus-ring)] underline-offset-2 transition-colors',
 );
 
 export const mutedTextClass = cn('muted mt-(--space-2) text-subtle');

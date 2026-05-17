@@ -18,7 +18,7 @@ export const pageStatusBannerClass = 'page-status-banner mt-(--space-2-5)';
 
 export const turnstileWrapClass = 'turnstile-wrap mt-(--space-3)';
 
-export const orderedListClass = 'ordered mt-2.5 pl-5';
+export const orderedListClass = 'ordered mt-2.5 list-disc pl-5';
 
 export const tableScrollClass = 'table-scroll w-full overflow-x-auto';
 

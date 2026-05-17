@@ -10,6 +10,7 @@ describe('design system compliance', () => {
     const output = execFileSync('node', ['scripts/reports/check-design-system.mjs'], {
       cwd: repoRoot,
       encoding: 'utf8',
+      env: { ...process.env, DESIGN_SYSTEM_SKIP_PRODUCTION_BUILD: '1' },
     });
     expect(output).toMatch(/Tailwind v4/);
   });

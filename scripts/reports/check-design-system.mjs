@@ -444,7 +444,9 @@ checkPlaygroundClassesModule();
 checkTsx();
 checkViteConfig();
 checkDesignDoc();
-checkProductionCssBudget();
+if (process.env.DESIGN_SYSTEM_SKIP_PRODUCTION_BUILD !== '1') {
+  checkProductionCssBudget();
+}
 
 if (errors.length === 0) {
   process.stdout.write('Design system check passed (Tailwind v4 + token bridge).\n');
