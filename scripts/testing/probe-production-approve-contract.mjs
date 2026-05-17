@@ -6,33 +6,46 @@
  * redirects to sign-in instead of returning invalid_approval_state JSON.
  */
 
-const baseUrl = (process.env.OAUTH_BASE_URL || 'https://courtlistenermcp.blakeoxford.com').replace(
-  /\/+$/,
-  '',
-);
+import {
+  OAUTH_PROBE_USER_AGENT,
+  registerOAuthClient,
+  resolveProbeConfig,
+} from './e2e-remote-oauth-handshake.mjs';
+
+const DEFAULT_BASE_URL = 'https://courtlistenermcp.blakeoxford.com';
 
 async function main() {
-  const discovery = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`).then((r) =>
-    r.json(),
-  );
-  const registration = await fetch(discovery.registration_endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client_name: 'Approve Contract Probe',
-      redirect_uris: ['http://127.0.0.1:59999/callback'],
-      grant_types: ['authorization_code'],
-      response_types: ['code'],
-      token_endpoint_auth_method: 'none',
-      scope: 'legal:read legal:search legal:analyze',
-    }),
+  const cfg = resolveProbeConfig({
+    ...process.env,
+    OAUTH_BASE_URL:
+      process.env.OAUTH_BASE_URL?.trim() ||
+      process.env.REMOTE_SERVER_URL?.trim() ||
+      DEFAULT_BASE_URL,
+  });
+
+  const baseUrl = cfg.baseUrl;
+  const redirectUri = 'http://127.0.0.1:59999/callback';
+  const scope = 'legal:read legal:search legal:analyze';
+
+  const discovery = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`, {
+    headers: { 'user-agent': OAUTH_PROBE_USER_AGENT },
   }).then((r) => r.json());
+
+  const registration = cfg.clientId
+    ? { client_id: cfg.clientId }
+    : await registerOAuthClient(discovery.registration_endpoint, {
+        clientOrigin: cfg.clientOrigin,
+        redirectUri,
+        scope,
+        clientName: 'Approve Contract Probe',
+        retries: cfg.registrationRetries,
+      });
 
   const authorizeUrl = new URL(discovery.authorization_endpoint);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('client_id', registration.client_id);
-  authorizeUrl.searchParams.set('redirect_uri', 'http://127.0.0.1:59999/callback');
-  authorizeUrl.searchParams.set('scope', 'legal:read legal:search legal:analyze');
+  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+  authorizeUrl.searchParams.set('scope', scope);
   authorizeUrl.searchParams.set('state', 'probe-state');
   authorizeUrl.searchParams.set('code_challenge_method', 'S256');
   authorizeUrl.searchParams.set('code_challenge', 'probe-challenge-not-s256-valid');

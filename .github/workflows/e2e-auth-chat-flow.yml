@@ -19,6 +19,7 @@ jobs:
 
     env:
       OAUTH_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      OAUTH_CLIENT_ID: ${{ secrets.E2E_OAUTH_CLIENT_ID }}
 
     steps:
       - name: Checkout repository
@@ -49,3 +50,6 @@ jobs:
 
       - name: Run hosted OAuth handshake probe
         run: pnpm run test:e2e:oauth-remote
+
+      - name: Run OAuth approve contract probe
+        run: pnpm run test:e2e:oauth-approve-contract

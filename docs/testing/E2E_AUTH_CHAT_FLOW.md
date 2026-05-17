@@ -22,6 +22,10 @@ pnpm run test:e2e:oauth-remote
 - `OAUTH_CLIENT_ORIGIN` client origin used for DCR and metadata checks
 - `OAUTH_REDIRECT_URI` redirect URI used for the OAuth authorization request
 - `OAUTH_SCOPE` scope requested during the authorization probe
+- `OAUTH_CLIENT_ID` or `E2E_OAUTH_CLIENT_ID` skip dynamic registration when
+  CI/WAF blocks DCR
+- `OAUTH_REGISTRATION_RETRIES` retries transient registration failures like
+  `403`/`429`/`5xx` (default `3`)
 
 ## Notes
 
@@ -41,3 +45,5 @@ deployment monitor instead of a `push` gate for `main`.
 Configure these repository secrets:
 
 - `E2E_BASE_URL`
+- `E2E_OAUTH_CLIENT_ID` (optional) long-lived probe client when GitHub Actions
+  IPs cannot register
