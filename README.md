@@ -23,6 +23,8 @@ Cloudflare Workers OAuth, structured logging, caching, and CI testing.
 ## Repository Structure
 
 - `src/` core server, tool handlers, API integration, worker runtime
+- `src/web-spa/` browser portal (React SPA, **Tailwind CSS v4**); see
+  [`src/web-spa/DESIGN.md`](src/web-spa/DESIGN.md)
 - `configs/` ready-to-use MCP client configs for local, self-hosted, and hosted
   clients
 - `docs/` deployment, testing, and operational documentation

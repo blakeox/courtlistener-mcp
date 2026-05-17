@@ -1,4 +1,8 @@
+@import 'tailwindcss';
+@source './**/*.{tsx,html}';
+
 @import './styles/tokens.css';
+@import './styles/theme.css';
 @import './styles/primitives.css';
 @import './styles/workspace.css';
 @import './styles/landing.css';

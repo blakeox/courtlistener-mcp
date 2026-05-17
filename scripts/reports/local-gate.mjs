@@ -7,6 +7,7 @@ const skipSpaAuth = args.has('--skip-spa-auth');
 
 const steps = [
   ['repo hygiene', ['pnpm', ['run', 'ci:check:repo-hygiene']]],
+  ['design system', ['pnpm', ['run', 'ci:check:design-system']]],
   ['typecheck', ['pnpm', ['run', 'typecheck']]],
   ['build', ['pnpm', ['run', 'build']]],
   ['generated files', ['pnpm', ['run', 'ci:check:generated']]],

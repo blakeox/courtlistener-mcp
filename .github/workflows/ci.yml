@@ -181,6 +181,15 @@ jobs:
       - name: Run shared local gate
         run: pnpm run ci:local-gate
 
+      - name: Run SPA unit tests
+        run: pnpm run test:spa
+
+      - name: Install Chromium for SPA design smoke
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run SPA design smoke tests
+        run: pnpm run test:spa:design
+
       - name: Run integration tests
         run: pnpm run test:integration
 

@@ -10,7 +10,14 @@ import {
   PageHeader,
   StatusBanner,
 } from '../components/ui';
+import { mutedCopyClass } from '../lib/ui-classes';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import {
+  orderedListClass,
+  stackClass,
+  twoColClass,
+  twoUpGridClass,
+} from '../lib/workspace-classes';
 import { getUsage, getWorkerHealth, toErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
@@ -44,7 +51,7 @@ export function ObservabilityPage(): React.JSX.Element {
   );
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <PageHeader
         eyebrow="Monitor"
         title="Agent Observability"
@@ -70,20 +77,24 @@ export function ObservabilityPage(): React.JSX.Element {
         type="error"
       />
 
-      <div className="two-up-grid">
+      <div className={twoUpGridClass}>
         <MetricCard
           label="Analytics Engine"
           value={analyticsEnabled ? 'Enabled' : 'Disabled'}
           accent={analyticsEnabled ? 'Worker export active' : 'No Cloudflare analytics write path'}
         >
-          <p className="muted">Controls whether worker telemetry is exported into Cloudflare.</p>
+          <p className={mutedCopyClass}>
+            Controls whether worker telemetry is exported into Cloudflare.
+          </p>
         </MetricCard>
         <MetricCard
           label="Async execution"
           value={queueConfigured ? 'Queue bound' : 'Queue missing'}
           accent={kvConfigured ? 'Job KV bound' : 'Job KV missing'}
         >
-          <p className="muted">Shows whether async jobs can survive process-local state loss.</p>
+          <p className={mutedCopyClass}>
+            Shows whether async jobs can survive process-local state loss.
+          </p>
         </MetricCard>
         <MetricCard
           label="Turnstile policy"
@@ -92,7 +103,9 @@ export function ObservabilityPage(): React.JSX.Element {
           }
           accent={formatRoutes(enforcedRoutes)}
         >
-          <p className="muted">Server-side challenge gates currently active on browser surfaces.</p>
+          <p className={mutedCopyClass}>
+            Server-side challenge gates currently active on browser surfaces.
+          </p>
         </MetricCard>
         <MetricCard
           label="Usage telemetry"
@@ -109,12 +122,14 @@ export function ObservabilityPage(): React.JSX.Element {
               : 'Per-user analytics summary'
           }
         >
-          <p className="muted">Confirms whether UI recovery telemetry is visible to operators.</p>
+          <p className={mutedCopyClass}>
+            Confirms whether UI recovery telemetry is visible to operators.
+          </p>
         </MetricCard>
       </div>
 
-      <div className="two-col">
-        <div className="stack">
+      <div className={twoColClass}>
+        <div className={stackClass}>
           <Card
             title="Cloudflare control surface"
             subtitle="Bindings and policies the worker is currently reporting through /health."
@@ -150,18 +165,18 @@ export function ObservabilityPage(): React.JSX.Element {
             subtitle="Worker latency keys exposed through the live health payload."
           >
             {latencyKeys.length ? (
-              <ul className="ordered">
+              <ul className={orderedListClass}>
                 {latencyKeys.map((metric) => (
                   <li key={metric}>{metric}</li>
                 ))}
               </ul>
             ) : (
-              <p className="muted">No latency metric groups have been reported yet.</p>
+              <p className={mutedCopyClass}>No latency metric groups have been reported yet.</p>
             )}
           </Card>
         </div>
 
-        <aside className="stack">
+        <aside className={stackClass}>
           <Card title="Session topology" subtitle="Current Durable Object session model shape.">
             <DefinitionList
               entries={[
@@ -201,7 +216,7 @@ export function ObservabilityPage(): React.JSX.Element {
             title="Operator posture"
             subtitle="Whether the browser-facing control path is measurable end to end."
           >
-            <ul className="ordered">
+            <ul className={orderedListClass}>
               <li>
                 <Badge tone={analyticsEnabled ? 'ok' : 'warn'}>
                   {analyticsEnabled ? 'Cloudflare export active' : 'Analytics export inactive'}

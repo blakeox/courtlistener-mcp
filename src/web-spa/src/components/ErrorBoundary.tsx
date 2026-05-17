@@ -1,4 +1,5 @@
 import React from 'react';
+import { stackClass } from '../lib/workspace-classes';
 import { Button, ButtonLink, Card, InlineGroup, StatusBanner } from './ui';
 
 interface ErrorBoundaryProps {
@@ -30,7 +31,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     return (
-      <div className="stack">
+      <div className={stackClass}>
         <Card
           title="Something went wrong"
           subtitle="An unexpected error occurred. You can try again or return to the workspace overview."
