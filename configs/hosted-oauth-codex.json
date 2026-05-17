@@ -5,7 +5,7 @@
       "transport": "streamable-http",
       "auth": {
         "type": "oauth2",
-        "authorizationUrl": "https://courtlistenermcp.blakeoxford.com/authorize",
+        "authorizationUrl": "https://courtlistenermcp.blakeoxford.com/oauth/authorize",
         "tokenUrl": "https://courtlistenermcp.blakeoxford.com/token",
         "scopes": ["legal:read", "legal:search", "legal:analyze"]
       }
