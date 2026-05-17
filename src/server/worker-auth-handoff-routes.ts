@@ -3310,12 +3310,49 @@ export async function handleWorkerAuthHandoffRoutes<
       return attachHostedAuthHeaders(response, signal);
     }
 
-    const effectiveReturnTo = resolveEffectiveApprovalReturnTo(request, [
-      approvalState?.returnTo,
+    const submittedReturnTo = resolveEffectiveApprovalReturnTo(request, [
       queryReturnTo,
       formReturnTo,
-      flowState?.returnTo,
     ]);
+    const effectiveReturnTo =
+      submittedReturnTo ??
+      resolveEffectiveApprovalReturnTo(request, [flowState?.returnTo, approvalState?.returnTo]);
+    if (
+      submittedReturnTo &&
+      approvalState?.returnTo &&
+      isDirectOauthReturnTarget(request, approvalState.returnTo) &&
+      submittedReturnTo !== approvalState.returnTo
+    ) {
+      const response = deps.jsonError(
+        'Approval state is invalid or expired.',
+        400,
+        'invalid_approval_state',
+      );
+      response.headers.append('Set-Cookie', clearApprovalCookie);
+      if (approvalCorrelation.setCookieHeader) {
+        response.headers.append('Set-Cookie', approvalCorrelation.setCookieHeader);
+      }
+      const signal = withHostedAuthRequestDuration(
+        {
+          ...signalBase,
+          ready: false,
+          status: 'invalid_return_target' as const,
+          outcome: 'rejected' as const,
+          correlationId: approvalCorrelation.correlationId,
+          authError: 'invalid_approval_state',
+          approvalDurationMs: getElapsedDurationMs(requestStartedAtMs),
+        },
+        requestStartedAtMs,
+      );
+      emitHostedAuthEvent(
+        env,
+        request,
+        'hosted_auth.approve.reject',
+        { reason: 'approval_state_mismatch' },
+        signal,
+      );
+      return attachHostedAuthHeaders(response, signal);
+    }
     if (!effectiveReturnTo) {
       const response = deps.jsonError(
         'Approval state is invalid or expired.',
