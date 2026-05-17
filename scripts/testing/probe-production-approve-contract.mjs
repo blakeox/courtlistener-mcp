@@ -12,11 +12,16 @@ import {
   resolveProbeConfig,
 } from './e2e-remote-oauth-handshake.mjs';
 
+const DEFAULT_BASE_URL = 'https://courtlistenermcp.blakeoxford.com';
+
 async function main() {
-  const cfg = resolveProbeConfig();
-  if ('skipReason' in cfg) {
-    throw new Error(cfg.skipReason);
-  }
+  const cfg = resolveProbeConfig({
+    ...process.env,
+    OAUTH_BASE_URL:
+      process.env.OAUTH_BASE_URL?.trim() ||
+      process.env.REMOTE_SERVER_URL?.trim() ||
+      DEFAULT_BASE_URL,
+  });
 
   const baseUrl = cfg.baseUrl;
   const redirectUri = 'http://127.0.0.1:59999/callback';
