@@ -37,6 +37,7 @@ const AUTH_FLOW_COOKIE_NAME = 'clauth_flow';
 const CSRF_COOKIE_NAME = 'clmcp_csrf';
 const AUTH_STATE_TTL_SECONDS = 10 * 60;
 const AUTH_APPROVAL_TTL_SECONDS = 10 * 60;
+const AUTH_APPROVAL_COOKIE_SAMESITE: CookieSameSite = 'Lax';
 const AUTH_FLOW_TTL_SECONDS = 12 * 60 * 60;
 const DEFAULT_AUTH_SUCCESS_PATH = '/app/account';
 const UPSTREAM_DISCOVERY_TIMEOUT_MS = 5000;
@@ -956,6 +957,7 @@ interface AuthApprovalPayload {
 
 interface AuthFlowPayload {
   correlationId: string;
+  returnTo?: string;
   exp: number;
 }
 
@@ -1151,7 +1153,7 @@ async function encodeAuthApprovalCookie(
     signature,
     secure,
     AUTH_APPROVAL_TTL_SECONDS,
-    'Strict',
+    AUTH_APPROVAL_COOKIE_SAMESITE,
   );
 }
 
@@ -1221,7 +1223,8 @@ async function decodeAuthFlowCookie(
       typeof payload.correlationId !== 'string' ||
       typeof payload.exp !== 'number' ||
       !isSafeCorrelationId(payload.correlationId) ||
-      payload.exp <= Math.floor(Date.now() / 1000)
+      payload.exp <= Math.floor(Date.now() / 1000) ||
+      (payload.returnTo !== undefined && typeof payload.returnTo !== 'string')
     ) {
       return null;
     }
@@ -1758,6 +1761,8 @@ function renderAuthApprovalPage(params: {
   redirectUriHost: string | null;
   scope: string[];
   csrfToken: string;
+  returnTo: string;
+  approveAction: string;
   logoutHref: string;
   nonce: string;
 }): string {
@@ -1789,8 +1794,9 @@ function renderAuthApprovalPage(params: {
     `,
     actionsHtml: `
       <div class="auth-form-actions">
-        <form class="auth-inline-form" method="post" action="${HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve}">
+        <form class="auth-inline-form" method="post" action="${escapeHtml(params.approveAction)}">
           <input type="hidden" name="csrf_token" value="${escapeHtml(params.csrfToken)}" />
+          <input type="hidden" name="return_to" value="${escapeHtml(params.returnTo)}" />
           <button class="auth-button auth-button-primary" type="submit">Approve and continue</button>
         </form>
         ${renderAuthButtonLink(params.logoutHref, 'Sign out instead', 'secondary')}
@@ -1836,6 +1842,20 @@ function isDirectOauthReturnTarget(request: Request, returnTo: string): boolean 
   } catch {
     return false;
   }
+}
+
+function resolveEffectiveApprovalReturnTo(
+  request: Request,
+  candidates: Array<string | null | undefined>,
+): string | null {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (!trimmed) continue;
+    if (isDirectOauthReturnTarget(request, trimmed)) {
+      return trimmed;
+    }
+  }
+  return null;
 }
 
 function buildAuthApprovalUrl(request: Request, returnTo: string): string {
@@ -1982,6 +2002,8 @@ async function buildApprovalPageResponse<
     headers.append('Set-Cookie', csrfCookieHeader);
   }
   const nonce = deps.generateCspNonce();
+  const approveActionUrl = new URL(HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve, request.url);
+  approveActionUrl.searchParams.set('return_to', returnTo);
 
   return deps.htmlResponse(
     renderAuthApprovalPage({
@@ -1989,6 +2011,8 @@ async function buildApprovalPageResponse<
       redirectUriHost: redirectUri?.host || null,
       scope: Array.isArray(authRequest.scope) ? authRequest.scope : [],
       csrfToken,
+      returnTo,
+      approveAction: `${approveActionUrl.pathname}${approveActionUrl.search}`,
       logoutHref: buildLogoutUrl(request, returnTo),
       nonce,
     }),
@@ -2159,6 +2183,7 @@ async function resolveHostedAuthCorrelationId<TEnv extends WorkerUiSessionRuntim
   env: TEnv,
   deps: Pick<HandleWorkerAuthHandoffRoutesDeps<TEnv>, 'workerUiSessionRuntime'>,
   candidates: Array<string | null | undefined> = [],
+  options?: { returnTo?: string | null },
 ): Promise<{ correlationId: string | null; setCookieHeader: string | null }> {
   const secret = deps.workerUiSessionRuntime.getUiSessionSecret(env);
   const secure = getSecureCookieSetting(request, env, deps);
@@ -2169,11 +2194,13 @@ async function resolveHostedAuthCorrelationId<TEnv extends WorkerUiSessionRuntim
     if (!secret) {
       return { correlationId: normalized, setCookieHeader: null };
     }
+    const returnTo = resolveEffectiveApprovalReturnTo(request, [options?.returnTo]);
     return {
       correlationId: normalized,
       setCookieHeader: await encodeAuthFlowCookie(
         {
           correlationId: normalized,
+          ...(returnTo ? { returnTo } : {}),
           exp: Math.floor(Date.now() / 1000) + AUTH_FLOW_TTL_SECONDS,
         },
         secret,
@@ -2188,6 +2215,24 @@ async function resolveHostedAuthCorrelationId<TEnv extends WorkerUiSessionRuntim
 
   const persisted = await decodeAuthFlowCookie(request, secret);
   if (persisted?.correlationId) {
+    const returnTo = resolveEffectiveApprovalReturnTo(request, [
+      options?.returnTo,
+      persisted.returnTo,
+    ]);
+    if (returnTo && returnTo !== persisted.returnTo) {
+      return {
+        correlationId: persisted.correlationId,
+        setCookieHeader: await encodeAuthFlowCookie(
+          {
+            correlationId: persisted.correlationId,
+            returnTo,
+            exp: Math.floor(Date.now() / 1000) + AUTH_FLOW_TTL_SECONDS,
+          },
+          secret,
+          secure,
+        ),
+      };
+    }
     return { correlationId: persisted.correlationId, setCookieHeader: null };
   }
 
@@ -2356,7 +2401,10 @@ export async function handleWorkerAuthHandoffRoutes<
     headers.append('Set-Cookie', buildExpiredCookie('clmcp_ui', secure, 'Lax'));
     headers.append('Set-Cookie', buildExpiredCookie('clmcp_ui_present', secure, 'Lax'));
     headers.append('Set-Cookie', buildExpiredCookie(AUTH_STATE_COOKIE_NAME, secure, 'Lax'));
-    headers.append('Set-Cookie', buildExpiredCookie(AUTH_APPROVAL_COOKIE_NAME, secure, 'Strict'));
+    headers.append(
+      'Set-Cookie',
+      buildExpiredCookie(AUTH_APPROVAL_COOKIE_NAME, secure, AUTH_APPROVAL_COOKIE_SAMESITE),
+    );
     headers.append('Set-Cookie', buildExpiredCookie(AUTH_FLOW_COOKIE_NAME, secure, 'Lax'));
     headers.append('Set-Cookie', buildExpiredCookie(CSRF_COOKIE_NAME, secure, 'Lax'));
     const response = buildRedirectResponse(
@@ -2937,12 +2985,19 @@ export async function handleWorkerAuthHandoffRoutes<
   }
 
   if (isHostedApprovalPath(url.pathname) && request.method === 'GET') {
-    const approveCorrelation = requestCorrelation.correlationId
-      ? requestCorrelation
-      : await resolveHostedAuthCorrelationId(request, env, deps, [createHostedAuthCorrelationId()]);
     const resolvedReturnTo = resolveAuthStartReturnTarget(
       request,
       url.searchParams.get('return_to'),
+    );
+    const approveCorrelation = await resolveHostedAuthCorrelationId(
+      request,
+      env,
+      deps,
+      [
+        requestCorrelation.correlationId,
+        ...(requestCorrelation.correlationId ? [] : [createHostedAuthCorrelationId()]),
+      ],
+      { returnTo: resolvedReturnTo.value },
     );
     if (!isDirectOauthReturnTarget(request, resolvedReturnTo.value)) {
       const nonce = deps.generateCspNonce();
@@ -3148,7 +3203,11 @@ export async function handleWorkerAuthHandoffRoutes<
     const initialApproveCorrelation = requestCorrelation.correlationId
       ? requestCorrelation
       : await resolveHostedAuthCorrelationId(request, env, deps, [createHostedAuthCorrelationId()]);
-    const clearApprovalCookie = buildExpiredCookie(AUTH_APPROVAL_COOKIE_NAME, secure, 'Strict');
+    const clearApprovalCookie = buildExpiredCookie(
+      AUTH_APPROVAL_COOKIE_NAME,
+      secure,
+      AUTH_APPROVAL_COOKIE_SAMESITE,
+    );
     if (!sessionSecret) {
       const response = deps.jsonError('Hosted auth is not configured.', 503, 'auth_not_configured');
       response.headers.append('Set-Cookie', clearApprovalCookie);
@@ -3206,46 +3265,19 @@ export async function handleWorkerAuthHandoffRoutes<
       return attachHostedAuthHeaders(response, signal);
     }
 
-    const approvalState = await decodeAuthApprovalCookie(request, sessionSecret);
-    const approvalCorrelation = await resolveHostedAuthCorrelationId(request, env, deps, [
-      approvalState?.correlationId,
-      initialApproveCorrelation.correlationId,
-    ]);
-    if (!approvalState || !isDirectOauthReturnTarget(request, approvalState.returnTo)) {
-      const response = deps.jsonError(
-        'Approval state is invalid or expired.',
-        400,
-        'invalid_approval_state',
-      );
-      response.headers.append('Set-Cookie', clearApprovalCookie);
-      if (approvalCorrelation.setCookieHeader) {
-        response.headers.append('Set-Cookie', approvalCorrelation.setCookieHeader);
-      }
-      const signal = withHostedAuthRequestDuration(
-        {
-          ...signalBase,
-          ready: false,
-          status: 'invalid_return_target' as const,
-          outcome: 'rejected' as const,
-          correlationId: approvalCorrelation.correlationId,
-          authError: 'invalid_approval_state',
-          approvalDurationMs: getElapsedDurationMs(requestStartedAtMs),
-        },
-        requestStartedAtMs,
-      );
-      emitHostedAuthEvent(
-        env,
-        request,
-        'hosted_auth.approve.reject',
-        { reason: 'invalid_approval_state' },
-        signal,
-      );
-      return attachHostedAuthHeaders(response, signal);
-    }
-
     const form = await request.formData();
     const csrfToken =
       typeof form.get('csrf_token') === 'string' ? String(form.get('csrf_token')).trim() : '';
+    const formReturnTo =
+      typeof form.get('return_to') === 'string' ? String(form.get('return_to')).trim() : '';
+    const queryReturnTo = url.searchParams.get('return_to')?.trim() || '';
+    const approvalState = await decodeAuthApprovalCookie(request, sessionSecret);
+    const flowState = await decodeAuthFlowCookie(request, sessionSecret);
+    const approvalCorrelation = await resolveHostedAuthCorrelationId(request, env, deps, [
+      approvalState?.correlationId,
+      initialApproveCorrelation.correlationId,
+      flowState?.correlationId,
+    ]);
     if (!csrfToken || csrfToken !== (getCookieValue(request, CSRF_COOKIE_NAME) ?? '')) {
       const response = deps.jsonError(
         'CSRF token validation failed.',
@@ -3278,11 +3310,86 @@ export async function handleWorkerAuthHandoffRoutes<
       return attachHostedAuthHeaders(response, signal);
     }
 
+    const submittedReturnTo = resolveEffectiveApprovalReturnTo(request, [
+      queryReturnTo,
+      formReturnTo,
+    ]);
+    const effectiveReturnTo =
+      submittedReturnTo ??
+      resolveEffectiveApprovalReturnTo(request, [flowState?.returnTo, approvalState?.returnTo]);
+    if (
+      submittedReturnTo &&
+      approvalState?.returnTo &&
+      isDirectOauthReturnTarget(request, approvalState.returnTo) &&
+      submittedReturnTo !== approvalState.returnTo
+    ) {
+      const response = deps.jsonError(
+        'Approval state is invalid or expired.',
+        400,
+        'invalid_approval_state',
+      );
+      response.headers.append('Set-Cookie', clearApprovalCookie);
+      if (approvalCorrelation.setCookieHeader) {
+        response.headers.append('Set-Cookie', approvalCorrelation.setCookieHeader);
+      }
+      const signal = withHostedAuthRequestDuration(
+        {
+          ...signalBase,
+          ready: false,
+          status: 'invalid_return_target' as const,
+          outcome: 'rejected' as const,
+          correlationId: approvalCorrelation.correlationId,
+          authError: 'invalid_approval_state',
+          approvalDurationMs: getElapsedDurationMs(requestStartedAtMs),
+        },
+        requestStartedAtMs,
+      );
+      emitHostedAuthEvent(
+        env,
+        request,
+        'hosted_auth.approve.reject',
+        { reason: 'approval_state_mismatch' },
+        signal,
+      );
+      return attachHostedAuthHeaders(response, signal);
+    }
+    if (!effectiveReturnTo) {
+      const response = deps.jsonError(
+        'Approval state is invalid or expired.',
+        400,
+        'invalid_approval_state',
+      );
+      response.headers.append('Set-Cookie', clearApprovalCookie);
+      if (approvalCorrelation.setCookieHeader) {
+        response.headers.append('Set-Cookie', approvalCorrelation.setCookieHeader);
+      }
+      const signal = withHostedAuthRequestDuration(
+        {
+          ...signalBase,
+          ready: false,
+          status: 'invalid_return_target' as const,
+          outcome: 'rejected' as const,
+          correlationId: approvalCorrelation.correlationId,
+          authError: 'invalid_approval_state',
+          approvalDurationMs: getElapsedDurationMs(requestStartedAtMs),
+        },
+        requestStartedAtMs,
+      );
+      emitHostedAuthEvent(
+        env,
+        request,
+        'hosted_auth.approve.reject',
+        { reason: 'invalid_approval_state' },
+        signal,
+      );
+      return attachHostedAuthHeaders(response, signal);
+    }
+
     try {
       const approvalStartedAtMs = Date.now();
       const response = await completeHostedAuthorization(
         env,
-        approvalState.returnTo,
+        effectiveReturnTo,
         sessionState.userId,
         deps,
       );
@@ -3306,7 +3413,7 @@ export async function handleWorkerAuthHandoffRoutes<
         request,
         'hosted_auth.approve.completed',
         {
-          return_to: approvalState.returnTo,
+          return_to: effectiveReturnTo,
         },
         signal,
       );
