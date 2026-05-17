@@ -24,8 +24,8 @@ pnpm run test:e2e:oauth-remote
 - `OAUTH_SCOPE` scope requested during the authorization probe
 - `OAUTH_CLIENT_ID` or `E2E_OAUTH_CLIENT_ID` skip dynamic registration when
   CI/WAF blocks DCR
-- `OAUTH_REGISTRATION_RETRIES` retries for transient `403`/`429` on registration
-  (default `3`)
+- `OAUTH_REGISTRATION_RETRIES` retries transient registration failures with
+  `403`, `429`, `502`, `503`, or `504` responses (default `3`)
 
 ## Notes
 
