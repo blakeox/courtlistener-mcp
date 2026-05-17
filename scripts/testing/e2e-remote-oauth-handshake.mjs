@@ -14,11 +14,18 @@
  *   OAUTH_CLIENT_ORIGIN            Defaults to https://chatgpt.com
  *   OAUTH_REDIRECT_URI             Defaults to https://oauth-debug.example/callback
  *   OAUTH_SCOPE                    Defaults to legal:read legal:search legal:analyze
+ *   OAUTH_CLIENT_ID                Skip dynamic registration (also E2E_OAUTH_CLIENT_ID)
+ *   OAUTH_REGISTRATION_RETRIES     Retries for flaky DCR (default 3)
  */
 
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { normalizeRemoteEndpoints } from '../resolve-remote-endpoints.js';
+
+export const OAUTH_PROBE_USER_AGENT = 'courtlistener-mcp-oauth-probe/1.0';
+
+const DEFAULT_REGISTRATION_RETRIES = 3;
+const REGISTRATION_RETRY_STATUSES = new Set([403, 429, 502, 503, 504]);
 
 export function resolveProbeConfig(env = process.env) {
   const baseUrlInput = env.OAUTH_BASE_URL?.trim() || env.REMOTE_SERVER_URL?.trim() || '';
@@ -29,12 +36,104 @@ export function resolveProbeConfig(env = process.env) {
     };
   }
 
+  const clientId = env.OAUTH_CLIENT_ID?.trim() || env.E2E_OAUTH_CLIENT_ID?.trim() || '';
+  const registrationRetries = Number.parseInt(env.OAUTH_REGISTRATION_RETRIES?.trim() || '', 10);
+
   return {
     baseUrl: normalizeRemoteEndpoints(baseUrlInput).baseUrl.replace(/\/+$/, ''),
     clientOrigin: (env.OAUTH_CLIENT_ORIGIN || 'https://chatgpt.com').trim(),
     redirectUri: (env.OAUTH_REDIRECT_URI || 'https://oauth-debug.example/callback').trim(),
     scope: (env.OAUTH_SCOPE || 'legal:read legal:search legal:analyze').trim(),
+    ...(clientId ? { clientId } : {}),
+    registrationRetries:
+      Number.isFinite(registrationRetries) && registrationRetries > 0
+        ? registrationRetries
+        : DEFAULT_REGISTRATION_RETRIES,
   };
+}
+
+export function registrationRetryDelayMs(attemptIndex) {
+  return 1000 * 2 ** attemptIndex;
+}
+
+export async function registerOAuthClient(
+  registrationEndpoint,
+  {
+    clientOrigin,
+    redirectUri,
+    scope,
+    clientName = 'Remote OAuth Probe',
+    retries = DEFAULT_REGISTRATION_RETRIES,
+    fetchImpl = fetch,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  },
+) {
+  const payload = {
+    client_name: clientName,
+    redirect_uris: [redirectUri],
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none',
+    scope,
+  };
+
+  let lastFailure = null;
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    const response = await fetchJson(
+      registrationEndpoint,
+      {
+        method: 'POST',
+        headers: {
+          Origin: clientOrigin,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+      fetchImpl,
+    );
+
+    if (response.status === 201) {
+      assert(
+        typeof response.body?.client_id === 'string' && response.body.client_id.length > 0,
+        'Missing client_id',
+      );
+      assert(response.headers.get('location'), 'Missing registration Location header');
+      return response.body;
+    }
+
+    lastFailure = summarizeRegistrationFailure(response);
+    if (attempt < retries - 1 && REGISTRATION_RETRY_STATUSES.has(response.status)) {
+      await sleep(registrationRetryDelayMs(attempt));
+      continue;
+    }
+    break;
+  }
+
+  throw new Error(
+    `Expected 201, got ${lastFailure?.status ?? 'unknown'}${formatRegistrationFailureDetail(lastFailure)}`,
+  );
+}
+
+function summarizeRegistrationFailure(response) {
+  const bodySnippet =
+    typeof response.body === 'object' && response.body !== null
+      ? JSON.stringify(response.body).slice(0, 240)
+      : String(response.body ?? '').slice(0, 240);
+  return {
+    status: response.status,
+    bodySnippet,
+    cfRay: response.headers.get('cf-ray'),
+    retryAfter: response.headers.get('retry-after'),
+  };
+}
+
+function formatRegistrationFailureDetail(failure) {
+  if (!failure) return '';
+  const parts = [];
+  if (failure.bodySnippet) parts.push(` body=${failure.bodySnippet}`);
+  if (failure.cfRay) parts.push(` cf-ray=${failure.cfRay}`);
+  if (failure.retryAfter) parts.push(` retry-after=${failure.retryAfter}`);
+  return parts.length > 0 ? `;${parts.join(';')}` : '';
 }
 
 export async function main() {
@@ -70,30 +169,20 @@ export async function main() {
     );
   });
 
-  const registration = await step('Register public OAuth client', async () => {
-    const response = await fetchJson(discovery.registration_endpoint, {
-      method: 'POST',
-      headers: {
-        Origin: cfg.clientOrigin,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_name: 'Remote OAuth Probe',
-        redirect_uris: [cfg.redirectUri],
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-        token_endpoint_auth_method: 'none',
+  const registration = await step(
+    cfg.clientId ? 'Use configured OAuth client' : 'Register public OAuth client',
+    async () => {
+      if (cfg.clientId) {
+        return { client_id: cfg.clientId };
+      }
+      return registerOAuthClient(discovery.registration_endpoint, {
+        clientOrigin: cfg.clientOrigin,
+        redirectUri: cfg.redirectUri,
         scope: cfg.scope,
-      }),
-    });
-    assert(response.status === 201, `Expected 201, got ${response.status}`);
-    assert(
-      typeof response.body?.client_id === 'string' && response.body.client_id.length > 0,
-      'Missing client_id',
-    );
-    assert(response.headers.get('location'), 'Missing registration Location header');
-    return response.body;
-  });
+        retries: cfg.registrationRetries,
+      });
+    },
+  );
 
   const pkce = createPkce();
   const state = randomId('state');
@@ -166,8 +255,12 @@ function base64Url(buffer) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-async function fetchJson(url, init = {}) {
-  const response = await fetch(url, init);
+async function fetchJson(url, init = {}, fetchImpl = fetch) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('user-agent')) {
+    headers.set('user-agent', OAUTH_PROBE_USER_AGENT);
+  }
+  const response = await fetchImpl(url, { ...init, headers });
   const body = await response.json().catch(() => ({}));
   return { status: response.status, headers: response.headers, body };
 }
