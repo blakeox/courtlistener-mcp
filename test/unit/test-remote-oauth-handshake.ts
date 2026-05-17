@@ -5,10 +5,62 @@ import {
   assertAuthPortalHandoffContent,
   assertHostedAuthReadinessContract,
   probeHostedAuthReadiness,
+  registerOAuthClient,
+  registrationRetryDelayMs,
+  resolveProbeConfig,
   summarizeHostedAuthProbeResponse,
 } from '../../scripts/testing/e2e-remote-oauth-handshake.mjs';
 
 describe('remote oauth handshake probe', () => {
+  it('resolves a preconfigured client id for CI probes', () => {
+    const cfg = resolveProbeConfig({
+      OAUTH_BASE_URL: 'https://worker.example',
+      E2E_OAUTH_CLIENT_ID: 'probe-client-1',
+      OAUTH_REGISTRATION_RETRIES: '5',
+    });
+    assert.ok(!('skipReason' in cfg));
+    assert.equal(cfg.clientId, 'probe-client-1');
+    assert.equal(cfg.registrationRetries, 5);
+  });
+
+  it('retries transient registration failures before succeeding', async () => {
+    const attempts: number[] = [];
+    const registration = await registerOAuthClient('https://worker.example/register', {
+      clientOrigin: 'https://chatgpt.com',
+      redirectUri: 'https://oauth-debug.example/callback',
+      scope: 'legal:read',
+      retries: 3,
+      sleep: async () => {},
+      fetchImpl: async () => {
+        attempts.push(attempts.length + 1);
+        if (attempts.length < 3) {
+          return new Response('Forbidden', { status: 403 });
+        }
+        return new Response(
+          JSON.stringify({
+            client_id: 'client-registered',
+          }),
+          {
+            status: 201,
+            headers: {
+              'content-type': 'application/json',
+              location: 'https://worker.example/register/client-registered',
+            },
+          },
+        );
+      },
+    });
+
+    assert.equal(registration.client_id, 'client-registered');
+    assert.equal(attempts.length, 3);
+  });
+
+  it('uses exponential backoff between registration retries', () => {
+    assert.equal(registrationRetryDelayMs(0), 1000);
+    assert.equal(registrationRetryDelayMs(1), 2000);
+    assert.equal(registrationRetryDelayMs(2), 4000);
+  });
+
   it('probes the hosted-auth readiness redirect contract', async () => {
     let requestedUrl: string | null = null;
     const probe = await probeHostedAuthReadiness(
