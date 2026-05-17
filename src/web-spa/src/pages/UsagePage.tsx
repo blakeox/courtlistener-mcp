@@ -11,7 +11,15 @@ import {
   StatusBanner,
   TextLink,
 } from '../components/ui';
+import { mutedCopyClass } from '../lib/ui-classes';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import {
+  stackClass,
+  tableClass,
+  tableScrollClass,
+  twoColClass,
+  twoUpGridClass,
+} from '../lib/workspace-classes';
 import { useAuth } from '../lib/auth';
 import { getUsage, toErrorMessage } from '../lib/api';
 
@@ -40,7 +48,7 @@ export function UsagePage(): React.JSX.Element {
   const bootstrap = usageQuery.data?.browserBootstrap;
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <PageHeader
         eyebrow="Monitor"
         title="Usage & History"
@@ -72,27 +80,27 @@ export function UsagePage(): React.JSX.Element {
 
       {authed ? (
         <>
-          <div className="two-up-grid">
+          <div className={twoUpGridClass}>
             <MetricCard
               label="Requests today"
               value={usageQuery.data ? String(usageQuery.data.dailyRequests) : 'Loading'}
               accent={usageQuery.data?.currentDay ?? 'Daily window'}
             >
-              <p className="muted">Current authenticated operator usage for today.</p>
+              <p className={mutedCopyClass}>Current authenticated operator usage for today.</p>
             </MetricCard>
             <MetricCard
               label="Total requests"
               value={usageQuery.data ? String(usageQuery.data.totalRequests) : 'Loading'}
               accent={usageQuery.data?.userId ?? 'User scope'}
             >
-              <p className="muted">Cumulative requests recorded for this user.</p>
+              <p className={mutedCopyClass}>Cumulative requests recorded for this user.</p>
             </MetricCard>
             <MetricCard
               label="Top route"
               value={topRoute ? topRoute[0] : 'No route data yet'}
               accent={topRoute ? `${topRoute[1]} requests` : 'Awaiting activity'}
             >
-              <p className="muted">Highest-volume route in the current usage snapshot.</p>
+              <p className={mutedCopyClass}>Highest-volume route in the current usage snapshot.</p>
             </MetricCard>
             <MetricCard
               label="Bootstrap recovery"
@@ -107,21 +115,21 @@ export function UsagePage(): React.JSX.Element {
                   : 'Browser recovery telemetry'
               }
             >
-              <p className="muted">
+              <p className={mutedCopyClass}>
                 Manual browser-session recovery outcomes from the account page.
               </p>
             </MetricCard>
           </div>
 
-          <div className="two-col">
-            <div className="stack">
+          <div className={twoColClass}>
+            <div className={stackClass}>
               <Card
                 title="Route activity"
                 subtitle="Live route counts from the current worker-backed usage snapshot."
               >
                 {routeEntries.length ? (
-                  <div className="table-scroll">
-                    <table className="table">
+                  <div className={tableScrollClass}>
+                    <table className={tableClass}>
                       <thead>
                         <tr>
                           <th>Route</th>
@@ -145,12 +153,12 @@ export function UsagePage(): React.JSX.Element {
                     </table>
                   </div>
                 ) : (
-                  <p className="muted">No route activity has been recorded yet.</p>
+                  <p className={mutedCopyClass}>No route activity has been recorded yet.</p>
                 )}
               </Card>
             </div>
 
-            <aside className="stack">
+            <aside className={stackClass}>
               <Card
                 title="Browser bootstrap history"
                 subtitle="Recovery telemetry dual-written to Cloudflare analytics and the usage snapshot."

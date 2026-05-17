@@ -338,8 +338,8 @@ export class ExpressErrorHandler {
       '/admin/errors/:errorKey/resolution',
       this.boundary.wrapAsync(async (req: Request, res: Response) => {
         const { errorKey } = req.params;
-        if (!errorKey) {
-          res.status(400).json({ error: 'Missing errorKey parameter' });
+        if (!errorKey || Array.isArray(errorKey)) {
+          res.status(400).json({ error: 'Missing or invalid errorKey parameter' });
           return;
         }
         const { status, assignee, notes } = req.body;

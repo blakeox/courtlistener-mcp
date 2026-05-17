@@ -155,6 +155,12 @@ pnpm run test:spa:focus -- src/web-spa/src/__tests__/shell.test.tsx
 # Run the browser-based SPA harness against the local Vite app
 npm run test:spa:e2e
 
+# Run design-token smoke checks (landing, theme toggle, buttons, eyebrows)
+npm run test:spa:design
+
+# Lint SPA styles for token-only CSS and no Tailwind utilities
+pnpm run ci:check:design-system
+
 # Run the auth-focused Playwright browser suite
 npm run test:spa:e2e:auth
 

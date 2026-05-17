@@ -1,0 +1,37 @@
+/*
+ * Tailwind v4 @theme bridge — maps portal tokens (tokens.css) to utility namespaces.
+ * Component CSS keeps using var(--ink); utilities use text-ink, bg-bg, dark:bg-bg-soft, etc.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-subtle: var(--text-subtle);
+  --color-accent: var(--accent-text);
+  --color-accent-muted: var(--accent-text-muted);
+
+  --radius-portal-xs: var(--radius-xs);
+  --radius-portal-sm: var(--radius-sm);
+  --radius-portal-md: var(--radius-md);
+  --radius-portal-lg: var(--radius-lg);
+  --radius-portal-pill: var(--radius-pill);
+
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-topbar: 640px;
+  --breakpoint-shell: 1080px;
+  --breakpoint-modal: 480px;
+}

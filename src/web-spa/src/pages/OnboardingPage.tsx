@@ -6,6 +6,7 @@ import { useToken } from '../lib/token-context';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { stackClass, turnstileWrapClass } from '../lib/workspace-classes';
 import { useToast } from '../components/Toast';
 import {
   Badge,
@@ -14,12 +15,14 @@ import {
   Card,
   DefinitionList,
   HeroPanel,
+  PageHeroNote,
   InlineGroup,
   KeyValueList,
   LoadingState,
   StatusBanner,
   Stepper,
 } from '../components/ui';
+import { inlineGroupRowClass, monoClass, mutedCopyClass } from '../lib/ui-classes';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 
 export function OnboardingPage(): React.JSX.Element {
@@ -121,7 +124,7 @@ export function OnboardingPage(): React.JSX.Element {
   const turnstileSummary = describeTurnstileStatus(turnstile.status, turnstile.error);
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <HeroPanel
         eyebrow="Runtime diagnostics"
         title={authed ? 'Runtime Diagnostics' : 'Sign in to continue'}
@@ -138,15 +141,14 @@ export function OnboardingPage(): React.JSX.Element {
           ) : undefined
         }
         aside={
-          <div className="page-hero-note">
-            <strong className="page-hero-note-title">
-              {authed ? 'Diagnostics surface' : 'Authentication required'}
-            </strong>
-            <p className="page-hero-note-text">
-              {authed
+          <PageHeroNote
+            title={authed ? 'Diagnostics surface' : 'Authentication required'}
+            description={
+              authed
                 ? 'Use this route to validate browser access, credential posture, protocol, and tool discovery before deeper troubleshooting.'
-                : 'Start with hosted sign-in, then return here to validate the MCP runtime surface.'}
-            </p>
+                : 'Start with hosted sign-in, then return here to validate the MCP runtime surface.'
+            }
+          >
             <KeyValueList
               entries={[
                 { label: 'Access', value: sessionSummary },
@@ -154,7 +156,7 @@ export function OnboardingPage(): React.JSX.Element {
                 { label: 'Runtime', value: runtimeSummary },
               ]}
             />
-          </div>
+          </PageHeroNote>
         }
       />
 
@@ -227,7 +229,7 @@ export function OnboardingPage(): React.JSX.Element {
       >
         {turnstile.enabled ? (
           <>
-            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+            <div className={turnstileWrapClass} ref={turnstile.containerRef} />
             <InlineGroup>
               <Badge tone={turnstile.status === 'verified' ? 'ok' : 'neutral'}>
                 {turnstileSummary}
@@ -239,7 +241,7 @@ export function OnboardingPage(): React.JSX.Element {
             <StatusBanner role="alert" message={turnstile.error} type="error" />
           </>
         ) : (
-          <p className="muted">
+          <p className={mutedCopyClass}>
             This worker is not currently enforcing Turnstile for browser bootstrap checks.
           </p>
         )}
@@ -271,7 +273,7 @@ export function OnboardingPage(): React.JSX.Element {
         subtitle="Live metadata from initialize + tools/resources/prompts discovery."
       >
         {!hasToken ? (
-          <p className="muted">
+          <p className={mutedCopyClass}>
             Load a local MCP credential only if you need direct browser-side protocol probing.
             Public client access should use OAuth.
           </p>
@@ -296,14 +298,14 @@ export function OnboardingPage(): React.JSX.Element {
                   description: (
                     <>
                       {readiness?.serverName || 'unknown'}{' '}
-                      <span className="mono">{readiness?.serverVersion || 'unknown'}</span>
+                      <span className={monoClass}>{readiness?.serverVersion || 'unknown'}</span>
                     </>
                   ),
                 },
                 {
                   term: 'Session id',
                   description: readiness?.sessionId || 'none returned',
-                  descriptionClassName: 'mono',
+                  descriptionClassName: monoClass,
                 },
                 {
                   term: 'Catalog counts',
@@ -326,7 +328,7 @@ export function OnboardingPage(): React.JSX.Element {
                           <Badge key={capability}>{capability}</Badge>
                         ))
                       : 'none advertised',
-                  descriptionClassName: 'row',
+                  descriptionClassName: inlineGroupRowClass,
                 },
               ]}
             />

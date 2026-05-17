@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '../components/Toast';
+import { infoBlockClass, monoClass, tokenKeyClass } from '../lib/ui-classes';
 import {
   Badge,
   BadgeLink,
@@ -27,6 +28,7 @@ import {
   Panel,
   PageHeader,
   HeroPanel,
+  PageHeroNote,
   SectionHeading,
   PillLink,
   SkipLink,
@@ -91,16 +93,19 @@ describe('SectionHeading', () => {
   it('renders the shared eyebrow/title/description shell with optional trailing content', () => {
     render(
       <SectionHeading
+        tone="landing"
         eyebrow="Capabilities"
-        eyebrowClassName="landing-section-label"
+        eyebrowVariant="section-label"
         title="Powerful legal data tools"
         description="Structured legal research for AI workflows."
-        className="landing-section-heading"
       >
         <ButtonLink href="https://example.com">Learn more</ButtonLink>
       </SectionHeading>,
     );
     expect(screen.getByText('Capabilities')).toHaveClass('landing-section-label');
+    expect(
+      screen.getByText('Capabilities').closest('.landing-section-heading'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Powerful legal data tools')).toBeInTheDocument();
     expect(screen.getByText('Structured legal research for AI workflows.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Learn more' })).toBeInTheDocument();
@@ -129,7 +134,7 @@ describe('BrandLink', () => {
           tone="landing"
           label="CourtListener MCP"
           icon="⚖️"
-          badge={<Badge className="brand-link-badge">Beta</Badge>}
+          badge={<Badge variant="brand-link">Beta</Badge>}
         />
       </MemoryRouter>,
     );
@@ -150,7 +155,7 @@ describe('InfoBlock', () => {
         title="Agent Workspace"
         titleAs="h3"
         description="Workspace state for operators."
-        className="topbar-heading"
+        className={infoBlockClass}
         titleClassName="workspace-topbar-title"
       />,
     );
@@ -187,6 +192,80 @@ describe('PageHeader', () => {
   });
 });
 
+describe('workspace-classes', () => {
+  it('preserves hook class names on layout recipes', async () => {
+    const { stackClass, twoColClass, tableClass } = await import('../lib/workspace-classes');
+    expect(stackClass).toContain('stack');
+    expect(twoColClass).toContain('two-col');
+    expect(tableClass).toContain('table');
+  });
+});
+
+describe('shell-classes', () => {
+  it('preserves hook class names on shell layout recipes', async () => {
+    const { workspaceShellClass, workspaceTopbarClass } = await import('../lib/shell-classes');
+    expect(workspaceShellClass).toContain('workspace-shell');
+    expect(workspaceTopbarClass).toContain('workspace-topbar');
+  });
+});
+
+describe('toast-classes', () => {
+  it('preserves hook class names on toast recipes', async () => {
+    const { toastContainerClass, toastClassName } = await import('../lib/toast-classes');
+    expect(toastContainerClass).toContain('toast-container');
+    expect(toastClassName('error')).toContain('toast-error');
+  });
+});
+
+describe('playground-classes', () => {
+  it('preserves hook class names on protocol and transcript recipes', async () => {
+    const { protocolEntryClassName, transcriptEntryClassName } =
+      await import('../lib/playground-classes');
+    expect(protocolEntryClassName('request')).toContain('protocol-entry');
+    expect(transcriptEntryClassName('error')).toContain('transcript-entry');
+    expect(transcriptEntryClassName('error')).toContain('error');
+  });
+});
+
+describe('landing tab recipes', () => {
+  it('preserves hook class names on landing setup tabs', async () => {
+    const { landingTabButtonClassName } = await import('../lib/landing-classes');
+    expect(landingTabButtonClassName(true)).toContain('landing-tab');
+    expect(landingTabButtonClassName(true)).toContain('active');
+  });
+});
+
+describe('shell toolbar recipes', () => {
+  it('preserves hook class names on toolbar and account menu recipes', async () => {
+    const {
+      toolbarButtonClass,
+      toolbarUtilityButtonClass,
+      accountMenuTriggerClassName,
+      accountMenuPanelClassName,
+      navCardLinkMetaClass,
+    } = await import('../lib/shell-classes');
+    expect(toolbarButtonClass).toContain('toolbar-button');
+    expect(toolbarUtilityButtonClass).toContain('toolbar-utility-button');
+    expect(accountMenuTriggerClassName({ open: true, warning: true })).toContain('warning');
+    expect(accountMenuPanelClassName(true)).toContain('account-menu-panel');
+    expect(navCardLinkMetaClass).toContain('nav-card-link-meta');
+  });
+});
+
+describe('PageHeroNote', () => {
+  it('renders title, description, and children with hook classes', () => {
+    render(
+      <PageHeroNote title="Runtime posture" description="Worker is ready for MCP calls.">
+        <p>Extra detail</p>
+      </PageHeroNote>,
+    );
+    expect(screen.getByText('Runtime posture')).toHaveClass('page-hero-note-title');
+    expect(screen.getByText('Worker is ready for MCP calls.')).toHaveClass('page-hero-note-text');
+    expect(screen.getByText('Extra detail')).toBeInTheDocument();
+    expect(screen.getByText('Runtime posture').closest('.page-hero-note')).toBeInTheDocument();
+  });
+});
+
 describe('HeroPanel', () => {
   it('renders the shared emphasized hero panel with an aside surface', () => {
     render(
@@ -195,10 +274,9 @@ describe('HeroPanel', () => {
         title="Session"
         description="Session, credential, and runtime posture."
         aside={
-          <div className="page-hero-note">
-            <strong className="page-hero-note-title">Current status</strong>
+          <PageHeroNote title="Current status">
             <KeyValueList entries={[{ label: 'Runtime', value: 'Ready' }]} />
-          </div>
+          </PageHeroNote>
         }
       />,
     );
@@ -215,11 +293,10 @@ describe('FeatureCard', () => {
   it('renders the shared icon/title/description card shell', () => {
     render(
       <FeatureCard
+        tone="landing"
         icon="⚖️"
-        iconClassName="landing-icon-wrap"
         title="Search Opinions"
         description="Find federal court opinions by query and citation."
-        className="landing-card"
       />,
     );
     expect(screen.getByText('Search Opinions')).toBeInTheDocument();
@@ -227,21 +304,16 @@ describe('FeatureCard', () => {
       screen.getByText('Find federal court opinions by query and citation.'),
     ).toBeInTheDocument();
     expect(screen.getByText('⚖️')).toHaveClass('landing-icon-wrap');
+    expect(screen.getByRole('article')).toHaveClass('landing-feature-card');
   });
 });
 
 describe('StatCard', () => {
   it('renders the shared label/value card shell', () => {
-    render(
-      <StatCard
-        label="License"
-        labelClassName="landing-stat-label"
-        value="MIT"
-        className="landing-card"
-      />,
-    );
+    render(<StatCard tone="landing" label="License" labelVariant="stat-label" value="MIT" />);
     expect(screen.getByText('License')).toHaveClass('landing-stat-label');
     expect(screen.getByText('MIT')).toBeInTheDocument();
+    expect(screen.getByRole('article')).toHaveClass('landing-stat-card');
   });
 });
 
@@ -276,7 +348,7 @@ describe('DefinitionList', () => {
     render(
       <DefinitionList
         entries={[
-          { term: 'User ID', description: 'abc123', descriptionClassName: 'mono' },
+          { term: 'User ID', description: 'abc123', descriptionClassName: monoClass },
           { term: 'Status', description: 'Ready' },
         ]}
       />,
@@ -656,7 +728,7 @@ describe('CodeSurface', () => {
           }
           code='{"ok":true}'
         >
-          <span className="token-key">"ok"</span>
+          <span className={tokenKeyClass}>"ok"</span>
         </CodeSurface>
       </ToastProvider>,
     );

@@ -10,6 +10,14 @@ import { forwardUiTelemetryEvent, trackEvent } from '../lib/telemetry';
 import { describeTurnstileStatus, useTurnstileToken } from '../lib/turnstile';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { accountSupportCardClass } from '../lib/shell-classes';
+import {
+  pageCardGridClass,
+  pageStatusBannerClass,
+  stackClass,
+  turnstileWrapClass,
+} from '../lib/workspace-classes';
+import { monoClass } from '../lib/ui-classes';
 import {
   Button,
   ButtonLink,
@@ -150,7 +158,7 @@ export function AccountPage(): React.JSX.Element {
   }
 
   return (
-    <div className="stack">
+    <div className={stackClass}>
       <PageHeader
         eyebrow="Workspace account"
         title="Account"
@@ -181,7 +189,7 @@ export function AccountPage(): React.JSX.Element {
       />
 
       <StatusBanner role="alert" message={sessionError} type="error" />
-      <div className="page-card-grid">
+      <div className={pageCardGridClass}>
         <Card title="Account access" subtitle={accountSummary}>
           <DefinitionList
             entries={[
@@ -205,7 +213,7 @@ export function AccountPage(): React.JSX.Element {
               {
                 term: 'User ID',
                 description: session?.user?.id ?? 'n/a',
-                descriptionClassName: 'mono',
+                descriptionClassName: monoClass,
               },
               {
                 term: 'Recovery',
@@ -287,7 +295,7 @@ export function AccountPage(): React.JSX.Element {
             ]}
           />
           {turnstile.enabled ? (
-            <div className="turnstile-wrap" ref={turnstile.containerRef} />
+            <div className={turnstileWrapClass} ref={turnstile.containerRef} />
           ) : null}
           <form
             onSubmit={(event) => {
@@ -351,7 +359,7 @@ export function AccountPage(): React.JSX.Element {
       ) : null}
 
       {showDiagnosticsCard ? (
-        <Card title="Diagnostics" subtitle={diagnosticsSummary} className="account-support-card">
+        <Card title="Diagnostics" subtitle={diagnosticsSummary} className={accountSupportCardClass}>
           <DefinitionList
             entries={[
               {
@@ -376,7 +384,7 @@ export function AccountPage(): React.JSX.Element {
                     {
                       term: 'Runtime session',
                       description: protocolQuery.data.sessionId,
-                      descriptionClassName: 'mono',
+                      descriptionClassName: monoClass,
                     },
                   ]
                 : []),
@@ -386,13 +394,13 @@ export function AccountPage(): React.JSX.Element {
             role="alert"
             message={protocolMismatchMessage}
             type="error"
-            className="page-status-banner"
+            className={pageStatusBannerClass}
           />
           <StatusBanner
             role="alert"
             message={protocolQuery.isError ? toErrorMessage(protocolQuery.error) : ''}
             type="error"
-            className="page-status-banner"
+            className={pageStatusBannerClass}
           />
           <InlineGroup>
             {hasServerSession && hasToken ? (
