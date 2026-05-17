@@ -42,7 +42,7 @@ styles.css
 | ------------------------- | ------------------------------------------------------------------------------------------------------- |
 | New layout/spacing in TSX | Tailwind utilities (`flex`, `gap-3`, `p-4`, `md:grid-cols-2`)                                           |
 | New colors in TSX         | Theme utilities (`text-ink`, `bg-card`, `text-accent`, `dark:bg-bg-soft`)                               |
-| Reusable component look   | Semantic class in `primitives.css` / `workspace.css` (optionally with `@apply`)                         |
+| Reusable component look   | Export a recipe from `lib/*-classes.ts` and compose with `cn()` in TSX                                  |
 | New color value           | Add to `tokens.css` (+ dark override), then wire in `theme.css` `@theme inline` if utilities are needed |
 
 **Rule of thumb:** primary actions → shell blue (`btn primary` or `bg` utilities
@@ -93,14 +93,36 @@ Opens Vite at `http://127.0.0.1:5173`. API routes proxy to
 
 ```bash
 pnpm run ci:check:design-system   # Tailwind wired, class-recipe modules, token-only CSS, production CSS budget
-npm run test:spa                 # Vitest (includes design-system-compliance)
-npm run test:spa:design          # Playwright layout/token smoke (landing grid, chat, transcript)
+npm run test:spa                 # Vitest (design-system wiring; skips production build — see below)
+npm run test:spa:design          # Playwright layout/token smoke (landing, workspace, usage, observability, …)
 ```
 
 The design-system script also verifies class-recipe modules export hook classes
 (`landing-page`, `stack`, `chat-stream`, …), require `cn()` composition, block
 raw layout class strings in workspace page TSX, and fail if the production CSS
 bundle exceeds **92 kB** (builds the SPA as part of the check).
+
+`ci:local-gate` and CI Full Validation run the full check (including the
+production build + CSS budget). Vitest sets
+`DESIGN_SYSTEM_SKIP_PRODUCTION_BUILD=1` so `test:spa` does not run a second Vite
+production build.
+
+## Composing classes with `cn()` and `tailwind-merge`
+
+Class recipes live in `lib/*-classes.ts` and are composed with `cn()` from
+`lib/cn.ts` (`tailwind-merge`).
+
+**Hook classes last:** stable selectors used by tests and Playwright smoke
+(`text-link`, `ui-card`, `stack`, `chat-stream`, …) must appear **after**
+conflicting Tailwind utilities in `cn()`, or `tailwind-merge` may drop them.
+Example from `ui-classes.ts`:
+
+```ts
+export const textLinkClass = cn(
+  'font-semibold text-accent underline …',
+  'text-link', // hook class — keep last
+);
+```
 
 ## Adding a new style
 
@@ -120,21 +142,25 @@ bundle exceeds **92 kB** (builds the SPA as part of the check).
    `lib/workspace-classes.ts`.
 9. Run `npm run test:spa` and `npm run test:spa:design`.
 
-## Common classes (semantic layer)
+## Hook classes (stable selectors)
 
-| Class                          | Role                         |
-| ------------------------------ | ---------------------------- |
-| `.btn.primary`                 | Blue gradient primary action |
-| `.nav-card-link.active`        | Shell sidebar active item    |
-| `.page-hero`                   | In-app hero panel            |
-| `.ui-card` / `.card-spotlight` | Content cards                |
-| `.eyebrow-label`               | Section label above headings |
-| `.text-link`                   | Accent-colored inline link   |
-| `.landing-page`                | Marketing root wrapper       |
+Recipes in `*-classes.ts` attach **hook class names** alongside Tailwind
+utilities. These are not defined in component CSS anymore; they exist for tests,
+Playwright smoke, and debugging.
 
-Shared primitives in `ui.tsx` are migrated to `ui-classes.ts`. Landing layout
-uses `landing-classes.ts` + `landing-layout.tsx`; Playground chat/transcript
-uses `playground-classes.ts`. Component CSS (`landing.css`, `primitives.css`)
-keeps marketing nav colors, setup tabs, code syntax, and other patterns not yet
-ported. Compose with `cn()` and keep hook class names (`ui-card`, `btn`,
-`text-link`, `chat-stream`, `transcript-entry`, …) for tests.
+| Hook class               | Module                  | Role                         |
+| ------------------------ | ----------------------- | ---------------------------- |
+| `btn` / `primary`        | `ui-classes.ts`         | Primary shell action         |
+| `nav-card-link`          | `shell-classes.ts`      | Sidebar navigation item      |
+| `page-hero`              | `ui-classes.ts`         | In-app hero panel            |
+| `ui-card`                | `ui-classes.ts`         | Content card shell           |
+| `eyebrow-label`          | `ui-classes.ts`         | Section label above headings |
+| `text-link`              | `ui-classes.ts`         | Accent inline link           |
+| `landing-page`           | `landing-classes.ts`    | Marketing root wrapper       |
+| `stack` / `two-col`      | `workspace-classes.ts`  | Workspace page layout        |
+| `chat-stream`            | `playground-classes.ts` | Playground chat column       |
+| `table` / `table-scroll` | `workspace-classes.ts`  | Usage route table            |
+
+`primitives.css` and `landing.css` / `workspace.css` hold only global resets and
+reserved placeholders — not component layout. Add new UI via the matching
+`*-classes.ts` module and compose with `cn()`.
