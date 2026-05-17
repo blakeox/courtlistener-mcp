@@ -85,6 +85,15 @@ async function main() {
     );
   }
 
+  let approvePostError = null;
+  if (postBody.includes('error_code')) {
+    try {
+      approvePostError = JSON.parse(postBody).error_code;
+    } catch {
+      // postBody contains 'error_code' substring but is not valid JSON
+    }
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -94,7 +103,7 @@ async function main() {
         approveGetStatus: approveGet.status,
         approveGetRedirect: approveGetLocation,
         approvePostStatus: approvePost.status,
-        approvePostError: postBody.includes('error_code') ? JSON.parse(postBody).error_code : null,
+        approvePostError,
       },
       null,
       2,
