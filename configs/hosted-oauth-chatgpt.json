@@ -5,7 +5,7 @@
       "transport": "streamable-http",
       "auth": {
         "type": "oauth2",
-        "authorizationUrl": "https://your-deployment.example.com/authorize",
+        "authorizationUrl": "https://your-deployment.example.com/oauth/authorize",
         "tokenUrl": "https://your-deployment.example.com/token",
         "scopes": ["legal:read", "legal:search", "legal:analyze"]
       }

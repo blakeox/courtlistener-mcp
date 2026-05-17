@@ -171,6 +171,62 @@ test.describe('Design system smoke', () => {
     await expect(page.locator('.stack').first()).toBeVisible();
   });
 
+  test('workspace usage page uses stack and table layout classes', async ({ page }) => {
+    await installSpaMocks(page, {
+      session: {
+        authenticated: true,
+        user: { id: 'operator-1' },
+        turnstile_site_key: '',
+      },
+      usage: {
+        userId: 'operator-1',
+        totalRequests: 17,
+        dailyRequests: 4,
+        currentDay: '2026-04-23',
+        lastSeenAt: '2026-04-23T20:45:00.000Z',
+        byRoute: {
+          '/mcp': 11,
+          '/api/session': 6,
+        },
+        browserBootstrap: {
+          attempted: 2,
+          succeeded: 1,
+          failed: 1,
+          turnstileRefreshed: 0,
+          lastOutcome: 'success',
+          lastEventAt: '2026-04-23T20:40:00.000Z',
+        },
+      },
+    });
+
+    await page.goto('/app/usage');
+    await expect(page.getByRole('heading', { name: 'Usage & History', level: 1 })).toBeVisible();
+    await expect(page.locator('.stack').first()).toBeVisible();
+    await expect(page.locator('.table-scroll')).toBeVisible();
+    await expect(page.locator('.table')).toBeVisible();
+  });
+
+  test('workspace observability page uses stack layout and worker health tokens', async ({
+    page,
+  }) => {
+    await installSpaMocks(page, {
+      session: {
+        authenticated: true,
+        user: { id: 'operator-1' },
+        turnstile_site_key: '',
+      },
+    });
+
+    await page.goto('/app/observability');
+    await expect(
+      page.getByRole('heading', { name: 'Agent Observability', level: 1 }),
+    ).toBeVisible();
+    await expect(page.locator('.stack').first()).toBeVisible();
+    await expect(page.locator('.two-up-grid')).toBeVisible();
+    await expect(page.locator('.two-col')).toBeVisible();
+    await expect(page.locator('ul.ordered').first()).toBeVisible();
+  });
+
   test('playground exposes eyebrow label typography class', async ({ page }) => {
     await installSpaMocks(page, {
       session: {

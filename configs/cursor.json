@@ -7,6 +7,9 @@
       "env": {
         "COURTLISTENER_API_KEY": "your-api-key"
       }
+    },
+    "courtlistener-remote": {
+      "url": "https://courtlistenermcp.blakeoxford.com/mcp"
     }
   }
 }
