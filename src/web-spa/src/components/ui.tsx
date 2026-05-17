@@ -109,9 +109,11 @@ import {
 } from '../lib/landing-classes';
 import { useToast } from './toast-context';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'default' | 'compact' | 'tiny';
 type BadgeTone = 'neutral' | 'ok' | 'warn';
+type BadgeVariant = 'default' | 'brand-link' | 'command-chip' | 'code-format';
+type EyebrowVariant = 'default' | 'pill' | 'section-label' | 'stat-label';
 
 export function Card(
   props: React.PropsWithChildren<{
@@ -244,6 +246,7 @@ export function SectionHeading(
     compact?: boolean;
     className?: string;
     eyebrowClassName?: string;
+    eyebrowVariant?: EyebrowVariant;
   }>,
 ): React.JSX.Element {
   const isLanding = props.tone === 'landing';
@@ -255,7 +258,9 @@ export function SectionHeading(
         props.className,
       )}
     >
-      <Eyebrow className={props.eyebrowClassName}>{props.eyebrow}</Eyebrow>
+      <Eyebrow variant={props.eyebrowVariant} className={props.eyebrowClassName}>
+        {props.eyebrow}
+      </Eyebrow>
       <h2 className={isLanding ? landingSectionHeadingTitleClass : sectionHeadingTitleClass}>
         {props.title}
       </h2>
@@ -332,11 +337,14 @@ export function StatCard(
     tone?: 'default' | 'landing';
     className?: string;
     labelClassName?: string;
+    labelVariant?: EyebrowVariant;
   }>,
 ): React.JSX.Element {
   return (
     <article className={cn(props.tone === 'landing' && landingStatCardClass, props.className)}>
-      <Eyebrow className={props.labelClassName}>{props.label}</Eyebrow>
+      <Eyebrow variant={props.labelVariant} className={props.labelClassName}>
+        {props.label}
+      </Eyebrow>
       <strong className={statCardValueClass}>{props.value}</strong>
       {props.children}
     </article>
@@ -773,16 +781,17 @@ export function LoadingState(props: { label: string; message?: string }): React.
 
 export function Eyebrow(props: {
   children: React.ReactNode;
+  variant?: EyebrowVariant;
   className?: string;
 }): React.JSX.Element {
-  const className = props.className ?? '';
+  const variant = props.variant ?? 'default';
   return (
     <span
       className={cn(
         eyebrowLabelClass,
-        className.includes('landing-pill') && landingPillClass,
-        className.includes('landing-section-label') && landingSectionLabelClass,
-        className.includes('landing-stat-label') && landingStatLabelClass,
+        variant === 'pill' && landingPillClass,
+        variant === 'section-label' && landingSectionLabelClass,
+        variant === 'stat-label' && landingStatLabelClass,
         props.className,
       )}
     >
@@ -941,24 +950,18 @@ export const TabButton = React.forwardRef<
 
 export function Badge(props: {
   tone?: BadgeTone;
+  variant?: BadgeVariant;
   children: React.ReactNode;
   className?: string;
 }): React.JSX.Element {
   const tone = props.tone ?? 'neutral';
-  const hookClass = props.className ?? '';
+  const variant = props.variant ?? 'default';
   const className = cn(
-    hookClass.includes('brand-link-badge') && brandLinkBadgeClass,
-    hookClass.includes('landing-command-chip') && landingCommandChipClass,
-    hookClass.includes('landing-code-format-badge') && landingCodeFormatBadgeClass,
-    !hookClass.includes('brand-link-badge') &&
-      !hookClass.includes('landing-command-chip') &&
-      !hookClass.includes('landing-code-format-badge') &&
-      badgeClassName(tone, props.className),
-    hookClass &&
-      (hookClass.includes('brand-link-badge') ||
-        hookClass.includes('landing-command-chip') ||
-        hookClass.includes('landing-code-format-badge')) &&
-      props.className,
+    variant === 'brand-link' && brandLinkBadgeClass,
+    variant === 'command-chip' && landingCommandChipClass,
+    variant === 'code-format' && landingCodeFormatBadgeClass,
+    variant === 'default' && badgeClassName(tone, props.className),
+    variant !== 'default' && props.className,
   );
   return <span className={className}>{props.children}</span>;
 }

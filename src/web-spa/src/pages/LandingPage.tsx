@@ -44,27 +44,21 @@ import {
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import {
-  brandLinkBadgeClass,
   landingCodeArrayClass,
   landingCodeCardClass,
-  landingCodeFormatBadgeClass,
   landingCodeKeyClass,
   landingCodePunctuationClass,
   landingCodeStringClass,
   landingCodeTabsClass,
   landingCommandCaptionClass,
-  landingCommandChipClass,
   landingCommandRowClass,
   landingHeroNoteDescriptionClass,
   landingInlineLinksClass,
   landingNumberedListClass,
-  landingPillClass,
-  landingSectionLabelClass,
   landingSetupCopyClass,
   landingSetupCodeClass,
   landingSetupPanelClass,
   landingSetupTabsClass,
-  landingStatLabelClass,
   landingButtonRowClass,
   landingFooterStackClass,
 } from '../lib/landing-classes';
@@ -220,7 +214,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
             aria-label="CourtListener MCP home"
             label="CourtListener MCP"
             icon={<ScaleLogoIcon />}
-            badge={<Badge className={brandLinkBadgeClass}>Beta</Badge>}
+            badge={<Badge variant="brand-link">Beta</Badge>}
           />
 
           <LandingMenuToggle
@@ -255,7 +249,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
         <LandingHero>
           <LandingHeroGrid>
             <LandingHeroCopy>
-              <Eyebrow className={landingPillClass}>Model Context Protocol</Eyebrow>
+              <Eyebrow variant="pill">Model Context Protocol</Eyebrow>
               <LandingHeroTitle>
                 Connect AI to the Law. <span>Responsibly.</span>
               </LandingHeroTitle>
@@ -305,7 +299,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
             <SectionHeading
               tone="landing"
               eyebrow="Capabilities"
-              eyebrowClassName={landingSectionLabelClass}
+              eyebrowVariant="section-label"
               title="Powerful legal data tools for AI applications"
               description="CourtListener MCP exposes vetted tools for legal research, enabling AI applications to retrieve structured data from federal courts."
             />
@@ -333,7 +327,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
             <SectionHeading
               tone="landing"
               eyebrow="Developer setup"
-              eyebrowClassName={landingSectionLabelClass}
+              eyebrowVariant="section-label"
               title="Add CourtListener MCP to your AI client"
               description="Start from the source checkout workflow below, then register the built MCP server in the client you already use for research or developer workflows."
             />
@@ -370,7 +364,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   >
                     <InfoBlock
                       eyebrow={client.eyebrow}
-                      eyebrowClassName={landingSectionLabelClass}
+                      eyebrowVariant="section-label"
                       title={client.label}
                       titleAs="h3"
                       description={client.description}
@@ -389,7 +383,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   <div>
                     <InfoBlock
                       eyebrow="Install command"
-                      eyebrowClassName={landingSectionLabelClass}
+                      eyebrowVariant="section-label"
                       title={INSTALL_COMMAND}
                       titleAs="h3"
                       description="The npm package is not published yet, so local stdio setup currently runs from a repository checkout."
@@ -414,7 +408,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                       </TextLink>
                     </InlineGroup>
                   </div>
-                  <Badge className={landingCommandChipClass}>MCP server</Badge>
+                  <Badge variant="command-chip">MCP server</Badge>
                 </InlineGroup>
                 <CodeSurface code={MCP_CONFIG_SNIPPET}>{renderLandingConfigSnippet()}</CodeSurface>
               </div>
@@ -427,7 +421,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
             <SectionHeading
               tone="landing"
               eyebrow="Trust and safety"
-              eyebrowClassName={landingSectionLabelClass}
+              eyebrowVariant="section-label"
               title="Designed for responsible legal AI workflows"
               description="This server is meant to support serious research workflows with guardrails that are clear to both developers and legal practitioners."
             />
@@ -456,7 +450,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
               tone="landing"
               compact
               eyebrow="Open source"
-              eyebrowClassName={landingSectionLabelClass}
+              eyebrowVariant="section-label"
               title="Open-source infrastructure for legal AI"
               description="CourtListener MCP is an open-source project built to make legal data more accessible to AI systems through a standard protocol."
             >
@@ -486,7 +480,7 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   key={stat.label}
                   tone="landing"
                   label={stat.label}
-                  labelClassName={landingStatLabelClass}
+                  labelVariant="stat-label"
                   value={stat.value}
                 />
               ))}
@@ -540,7 +534,7 @@ function CodePreviewCard(): React.JSX.Element {
           <StatusPill tone="mcp" variant="solid">
             MCP Config
           </StatusPill>
-          <Badge className={landingCodeFormatBadgeClass}>JSON</Badge>
+          <Badge variant="code-format">JSON</Badge>
         </div>
       }
     >

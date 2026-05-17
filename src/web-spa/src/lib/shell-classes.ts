@@ -181,15 +181,13 @@ export const toolbarUtilityButtonClass = cn(
 
 export const mobileMenuBtnClass = cn(
   toolbarButtonClass,
-  toolbarUtilityButtonClass,
-  'mobile-menu-btn hidden max-shell:inline-flex max-topbar:flex-[var(--flex-half)] max-topbar:min-w-0',
+  'mobile-menu-btn hidden max-shell:inline-flex max-topbar:flex-[var(--flex-half)] max-topbar:min-w-0 max-topbar:px-(--space-2-5)',
 );
 
 export const themeToggleButtonClass = cn(
   toolbarButtonClass,
-  toolbarUtilityButtonClass,
   'theme-toggle min-w-[var(--size-toolbar-min)] rounded-portal-md px-(--space-2)',
-  'max-topbar:flex-[var(--flex-icon-fixed)] max-topbar:w-[var(--size-touch-sm)] max-topbar:px-0',
+  'max-topbar:flex-[var(--flex-icon-fixed)] max-topbar:w-[var(--size-touch-sm)] max-topbar:px-0 max-topbar:px-(--space-2-5)',
 );
 
 export const themeToggleIconClass = 'theme-toggle-icon text-[length:var(--text-lg)] leading-none';

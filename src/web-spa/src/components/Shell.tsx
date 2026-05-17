@@ -534,7 +534,7 @@ export function Shell(
             <div className={topbarActionsClass} role="group" aria-label="Workspace utilities">
               <InlineGroup className={topActionsUtilityClass}>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="compact"
                   className={mobileMenuBtnClass}
                   onClick={() => setSidebarOpen((value) => !value)}
@@ -545,7 +545,7 @@ export function Shell(
                   ☰ Menu
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="compact"
                   className={themeToggleButtonClass}
                   onClick={toggleTheme}
