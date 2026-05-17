@@ -3,6 +3,27 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
+/** Local Worker (`wrangler dev` / HTTP transport on port 3001). */
+const workerDevTarget = 'http://localhost:3001';
+
+const workerDevProxy = {
+  target: workerDevTarget,
+  changeOrigin: true,
+} as const;
+
+/** Worker-owned routes required for hosted sign-in and MCP OAuth during SPA dev. */
+const workerDevProxyPrefixes = [
+  '/api',
+  '/mcp',
+  '/sse',
+  '/auth',
+  '/oauth',
+  '/token',
+  '/register',
+  '/health',
+  '/.well-known',
+] as const;
+
 export default defineConfig({
   root: path.resolve(__dirname),
   plugins: [react(), tailwindcss()],
@@ -17,15 +38,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      '/mcp': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
+    proxy: Object.fromEntries(workerDevProxyPrefixes.map((prefix) => [prefix, workerDevProxy])),
   },
 });
