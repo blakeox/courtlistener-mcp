@@ -819,10 +819,15 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     assert.ok(getResponse);
     assert.equal(getResponse.status, 200);
-    assert.match(await getResponse.text(), /Approve OAuth access/);
+    const approvalHtml = await getResponse.text();
+    assert.match(approvalHtml, /Approve OAuth access/);
+    assert.match(approvalHtml, /name="return_to"/);
+    assert.match(approvalHtml, /action="\/oauth\/approve\?return_to=/);
+    assert.match(approvalHtml, /worker\.example\/authorize\?/);
     const responseCookies = getResponse.headers.getSetCookie();
     const setCookie = String(getResponse.headers.get('set-cookie'));
     assert.match(setCookie, /clauth_approve=/);
+    assert.match(setCookie, /SameSite=Lax/);
     assert.match(setCookie, /clauth_flow=/);
     assert.match(setCookie, /clmcp_csrf=csrf-token-123/);
     assert.ok(responseCookies.some((cookie) => cookie.startsWith('clauth_approve=')));
@@ -876,11 +881,11 @@ describe('handleWorkerAuthHandoffRoutes', () => {
       },
     });
 
-    assert.equal(invalidPostResponse.status, 400);
-    assert.equal(invalidPostResponse.headers.get('x-hosted-auth-error'), 'invalid_approval_state');
+    assert.equal(invalidPostResponse.status, 403);
+    assert.equal(invalidPostResponse.headers.get('x-hosted-auth-error'), 'csrf_validation_failed');
     assert.equal(invalidPostResponse.headers.get('x-hosted-auth-route'), 'auth-approve');
     assert.equal(invalidPostResponse.headers.get('x-hosted-auth-outcome'), 'rejected');
-    assert.equal(invalidPostResponse.headers.get('x-hosted-auth-category'), 'request_validation');
+    assert.equal(invalidPostResponse.headers.get('x-hosted-auth-category'), 'security');
     assert.equal(completionCount, 0);
 
     const approvalCookie = setCookie
@@ -943,6 +948,100 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.match(String(postResponse.headers.get('x-hosted-auth-duration-ms')), /^\d+$/);
     assert.match(String(postResponse.headers.get('x-hosted-auth-approval-duration-ms')), /^\d+$/);
     assert.match(String(postResponse.headers.get('set-cookie')), /clauth_approve=;/);
+    assert.equal(completionCount, 1);
+
+    completionCount = 0;
+    const returnToParam = new URL(approvalUrl).searchParams.get('return_to');
+    assert.ok(returnToParam);
+    const postWithoutApprovalCookie = await handleWorkerAuthHandoffRoutes({
+      request: new Request('https://worker.example/oauth/approve', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: `clmcp_ui=signed-session; ${flowCookie}; clmcp_csrf=csrf-token-123`,
+        },
+        body: `csrf_token=csrf-token-123&return_to=${encodeURIComponent(returnToParam)}`,
+      }),
+      url: new URL('https://worker.example/oauth/approve'),
+      env: {
+        OIDC_ISSUER: 'https://issuer.example',
+        OIDC_AUDIENCE: 'https://worker.example',
+        MCP_AUTH_OIDC_CLIENT_ID: 'oidc-client-id',
+        MCP_AUTH_OIDC_CLIENT_SECRET: 'oidc-client-secret',
+        MCP_UI_SESSION_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
+      },
+      deps: {
+        jsonError,
+        generateCspNonce: () => 'nonce',
+        htmlResponse,
+        workerUiSessionRuntime: {
+          getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
+          resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-123' }),
+          createUiSessionState: async () => null,
+          getOrCreateCsrfCookieHeader: () => null,
+          isSecureCookieRequest: () => true,
+        },
+        getOAuthHelpers: () => ({
+          parseAuthRequest: async () => ({ scope: ['legal:read'] }),
+          completeAuthorization: async () => {
+            completionCount += 1;
+            return { redirectTo: 'https://chatgpt.com/callback?code=worker-code&state=state-1' };
+          },
+        }),
+        buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+        resolveGrantedScopes: () => ['legal:read'],
+      },
+    });
+
+    assert.equal(postWithoutApprovalCookie.status, 302);
+    assert.equal(
+      postWithoutApprovalCookie.headers.get('location'),
+      'https://chatgpt.com/callback?code=worker-code&state=state-1',
+    );
+    assert.equal(completionCount, 1);
+
+    completionCount = 0;
+    const postWithFlowCookieOnly = await handleWorkerAuthHandoffRoutes({
+      request: new Request('https://worker.example/oauth/approve', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: `clmcp_ui=signed-session; ${flowCookie}; clmcp_csrf=csrf-token-123`,
+        },
+        body: 'csrf_token=csrf-token-123',
+      }),
+      url: new URL('https://worker.example/oauth/approve'),
+      env: {
+        OIDC_ISSUER: 'https://issuer.example',
+        OIDC_AUDIENCE: 'https://worker.example',
+        MCP_AUTH_OIDC_CLIENT_ID: 'oidc-client-id',
+        MCP_AUTH_OIDC_CLIENT_SECRET: 'oidc-client-secret',
+        MCP_UI_SESSION_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
+      },
+      deps: {
+        jsonError,
+        generateCspNonce: () => 'nonce',
+        htmlResponse,
+        workerUiSessionRuntime: {
+          getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
+          resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-123' }),
+          createUiSessionState: async () => null,
+          getOrCreateCsrfCookieHeader: () => null,
+          isSecureCookieRequest: () => true,
+        },
+        getOAuthHelpers: () => ({
+          parseAuthRequest: async () => ({ scope: ['legal:read'] }),
+          completeAuthorization: async () => {
+            completionCount += 1;
+            return { redirectTo: 'https://chatgpt.com/callback?code=worker-code&state=state-1' };
+          },
+        }),
+        buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+        resolveGrantedScopes: () => ['legal:read'],
+      },
+    });
+
+    assert.equal(postWithFlowCookieOnly.status, 302);
     assert.equal(completionCount, 1);
   });
 

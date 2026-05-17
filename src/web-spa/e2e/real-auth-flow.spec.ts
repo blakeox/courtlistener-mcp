@@ -163,6 +163,33 @@ test.describe('SPA real auth flow', () => {
     expect(callbackUrl.searchParams.get('state')).toBe('state-1');
   });
 
+  test('completes OAuth when the approval cookie is missing but return_to is posted', async ({
+    page,
+  }) => {
+    await bootstrapSession(page);
+
+    const authorizeUrl = new URL('/oauth/authorize', server.baseUrl);
+    authorizeUrl.searchParams.set('response_type', 'code');
+    authorizeUrl.searchParams.set('client_id', 'client-1');
+    authorizeUrl.searchParams.set('redirect_uri', `${server.baseUrl}/client/callback`);
+    authorizeUrl.searchParams.set('state', 'state-1');
+    authorizeUrl.searchParams.set('scope', 'legal:read');
+    authorizeUrl.searchParams.set('code_challenge', 'challenge');
+    authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+
+    await page.goto(authorizeUrl.toString());
+    await expect(page.getByRole('heading', { name: 'Approve OAuth access' })).toBeVisible();
+
+    const cookies = await page.context().cookies(server.baseUrl);
+    await page.context().clearCookies();
+    await page.context().addCookies(cookies.filter((cookie) => cookie.name !== 'clauth_approve'));
+
+    await page.getByRole('button', { name: 'Approve and continue' }).click();
+
+    await page.waitForURL(/\/client\/callback\?/);
+    await expect(page.getByRole('heading', { name: 'Authorization completed' })).toBeVisible();
+  });
+
   test('allows approval to complete against a loopback callback origin', async ({ page }) => {
     await bootstrapSession(page);
 
