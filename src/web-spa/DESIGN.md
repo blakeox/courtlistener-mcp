@@ -86,8 +86,10 @@ component CSS for complex grids.
 npm run dev:spa
 ```
 
-Opens Vite at `http://127.0.0.1:5173`. API routes proxy to
-`http://localhost:3001` when a worker is running locally.
+Opens Vite at `http://127.0.0.1:5173`. Worker routes (`/api`, `/auth`, `/oauth`,
+`/mcp`, `/health`, `/.well-known`, …) proxy to `http://localhost:3001` when
+`wrangler dev` (or the local HTTP transport) is running — required for hosted
+sign-in and MCP OAuth from the dev SPA.
 
 ## Checks
 
