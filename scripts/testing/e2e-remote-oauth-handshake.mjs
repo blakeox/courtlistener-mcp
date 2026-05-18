@@ -270,12 +270,8 @@ async function fetchJson(url, init = {}, fetchImpl = fetch) {
   return { status: response.status, headers: response.headers, body };
 }
 
-function isRedirectStatus(status) {
-  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
-}
-
 export function isDegradedHostedAuthRedirect(probe) {
-  if (!isRedirectStatus(probe.status) || !probe.location) {
+  if (!isRedirect(probe.status) || !probe.location) {
     return false;
   }
   try {
