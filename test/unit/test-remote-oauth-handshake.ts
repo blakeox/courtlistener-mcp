@@ -10,8 +10,16 @@ import {
   resolveProbeConfig,
   summarizeHostedAuthProbeResponse,
 } from '../../scripts/testing/e2e-remote-oauth-handshake.mjs';
+import { validateE2eOAuthTarget } from '../../scripts/testing/validate-e2e-oauth-target.mjs';
 
 describe('remote oauth handshake probe', () => {
+  it('validates the production E2E OAuth target contract', async () => {
+    const result = await validateE2eOAuthTarget({
+      OAUTH_BASE_URL: 'https://courtlistenermcp.blakeoxford.com',
+    });
+    assert.equal(result.probe.hostedAuthRoute, 'auth-start');
+  });
+
   it('resolves a preconfigured client id for CI probes', () => {
     const cfg = resolveProbeConfig({
       OAUTH_BASE_URL: 'https://worker.example',

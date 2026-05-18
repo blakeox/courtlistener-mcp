@@ -44,6 +44,8 @@ deployment monitor instead of a `push` gate for `main`.
 
 Configure these repository secrets:
 
-- `E2E_BASE_URL`
+- `E2E_BASE_URL` — must be the production custom domain (recommended:
+  `https://courtlistenermcp.blakeoxford.com`). `*.workers.dev` aliases return
+  `404` on `/auth/start` and will fail the readiness contract.
 - `E2E_OAUTH_CLIENT_ID` (optional) long-lived probe client when GitHub Actions
   IPs cannot register

@@ -47,6 +47,10 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+          echo "E2E target host: $(node -e "console.log(new URL(process.env.OAUTH_BASE_URL).host)")"
+
+      - name: Validate E2E OAuth target exposes hosted-auth readiness
+        run: pnpm run test:e2e:oauth-target
 
       - name: Run hosted OAuth handshake probe
         run: pnpm run test:e2e:oauth-remote
