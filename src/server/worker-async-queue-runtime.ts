@@ -353,6 +353,7 @@ export async function processAsyncQueueMessage(params: {
     // Re-read job from KV to get fresh cancellation state for retry/error decisions
     const freshJobState = await readJob(params.env, params.message.jobId);
     const cancellationRequested = freshJobState?.cancellationRequested ?? false;
+    job.cancellationRequested = cancellationRequested;
 
     const message = error instanceof Error ? error.message : String(error);
     const history = [...(job.error?.history ?? []), message];
