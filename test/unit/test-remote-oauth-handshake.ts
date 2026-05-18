@@ -13,11 +13,38 @@ import {
 import { validateE2eOAuthTarget } from '../../scripts/testing/validate-e2e-oauth-target.mjs';
 
 describe('remote oauth handshake probe', () => {
-  it('validates the production E2E OAuth target contract', async () => {
-    const result = await validateE2eOAuthTarget({
-      OAUTH_BASE_URL: 'https://courtlistenermcp.blakeoxford.com',
-    });
+  it('validates E2E OAuth targets that expose hosted-auth readiness headers', async () => {
+    const result = await validateE2eOAuthTarget(
+      { OAUTH_BASE_URL: 'https://worker.example' },
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: {
+            location: 'https://issuer.example/authorize',
+            'x-hosted-auth-ready': 'true',
+            'x-hosted-auth-status': 'ready',
+            'x-hosted-auth-route': 'auth-start',
+            'x-hosted-auth-outcome': 'redirect',
+            'x-hosted-auth-category': 'ok',
+            'x-hosted-auth-correlation-id': 'corr_e2e_target',
+            'x-hosted-auth-config-error-count': '0',
+            'x-hosted-auth-duration-ms': '5',
+            'x-hosted-auth-upstream-discovery-duration-ms': '2',
+          },
+        }),
+    );
     assert.equal(result.probe.hostedAuthRoute, 'auth-start');
+  });
+
+  it('rejects E2E OAuth targets without hosted-auth readiness headers', async () => {
+    await assert.rejects(
+      () =>
+        validateE2eOAuthTarget(
+          { OAUTH_BASE_URL: 'https://courtlistener-mcp.blakeoxford.workers.dev' },
+          async () => new Response('Not Found', { status: 404 }),
+        ),
+      /E2E OAuth target failed hosted-auth readiness validation/,
+    );
   });
 
   it('resolves a preconfigured client id for CI probes', () => {

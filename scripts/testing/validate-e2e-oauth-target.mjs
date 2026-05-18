@@ -15,13 +15,13 @@ import {
 
 const RECOMMENDED_BASE_URL = 'https://courtlistenermcp.blakeoxford.com';
 
-export async function validateE2eOAuthTarget(env = process.env) {
+export async function validateE2eOAuthTarget(env = process.env, fetchImpl = fetch) {
   const cfg = resolveProbeConfig(env);
   if ('skipReason' in cfg) {
     throw new Error(cfg.skipReason);
   }
 
-  const probe = await probeHostedAuthReadiness(cfg.baseUrl);
+  const probe = await probeHostedAuthReadiness(cfg.baseUrl, null, fetchImpl);
   try {
     assertHostedAuthReadinessContract(probe);
   } catch (error) {
