@@ -240,7 +240,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
           </Card>
         </div>
 
-        <aside className={stackClass}>
+        <div className={stackClass}>
           <Card title="Provider Status" subtitle="All systems operational">
             <ul className={orderedListClass}>
               <li>CourtListener API — Connected</li>
@@ -307,7 +307,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
               ]}
             />
           </Card>
-        </aside>
+        </div>
       </div>
     </div>
   );

@@ -158,7 +158,7 @@ export function UsagePage(): React.JSX.Element {
               </Card>
             </div>
 
-            <aside className={stackClass}>
+            <div className={stackClass}>
               <Card
                 title="Browser bootstrap history"
                 subtitle="Recovery telemetry dual-written to Cloudflare analytics and the usage snapshot."
@@ -184,7 +184,7 @@ export function UsagePage(): React.JSX.Element {
                   ]}
                 />
               </Card>
-            </aside>
+            </div>
           </div>
         </>
       ) : null}

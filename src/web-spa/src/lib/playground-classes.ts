@@ -27,7 +27,7 @@ export const comparisonGridWideClass = cn(
 );
 
 export const comparisonLatencyClass =
-  'comparison-latency mt-(--space-1) text-center text-[0.75rem] text-subtle';
+  'comparison-latency mt-(--space-1) text-center text-[0.75rem] text-faint';
 
 export const chatControlsRowClass = cn(
   'chat-controls-row mb-(--space-2) max-md:flex-col max-md:items-stretch max-md:gap-(--space-3)',
@@ -62,7 +62,7 @@ export const comparisonSummaryClass = 'comparison-summary m-0 text-[0.9rem] lead
 export const playgroundModeSummaryClass = 'playground-mode-summary items-center';
 
 export const transcriptPanelClass = cn(
-  'transcript mono min-h-[var(--size-transcript-min)] max-h-[var(--size-transcript-max)] overflow-auto rounded-portal-sm border border-line bg-bg-soft p-2.5',
+  'transcript mono min-h-[var(--size-transcript-min)] max-h-[var(--size-transcript-max)] overflow-auto rounded-portal-sm border border-border bg-canvas-muted p-2.5',
 );
 
 export const transcriptEntryHeaderClass = 'transcript-entry-header mb-0.5';
@@ -76,12 +76,12 @@ export const transcriptEntryActionClass = 'transcript-entry-action ml-auto text-
 export const transcriptEntryBodyClass = 'transcript-entry-body text-[0.9rem] leading-normal';
 
 const transcriptRoleStyles: Record<string, string> = {
-  user: 'border-l-ink [&_.transcript-entry-role]:text-ink',
+  user: 'border-l-foreground [&_.transcript-entry-role]:text-foreground',
   assistant:
     'border-l-[color:var(--surface-accent-blue)] [&_.transcript-entry-role]:text-[color:var(--surface-accent-blue)]',
-  system: 'border-l-ink-muted [&_.transcript-entry-role]:text-subtle',
+  system: 'border-l-muted [&_.transcript-entry-role]:text-faint',
   error:
-    'border-l-danger text-danger [&_.transcript-entry-role]:text-danger [&_.transcript-entry-body]:text-danger',
+    'border-l-[color:var(--danger)] text-foreground [&_.transcript-entry-role]:text-foreground [&_.transcript-entry-body]:text-foreground',
 };
 
 export function transcriptEntryClassName(role: string): string {
@@ -110,7 +110,7 @@ export const asyncJobListClass = 'async-job-list mt-(--space-3) grid gap-(--spac
 
 export function asyncJobItemClassName(active: boolean): string {
   return cn(
-    'async-job-item cursor-pointer rounded-portal-sm border border-line bg-card px-(--space-2) py-(--space-2) text-left',
+    'async-job-item cursor-pointer rounded-portal-sm border border-border bg-panel px-(--space-2) py-(--space-2) text-left',
     active && 'active border-brand bg-[color:var(--surface-active-soft-bg)]',
   );
 }
@@ -118,7 +118,7 @@ export function asyncJobItemClassName(active: boolean): string {
 export const asyncJobItemHeaderClass =
   'async-job-item-header flex flex-wrap items-center justify-between gap-(--space-2)';
 
-export const asyncJobDetailClass = 'async-job-detail mt-3.5 border-t border-line pt-(--space-3)';
+export const asyncJobDetailClass = 'async-job-detail mt-3.5 border-t border-border pt-(--space-3)';
 
 export const asyncJobHeadingClass = 'async-job-heading m-0 mb-(--space-2)';
 
@@ -137,7 +137,7 @@ export const toolCatalogHeadingClass = 'tool-catalog-heading m-0 mb-1.5 text-bra
 export const toolCatalogGridClass = 'tool-catalog-grid grid gap-1.5';
 
 export const toolCatalogItemClass = cn(
-  'tool-catalog-item rounded-[6px] border border-line bg-card px-(--space-3) py-(--space-2) text-[0.9rem]',
+  'tool-catalog-item rounded-[6px] border border-border bg-panel px-(--space-3) py-(--space-2) text-[0.9rem]',
 );
 
 export const toolCatalogNameClass = 'tool-catalog-name font-semibold';

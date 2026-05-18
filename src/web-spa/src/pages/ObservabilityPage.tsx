@@ -176,7 +176,7 @@ export function ObservabilityPage(): React.JSX.Element {
           </Card>
         </div>
 
-        <aside className={stackClass}>
+        <div className={stackClass}>
           <Card title="Session topology" subtitle="Current Durable Object session model shape.">
             <DefinitionList
               entries={[
@@ -238,7 +238,7 @@ export function ObservabilityPage(): React.JSX.Element {
               </li>
             </ul>
           </Card>
-        </aside>
+        </div>
       </div>
     </div>
   );

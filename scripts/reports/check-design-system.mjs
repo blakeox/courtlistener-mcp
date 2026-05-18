@@ -62,6 +62,78 @@ function checkStylesEntry() {
   }
 }
 
+const requiredSemanticTokens = [
+  '--text-primary',
+  '--bg-panel',
+  '--bg-glass',
+  '--border-default',
+  '--action-primary-bg',
+  '--status-success-text',
+];
+
+const requiredThemeColorUtilities = [
+  '--color-foreground',
+  '--color-muted',
+  '--color-faint',
+  '--color-panel',
+  '--color-border',
+  '--color-status-success',
+];
+
+const legacyTokenDefinitionPatterns = [
+  /\n  --ink:/,
+  /\n  --ink-muted:/,
+  /\n  --line:/,
+  /\n  --card:/,
+  /\n  --bg-soft:/,
+  /\n  --bg:/,
+  /\n  --text-subtle:/,
+];
+
+const legacyThemeUtilityPatterns = [
+  /--color-ink\b/,
+  /--color-ink-muted\b/,
+  /--color-line\b/,
+  /--color-card\b/,
+  /--color-bg-soft\b/,
+  /--color-bg\b/,
+  /--color-subtle\b/,
+  /--color-text-primary\b/,
+];
+
+const legacyRecipeUtilityPattern =
+  /(?<![-\w])(text-ink|text-ink-muted|text-text-primary|text-text-secondary|text-text-tertiary|bg-card|bg-bg-soft|bg-bg|border-line|border-border-default|border-l-ink|bg-ink-muted)(?![-\w])/;
+
+const legacyRecipeVarPattern =
+  /var\(--(ink|ink-muted|line|bg-soft|text-subtle)\)|var\(--card\)(?![-a-zA-Z0-9])|var\(--bg\)(?![-a-zA-Z0-9])/;
+
+const requiredThemeTypeUtilities = ['--text-ui-sm', '--text-ui-lg', '--text-ui-xl'];
+
+const opaqueRecipeModules = [uiClassesPath, workspaceClassesPath, playgroundClassesPath];
+
+const deprecatedOpaqueSurfacePatterns = [
+  /bg-\[color:var\(--surface-bg\)\]/,
+  /bg-\[color:var\(--card\)\]/,
+];
+
+function checkSemanticTokens() {
+  const tokensPath = path.join(stylesDir, 'tokens.css');
+  const source = readText(tokensPath);
+  for (const token of requiredSemanticTokens) {
+    if (!source.includes(`${token}:`)) {
+      errors.push(`tokens.css must define semantic token ${token}.`);
+    }
+  }
+  for (const pattern of legacyTokenDefinitionPatterns) {
+    if (pattern.test(source)) {
+      errors.push(
+        'tokens.css must not define legacy tokens (--ink, --card, --line, --bg); use semantic names.',
+      );
+      break;
+    }
+  }
+}
+
 function checkThemeBridge() {
   const themePath = path.join(stylesDir, 'theme.css');
   const source = readText(themePath);
@@ -71,6 +143,80 @@ function checkThemeBridge() {
   if (!/@custom-variant\s+dark\b/.test(source)) {
     errors.push(
       'src/web-spa/src/styles/theme.css must define @custom-variant dark for data-theme.',
+    );
+  }
+  for (const utility of requiredThemeColorUtilities) {
+    if (!source.includes(utility)) {
+      errors.push(`theme.css @theme must map ${utility} from semantic tokens.`);
+    }
+  }
+  for (const utility of requiredThemeTypeUtilities) {
+    if (!source.includes(utility)) {
+      errors.push(`theme.css @theme must map ${utility} for text-ui-* utilities.`);
+    }
+  }
+  for (const pattern of legacyThemeUtilityPatterns) {
+    if (pattern.test(source)) {
+      errors.push('theme.css must not map legacy utilities (--color-ink, --color-card, …).');
+      break;
+    }
+  }
+}
+
+function checkRecipeModernUtilities() {
+  const recipeModules = [
+    uiClassesPath,
+    workspaceClassesPath,
+    playgroundClassesPath,
+    shellClassesPath,
+    toastClassesPath,
+  ];
+  for (const filePath of recipeModules) {
+    const source = readText(filePath);
+    const rel = path.relative(repoRoot, filePath);
+    if (legacyRecipeUtilityPattern.test(source)) {
+      errors.push(
+        `${rel} uses legacy Tailwind utilities; prefer text-foreground, bg-panel, border-border, text-muted, text-faint.`,
+      );
+    }
+    if (legacyRecipeVarPattern.test(source)) {
+      errors.push(
+        `${rel} references legacy CSS variables; use --text-primary, --bg-panel, --border-default, etc.`,
+      );
+    }
+  }
+}
+
+function checkOpaqueRecipeSurfaces() {
+  for (const filePath of opaqueRecipeModules) {
+    const source = readText(filePath);
+    const rel = path.relative(repoRoot, filePath);
+    for (const pattern of deprecatedOpaqueSurfacePatterns) {
+      if (pattern.test(source)) {
+        errors.push(
+          `${rel} must use bg-panel for readable surfaces, not translucent --surface-bg or legacy --card arbitrary.`,
+        );
+      }
+    }
+  }
+  const tokensSource = readText(path.join(stylesDir, 'tokens.css'));
+  if (!/--shell-topbar-bg:\s*var\(--bg-glass\)/.test(tokensSource)) {
+    errors.push('tokens.css must set --shell-topbar-bg to var(--bg-glass).');
+  }
+}
+
+function checkRecipeTokenNamespaces() {
+  const workspaceSource = readText(workspaceClassesPath);
+  const playgroundSource = readText(playgroundClassesPath);
+  const landingTokenPattern = /var\(--landing-/;
+  if (landingTokenPattern.test(workspaceSource)) {
+    errors.push(
+      'workspace-classes.ts must not use --landing-* tokens; use semantic or workspace tokens.',
+    );
+  }
+  if (landingTokenPattern.test(playgroundSource)) {
+    errors.push(
+      'playground-classes.ts must not use --landing-* tokens; use semantic or workspace tokens.',
     );
   }
 }
@@ -432,7 +578,11 @@ function checkProductionCssBudget() {
 
 checkPackageJson();
 checkStylesEntry();
+checkSemanticTokens();
 checkThemeBridge();
+checkRecipeTokenNamespaces();
+checkRecipeModernUtilities();
+checkOpaqueRecipeSurfaces();
 checkComponentStylesheets();
 checkUiClassesModule();
 checkUiTsx();

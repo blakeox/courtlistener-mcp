@@ -136,7 +136,7 @@ export const shellMainColumnClass = cn(
 export const workspaceStatusStackClass = 'workspace-status-stack grid gap-(--space-4)';
 
 export const workspaceTopbarClass = cn(
-  'workspace-topbar flex items-center justify-between gap-(--space-4) border-b border-[length:var(--size-border-sm)] border-[color:var(--shell-topbar-border)] bg-[color:var(--shell-topbar-bg)] pb-(--space-4) backdrop-blur-[length:var(--blur-md)]',
+  'workspace-topbar flex items-center justify-between gap-(--space-4) border-b border-[length:var(--size-border-sm)] border-[color:var(--shell-topbar-border)] bg-glass pb-(--space-4) backdrop-blur-[length:var(--blur-md)]',
   'max-sm:flex-col max-sm:items-stretch max-sm:gap-(--space-3) max-sm:px-(--space-3-5) max-sm:pt-(--space-3)',
 );
 

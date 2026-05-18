@@ -42,6 +42,9 @@
     "test:spa:e2e": "playwright test",
     "test:spa:design": "playwright test src/web-spa/e2e/design-smoke.spec.ts",
     "test:spa:design:lint": "node scripts/reports/check-design-system.mjs",
+    "test:spa:a11y": "node scripts/testing/run-spa-vitest.mjs src/web-spa/src/__tests__/a11y-compliance.test.ts src/web-spa/src/__tests__/a11y-pages.test.tsx",
+    "test:spa:a11y:smoke": "playwright test src/web-spa/e2e/a11y-smoke.spec.ts",
+    "test:spa:a11y:lint": "node scripts/reports/check-a11y.mjs",
     "test:spa:e2e:auth": "node scripts/testing/run-spa-auth-playwright.mjs",
     "test:spa:e2e:headed": "playwright test --project=chromium --headed",
     "test:spa:e2e:debug": "playwright test --project=chromium --debug",
@@ -108,6 +111,7 @@
     "ci:test-inspector:performance": "ENABLE_PERFORMANCE_TESTS=true npx tsx test/runners/enhanced-ci-test-inspector.ts",
     "ci:version-check": "node scripts/build/version-check.js",
     "ci:check:design-system": "node scripts/reports/check-design-system.mjs",
+    "ci:check:a11y": "node scripts/reports/check-a11y.mjs",
     "ci:check:repo-hygiene": "node scripts/reports/check-repo-hygiene.mjs",
     "ci:check:repo-hygiene:staged": "node scripts/reports/check-repo-hygiene.mjs --staged",
     "ci:check:generated": "node scripts/reports/check-generated-files-clean.mjs",
@@ -169,6 +173,7 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@cloudflare/workers-types": "^4.20260303.0",
     "@modelcontextprotocol/inspector": "^0.19.0",
     "@tailwindcss/vite": "^4.3.0",
@@ -183,6 +188,7 @@
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "@vitejs/plugin-react": "^4.5.2",
+    "axe-core": "^4.11.4",
     "c8": "^10.1.3",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.2",
@@ -199,6 +205,7 @@
     "typescript": "^5.9.3",
     "vite": "^7.0.4",
     "vitest": "^4.0.18",
+    "vitest-axe": "^0.1.0",
     "wrangler": "^4.63.0"
   },
   "engines": {

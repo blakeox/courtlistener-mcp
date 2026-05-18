@@ -410,7 +410,9 @@ export function LandingPage(props: { initialSectionId?: string }): React.JSX.Ele
                   </div>
                   <Badge variant="command-chip">MCP server</Badge>
                 </InlineGroup>
-                <CodeSurface code={MCP_CONFIG_SNIPPET}>{renderLandingConfigSnippet()}</CodeSurface>
+                <CodeSurface className={landingCodeCardClass} code={MCP_CONFIG_SNIPPET}>
+                  {renderLandingConfigSnippet()}
+                </CodeSurface>
               </div>
             </LandingSetupLayout>
           </LandingContainer>

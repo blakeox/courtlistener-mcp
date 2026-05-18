@@ -24,6 +24,6 @@ export const tableScrollClass = 'table-scroll w-full overflow-x-auto';
 
 export const tableClass = cn(
   'table mt-(--space-3) w-full min-w-[640px] border-collapse',
-  '[&_th]:border-b [&_th]:border-line [&_th]:px-2 [&_th]:py-2 [&_th]:text-left [&_th]:align-top',
-  '[&_td]:border-b [&_td]:border-line [&_td]:px-2 [&_td]:py-2 [&_td]:text-left [&_td]:align-top',
+  '[&_th]:border-b [&_th]:border-border [&_th]:px-2 [&_th]:py-2 [&_th]:text-left [&_th]:align-top',
+  '[&_td]:border-b [&_td]:border-border [&_td]:px-2 [&_td]:py-2 [&_td]:text-left [&_td]:align-top',
 );

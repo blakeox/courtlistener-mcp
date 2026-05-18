@@ -23,8 +23,9 @@
  * Accent (--accent-*): interactive blue highlights (links, selection, primary actions)
  * Font weight: --font-weight-normal (400), --font-weight-semibold (600),
  *   --font-weight-bold (700), --font-weight-display (800)
- * Color tokens: --bg, --brand (success/legal green), --danger, --ok
- *   Overridden in [data-theme="dark"] block for dark mode.
+ * Semantic colors: --text-primary, --bg-panel, --border-default, --action-*, --status-*
+ *   Brand/signal: --brand (legal green), --danger, --ok
+ *   Dark overrides: [data-theme="dark"] block
  *
  * Breakpoints:
  *   480px  — small phones (reduced padding, full-width buttons)
@@ -32,14 +33,15 @@
  *   1080px — desktop sidebar collapse, mobile menu (aligned with landing)
  */
 :root {
-  --bg: #f5f0e8;
-  --bg-soft: #faf7f2;
-  --ink: #11253f;
-  --ink-muted: #4a6078;
+  --text-primary: #11253f;
+  --text-secondary: #4a6078;
+  --text-tertiary: #4b5563;
+  --bg-canvas: #f5f0e8;
+  --bg-canvas-soft: #faf7f2;
+  --bg-panel: #fffdf9;
+  --border-default: #d9c8b1;
   --brand: #0a7f5a;
   --brand-deep: #086245;
-  --line: #d9c8b1;
-  --card: #fffdf9;
   --danger: #b83232;
   --ok: #1f7a4d;
   --shadow: 0 14px 30px rgba(17, 37, 63, 0.14);
@@ -74,6 +76,8 @@
   --surface-status-success-soft-bg: rgba(34, 197, 94, 0.15);
   --surface-status-success-soft-border: #22c55e;
   --surface-status-success-soft-text: #15803d;
+  --surface-status-success-text: #166534;
+  --surface-status-error-text: #7f1d1d;
   --surface-status-error-soft-bg: rgba(239, 68, 68, 0.15);
   --surface-active-soft-bg: rgba(59, 130, 246, 0.1);
   --surface-active-soft-bg-subtle: rgba(59, 130, 246, 0.06);
@@ -83,7 +87,7 @@
   --surface-accent-blue-soft-text: #2563eb;
   --surface-accent-green-soft-bg: rgba(34, 197, 94, 0.05);
   --surface-accent-green-soft-text: #15803d;
-  --text-subtle: #64748b;
+  --placeholder-text: var(--text-tertiary);
   --hero-bg:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.22), transparent 34%),
     linear-gradient(135deg, #071426 0%, #0b1b33 60%, #10233f 100%);
@@ -126,7 +130,7 @@
   --shell-sidebar-text-muted: rgba(226, 232, 240, 0.72);
   --shell-sidebar-divider: rgba(255, 255, 255, 0.08);
   --shell-sidebar-overlay: rgba(15, 23, 42, 0.42);
-  --shell-topbar-bg: rgba(255, 255, 255, 0.82);
+  --shell-topbar-bg: var(--bg-glass);
   --shell-topbar-border: rgba(226, 232, 240, 0.72);
   --shell-topbar-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   --shell-footer-text: #475569;
@@ -240,11 +244,42 @@
   --font-weight-bold: 700;
   --font-weight-display: 800;
   --accent-text: var(--surface-accent-blue-soft-text);
-  --accent-text-muted: #60a5fa;
+  --accent-text-muted: #2563eb;
   --accent-border: var(--shell-button-primary-border);
   --accent-soft-bg: var(--surface-active-soft-bg);
   --accent-primary-bg: var(--shell-button-primary-bg);
   --accent-primary-fg: var(--surface-button-primary-fg);
+
+  /* Semantic derived tokens */
+  --text-link: var(--accent-text);
+  --text-inverse: var(--shell-sidebar-text-strong);
+  --text-inverse-muted: var(--hero-note-text);
+  --bg-panel-muted: var(--bg-canvas-soft);
+  --bg-glass: var(--surface-bg);
+  --bg-glass-strong: var(--surface-bg-strong);
+  --border-subtle: var(--surface-border);
+  --border-strong: var(--surface-border-strong);
+  --border-control: var(--surface-control-border);
+  /* Actions (shell blue) */
+  --action-primary-bg: var(--shell-button-primary-bg);
+  --action-primary-border: var(--shell-button-primary-border);
+  --action-primary-fg: var(--accent-primary-fg);
+  --action-primary-shadow: var(--shell-button-primary-shadow);
+  --action-secondary-bg: var(--shell-button-secondary-bg);
+  --action-secondary-border: var(--shell-button-secondary-border);
+  --action-secondary-fg: var(--shell-button-secondary-text);
+  --action-focus-ring: var(--shell-focus-ring);
+  /* Status */
+  --status-success-bg: var(--surface-status-success-bg);
+  --status-success-border: var(--surface-status-success-border);
+  --status-success-text: var(--surface-status-success-text);
+  --status-error-bg: var(--surface-status-error-bg);
+  --status-error-border: var(--surface-status-error-border);
+  --status-error-text: var(--surface-status-error-text);
+  --status-warn-bg: var(--surface-status-warn-bg);
+  --status-warn-border: var(--surface-status-warn-border);
+  --status-warn-text: var(--surface-status-warn-text);
+
   --shadow-none: none;
   --space-0: 0;
   --margin-none: 0;
@@ -384,7 +419,7 @@
   --card-spotlight-gradient:
     radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 42%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.92));
-  --landing-header-bg: rgba(255, 255, 255, 0.94);
+  --landing-header-bg: var(--bg-glass-strong);
   --landing-accent-soft-bg: rgba(37, 99, 235, 0.08);
   --landing-accent-soft-border: rgba(37, 99, 235, 0.18);
   --landing-accent-active-border: rgba(37, 99, 235, 0.26);
@@ -415,10 +450,10 @@
   --landing-color-blue-500: var(--surface-accent-blue);
   --landing-color-blue-400: var(--accent-text-muted);
   --landing-color-white: #ffffff;
-  --landing-color-paper: var(--bg-soft);
-  --landing-color-text-primary: var(--ink);
+  --landing-color-paper: var(--bg-canvas-soft);
+  --landing-color-text-primary: var(--text-primary);
   --landing-color-text-secondary: var(--shell-footer-text);
-  --landing-color-text-muted: var(--text-subtle);
+  --landing-color-text-muted: var(--text-tertiary);
   --landing-color-text-inverse: var(--shell-sidebar-text-strong);
   --landing-color-text-inverse-muted: var(--hero-note-text);
   --landing-color-border-light: var(--shell-button-secondary-border);
@@ -432,14 +467,15 @@
   --code-syntax-muted: #94a3b8;
 }
 [data-theme='dark'] {
-  --bg: #1a1e2e;
-  --bg-soft: #232838;
-  --ink: #e2e8f0;
-  --ink-muted: #94a3b8;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #cbd5e1;
+  --bg-canvas: #1a1e2e;
+  --bg-canvas-soft: #232838;
+  --bg-panel: #1e293b;
+  --border-default: #334155;
   --brand: #34d399;
   --brand-deep: #10b981;
-  --line: #334155;
-  --card: #1e293b;
   --danger: #f87171;
   --ok: #4ade80;
   --shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
@@ -469,6 +505,8 @@
   --surface-status-success-soft-bg: rgba(34, 197, 94, 0.18);
   --surface-status-success-soft-border: #22c55e;
   --surface-status-success-soft-text: #86efac;
+  --surface-status-success-text: #86efac;
+  --surface-status-error-text: #fca5a5;
   --surface-status-error-soft-bg: rgba(239, 68, 68, 0.18);
   --surface-active-soft-bg: rgba(59, 130, 246, 0.18);
   --surface-active-soft-bg-subtle: rgba(59, 130, 246, 0.1);
@@ -479,7 +517,7 @@
   --surface-accent-green-soft-bg: rgba(34, 197, 94, 0.12);
   --surface-accent-green-soft-text: #86efac;
   --surface-skeleton-bg: linear-gradient(90deg, #232838 25%, #2d3548 50%, #232838 75%);
-  --text-subtle: #cbd5e1;
+  --placeholder-text: #94a3b8;
   --hero-grid-dot: rgba(96, 165, 250, 0.18);
   --hero-note-bg: rgba(15, 23, 42, 0.4);
   --hero-note-border: rgba(51, 65, 85, 0.9);
@@ -514,7 +552,7 @@
   --shell-sidebar-text-muted: rgba(226, 232, 240, 0.72);
   --shell-sidebar-divider: rgba(51, 65, 85, 0.84);
   --shell-sidebar-overlay: rgba(15, 23, 42, 0.56);
-  --shell-topbar-bg: rgba(15, 23, 42, 0.72);
+  --shell-topbar-bg: var(--bg-glass);
   --shell-topbar-border: rgba(51, 65, 85, 0.8);
   --shell-topbar-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
   --shell-footer-text: #cbd5e1;

@@ -405,6 +405,7 @@ export function Shell(
           id="primary-navigation"
           ref={sidebarRef}
           className={workspaceSidebarClassName(sidebarOpen)}
+          aria-label="Primary navigation"
         >
           <div className={appSidebarHeaderClass}>
             <div className={appSidebarBrandBlockClass}>
