@@ -103,7 +103,7 @@ function canonicalizeList(values) {
 async function createProbeRule(zoneId, rulesetId, rule) {
   const result = await cloudflareRequest(`/zones/${zoneId}/rulesets/${rulesetId}/rules`, {
     method: 'POST',
-    body: { rules: [rule] },
+    body: rule,
   });
   return unwrapRuleResult(result, PROBE_RULE_REF);
 }
