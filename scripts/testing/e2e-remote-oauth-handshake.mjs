@@ -276,7 +276,11 @@ export async function probeFetch(url, init = {}, fetchImpl = fetch) {
 }
 
 async function fetchJson(url, init = {}, fetchImpl = fetch) {
-  const response = await probeFetch(url, init, fetchImpl);
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('accept')) {
+    headers.set('accept', 'application/json');
+  }
+  const response = await probeFetch(url, { ...init, headers }, fetchImpl);
   const body = await response.json().catch(() => ({}));
   return { status: response.status, headers: response.headers, body };
 }
