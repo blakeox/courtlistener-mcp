@@ -210,7 +210,7 @@ export async function main() {
   const authRedirect = await step(
     'Request /authorize and capture auth portal redirect',
     async () => {
-      const response = await fetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
+      const response = await probeFetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
       assert(isRedirect(response.status), `Expected redirect, got ${response.status}`);
       const location = response.headers.get('location');
       assert(location, 'Missing authorize redirect location');
@@ -228,7 +228,7 @@ export async function main() {
   );
 
   await step('Fetch auth portal handoff page', async () => {
-    const response = await fetch(authRedirect, { redirect: 'manual' });
+    const response = await probeFetch(authRedirect, { redirect: 'manual' });
     assert(
       isRedirect(response.status) || response.status === 200,
       `Expected redirect or 200, got ${response.status}`,
@@ -260,12 +260,23 @@ function base64Url(buffer) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-async function fetchJson(url, init = {}, fetchImpl = fetch) {
+function withProbeHeaders(init = {}) {
   const headers = new Headers(init.headers || {});
   if (!headers.has('user-agent')) {
     headers.set('user-agent', OAUTH_PROBE_USER_AGENT);
   }
-  const response = await fetchImpl(url, { ...init, headers });
+  if (!headers.has('accept')) {
+    headers.set('accept', 'text/html,application/json');
+  }
+  return { ...init, headers };
+}
+
+export async function probeFetch(url, init = {}, fetchImpl = fetch) {
+  return fetchImpl(url, withProbeHeaders(init));
+}
+
+async function fetchJson(url, init = {}, fetchImpl = fetch) {
+  const response = await probeFetch(url, init, fetchImpl);
   const body = await response.json().catch(() => ({}));
   return { status: response.status, headers: response.headers, body };
 }
@@ -305,14 +316,14 @@ export async function probeHostedAuthReadiness(baseUrl, returnTo = null, fetchIm
     probeUrl.searchParams.set('return_to', returnTo.trim());
   }
 
-  const response = await fetchImpl(probeUrl, {
-    method: 'GET',
-    redirect: 'manual',
-    headers: {
-      'user-agent': OAUTH_PROBE_USER_AGENT,
-      accept: 'text/html,application/json',
+  const response = await probeFetch(
+    probeUrl,
+    {
+      method: 'GET',
+      redirect: 'manual',
     },
-  });
+    fetchImpl,
+  );
 
   return summarizeHostedAuthProbeResponse(response);
 }
