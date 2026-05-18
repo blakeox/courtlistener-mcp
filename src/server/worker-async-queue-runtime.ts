@@ -335,6 +335,9 @@ export async function processAsyncQueueMessage(params: {
           job.userId,
         ),
     );
+    // Re-read job from KV to check if cancellation was requested during execution
+    const freshJob = await readJob(params.env, params.message.jobId);
+    job.cancellationRequested = freshJob?.cancellationRequested ?? job.cancellationRequested;
     if (job.cancellationRequested) {
       throw new Error('Job cancelled during execution');
     }
@@ -348,9 +351,14 @@ export async function processAsyncQueueMessage(params: {
     await writeJob(params.env, job);
     params.onAsyncJobUpdate?.('succeeded', job.toolName, job.attempts.current);
   } catch (error) {
+    // Re-read job from KV to get fresh cancellation state for retry/error decisions
+    const freshJobState = await readJob(params.env, params.message.jobId);
+    const cancellationRequested = freshJobState?.cancellationRequested ?? false;
+    job.cancellationRequested = cancellationRequested;
+
     const message = error instanceof Error ? error.message : String(error);
     const history = [...(job.error?.history ?? []), message];
-    if (job.attempts.current < job.attempts.max && !job.cancellationRequested) {
+    if (job.attempts.current < job.attempts.max && !cancellationRequested) {
       job.status = 'queued';
       job.updatedAtMs = Date.now();
       job.queuedAtMs = job.updatedAtMs;
@@ -374,9 +382,9 @@ export async function processAsyncQueueMessage(params: {
     job.status = 'failed';
     job.updatedAtMs = Date.now();
     job.error = {
-      code: job.cancellationRequested ? 'cancelled' : 'max_attempts_exceeded',
+      code: cancellationRequested ? 'cancelled' : 'max_attempts_exceeded',
       message,
-      deadLetter: !job.cancellationRequested,
+      deadLetter: !cancellationRequested,
       attempts: job.attempts.current,
       history,
     };
