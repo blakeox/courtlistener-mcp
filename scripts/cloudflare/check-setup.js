@@ -595,6 +595,16 @@ async function main() {
     '  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions',
   );
   console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
+  if (!process.env.CLOUDFLARE_API_TOKEN?.trim()) {
+    warn(
+      'CLOUDFLARE_API_TOKEN is not set. Run `pnpm run cloudflare:waf:ensure` after creating a Zone.WAF Edit token to allow OAuth monitoring probes through Bot Fight / BIC.',
+    );
+  } else {
+    ok(
+      'CLOUDFLARE_API_TOKEN is present. Run `pnpm run cloudflare:waf:ensure` explicitly to install or update the OAuth probe WAF rule.',
+    );
+  }
+  console.log('  pnpm run cloudflare:waf:ensure   # idempotent WAF rule for OAuth probes');
   console.log('  pnpm run cloudflare:deploy');
 
   if (hasCriticalError) {

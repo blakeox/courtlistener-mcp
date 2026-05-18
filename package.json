@@ -26,6 +26,8 @@
     "cloudflare:deploy": "pnpm run cloudflare:check && wrangler deploy",
     "cloudflare:tail": "wrangler tail",
     "cloudflare:register:oauth": "node scripts/cloudflare/register-oauth-client.mjs",
+    "cloudflare:waf:ensure": "node scripts/cloudflare/ensure-waf-probe-access.mjs",
+    "cloudflare:zone:id": "node scripts/cloudflare/print-zone-id.mjs",
     "start": "node dist/index.js",
     "start:http": "node dist/http.js",
     "doctor": "node dist/index.js --doctor",

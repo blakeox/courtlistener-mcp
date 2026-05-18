@@ -1,0 +1,3 @@
+cloudflare_api_token = "replace-with-zone-waf-edit-token"
+zone_name            = "blakeoxford.com"
+mcp_hostname         = "courtlistenermcp.blakeoxford.com"
