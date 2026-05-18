@@ -7,7 +7,7 @@
  */
 
 import {
-  OAUTH_PROBE_USER_AGENT,
+  probeFetch,
   registerOAuthClient,
   resolveProbeConfig,
 } from './e2e-remote-oauth-handshake.mjs';
@@ -27,8 +27,8 @@ async function main() {
   const redirectUri = 'http://127.0.0.1:59999/callback';
   const scope = 'legal:read legal:search legal:analyze';
 
-  const discovery = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`, {
-    headers: { 'user-agent': OAUTH_PROBE_USER_AGENT },
+  const discovery = await probeFetch(`${baseUrl}/.well-known/oauth-authorization-server`, {
+    headers: { accept: 'application/json' },
   }).then((r) => r.json());
 
   const registration = cfg.clientId
@@ -50,7 +50,7 @@ async function main() {
   authorizeUrl.searchParams.set('code_challenge_method', 'S256');
   authorizeUrl.searchParams.set('code_challenge', 'probe-challenge-not-s256-valid');
 
-  const authorizeRes = await fetch(authorizeUrl, { redirect: 'manual' });
+  const authorizeRes = await probeFetch(authorizeUrl, { redirect: 'manual' });
   const authStart = authorizeRes.headers.get('location');
   if (!authStart?.includes('/auth/start')) {
     throw new Error(`Expected /auth/start redirect, got ${authStart}`);
@@ -64,7 +64,7 @@ async function main() {
   const approveUrl = new URL('/oauth/approve', baseUrl);
   approveUrl.searchParams.set('return_to', returnTo);
 
-  const approveGet = await fetch(approveUrl, { redirect: 'manual' });
+  const approveGet = await probeFetch(approveUrl, { redirect: 'manual' });
   const approveGetLocation = approveGet.headers.get('location') || '';
   if (!approveGetLocation.includes('/auth/start')) {
     throw new Error(
@@ -72,7 +72,7 @@ async function main() {
     );
   }
 
-  const approvePost = await fetch(`${baseUrl}/oauth/approve`, {
+  const approvePost = await probeFetch(`${baseUrl}/oauth/approve`, {
     method: 'POST',
     redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
