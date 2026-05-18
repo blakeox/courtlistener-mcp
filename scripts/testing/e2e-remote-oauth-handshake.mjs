@@ -265,9 +265,6 @@ function withProbeHeaders(init = {}) {
   if (!headers.has('user-agent')) {
     headers.set('user-agent', OAUTH_PROBE_USER_AGENT);
   }
-  if (!headers.has('accept')) {
-    headers.set('accept', 'text/html,application/json');
-  }
   return { ...init, headers };
 }
 
@@ -325,6 +322,9 @@ export async function probeHostedAuthReadiness(baseUrl, returnTo = null, fetchIm
     {
       method: 'GET',
       redirect: 'manual',
+      headers: {
+        accept: 'text/html,application/json',
+      },
     },
     fetchImpl,
   );

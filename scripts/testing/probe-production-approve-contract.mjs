@@ -27,9 +27,9 @@ async function main() {
   const redirectUri = 'http://127.0.0.1:59999/callback';
   const scope = 'legal:read legal:search legal:analyze';
 
-  const discovery = await probeFetch(`${baseUrl}/.well-known/oauth-authorization-server`).then(
-    (r) => r.json(),
-  );
+  const discovery = await probeFetch(`${baseUrl}/.well-known/oauth-authorization-server`, {
+    headers: { accept: 'application/json' },
+  }).then((r) => r.json());
 
   const registration = cfg.clientId
     ? { client_id: cfg.clientId }
