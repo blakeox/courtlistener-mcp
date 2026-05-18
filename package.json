@@ -80,6 +80,7 @@
     "mcp:test:remote": "node scripts/dev/test-remote-mcp.js",
     "test:e2e:ai-chat-presets": "node scripts/testing/e2e-ai-chat-presets.mjs",
     "test:e2e:oauth-remote": "node scripts/testing/e2e-remote-oauth-handshake.mjs",
+    "test:e2e:oauth-target": "node scripts/testing/validate-e2e-oauth-target.mjs",
     "test:e2e:oauth-approve-contract": "node scripts/testing/probe-production-approve-contract.mjs",
     "test:e2e:worker-auth-flow": "node scripts/testing/e2e-remote-oauth-handshake.mjs",
     "dev": "tsc --watch --preserveWatchOutput",
