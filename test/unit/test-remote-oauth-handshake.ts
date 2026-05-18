@@ -4,6 +4,8 @@ import { describe, it } from 'node:test';
 import {
   assertAuthPortalHandoffContent,
   assertHostedAuthReadinessContract,
+  assertHostedAuthReadinessContractOrDegraded,
+  isDegradedHostedAuthRedirect,
   probeHostedAuthReadiness,
   registerOAuthClient,
   registrationRetryDelayMs,
@@ -34,6 +36,30 @@ describe('remote oauth handshake probe', () => {
         }),
     );
     assert.equal(result.probe.hostedAuthRoute, 'auth-start');
+  });
+
+  it('accepts degraded CI redirects when hosted-auth headers are stripped', () => {
+    const probe = summarizeHostedAuthProbeResponse(
+      new Response(null, {
+        status: 302,
+        headers: {
+          location:
+            'https://auth.example.com/oidc/auth?client_id=probe&redirect_uri=https%3A%2F%2Fworker.example%2Fauth%2Fcallback',
+        },
+      }),
+    );
+    assert.equal(isDegradedHostedAuthRedirect(probe), true);
+    const previous = process.env.GITHUB_ACTIONS;
+    process.env.GITHUB_ACTIONS = 'true';
+    try {
+      assert.equal(assertHostedAuthReadinessContractOrDegraded(probe).degraded, true);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GITHUB_ACTIONS;
+      } else {
+        process.env.GITHUB_ACTIONS = previous;
+      }
+    }
   });
 
   it('rejects E2E OAuth targets without hosted-auth readiness headers', async () => {

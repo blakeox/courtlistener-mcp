@@ -337,8 +337,7 @@ export async function processAsyncQueueMessage(params: {
     );
     // Re-read job from KV to check if cancellation was requested during execution
     const freshJob = await readJob(params.env, params.message.jobId);
-    job.cancellationRequested = freshJob?.cancellationRequested ?? job.cancellationRequested;
-    if (job.cancellationRequested) {
+    if (freshJob?.cancellationRequested) {
       throw new Error('Job cancelled during execution');
     }
     if (result.isError) {
