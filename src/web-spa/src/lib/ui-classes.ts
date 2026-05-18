@@ -13,10 +13,10 @@ export const textLinkClass = cn(
   'text-link',
 );
 
-export const mutedTextClass = cn('muted mt-(--space-2) text-foreground');
+export const mutedTextClass = cn('muted mt-(--space-2) text-muted');
 
 /** Muted body copy without extra block spacing (metric cards, empty states). */
-export const mutedCopyClass = 'muted text-foreground';
+export const mutedCopyClass = 'muted text-muted';
 
 export const cardClass = cn(
   'ui-card',
@@ -150,7 +150,7 @@ export function buttonClassName(
       'danger border-[color:var(--shell-button-danger-border)] bg-[color:var(--shell-button-danger-bg)] text-[color:var(--shell-button-danger-text)] shadow-none',
     variant === 'ghost' &&
       cn(
-        'ghost border-transparent bg-transparent shadow-none text-[color:var(--shell-account-menu-text-faint)]',
+        'ghost border-transparent bg-transparent shadow-none text-[color:var(--shell-account-menu-text-subtle)]',
         'hover:border-[color:var(--action-secondary-border)] hover:bg-[color:var(--action-secondary-bg)] hover:text-[color:var(--action-secondary-fg)]',
         'focus-visible:border-[color:var(--action-secondary-border)] focus-visible:bg-[color:var(--action-secondary-bg)] focus-visible:text-[color:var(--action-secondary-fg)]',
       ),
