@@ -886,7 +886,7 @@ function normalizeValueForSerialization(value: unknown): unknown {
   return value;
 }
 
-function resolveBoundedPositiveInt(input: number | undefined, fallback: number): number {
+export function resolveBoundedPositiveInt(input: number | undefined, fallback: number): number {
   if (input === undefined || Number.isNaN(input) || !Number.isFinite(input)) {
     return fallback;
   }
