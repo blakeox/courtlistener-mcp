@@ -5,6 +5,7 @@ import type { Logger } from '../infrastructure/logger.js';
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
 import {
   createAsyncEnvelope,
+  resolveBoundedPositiveInt,
   type AsyncExecutionDirective,
   type AsyncJobSnapshot,
   type AsyncWorkflowDiagnostics,
@@ -61,13 +62,6 @@ export interface AsyncJobMessage {
   jobId: string;
 }
 
-function resolveBoundedPositiveInt(input: number | undefined, fallback: number): number {
-  if (input === undefined || Number.isNaN(input) || !Number.isFinite(input)) {
-    return fallback;
-  }
-  return Math.max(1, Math.floor(input));
-}
-
 function snapshot(job: StoredAsyncJob): AsyncJobSnapshot {
   return {
     id: job.id,
@@ -76,7 +70,10 @@ function snapshot(job: StoredAsyncJob): AsyncJobSnapshot {
     createdAt: new Date(job.createdAtMs).toISOString(),
     updatedAt: new Date(job.updatedAtMs).toISOString(),
     expiresAt: new Date(job.expiresAtMs).toISOString(),
-    attempts: job.attempts,
+    attempts: {
+      current: job.attempts.current,
+      max: job.attempts.max,
+    },
     ...(job.idempotencyKey ? { idempotencyKey: job.idempotencyKey } : {}),
     cancellationRequested: job.cancellationRequested,
     ...(job.error ? { error: job.error } : {}),

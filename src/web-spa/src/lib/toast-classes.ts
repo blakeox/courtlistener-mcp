@@ -11,7 +11,7 @@ const toastToneClass: Record<'ok' | 'error' | 'info', string> = {
   ok: 'toast-ok border border-[color:var(--surface-status-success-border)] bg-[color:var(--surface-status-success-bg)] text-ok',
   error:
     'toast-error border border-[color:var(--surface-status-error-border)] bg-[color:var(--surface-status-error-bg)] text-danger',
-  info: 'toast-info border border-line bg-[color:var(--surface-status-info-bg)] text-ink',
+  info: 'toast-info border border-border bg-[color:var(--surface-status-info-bg)] text-foreground',
 };
 
 export function toastClassName(type: 'ok' | 'error' | 'info'): string {

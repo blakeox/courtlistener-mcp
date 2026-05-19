@@ -211,7 +211,7 @@ export function HeroPanel(
           {props.actions ? <div className={pageHeroActionsClass}>{props.actions}</div> : null}
           {props.children}
         </div>
-        {props.aside ? <aside className={pageHeroAsideClass}>{props.aside}</aside> : null}
+        {props.aside ? <div className={pageHeroAsideClass}>{props.aside}</div> : null}
       </div>
     </section>
   );
