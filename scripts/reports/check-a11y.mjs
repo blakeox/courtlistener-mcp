@@ -157,7 +157,9 @@ function checkDecorativeSvgs() {
       if (
         !/\baria-hidden=/.test(slice) &&
         !/\brole=["']img["']/.test(slice) &&
-        !/\baria-label=/.test(slice)
+        !/\baria-label=/.test(slice) &&
+        !/\baria-labelledby=/.test(slice) &&
+        !/<title[\s>]/.test(slice)
       ) {
         errors.push(
           `${relPath} includes inline <svg> without aria-hidden or an accessible name (${slice.slice(0, 96)}…).`,
