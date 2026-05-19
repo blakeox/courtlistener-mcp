@@ -6,13 +6,12 @@ async function expectOpaqueForegroundText(
   page: import('@playwright/test').Page,
   selector: string,
 ): Promise<void> {
-  const color = await page
-    .locator(selector)
-    .first()
-    .evaluate((element) => {
-      return getComputedStyle(element).color;
-    });
-  expect(color, `Expected ${selector} to use portal foreground text`).toBe('rgb(17, 37, 63)');
+  const target = page.locator(selector).first();
+  await expect(target, `Expected ${selector} to match at least one element`).toBeVisible();
+  await expect(target, `Expected ${selector} to use portal foreground text`).toHaveCSS(
+    'color',
+    'rgb(17, 37, 63)',
+  );
 }
 
 async function expectNoSeriousViolations(
