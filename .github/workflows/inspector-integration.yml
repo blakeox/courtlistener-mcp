@@ -97,7 +97,7 @@ jobs:
           fi
 
       - name: Upload compatibility artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: inspector-compatibility-${{ matrix.inspector-version }}-node${{ matrix.node-version }}
@@ -209,7 +209,7 @@ jobs:
           fi
 
       - name: Upload visual test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: visual-regression-tests
           path: |
@@ -301,7 +301,7 @@ jobs:
           echo "Sample tool exec (ms): $TOOL_MS" >> inspector-performance-report.txt
 
       - name: Upload performance artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: inspector-performance-results
           path: |
@@ -358,7 +358,7 @@ jobs:
           EOF
 
       - name: Upload summary report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: inspector-integration-summary
           path: inspector-integration-summary.md
