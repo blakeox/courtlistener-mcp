@@ -4,23 +4,23 @@ import { cn } from './cn';
 
 export const eyebrowLabelClass = cn(
   'eyebrow-label workspace-card-label',
-  'text-accent text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] uppercase',
+  'text-foreground text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] uppercase',
 );
 
 /** Keep `text-link` after utilities — tailwind-merge drops it if listed before `text-accent`. */
 export const textLinkClass = cn(
-  'font-semibold text-accent underline decoration-[color:var(--shell-focus-ring)] underline-offset-2 transition-colors',
+  'font-semibold text-accent underline decoration-[color:var(--action-focus-ring)] underline-offset-2 transition-colors',
   'text-link',
 );
 
-export const mutedTextClass = cn('muted mt-(--space-2) text-subtle');
+export const mutedTextClass = cn('muted mt-(--space-2) text-muted');
 
 /** Muted body copy without extra block spacing (metric cards, empty states). */
-export const mutedCopyClass = 'muted text-subtle';
+export const mutedCopyClass = 'muted text-muted';
 
 export const cardClass = cn(
   'ui-card',
-  'rounded-portal-md border border-[color:var(--surface-border)] bg-[color:var(--surface-bg)] p-(--space-5) shadow-[var(--surface-shadow)] backdrop-blur-[length:var(--blur-lg)]',
+  'rounded-portal-md border border-border-subtle bg-panel p-(--space-5) shadow-[var(--surface-shadow)]',
   'max-sm:p-(--space-3)',
 );
 
@@ -29,11 +29,12 @@ export const cardSpotlightClass = cn(
   'card-spotlight bg-[image:var(--card-spotlight-gradient)]',
 );
 
-export const cardTitleClass = 'm-0 text-[length:var(--text-2xl)] tracking-[var(--tracking-snug)]';
+export const cardTitleClass =
+  'm-0 text-[length:var(--text-2xl)] tracking-[var(--tracking-snug)] text-foreground';
 
 export const panelClass = cn(
   'panel-card',
-  'grid gap-(--space-2) rounded-portal-md border border-[color:var(--surface-border)] bg-[image:var(--surface-panel-bg)] p-(--space-4-5)',
+  'grid gap-(--space-2) rounded-portal-md border border-border-subtle bg-panel p-(--space-4-5)',
 );
 
 export const panelInverseClass = cn(
@@ -57,7 +58,7 @@ export const pageHeaderTitleClass = cn(
 
 export const pageHeaderDescriptionClass = cn(
   'page-header-description',
-  'm-0 max-w-[var(--width-prose-2xl)] text-[length:var(--text-lg-plus)] leading-[var(--leading-loose)] text-subtle',
+  'm-0 max-w-[var(--width-prose-2xl)] text-[length:var(--text-lg-plus)] leading-[var(--leading-loose)] text-faint',
 );
 
 export const pageHeaderSideClass = cn(
@@ -65,7 +66,7 @@ export const pageHeaderSideClass = cn(
   'grid flex-[var(--flex-side)] justify-items-start gap-(--space-3)',
 );
 
-export const pageHeaderMetaClass = cn('page-header-meta', 'm-0 font-semibold text-subtle');
+export const pageHeaderMetaClass = cn('page-header-meta', 'm-0 font-semibold text-faint');
 
 export const pageHeaderActionsClass = cn('page-header-actions', 'flex flex-wrap gap-(--space-2)');
 
@@ -122,7 +123,7 @@ export const inlineGroupClass = (
   );
 
 const interactiveButtonBase = cn(
-  'inline-flex cursor-pointer items-center justify-center rounded-portal-sm border border-[length:var(--size-border-sm)] border-[color:var(--surface-button-border)] bg-[color:var(--surface-button-bg)] px-(--space-3-5) py-(--space-2-5) font-bold text-ink no-underline transition-[transform,box-shadow,filter,border-color,background,color] duration-200',
+  'inline-flex cursor-pointer items-center justify-center rounded-portal-sm border border-[length:var(--size-border-sm)] border-[color:var(--surface-button-border)] bg-[color:var(--surface-button-bg)] px-(--space-3-5) py-(--space-2-5) font-bold text-foreground no-underline transition-[transform,box-shadow,filter,border-color,background,color] duration-200',
   'min-h-[var(--size-touch-md)]',
   'enabled:hover:brightness-[var(--motion-brightness-hover)]',
   'enabled:active:scale-[var(--motion-scale-press)]',
@@ -143,16 +144,16 @@ export function buttonClassName(
   return cn(
     buttonBase,
     variant === 'primary' &&
-      'primary border-[color:var(--shell-button-primary-border)] bg-[image:var(--shell-button-primary-bg)] text-[color:var(--accent-primary-fg)] shadow-[var(--shell-button-primary-shadow)]',
+      'primary border-[color:var(--action-primary-border)] bg-[image:var(--action-primary-bg)] text-[color:var(--action-primary-fg)] shadow-[var(--action-primary-shadow)]',
     variant === 'secondary' &&
-      'secondary border-[color:var(--shell-button-secondary-border)] bg-[color:var(--shell-button-secondary-bg)] text-[color:var(--shell-button-secondary-text)] shadow-none',
+      'secondary border-[color:var(--action-secondary-border)] bg-[color:var(--action-secondary-bg)] text-[color:var(--action-secondary-fg)] shadow-none',
     variant === 'danger' &&
       'danger border-[color:var(--shell-button-danger-border)] bg-[color:var(--shell-button-danger-bg)] text-[color:var(--shell-button-danger-text)] shadow-none',
     variant === 'ghost' &&
       cn(
         'ghost border-transparent bg-transparent shadow-none text-[color:var(--shell-account-menu-text-subtle)]',
-        'hover:border-[color:var(--shell-button-secondary-border)] hover:bg-[color:var(--shell-button-secondary-bg)] hover:text-[color:var(--shell-button-secondary-text)]',
-        'focus-visible:border-[color:var(--shell-button-secondary-border)] focus-visible:bg-[color:var(--shell-button-secondary-bg)] focus-visible:text-[color:var(--shell-button-secondary-text)]',
+        'hover:border-[color:var(--action-secondary-border)] hover:bg-[color:var(--action-secondary-bg)] hover:text-[color:var(--action-secondary-fg)]',
+        'focus-visible:border-[color:var(--action-secondary-border)] focus-visible:bg-[color:var(--action-secondary-bg)] focus-visible:text-[color:var(--action-secondary-fg)]',
       ),
     size === 'compact' && 'btn-compact text-base px-(--space-3) py-(--space-2)',
     size === 'tiny' &&
@@ -175,20 +176,20 @@ export function landingButtonClassName(
     'enabled:hover:-translate-y-px',
     variant === 'primary' &&
       cn(
-        'landing-button-primary primary border-[color:var(--shell-button-primary-border)] bg-[image:var(--shell-button-primary-bg)] text-[color:var(--accent-primary-fg)] shadow-[var(--shell-button-primary-shadow)]',
+        'landing-button-primary primary border-[color:var(--action-primary-border)] bg-[image:var(--action-primary-bg)] text-[color:var(--action-primary-fg)] shadow-[var(--action-primary-shadow)]',
         'enabled:hover:shadow-[var(--shell-button-primary-hover-shadow)]',
       ),
     variant === 'secondary' &&
-      'landing-button-secondary secondary border-[color:var(--shell-button-secondary-border)] bg-[color:var(--shell-button-secondary-bg)] text-[color:var(--shell-button-secondary-text)]',
+      'landing-button-secondary secondary border-[color:var(--action-secondary-border)] bg-[color:var(--action-secondary-bg)] text-[color:var(--action-secondary-fg)]',
     className,
   );
 }
 
 export function badgeClassName(tone: 'neutral' | 'ok' | 'warn', className?: string): string {
   return cn(
-    'chip inline-block rounded-full border border-[length:var(--size-border-sm)] border-[color:var(--line)] px-(--space-2) py-(--space-1) text-[length:var(--text-base-compact)] font-bold',
+    'chip inline-block rounded-full border border-[length:var(--size-border-sm)] border-border px-(--space-2) py-(--space-1) text-[length:var(--text-base-compact)] font-bold',
     tone === 'ok' &&
-      'active border-[color:var(--surface-status-success-border)] bg-[color:var(--surface-status-success-bg)] text-[color:var(--ok)]',
+      'active border-[color:var(--surface-status-success-border)] bg-[color:var(--surface-control-bg)] text-foreground',
     tone === 'warn' &&
       'warn border-[color:var(--surface-status-warn-border)] bg-[color:var(--surface-status-warn-bg)] text-[color:var(--surface-status-warn-text-strong)]',
     className,
@@ -196,14 +197,14 @@ export function badgeClassName(tone: 'neutral' | 'ok' | 'warn', className?: stri
 }
 
 const controlFocusClass =
-  'focus-visible:outline-[length:var(--size-focus-ring)] focus-visible:outline-[color:var(--shell-focus-ring)] focus-visible:outline-offset-[var(--size-focus-offset)]';
+  'focus-visible:outline-[length:var(--size-focus-ring)] focus-visible:outline-[color:var(--action-focus-ring)] focus-visible:outline-offset-[var(--size-focus-offset)]';
 
 export function iconButtonClassName(chrome: 'boxed' | 'inline', className?: string): string {
   return cn(
     'icon-btn cursor-pointer',
     chrome === 'inline'
       ? 'inline h-auto w-auto border-0 bg-transparent p-0.5 px-1 text-inherit opacity-60'
-      : 'size-[30px] rounded-portal-sm border border-[color:var(--line)] bg-[color:var(--surface-control-bg)]',
+      : 'size-[30px] rounded-portal-sm border border-border bg-[color:var(--surface-control-bg)]',
     controlFocusClass,
     className,
   );
@@ -216,13 +217,13 @@ export function statusBannerClassName(
   return cn(
     'status mt-(--space-3) rounded-portal-sm border border-[length:var(--size-border-sm)] px-(--space-3-5) py-(--space-3-5)',
     type === 'info' &&
-      'info text-ink bg-[color:var(--surface-status-info-bg)] border-[color:var(--surface-border)]',
+      'info text-foreground bg-[color:var(--surface-status-info-bg)] border-border-subtle',
     type === 'ok' &&
-      'ok text-[color:var(--ok)] bg-[color:var(--surface-status-success-bg)] border-[color:var(--surface-status-success-border)]',
+      'ok text-status-success bg-[color:var(--status-success-bg)] border-[color:var(--status-success-border)]',
     type === 'warn' &&
-      'warn text-[color:var(--surface-status-warn-text)] bg-[color:var(--surface-status-warn-bg)] border-[color:var(--surface-status-warn-border)]',
+      'warn text-status-warn bg-[color:var(--status-warn-bg)] border-[color:var(--status-warn-border)]',
     type === 'error' &&
-      'error text-[color:var(--danger)] bg-[color:var(--surface-status-error-bg)] border-[color:var(--surface-status-error-border)]',
+      'error text-foreground bg-[color:var(--surface-control-bg)] border-[color:var(--status-error-border)]',
     className,
   );
 }
@@ -230,7 +231,7 @@ export function statusBannerClassName(
 export const statusActionsClass = 'status-actions mt-(--space-2)';
 
 export const loadingClass = cn(
-  'loading rounded-portal-md border border-[color:var(--line)] bg-[color:var(--surface-control-bg)] p-3',
+  'loading rounded-portal-md border border-border bg-[color:var(--surface-control-bg)] p-3',
 );
 
 export const skeletonClass = cn(
@@ -248,7 +249,7 @@ export const skeletonLineShortClass = cn(
 );
 
 export const emptyStateClass = cn(
-  'empty-state px-(--space-4) py-(--space-6) text-center text-ink-muted',
+  'empty-state px-(--space-4) py-(--space-6) text-center text-muted',
 );
 
 export const emptyStateIconClass = 'empty-state-icon text-[length:var(--text-display-sm)]';
@@ -262,7 +263,7 @@ export function comparisonCardClassName(
   className?: string,
 ): string {
   return cn(
-    'comparison-card rounded-portal-sm border-2 border-[color:var(--line)] bg-card p-(--space-3)',
+    'comparison-card rounded-portal-sm border-2 border-border bg-panel p-(--space-3)',
     size === 'large' && 'comparison-card-lg p-(--space-4)',
     tone === 'mcp'
       ? 'comparison-card-mcp border-[color:var(--brand)] bg-[color:var(--surface-active-soft-bg-subtle)]'
@@ -273,7 +274,7 @@ export function comparisonCardClassName(
 
 export function comparisonCardHeaderClassName(size: 'default' | 'large'): string {
   return cn(
-    'comparison-card-header mb-(--space-2) flex items-center gap-1.5 border-b border-[color:var(--line)] pb-1.5',
+    'comparison-card-header mb-(--space-2) flex items-center gap-1.5 border-b border-border pb-1.5',
     size === 'large' && 'comparison-card-header-lg mb-2.5 gap-(--space-2) border-b-0 pb-0',
   );
 }
@@ -316,10 +317,10 @@ export const keyValueListClass = cn(
   '[&_span]:text-[color:var(--hero-note-text)]',
 );
 
-export const metricCardAccentClass = 'metric-card-accent m-0 font-bold';
+export const metricCardAccentClass = 'metric-card-accent m-0 font-bold text-foreground';
 
 export const metaNoteClass = cn(
-  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-[color:var(--line)] bg-card px-1.5 py-0.5 text-[length:var(--text-xs)] text-ink-muted',
+  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-border bg-panel px-1.5 py-0.5 text-[length:var(--text-xs)] text-muted',
 );
 
 export const metaNoteLgClass = cn(
@@ -337,7 +338,7 @@ export const tokenKeyClass = 'token-key text-accent-muted';
 
 export function sessionBadgeClassName(connected: boolean, className?: string): string {
   return cn(
-    'session-badge inline-flex items-center gap-(--space-2) rounded-portal-lg border border-[color:var(--line)] bg-card px-(--space-3) py-1 text-[length:var(--text-base-sm)] text-ink-muted',
+    'session-badge inline-flex items-center gap-(--space-2) rounded-portal-lg border border-border bg-panel px-(--space-3) py-1 text-[length:var(--text-base-sm)] text-foreground',
     connected &&
       'connected border-[color:var(--surface-status-success-soft-border)] bg-[color:var(--surface-status-success-soft-bg)] text-[color:var(--surface-status-success-soft-text)]',
     className,
@@ -363,7 +364,7 @@ export function statusPillClassName(
       cn(
         'solid px-1.5 py-px text-[length:var(--text-2xs)] font-semibold text-[color:var(--surface-button-primary-fg)]',
         tone === 'mcp' && 'tone-mcp bg-brand',
-        tone === 'plain' && 'tone-plain bg-ink-muted',
+        tone === 'plain' && 'tone-plain bg-muted',
       ),
     variant === 'soft' &&
       tone === 'ok' &&
@@ -391,11 +392,11 @@ export function formFieldClassName(compact: boolean, className?: string): string
   );
 }
 
-export const hintClass = 'hint mt-(--space-1-5) text-base text-ink-muted';
+export const hintClass = 'hint mt-(--space-1-5) text-base text-muted';
 
-export const hintInlineClass = 'hint hint-inline text-base text-ink-muted';
+export const hintInlineClass = 'hint hint-inline text-base text-muted';
 
-export const hintTightClass = 'hint hint-tight text-base text-ink-muted';
+export const hintTightClass = 'hint hint-tight text-base text-muted';
 
 export const monoClass = 'mono font-mono';
 
@@ -408,7 +409,7 @@ export const fieldErrorClass =
   'field-error mt-(--space-1-5) text-[length:var(--text-base-plus)] font-bold text-danger';
 
 export const inputControlClass = cn(
-  'input-control mt-(--space-1-5) w-full min-h-[var(--size-touch-md)] rounded-portal-sm border border-[length:var(--size-border-sm)] border-[color:var(--surface-control-border)] bg-[color:var(--surface-control-bg)] px-(--space-3) py-(--space-2-5) text-ink',
+  'input-control mt-(--space-1-5) w-full min-h-[var(--size-touch-md)] rounded-portal-sm border border-[length:var(--size-border-sm)] border-[color:var(--surface-control-border)] bg-[color:var(--surface-control-bg)] px-(--space-3) py-(--space-2-5) text-foreground',
   controlFocusClass,
 );
 
@@ -424,7 +425,7 @@ export const stepperClass = 'stepper m-0 grid list-none gap-(--space-2) p-0';
 
 export function stepperItemClassName(state: '' | 'done' | 'active' | 'disabled'): string {
   return cn(
-    'grid gap-(--space-2) rounded-portal-sm border border-[color:var(--line)] bg-[color:var(--surface-control-bg)] px-2.5 py-2 text-ink-muted',
+    'grid gap-(--space-2) rounded-portal-sm border border-border bg-[color:var(--surface-control-bg)] px-2.5 py-2 text-muted',
     state === 'done' &&
       'done border-[color:var(--surface-status-success-border)] text-[color:var(--ok)]',
     state === 'active' && 'active border-[color:var(--brand)] font-bold text-brand',
@@ -437,20 +438,21 @@ export const stepperIconClass = 'stepper-icon';
 export const stepperActionClass = 'stepper-action';
 
 export const rawResponseClass = cn(
-  'raw-response my-0 max-h-80 min-h-[120px] overflow-auto rounded-portal-sm border border-[color:var(--line)] bg-bg-soft p-2.5 whitespace-pre-wrap',
+  'raw-response my-0 max-h-80 min-h-[120px] overflow-auto rounded-portal-sm border border-border bg-canvas-muted p-2.5 whitespace-pre-wrap',
 );
 
 export const rawResponseCodeClass = 'raw-response-code m-0 whitespace-pre-wrap';
 
 export const modalClass = cn(
-  'modal w-[min(480px,90vw)] max-w-[480px] rounded-portal-lg border border-[color:var(--line)] p-(--space-4)',
+  'modal w-[min(480px,90vw)] max-w-[480px] rounded-portal-lg border border-border p-(--space-4)',
 );
 
 export function tabButtonClassName(selected: boolean, className?: string): string {
   return cn(
-    'tab-btn cursor-pointer border-0 bg-[color:var(--surface-control-bg)] px-4 py-2 font-[inherit] font-bold text-ink-muted',
-    '[&:not(:last-child)]:border-r [&:not(:last-child)]:border-[color:var(--line)]',
-    selected && 'active bg-ink text-[color:var(--surface-button-primary-fg)]',
+    'tab-btn cursor-pointer border-0 bg-[color:var(--surface-control-bg)] px-4 py-2 font-[inherit] font-bold text-foreground',
+    '[&:not(:last-child)]:border-r [&:not(:last-child)]:border-border',
+    selected &&
+      'active bg-[image:var(--action-primary-bg)] text-[color:var(--action-primary-fg)] shadow-[var(--action-primary-shadow)]',
     controlFocusClass,
     className,
   );
@@ -459,7 +461,7 @@ export function tabButtonClassName(selected: boolean, className?: string): strin
 export const dlGridClass = cn(
   'dl-grid grid gap-x-(--space-3) gap-y-(--space-2) [grid-template-columns:minmax(136px,190px)_1fr]',
   'max-md:[grid-template-columns:var(--layout-grid-1)] max-sm:gap-(--space-2)',
-  '[&_dt]:text-[length:var(--text-base-sm)] [&_dt]:font-bold [&_dt]:tracking-[var(--tracking-wide)] [&_dt]:text-ink-muted [&_dt]:uppercase',
+  '[&_dt]:text-[length:var(--text-base-sm)] [&_dt]:font-bold [&_dt]:tracking-[var(--tracking-wide)] [&_dt]:text-muted [&_dt]:uppercase',
   '[&_dd]:m-0 [&_dd]:leading-[var(--leading-copy)]',
 );
 
@@ -492,7 +494,7 @@ export const brandLinkTitleRowClass =
   'brand-link-title-row inline-flex flex-wrap items-center gap-(--space-3)';
 export const brandLinkNameClass = 'brand-link-name font-extrabold tracking-[var(--tracking-snug)]';
 export const brandLinkSubtitleClass =
-  'brand-link-subtitle text-[length:var(--text-xs)] text-subtle uppercase tracking-[var(--tracking-label)]';
+  'brand-link-subtitle text-[length:var(--text-xs)] text-faint uppercase tracking-[var(--tracking-label)]';
 
 export function navCardLinkClassName(active: boolean, className?: string): string {
   return cn(

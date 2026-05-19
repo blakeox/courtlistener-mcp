@@ -6,7 +6,7 @@
 
 body {
   margin: var(--margin-none);
-  color: var(--ink);
+  color: var(--text-primary);
   min-height: var(--size-viewport-full);
   background:
     radial-gradient(var(--body-gradient-warm-size) at 8% -18%, var(--body-bg-warm), transparent 62%),
@@ -51,8 +51,15 @@ textarea {
 
 button:focus-visible,
 a:focus-visible {
-  outline: var(--size-focus-ring) solid var(--shell-focus-ring);
+  outline: var(--size-focus-ring) solid var(--action-focus-ring);
   outline-offset: var(--size-focus-offset);
+}
+
+.input-control::placeholder,
+.textarea-control::placeholder,
+.select-control::placeholder {
+  color: var(--placeholder-text);
+  opacity: 1;
 }
 
 .mono,
@@ -77,5 +84,16 @@ code {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

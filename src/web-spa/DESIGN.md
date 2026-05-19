@@ -11,7 +11,7 @@ in `theme.css`, and semantic component styles live in layered CSS files.
 | `tailwindcss` + `@tailwindcss/vite` | Utility engine and Vite integration                                                          |
 | `src/styles.css`                    | Entry: `@import "tailwindcss"`, `@source`, token + component imports                         |
 | `styles/tokens.css`                 | `:root` / `[data-theme='dark']` custom properties (source of truth)                          |
-| `styles/theme.css`                  | `@theme inline` maps tokens → `text-ink`, `bg-bg`, `dark:*`, etc.                            |
+| `styles/theme.css`                  | `@theme inline` maps tokens → `text-foreground`, `bg-panel`, `dark:*`, etc.                  |
 | `styles/primitives.css`             | Global resets, body background, focus rings, keyframes (component recipes in `*-classes.ts`) |
 | `styles/workspace.css`              | Reserved for shell-scoped rules that cannot be utilities (currently empty)                   |
 | `styles/landing.css`                | Reserved for marketing rules not yet utilities (currently empty)                             |
@@ -41,12 +41,67 @@ styles.css
 | Need                      | Use                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------- |
 | New layout/spacing in TSX | Tailwind utilities (`flex`, `gap-3`, `p-4`, `md:grid-cols-2`)                                           |
-| New colors in TSX         | Theme utilities (`text-ink`, `bg-card`, `text-accent`, `dark:bg-bg-soft`)                               |
+| New colors in TSX         | Theme utilities (`text-foreground`, `text-muted`, `bg-panel`, `border-border`, `text-accent`)           |
 | Reusable component look   | Export a recipe from `lib/*-classes.ts` and compose with `cn()` in TSX                                  |
 | New color value           | Add to `tokens.css` (+ dark override), then wire in `theme.css` `@theme inline` if utilities are needed |
 
 **Rule of thumb:** primary actions → shell blue (`btn primary` or `bg` utilities
 from accent/shell tokens). Success → `brand` / `ok` tokens (green).
+
+## Token taxonomy (semantic layer)
+
+Semantic color tokens in `tokens.css` are the **source of truth**
+(`--text-primary`, `--bg-panel`, `--border-default`). `theme.css` exposes
+Tailwind utilities; legacy names (`--ink`, `--card`, `text-ink`, `bg-card`) are
+removed and blocked in CI.
+
+| Family  | CSS token               | Tailwind utility                |
+| ------- | ----------------------- | ------------------------------- |
+| Text    | `--text-primary`        | `text-foreground`               |
+| Text    | `--text-secondary`      | `text-muted`                    |
+| Text    | `--text-tertiary`       | `text-faint`                    |
+| Surface | `--bg-canvas`           | `bg-canvas`                     |
+| Surface | `--bg-canvas-soft`      | `bg-canvas-muted`               |
+| Surface | `--bg-panel`            | `bg-panel`                      |
+| Surface | `--bg-glass`            | `bg-glass`                      |
+| Border  | `--border-default`      | `border-border`                 |
+| Action  | `--action-primary-*`    | `var(--action-*)` for gradients |
+| Status  | `--status-success-text` | `text-status-success`           |
+
+**Chrome namespaces** (do not use in workspace cards):
+
+- `--shell-*` — sidebar, topbar, account menu (`shell-classes.ts`)
+- `--landing-*` — marketing page (`landing-classes.ts`)
+
+`workspace-classes.ts` and `playground-classes.ts` must not reference
+`--landing-*` tokens (enforced by `ci:check:design-system`).
+
+### Surfaces and contrast (a11y)
+
+| Surface      | Token                  | Use for                                        |
+| ------------ | ---------------------- | ---------------------------------------------- |
+| Opaque panel | `--bg-panel`           | Cards, forms, modals, tabs — **all body copy** |
+| Canvas       | `--bg-canvas`          | Page background                                |
+| Glass chrome | `--bg-glass`           | Sticky topbar, translucent headers only        |
+| Control fill | `--surface-control-bg` | Inputs, tab strips, success chips              |
+
+On opaque panels use `text-foreground` for body and labels; use `text-muted` for
+secondary copy. Reserve `text-faint` for large de-emphasized headers on opaque
+backgrounds. Do not place long copy directly on glass without a `bg-panel`
+wrapper.
+
+### Typography utilities
+
+`theme.css` maps the portal type scale to `text-ui-*` utilities:
+
+| Utility              | Token               |
+| -------------------- | ------------------- |
+| `text-ui-sm`         | `--text-base-sm`    |
+| `text-ui-lg`         | `--text-lg-plus`    |
+| `text-ui-xl`         | `--text-2xl`        |
+| `text-ui-display-sm` | `--text-display-sm` |
+
+Prefer these over `text-[length:var(--text-*)]` in new `*-classes.ts` recipes.
 
 ## Dark mode
 
@@ -91,12 +146,35 @@ Opens Vite at `http://127.0.0.1:5173`. Worker routes (`/api`, `/auth`, `/oauth`,
 `wrangler dev` (or the local HTTP transport) is running — required for hosted
 sign-in and MCP OAuth from the dev SPA.
 
+## Accessibility (WCAG 2.2 AA target)
+
+- **Landmarks:** marketing routes use `<main id="landing-main">`; workspace
+  routes use `<main id="main-content" tabIndex={-1}>` inside `Shell.tsx`.
+- **Skip links:** `SkipLink` on landing and workspace shells; first focusable
+  control on each surface.
+- **Keyboard:** global `:focus-visible` rings in `primitives.css`; tab panels
+  use `role="tab"` / `aria-selected` / `aria-controls`.
+- **Motion:** animations respect `prefers-reduced-motion: reduce` in
+  `primitives.css`.
+- **Forms:** page-level controls use `FormField` + stable `id`s; icon-only
+  actions require `aria-label`.
+- **Live regions:** toasts and inline status use `role="status"` / `aria-live`
+  where appropriate.
+
+```bash
+pnpm run ci:check:a11y            # Static WCAG-oriented rules (landmarks, labels, motion, docs)
+pnpm run test:spa:a11y            # Vitest axe scans for landing + workspace routes
+pnpm run test:spa:a11y:smoke      # Playwright axe smoke on built SPA routes
+```
+
 ## Checks
 
 ```bash
 pnpm run ci:check:design-system   # Tailwind wired, class-recipe modules, token-only CSS, production CSS budget
-npm run test:spa                 # Vitest (design-system wiring; skips production build — see below)
+pnpm run ci:check:a11y            # Accessibility static gate (see above)
+npm run test:spa                 # Vitest (design-system + a11y wiring; skips production build — see below)
 npm run test:spa:design          # Playwright layout/token smoke (landing, workspace, usage, observability, …)
+pnpm run test:spa:a11y:smoke     # Playwright axe smoke (landing + workspace)
 ```
 
 The design-system script also verifies class-recipe modules export hook classes

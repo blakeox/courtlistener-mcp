@@ -237,7 +237,8 @@ export const landingCodeFormatBadgeClass = cn(
   'landing-code-format-badge text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] uppercase text-[color:var(--landing-color-text-inverse-muted)] border-[color:var(--landing-code-border-strong)] bg-[color:var(--landing-code-chip-bg)]',
 );
 
-export const landingCodeKeyClass = 'landing-code-key text-accent-muted';
+export const landingCodeKeyClass =
+  'landing-code-key text-[color:var(--landing-color-text-inverse-muted)]';
 
 export const landingCodeStringClass = 'landing-code-string text-[color:var(--code-syntax-string)]';
 

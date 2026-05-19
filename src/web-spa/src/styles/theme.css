@@ -1,6 +1,6 @@
 /*
- * Tailwind v4 @theme bridge — maps portal tokens (tokens.css) to utility namespaces.
- * Component CSS keeps using var(--ink); utilities use text-ink, bg-bg, dark:bg-bg-soft, etc.
+ * Tailwind v4 @theme bridge — maps portal semantic tokens (tokens.css) to utilities.
+ * Recipes use text-foreground, bg-panel, border-border, text-faint, bg-canvas-muted, etc.
  */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
@@ -9,19 +9,36 @@
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --color-bg: var(--bg);
-  --color-bg-soft: var(--bg-soft);
-  --color-ink: var(--ink);
-  --color-ink-muted: var(--ink-muted);
+  --color-foreground: var(--text-primary);
+  --color-muted: var(--text-secondary);
+  --color-faint: var(--text-tertiary);
+  --color-canvas: var(--bg-canvas);
+  --color-canvas-muted: var(--bg-canvas-soft);
+  --color-panel: var(--bg-panel);
+  --color-border: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-control: var(--border-control);
+  --color-glass: var(--bg-glass);
+  --color-glass-strong: var(--bg-glass-strong);
   --color-brand: var(--brand);
   --color-brand-deep: var(--brand-deep);
-  --color-line: var(--line);
-  --color-card: var(--card);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
-  --color-subtle: var(--text-subtle);
   --color-accent: var(--accent-text);
   --color-accent-muted: var(--accent-text-muted);
+  --color-focus: var(--action-focus-ring);
+  --color-status-success: var(--status-success-text);
+  --color-status-error: var(--status-error-text);
+  --color-status-warn: var(--status-warn-text);
+
+  --text-ui-2xs: var(--text-2xs);
+  --text-ui-xs: var(--text-xs);
+  --text-ui-sm: var(--text-base-sm);
+  --text-ui-base: var(--text-base-ui);
+  --text-ui-md: var(--text-md);
+  --text-ui-lg: var(--text-lg-plus);
+  --text-ui-xl: var(--text-2xl);
+  --text-ui-display-sm: var(--text-display-sm);
 
   --radius-portal-xs: var(--radius-xs);
   --radius-portal-sm: var(--radius-sm);
