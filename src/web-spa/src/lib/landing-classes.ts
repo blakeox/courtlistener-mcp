@@ -12,7 +12,7 @@ export const landingContainerClass = cn(
 );
 
 export const landingHeaderClass = cn(
-  'landing-header sticky top-0 z-[var(--z-sticky)] min-h-[var(--size-header)] border-b border-[length:var(--size-border-sm)] border-[color:var(--landing-color-border-light)] bg-glass-strong backdrop-blur-[length:var(--blur-md)]',
+  'landing-header sticky top-0 z-[var(--z-sticky)] min-h-[var(--size-header)] border-b border-[length:var(--size-border-sm)] border-[color:var(--landing-color-border-light)] bg-[color:var(--landing-header-bg)] backdrop-blur-[length:var(--blur-md)]',
 );
 
 export const landingHeaderInnerClass = cn(

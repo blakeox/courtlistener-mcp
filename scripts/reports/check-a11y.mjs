@@ -35,6 +35,21 @@ function rel(filePath) {
   return path.relative(repoRoot, filePath);
 }
 
+/** Slice from a JSX element open through its close (or self-close) for attribute checks. */
+function jsxElementSlice(source, startIndex, tagName) {
+  const selfClose = source.indexOf('/>', startIndex);
+  const closeTag = `</${tagName}>`;
+  const close = source.indexOf(closeTag, startIndex);
+  let end = startIndex + 1200;
+  if (selfClose !== -1) {
+    end = Math.min(end, selfClose + 2);
+  }
+  if (close !== -1) {
+    end = Math.min(end, close);
+  }
+  return source.slice(startIndex, end);
+}
+
 function walkTsx(dir, visitor) {
   for (const entry of readdirSync(dir)) {
     const fullPath = path.join(dir, entry);
@@ -121,10 +136,10 @@ function checkIconButtons() {
     const relPath = rel(filePath);
     let index = source.indexOf('<IconButton');
     while (index !== -1) {
-      const window = source.slice(index, index + 800);
-      if (!/\baria-label=/.test(window) && !/\baria-labelledby=/.test(window)) {
+      const slice = jsxElementSlice(source, index, 'IconButton');
+      if (!/\baria-label=/.test(slice) && !/\baria-labelledby=/.test(slice)) {
         errors.push(
-          `${relPath} renders <IconButton> without aria-label or aria-labelledby (${window.slice(0, 96)}…).`,
+          `${relPath} renders <IconButton> without aria-label or aria-labelledby (${slice.slice(0, 96)}…).`,
         );
       }
       index = source.indexOf('<IconButton', index + 1);
@@ -136,17 +151,19 @@ function checkDecorativeSvgs() {
   walkTsx(path.join(spaSrc, 'pages'), (filePath) => {
     const source = readText(filePath);
     const relPath = rel(filePath);
-    const inlineSvgPattern = /<svg\b(?![\s\S]*?aria-hidden)/g;
-    if (inlineSvgPattern.test(source) && !/function\s+\w+Icon\b/.test(source)) {
-      const hasUnlabeledSvg = source
-        .split('<svg')
-        .slice(1)
-        .some((chunk) => !chunk.includes('aria-hidden') && !chunk.includes('role="img"'));
-      if (hasUnlabeledSvg) {
+    let index = source.indexOf('<svg');
+    while (index !== -1) {
+      const slice = jsxElementSlice(source, index, 'svg');
+      if (
+        !/\baria-hidden=/.test(slice) &&
+        !/\brole=["']img["']/.test(slice) &&
+        !/\baria-label=/.test(slice)
+      ) {
         errors.push(
-          `${relPath} includes inline <svg> icons without aria-hidden or an accessible name.`,
+          `${relPath} includes inline <svg> without aria-hidden or an accessible name (${slice.slice(0, 96)}…).`,
         );
       }
+      index = source.indexOf('<svg', index + 1);
     }
   });
 }
@@ -155,17 +172,16 @@ function checkFormControlsInPages() {
   walkTsx(path.join(spaSrc, 'pages'), (filePath) => {
     const source = readText(filePath);
     const relPath = rel(filePath);
-    const bareInputPattern = /<Input\b(?![\s\S]*?\bid=)/;
-    const bareTextareaPattern = /<Textarea\b(?![\s\S]*?\bid=)/;
-    const bareSelectPattern = /<Select\b(?![\s\S]*?\bid=)/;
-    if (bareInputPattern.test(source)) {
-      errors.push(`${relPath} uses <Input> without an id for label association.`);
-    }
-    if (bareTextareaPattern.test(source)) {
-      errors.push(`${relPath} uses <Textarea> without an id for label association.`);
-    }
-    if (bareSelectPattern.test(source)) {
-      errors.push(`${relPath} uses <Select> without an id for label association.`);
+    for (const component of ['Input', 'Textarea', 'Select']) {
+      const open = `<${component}`;
+      let index = source.indexOf(open);
+      while (index !== -1) {
+        const slice = jsxElementSlice(source, index, component);
+        if (!/\bid=/.test(slice)) {
+          errors.push(`${relPath} uses <${component}> without an id for label association.`);
+        }
+        index = source.indexOf(open, index + 1);
+      }
     }
   });
 }
@@ -179,10 +195,10 @@ function checkAsideLandmarks() {
     const relPath = rel(filePath);
     let index = source.indexOf('<aside');
     while (index !== -1) {
-      const window = source.slice(index, index + 600);
-      if (!/\baria-label=/.test(window) && !/\baria-labelledby=/.test(window)) {
+      const slice = jsxElementSlice(source, index, 'aside');
+      if (!/\baria-label=/.test(slice) && !/\baria-labelledby=/.test(slice)) {
         errors.push(
-          `${relPath} renders <aside> without aria-label or aria-labelledby (${window.slice(0, 96)}…).`,
+          `${relPath} renders <aside> without aria-label or aria-labelledby (${slice.slice(0, 96)}…).`,
         );
       }
       index = source.indexOf('<aside', index + 1);

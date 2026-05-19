@@ -102,7 +102,7 @@ const legacyThemeUtilityPatterns = [
 ];
 
 const legacyRecipeUtilityPattern =
-  /(?<![-\w])(text-ink|text-ink-muted|text-text-primary|text-text-secondary|text-text-tertiary|bg-card|bg-bg-soft|bg-bg|border-line|border-border-default|border-l-ink|bg-ink-muted)(?![-\w])/;
+  /(?<![-\w])(text-ink|text-ink-muted|text-subtle|text-text-primary|text-text-secondary|text-text-tertiary|bg-card|bg-bg-soft|bg-bg|border-line|border-border-default|border-l-ink|bg-ink-muted)(?![-\w])/;
 
 const legacyRecipeVarPattern =
   /var\(--(ink|ink-muted|line|bg-soft|text-subtle)\)|var\(--card\)(?![-a-zA-Z0-9])|var\(--bg\)(?![-a-zA-Z0-9])/;
@@ -170,6 +170,7 @@ function checkRecipeModernUtilities() {
     playgroundClassesPath,
     shellClassesPath,
     toastClassesPath,
+    landingClassesPath,
   ];
   for (const filePath of recipeModules) {
     const source = readText(filePath);

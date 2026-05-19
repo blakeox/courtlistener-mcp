@@ -4,7 +4,7 @@ import { cn } from './cn';
 
 export const eyebrowLabelClass = cn(
   'eyebrow-label workspace-card-label',
-  'text-foreground text-ui-sm font-bold tracking-[var(--tracking-label)] uppercase',
+  'text-foreground text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] uppercase',
 );
 
 /** Keep `text-link` after utilities — tailwind-merge drops it if listed before `text-accent`. */
@@ -29,7 +29,8 @@ export const cardSpotlightClass = cn(
   'card-spotlight bg-[image:var(--card-spotlight-gradient)]',
 );
 
-export const cardTitleClass = 'm-0 text-ui-xl tracking-[var(--tracking-snug)] text-foreground';
+export const cardTitleClass =
+  'm-0 text-[length:var(--text-2xl)] tracking-[var(--tracking-snug)] text-foreground';
 
 export const panelClass = cn(
   'panel-card',
@@ -57,7 +58,7 @@ export const pageHeaderTitleClass = cn(
 
 export const pageHeaderDescriptionClass = cn(
   'page-header-description',
-  'm-0 max-w-[var(--width-prose-2xl)] text-ui-lg leading-[var(--leading-loose)] text-faint',
+  'm-0 max-w-[var(--width-prose-2xl)] text-[length:var(--text-lg-plus)] leading-[var(--leading-loose)] text-faint',
 );
 
 export const pageHeaderSideClass = cn(
@@ -155,7 +156,8 @@ export function buttonClassName(
         'focus-visible:border-[color:var(--action-secondary-border)] focus-visible:bg-[color:var(--action-secondary-bg)] focus-visible:text-[color:var(--action-secondary-fg)]',
       ),
     size === 'compact' && 'btn-compact text-base px-(--space-3) py-(--space-2)',
-    size === 'tiny' && 'btn-tiny rounded-portal-sm px-(--space-2) py-(--space-1) text-ui-sm',
+    size === 'tiny' &&
+      'btn-tiny rounded-portal-sm px-(--space-2) py-(--space-1) text-[length:var(--text-base-sm)]',
     className,
   );
 }
@@ -318,7 +320,7 @@ export const keyValueListClass = cn(
 export const metricCardAccentClass = 'metric-card-accent m-0 font-bold text-foreground';
 
 export const metaNoteClass = cn(
-  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-border bg-panel px-1.5 py-0.5 text-ui-xs text-muted',
+  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-border bg-panel px-1.5 py-0.5 text-[length:var(--text-xs)] text-muted',
 );
 
 export const metaNoteLgClass = cn(
@@ -336,7 +338,7 @@ export const tokenKeyClass = 'token-key text-accent-muted';
 
 export function sessionBadgeClassName(connected: boolean, className?: string): string {
   return cn(
-    'session-badge inline-flex items-center gap-(--space-2) rounded-portal-lg border border-border bg-panel px-(--space-3) py-1 text-ui-sm text-foreground',
+    'session-badge inline-flex items-center gap-(--space-2) rounded-portal-lg border border-border bg-panel px-(--space-3) py-1 text-[length:var(--text-base-sm)] text-foreground',
     connected &&
       'connected border-[color:var(--surface-status-success-soft-border)] bg-[color:var(--surface-status-success-soft-bg)] text-[color:var(--surface-status-success-soft-text)]',
     className,
@@ -403,7 +405,8 @@ export const tabsClass = cn(
   'max-sm:[&_.tab-btn]:px-(--space-1-5) max-sm:[&_.tab-btn]:text-[length:var(--text-base-sm)]',
 );
 
-export const fieldErrorClass = 'field-error mt-(--space-1-5) text-ui-lg font-bold text-danger';
+export const fieldErrorClass =
+  'field-error mt-(--space-1-5) text-[length:var(--text-base-plus)] font-bold text-danger';
 
 export const inputControlClass = cn(
   'input-control mt-(--space-1-5) w-full min-h-[var(--size-touch-md)] rounded-portal-sm border border-[length:var(--size-border-sm)] border-[color:var(--surface-control-border)] bg-[color:var(--surface-control-bg)] px-(--space-3) py-(--space-2-5) text-foreground',

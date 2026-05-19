@@ -20,7 +20,7 @@ async function expectNoSeriousViolations(
   context: string,
 ): Promise<void> {
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'])
     .analyze();
   const serious = results.violations.filter((violation) =>
     ['serious', 'critical'].includes(violation.impact ?? ''),
