@@ -15,6 +15,7 @@ const landingPagePath = path.join(spaSrc, 'pages/LandingPage.tsx');
 const uiPath = path.join(spaSrc, 'components/ui.tsx');
 const documentTitleHook = path.join(spaSrc, 'hooks/useDocumentTitle.ts');
 
+/** Workspace route modules that must call useDocumentTitle and appear in axe Vitest coverage. */
 const workspacePages = [
   'WorkspaceDashboardPage.tsx',
   'PlaygroundPage.tsx',
@@ -23,6 +24,39 @@ const workspacePages = [
   'ObservabilityPage.tsx',
   'OnboardingPage.tsx',
   'HostedAuthRedirectPage.tsx',
+];
+
+/** Routes exercised by Playwright axe smoke (must stay in sync with e2e/a11y-smoke.spec.ts). */
+const axeSmokeRoutes = [
+  { path: '/', heading: 'Connect AI to the Law' },
+  { path: '/app/control-center', heading: 'Overview' },
+  { path: '/app/playground', heading: 'Playground' },
+  { path: '/app/account', heading: 'Account' },
+  { path: '/app/usage', heading: 'Usage' },
+];
+
+const classRecipeModules = [
+  'ui-classes.ts',
+  'landing-classes.ts',
+  'playground-classes.ts',
+  'workspace-classes.ts',
+  'shell-classes.ts',
+  'toast-classes.ts',
+];
+
+const requiredDesignDocMarkers = [
+  { label: 'WCAG 2.2 AA target', pattern: /WCAG\s+2\.2\s+AA/i },
+  { label: 'skip links', pattern: /SkipLink|skip links/i },
+  { label: 'keyboard focus', pattern: /focus-visible|:focus-visible/i },
+  { label: 'reduced motion', pattern: /prefers-reduced-motion/i },
+  { label: 'labeled forms', pattern: /FormField/i },
+  { label: 'icon button labels', pattern: /aria-label/i },
+  { label: 'static gate command', pattern: /ci:check:a11y/ },
+  { label: 'vitest axe command', pattern: /test:spa:a11y/ },
+  { label: 'playwright axe command', pattern: /test:spa:a11y:smoke/ },
+  { label: 'new route checklist', pattern: /### New routes and pages/i },
+  { label: 'anti-patterns', pattern: /### Anti-patterns/i },
+  { label: 'enforced static rules', pattern: /### Enforced static rules/i },
 ];
 
 const errors = [];
@@ -50,6 +84,10 @@ function jsxElementSlice(source, startIndex, tagName) {
   return source.slice(startIndex, end);
 }
 
+function shouldSkipTsx(filePath) {
+  return filePath.includes(`${path.sep}__tests__${path.sep}`);
+}
+
 function walkTsx(dir, visitor) {
   for (const entry of readdirSync(dir)) {
     const fullPath = path.join(dir, entry);
@@ -61,7 +99,7 @@ function walkTsx(dir, visitor) {
       walkTsx(fullPath, visitor);
       continue;
     }
-    if (entry.endsWith('.tsx')) {
+    if (entry.endsWith('.tsx') && !shouldSkipTsx(fullPath)) {
       visitor(fullPath);
     }
   }
@@ -104,6 +142,11 @@ function checkSkipLinksAndLandmarks() {
   if (!shell.includes('id="main-content"')) {
     errors.push(`${rel(shellPath)} must expose <main id="main-content"> for skip targets.`);
   }
+  if (!/id="main-content"[^>]*tabIndex=\{-1\}/.test(shell)) {
+    errors.push(
+      `${rel(shellPath)} must set tabIndex={-1} on <main id="main-content"> so skip links can move focus.`,
+    );
+  }
 
   const landing = readText(landingPagePath);
   if (!landing.includes('<SkipLink')) {
@@ -129,9 +172,6 @@ function checkDocumentTitles() {
 
 function checkIconButtons() {
   walkTsx(spaSrc, (filePath) => {
-    if (filePath.includes(`${path.sep}__tests__${path.sep}`)) {
-      return;
-    }
     const source = readText(filePath);
     const relPath = rel(filePath);
     let index = source.indexOf('<IconButton');
@@ -148,7 +188,7 @@ function checkIconButtons() {
 }
 
 function checkDecorativeSvgs() {
-  walkTsx(path.join(spaSrc, 'pages'), (filePath) => {
+  walkTsx(spaSrc, (filePath) => {
     const source = readText(filePath);
     const relPath = rel(filePath);
     let index = source.indexOf('<svg');
@@ -166,6 +206,21 @@ function checkDecorativeSvgs() {
         );
       }
       index = source.indexOf('<svg', index + 1);
+    }
+  });
+}
+
+function checkImages() {
+  walkTsx(spaSrc, (filePath) => {
+    const source = readText(filePath);
+    const relPath = rel(filePath);
+    let index = source.indexOf('<img');
+    while (index !== -1) {
+      const slice = jsxElementSlice(source, index, 'img');
+      if (!/\balt=/.test(slice)) {
+        errors.push(`${relPath} includes <img> without an alt attribute (${slice.slice(0, 96)}…).`);
+      }
+      index = source.indexOf('<img', index + 1);
     }
   });
 }
@@ -190,9 +245,6 @@ function checkFormControlsInPages() {
 
 function checkAsideLandmarks() {
   walkTsx(spaSrc, (filePath) => {
-    if (filePath.includes(`${path.sep}__tests__${path.sep}`)) {
-      return;
-    }
     const source = readText(filePath);
     const relPath = rel(filePath);
     let index = source.indexOf('<aside');
@@ -219,12 +271,70 @@ function checkUiPrimitives() {
   if (!ui.includes('role="tab"')) {
     errors.push(`${rel(uiPath)} TabButton must expose role="tab" semantics.`);
   }
+  if (!/<dialog[^>]*aria-label=/.test(ui)) {
+    errors.push(`${rel(uiPath)} Modal must set aria-label on <dialog>.`);
+  }
+  if (!/htmlFor=\{props\.id\}/.test(ui)) {
+    errors.push(`${rel(uiPath)} FormField must associate <label htmlFor={props.id}>.`);
+  }
+}
+
+function checkToastLiveRegion() {
+  const toastPath = path.join(spaSrc, 'components/Toast.tsx');
+  const source = readText(toastPath);
+  if (!/aria-live=["']polite["']/.test(source) || !/role=["']status["']/.test(source)) {
+    errors.push(
+      `${rel(toastPath)} must expose toast updates via role="status" and aria-live="polite".`,
+    );
+  }
+}
+
+function checkClassRecipeFocus() {
+  for (const moduleName of classRecipeModules) {
+    const filePath = path.join(spaSrc, 'lib', moduleName);
+    const source = readText(filePath);
+    const relPath = rel(filePath);
+    for (const line of source.split('\n')) {
+      if (!line.includes('outline-none')) {
+        continue;
+      }
+      if (!line.includes('focus-visible')) {
+        errors.push(
+          `${relPath} uses outline-none without a focus-visible replacement on the same recipe line.`,
+        );
+      }
+    }
+  }
+}
+
+function checkAxeSmokeSpec() {
+  const smokePath = path.join(spaRoot, 'e2e/a11y-smoke.spec.ts');
+  const source = readText(smokePath);
+  for (const route of axeSmokeRoutes) {
+    if (!source.includes(route.path)) {
+      errors.push(`${rel(smokePath)} must axe-scan route ${route.path}.`);
+    }
+  }
+}
+
+function checkAxeVitestPages() {
+  const vitestPath = path.join(spaSrc, '__tests__/a11y-pages.test.tsx');
+  const source = readText(vitestPath);
+  const requiredAxePages = workspacePages.filter((page) => page !== 'HostedAuthRedirectPage.tsx');
+  for (const page of requiredAxePages) {
+    const componentName = page.replace(/\.tsx$/, '');
+    if (!source.includes(componentName)) {
+      errors.push(`${rel(vitestPath)} must include an axe scan for ${componentName}.`);
+    }
+  }
 }
 
 function checkDesignDoc() {
   const source = readText(designDoc);
-  if (!/accessibility|a11y|WCAG/i.test(source)) {
-    errors.push(`${rel(designDoc)} must document accessibility expectations and audit commands.`);
+  for (const marker of requiredDesignDocMarkers) {
+    if (!marker.pattern.test(source)) {
+      errors.push(`${rel(designDoc)} must document ${marker.label}.`);
+    }
   }
 }
 
@@ -235,8 +345,13 @@ checkDocumentTitles();
 checkIconButtons();
 checkAsideLandmarks();
 checkDecorativeSvgs();
+checkImages();
 checkFormControlsInPages();
 checkUiPrimitives();
+checkToastLiveRegion();
+checkClassRecipeFocus();
+checkAxeSmokeSpec();
+checkAxeVitestPages();
 checkDesignDoc();
 
 if (errors.length === 0) {

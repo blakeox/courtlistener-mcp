@@ -62,4 +62,30 @@ test.describe('Accessibility smoke', () => {
     await expect(page.getByRole('heading', { name: 'Playground', level: 1 })).toBeVisible();
     await expectNoSeriousViolations(page, 'playground');
   });
+
+  test('account page passes axe WCAG AA rules', async ({ page }) => {
+    await installSpaMocks(page, {
+      session: {
+        authenticated: false,
+        user: null,
+        turnstile_site_key: '',
+      },
+    });
+    await page.goto('/app/account');
+    await expect(page.getByRole('heading', { name: 'Account', level: 1 })).toBeVisible();
+    await expectNoSeriousViolations(page, 'account');
+  });
+
+  test('usage page passes axe WCAG AA rules', async ({ page }) => {
+    await installSpaMocks(page, {
+      session: {
+        authenticated: false,
+        user: null,
+        turnstile_site_key: '',
+      },
+    });
+    await page.goto('/app/usage');
+    await expect(page.getByRole('heading', { name: 'Usage & History', level: 1 })).toBeVisible();
+    await expectNoSeriousViolations(page, 'usage');
+  });
 });

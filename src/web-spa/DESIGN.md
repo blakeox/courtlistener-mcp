@@ -148,18 +148,66 @@ sign-in and MCP OAuth from the dev SPA.
 
 ## Accessibility (WCAG 2.2 AA target)
 
-- **Landmarks:** marketing routes use `<main id="landing-main">`; workspace
-  routes use `<main id="main-content" tabIndex={-1}>` inside `Shell.tsx`.
-- **Skip links:** `SkipLink` on landing and workspace shells; first focusable
-  control on each surface.
-- **Keyboard:** global `:focus-visible` rings in `primitives.css`; tab panels
-  use `role="tab"` / `aria-selected` / `aria-controls`.
-- **Motion:** animations respect `prefers-reduced-motion: reduce` in
-  `primitives.css`.
-- **Forms:** page-level controls use `FormField` + stable `id`s; icon-only
-  actions require `aria-label`.
-- **Live regions:** toasts and inline status use `role="status"` / `aria-live`
-  where appropriate.
+Portal UI targets **WCAG 2.2 Level AA**. Enforcement is layered: static rules in
+`scripts/reports/check-a11y.mjs`, Vitest axe scans, and Playwright smoke on
+built routes.
+
+### Enforced static rules
+
+| Rule           | What it checks                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Document       | `index.html` has `lang="en"` and viewport meta                                                |
+| Focus & motion | `:focus-visible` on buttons/links; `prefers-reduced-motion`; focus-ring tokens                |
+| Landmarks      | `SkipLink` + `<main id="landing-main">` / `<main id="main-content" tabIndex={-1}>`            |
+| Page titles    | Every workspace page module calls `useDocumentTitle()`                                        |
+| Icon buttons   | `<IconButton>` has `aria-label` or `aria-labelledby`                                          |
+| SVGs           | Inline `<svg>` has `aria-hidden`, `aria-label`, `aria-labelledby`, `role="img"`, or `<title>` |
+| Images         | `<img>` has an `alt` attribute (use `alt=""` when decorative)                                 |
+| Asides         | `<aside>` has `aria-label` or `aria-labelledby`                                               |
+| Forms in pages | `<Input>` / `<Textarea>` / `<Select>` in pages include stable `id`s                           |
+| Primitives     | `SkipLink`, `FormField`, tab semantics, `Modal` `aria-label`, toast live region               |
+| Class recipes  | `outline-none` only with a `focus-visible` replacement on the same line                       |
+| Tests wired    | `a11y-pages.test.tsx` and `a11y-smoke.spec.ts` cover required routes                          |
+| This doc       | Sections below stay present (checklist, anti-patterns, commands)                              |
+
+### New routes and pages
+
+When adding a workspace or marketing route:
+
+1. Call `useDocumentTitle()` with a unique title.
+2. Use `SkipLink` + a single `<main>` landmark (via `Shell` or landing layout).
+3. Prefer `FormField` + `id` for inputs; never ship icon-only controls without
+   `aria-label`.
+4. Put body copy on `bg-panel` with `text-foreground`; avoid long text on glass
+   chrome (see **Surfaces and contrast** above).
+5. Add an axe case to `src/web-spa/src/__tests__/a11y-pages.test.tsx` (skip only
+   for redirect-only pages such as `HostedAuthRedirectPage`).
+6. Add a Playwright axe smoke case to `src/web-spa/e2e/a11y-smoke.spec.ts` when
+   the route is reachable with mocks.
+7. Run `pnpm run ci:check:a11y` and `pnpm run test:spa:a11y` before opening a
+   PR.
+
+### Anti-patterns
+
+- Icon-only `<button>` or `<IconButton>` without an accessible name.
+- Inline `<svg>` or `<img>` without `aria-hidden` / `alt` / labeling.
+- Nested `<aside>` landmarks (use a labeled `<div>` or `motion.div` for layout
+  chrome).
+- `outline-none` in class recipes without a visible `focus-visible` style.
+- Raw `<Input>` on pages without `id` (breaks label association).
+- Unknown async control tool names falling through to cancel handlers (server).
+- Placing paragraph-length copy on `--bg-glass` without an opaque `bg-panel`
+  wrapper.
+
+### Patterns (reference)
+
+- **Landmarks:** marketing → `<main id="landing-main">`; workspace →
+  `<main id="main-content" tabIndex={-1}>` in `Shell.tsx`.
+- **Keyboard:** global `:focus-visible` in `primitives.css`; tabs use
+  `role="tab"` / `aria-selected` / `aria-controls`.
+- **Motion:** gate animations under `prefers-reduced-motion: reduce`.
+- **Live regions:** toasts (`role="status"`, `aria-live="polite"`); banners via
+  `StatusBanner`.
 
 ```bash
 pnpm run ci:check:a11y            # Static WCAG-oriented rules (landmarks, labels, motion, docs)
