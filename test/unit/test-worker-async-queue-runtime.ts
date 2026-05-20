@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import {
+  CloudflareAsyncQueueWorkflow,
   processAsyncQueueMessage,
   type AsyncJobMessage,
 } from '../../src/server/worker-async-queue-runtime.js';
@@ -45,6 +46,110 @@ class MemoryKvNamespace {
     this.store.set(key, value);
   }
 }
+
+function parsePayload(result: CallToolResult): Record<string, unknown> {
+  assert.ok(result.content.length > 0);
+  const first = result.content[0];
+  assert.strictEqual(first.type, 'text');
+  return JSON.parse(first.text) as Record<string, unknown>;
+}
+
+async function createQueuedJob(kv: MemoryKvNamespace, jobId: string): Promise<void> {
+  const now = Date.now();
+  const request: CallToolRequest = {
+    method: 'tools/call',
+    params: {
+      name: 'delayed_flaky',
+      arguments: {},
+    },
+  };
+
+  await kv.put(
+    `job:${jobId}`,
+    JSON.stringify({
+      id: jobId,
+      toolName: request.params.name,
+      request,
+      requestId: 'request-1',
+      status: 'queued',
+      createdAtMs: now,
+      updatedAtMs: now,
+      expiresAtMs: now + 60_000,
+      attempts: {
+        current: 0,
+        max: 3,
+      },
+      retryDelayMs: 1,
+      cancellationRequested: false,
+      queuedAtMs: now,
+    }),
+  );
+}
+
+describe('CloudflareAsyncQueueWorkflow.handleControlToolCall', () => {
+  it('rejects unsupported control tools without mutating the job', async () => {
+    const kv = new MemoryKvNamespace();
+    const jobId = 'job-unsupported-control';
+    await createQueuedJob(kv, jobId);
+
+    const workflow = new CloudflareAsyncQueueWorkflow(
+      {
+        ASYNC_JOBS_KV: kv as unknown as KVNamespace,
+        ASYNC_TOOL_QUEUE: {
+          send: async () => undefined,
+        } as unknown as Queue<AsyncJobMessage>,
+      },
+      { logger: new SilentLogger() as never },
+    );
+
+    const result = await workflow.handleControlToolCall({
+      method: 'tools/call',
+      params: {
+        name: 'mcp_async_future_control',
+        arguments: { jobId },
+      },
+    });
+
+    const payload = parsePayload(result);
+    assert.equal(result.isError, true);
+    assert.equal(payload.success, false);
+    assert.match(String(payload.error), /Unsupported control tool/);
+
+    const stored = (await kv.get(`job:${jobId}`, 'json')) as Record<string, unknown>;
+    assert.equal(stored.status, 'queued');
+    assert.equal(stored.cancellationRequested, false);
+  });
+
+  it('cancels queued jobs for mcp_async_cancel_job', async () => {
+    const kv = new MemoryKvNamespace();
+    const jobId = 'job-cancel-queued';
+    await createQueuedJob(kv, jobId);
+
+    const workflow = new CloudflareAsyncQueueWorkflow(
+      {
+        ASYNC_JOBS_KV: kv as unknown as KVNamespace,
+        ASYNC_TOOL_QUEUE: {
+          send: async () => undefined,
+        } as unknown as Queue<AsyncJobMessage>,
+      },
+      { logger: new SilentLogger() as never },
+    );
+
+    const result = await workflow.handleControlToolCall({
+      method: 'tools/call',
+      params: {
+        name: 'mcp_async_cancel_job',
+        arguments: { jobId },
+      },
+    });
+
+    const payload = parsePayload(result);
+    assert.equal(payload.success, true);
+    const job = payload.job as Record<string, unknown>;
+    assert.equal(job.status, 'failed');
+    assert.equal((job.error as Record<string, unknown>).code, 'cancelled');
+  });
+});
 
 describe('processAsyncQueueMessage', () => {
   it('preserves cancellationRequested when cancellation is persisted during execution', async () => {

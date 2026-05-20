@@ -5,6 +5,7 @@ import type { Logger } from '../infrastructure/logger.js';
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
 import {
   createAsyncEnvelope,
+  MCP_ASYNC_CONTROL_TOOLS,
   resolveBoundedPositiveInt,
   type AsyncExecutionDirective,
   type AsyncJobSnapshot,
@@ -186,6 +187,13 @@ export class CloudflareAsyncQueueWorkflow {
         job: snapshot(job),
         result: null,
       });
+    }
+
+    if (request.params.name !== MCP_ASYNC_CONTROL_TOOLS.cancel) {
+      return createAsyncEnvelope(
+        { success: false, error: `Unsupported control tool: ${request.params.name}` },
+        true,
+      );
     }
 
     job.cancellationRequested = true;
