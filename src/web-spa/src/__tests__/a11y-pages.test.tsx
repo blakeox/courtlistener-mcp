@@ -8,6 +8,7 @@ import { PlaygroundPage } from '../pages/PlaygroundPage';
 import { AccountPage } from '../pages/AccountPage';
 import { UsagePage } from '../pages/UsagePage';
 import { ObservabilityPage } from '../pages/ObservabilityPage';
+import { OnboardingPage } from '../pages/OnboardingPage';
 import { renderWithSpaProviders, renderWorkspaceRoute } from './a11y-test-utils';
 import { createMatchMediaMock, stubBrowserStorage } from './test-utils';
 
@@ -160,6 +161,12 @@ describe('axe accessibility scans', () => {
   it('observability page has no detectable WCAG violations', async () => {
     const { container } = renderWorkspaceRoute(<ObservabilityPage />, '/app/observability');
     await screen.findByRole('heading', { name: 'Agent Observability', level: 1 });
+    await expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('onboarding diagnostics page has no detectable WCAG violations', async () => {
+    const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/onboarding');
+    await screen.findByRole('heading', { name: 'Runtime Diagnostics', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
   });
 });
