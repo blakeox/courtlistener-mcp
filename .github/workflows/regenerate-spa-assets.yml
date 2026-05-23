@@ -7,6 +7,11 @@ on:
         description: Branch to regenerate and commit on
         required: true
         type: string
+  push:
+    branches:
+      - fix/mcp-credential-account-ui
+    paths:
+      - .github/trigger-spa-regen
 
 permissions:
   contents: write
@@ -19,7 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -42,4 +47,3 @@ jobs:
         with:
           commit_message: 'chore: regenerate spa-assets on Linux CI'
           file_pattern: src/web/spa-assets.ts
-          branch: ${{ inputs.branch }}
