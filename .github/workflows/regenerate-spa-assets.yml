@@ -1,0 +1,45 @@
+name: Regenerate SPA Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to regenerate and commit on
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    name: Regenerate spa-assets.ts (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate embedded SPA assets
+        run: pnpm run generate:web:spa
+
+      - name: Commit regenerated assets
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: 'chore: regenerate spa-assets on Linux CI'
+          file_pattern: src/web/spa-assets.ts
+          branch: ${{ inputs.branch }}
