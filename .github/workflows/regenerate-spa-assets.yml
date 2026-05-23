@@ -9,7 +9,7 @@ on:
         type: string
   push:
     branches:
-      - fix/mcp-credential-account-ui
+      - main
     paths:
       - .github/trigger-spa-regen
 
