@@ -1,5 +1,11 @@
 import React from 'react';
-import { readToken, saveToken, clearToken, isPersistedToken } from './storage';
+import {
+  readToken,
+  saveToken,
+  clearToken,
+  isPersistedToken,
+  normalizeMcpCredential,
+} from './storage';
 
 interface TokenContextValue {
   token: string;
@@ -15,8 +21,10 @@ export function TokenProvider({ children }: { children: React.ReactNode }): Reac
   const [persisted, setPersisted] = React.useState(() => isPersistedToken());
 
   const setToken = React.useCallback((value: string, persist: boolean) => {
-    saveToken(value, persist);
-    setTokenState(value);
+    const normalized = normalizeMcpCredential(value);
+    if (!normalized) return;
+    saveToken(normalized, persist);
+    setTokenState(normalized);
     setPersisted(persist);
   }, []);
 

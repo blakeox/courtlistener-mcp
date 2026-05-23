@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { bootstrapSession, toErrorMessage } from '../lib/api';
 import { useToken } from '../lib/token-context';
+import { normalizeMcpCredential } from '../lib/storage';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { getSessionDisplayLabel } from '../lib/session-display';
@@ -22,6 +23,7 @@ import {
   Button,
   ButtonLink,
   Card,
+  CheckboxField,
   DefinitionList,
   FormField,
   Input,
@@ -34,7 +36,7 @@ import {
 export function AccountPage(): React.JSX.Element {
   useDocumentTitle('Account');
   const { session, loading, sessionReady, sessionError, refresh, logout } = useAuth();
-  const { token, persisted, clear } = useToken();
+  const { token, persisted, setToken, clear } = useToken();
   const { toast } = useToast();
   const hasServerSession = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
@@ -44,6 +46,9 @@ export function AccountPage(): React.JSX.Element {
   const [bootstrapBusy, setBootstrapBusy] = React.useState(false);
   const [bootstrapError, setBootstrapError] = React.useState('');
   const [bootstrapSummary, setBootstrapSummary] = React.useState('');
+  const [credentialInput, setCredentialInput] = React.useState('');
+  const [persistCredential, setPersistCredential] = React.useState(true);
+  const [credentialError, setCredentialError] = React.useState('');
   const protocolQuery = useQuery({
     queryKey: ['account-mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -109,6 +114,23 @@ export function AccountPage(): React.JSX.Element {
     bootstrapBusy ||
     !bootstrapAuthorization.trim() ||
     (turnstile.enabled && turnstile.status !== 'verified');
+
+  function handleSaveCredential(): void {
+    const normalized = normalizeMcpCredential(credentialInput);
+    if (!normalized) {
+      setCredentialError('Paste an MCP access token or Bearer header value first.');
+      return;
+    }
+    setCredentialError('');
+    setToken(normalized, persistCredential);
+    setCredentialInput('');
+    toast(
+      persistCredential
+        ? 'Local MCP credential saved on this device.'
+        : 'Local MCP credential loaded for this browser tab.',
+      'ok',
+    );
+  }
 
   async function handleBootstrapSession(): Promise<void> {
     if (bootstrapDisabled) return;
@@ -230,7 +252,10 @@ export function AccountPage(): React.JSX.Element {
           </InlineGroup>
         </Card>
 
-        <Card title="Credential status" subtitle={credentialSummary}>
+        <Card
+          title="Local MCP credential"
+          subtitle="Optional bearer token for Playground and direct browser-side MCP probes. Hosted sign-in stays separate."
+        >
           <DefinitionList
             entries={[
               {
@@ -249,25 +274,61 @@ export function AccountPage(): React.JSX.Element {
                 term: 'Use case',
                 description: hasToken
                   ? 'Available for browser-side runtime probes'
-                  : 'Optional unless you need direct browser diagnostics',
+                  : 'Required for Playground raw MCP calls and runtime diagnostics',
               },
             ]}
           />
-          <InlineGroup>
-            <ButtonLink to="/app/credentials" variant="secondary">
-              Manage credentials
-            </ButtonLink>
-            <Button
-              variant="secondary"
-              disabled={!hasToken}
-              onClick={() => {
-                clear();
-                toast('Token cleared', 'info');
-              }}
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSaveCredential();
+            }}
+          >
+            <FormField
+              id="mcpCredential"
+              label="MCP access token"
+              hint="Paste an OAuth access token from your MCP client, or the full Authorization header value (Bearer …)."
             >
-              Clear local credential
-            </Button>
-          </InlineGroup>
+              <Input
+                id="mcpCredential"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={credentialInput}
+                onChange={(event) => setCredentialInput(event.target.value)}
+                placeholder="Bearer eyJ…"
+              />
+            </FormField>
+            <CheckboxField
+              id="persistCredential"
+              checked={persistCredential}
+              onChange={(event) => setPersistCredential(event.target.checked)}
+            >
+              Remember on this device
+            </CheckboxField>
+            <InlineGroup>
+              <Button type="submit" disabled={!credentialInput.trim()}>
+                Save credential
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!hasToken}
+                onClick={() => {
+                  clear();
+                  setCredentialInput('');
+                  setCredentialError('');
+                  toast('Local MCP credential cleared', 'info');
+                }}
+              >
+                Clear saved credential
+              </Button>
+              <ButtonLink to="/app/playground" variant="secondary">
+                Open playground
+              </ButtonLink>
+            </InlineGroup>
+          </form>
+          <StatusBanner role="alert" message={credentialError} type="error" />
         </Card>
       </div>
 
