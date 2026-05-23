@@ -301,10 +301,11 @@ export function AccountPage(): React.JSX.Element {
             </FormField>
             <CheckboxField
               id="persistCredential"
-              label="Remember on this device"
               checked={persistCredential}
               onChange={(event) => setPersistCredential(event.target.checked)}
-            />
+            >
+              Remember on this device
+            </CheckboxField>
             <InlineGroup>
               <Button type="submit" disabled={!credentialInput.trim()}>
                 Save credential
