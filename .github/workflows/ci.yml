@@ -210,7 +210,7 @@ jobs:
         run: pnpm run coverage
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-node-20
@@ -426,7 +426,7 @@ jobs:
 
       - name: Upload hardening gate artifacts
         if: always() && matrix.gate == 'stress-reliability'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -438,7 +438,7 @@ jobs:
 
       - name: Upload runtime parity gate artifacts
         if: always() && matrix.gate == 'runtime-parity-security-async'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -448,7 +448,7 @@ jobs:
 
       - name: Upload release readiness gate artifacts
         if: always() && matrix.gate == 'release-readiness'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -516,7 +516,7 @@ jobs:
           fi
 
       - name: Upload compliance report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-compliance-report
           path: mcp-compliance-report.md
