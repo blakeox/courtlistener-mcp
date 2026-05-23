@@ -1,5 +1,11 @@
 import React from 'react';
-import { readToken, saveToken, clearToken, isPersistedToken, normalizeMcpCredential } from './storage';
+import {
+  readToken,
+  saveToken,
+  clearToken,
+  isPersistedToken,
+  normalizeMcpCredential,
+} from './storage';
 
 interface TokenContextValue {
   token: string;
