@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { bootstrapSession, toErrorMessage } from '../lib/api';
 import { useToken } from '../lib/token-context';
+import { normalizeMcpCredential } from '../lib/storage';
 import { buildHostedAuthStartHref } from '../lib/hosted-auth';
 import { verifyMcpRuntimeReadiness } from '../lib/mcp-runtime-readiness';
 import { getSessionDisplayLabel } from '../lib/session-display';
@@ -115,7 +116,7 @@ export function AccountPage(): React.JSX.Element {
     (turnstile.enabled && turnstile.status !== 'verified');
 
   function handleSaveCredential(): void {
-    const normalized = credentialInput.trim();
+    const normalized = normalizeMcpCredential(credentialInput);
     if (!normalized) {
       setCredentialError('Paste an MCP access token or Bearer header value first.');
       return;
