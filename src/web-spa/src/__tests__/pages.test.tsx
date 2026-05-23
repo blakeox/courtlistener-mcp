@@ -659,9 +659,9 @@ describe('AccountPage', () => {
     expect(screen.getByText('Diagnostics')).toBeInTheDocument();
     expect(screen.queryByText('Usage & activity')).not.toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: 'Open playground' }).some(
-        (link) => link.getAttribute('href') === '/app/playground',
-      ),
+      screen
+        .getAllByRole('link', { name: 'Open playground' })
+        .some((link) => link.getAttribute('href') === '/app/playground'),
     ).toBe(true);
     expect(screen.getByRole('link', { name: 'Open usage' })).toHaveAttribute('href', '/app/usage');
     expect(screen.getByRole('link', { name: 'Open diagnostics' })).toHaveAttribute(
