@@ -371,7 +371,7 @@ describe('OnboardingPage', () => {
     render(<OnboardingPage />, { wrapper: Wrapper });
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
-    expect(screen.getByText(/browser access check failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/check failed/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /^sign in$/i })[0]).toHaveAttribute(
       'href',
       '/auth/start?return_to=%2Fapp%2Faccount',
@@ -511,10 +511,16 @@ describe('AccountPage', () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
     expect(screen.getByText('Account access')).toBeInTheDocument();
-    expect(screen.getByText('Credential status')).toBeInTheDocument();
-    expect(screen.getByText('Browser access')).toBeInTheDocument();
-    expect(screen.getByText('Storage')).toBeInTheDocument();
-    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Local MCP credential')).toBeInTheDocument();
+    const accountAccessCard = screen
+      .getByRole('heading', { name: 'Account access', level: 2 })
+      .closest('section');
+    expect(accountAccessCard).not.toBeNull();
+    expect(accountAccessCard).toHaveTextContent('Browser access');
+    expect(accountAccessCard).toHaveTextContent('Status');
+    expect(
+      screen.getByRole('heading', { name: 'Local MCP credential', level: 2 }).closest('section'),
+    ).toHaveTextContent('Storage');
     expect(screen.queryByText('Diagnostics')).not.toBeInTheDocument();
   });
 
@@ -536,7 +542,7 @@ describe('AccountPage', () => {
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Signed in as operator@example.com')).toBeInTheDocument();
+    expect(screen.getAllByText('Signed in as operator@example.com').length).toBeGreaterThan(0);
     expect(screen.getByText('Sign-in email')).toBeInTheDocument();
     expect(screen.getByText('operator@example.com')).toBeInTheDocument();
     expect(screen.getByText('tuqi3jzgswiz')).toBeInTheDocument();
@@ -649,13 +655,14 @@ describe('AccountPage', () => {
     render(<AccountPage />, { wrapper: Wrapper });
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
-    expect(screen.getByText(/⚠ Failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Failed$/)).toBeInTheDocument();
     expect(screen.getByText('Diagnostics')).toBeInTheDocument();
     expect(screen.queryByText('Usage & activity')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open credentials' })).toHaveAttribute(
-      'href',
-      '/app/credentials',
-    );
+    expect(
+      screen.getAllByRole('link', { name: 'Open playground' }).some(
+        (link) => link.getAttribute('href') === '/app/playground',
+      ),
+    ).toBe(true);
     expect(screen.getByRole('link', { name: 'Open usage' })).toHaveAttribute('href', '/app/usage');
     expect(screen.getByRole('link', { name: 'Open diagnostics' })).toHaveAttribute(
       'href',
@@ -753,6 +760,22 @@ describe('AccountPage', () => {
       expect(refreshMock).toHaveBeenCalledTimes(1);
       expect(refreshTurnstileMock).toHaveBeenCalledTimes(1);
       expect(screen.getByText(/browser session bootstrapped for u1/i)).toBeTruthy();
+    });
+  });
+
+  it('saves a local MCP credential from the account page', async () => {
+    const { AccountPage } = await import('../pages/AccountPage');
+    render(<AccountPage />, { wrapper: Wrapper });
+
+    fireEvent.change(screen.getByLabelText('MCP access token'), {
+      target: { value: 'Bearer saved-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save credential/i }));
+
+    await waitFor(() => {
+      expect(sessionStorage.getItem('courtlistenerMcpApiTokenSession')).toBeNull();
+      expect(localStorage.getItem('courtlistenerMcpApiToken')).toBe('saved-token');
+      expect(screen.getByText('Loaded')).toBeInTheDocument();
     });
   });
 

@@ -22,19 +22,25 @@ import {
   Button,
   ButtonLink,
   Card,
+  CheckboxField,
   DefinitionList,
   FormField,
+  HeroPanel,
   Input,
   InlineGroup,
-  PageHeader,
+  KeyValueList,
+  MetricCard,
+  MetricGrid,
+  PageHeroNote,
   StatusBanner,
   TextLink,
 } from '../components/ui';
+import { mutedCopyClass } from '../lib/ui-classes';
 
 export function AccountPage(): React.JSX.Element {
   useDocumentTitle('Account');
   const { session, loading, sessionReady, sessionError, refresh, logout } = useAuth();
-  const { token, persisted, clear } = useToken();
+  const { token, persisted, setToken, clear } = useToken();
   const { toast } = useToast();
   const hasServerSession = session?.authenticated === true;
   const hasToken = Boolean(token.trim());
@@ -44,6 +50,9 @@ export function AccountPage(): React.JSX.Element {
   const [bootstrapBusy, setBootstrapBusy] = React.useState(false);
   const [bootstrapError, setBootstrapError] = React.useState('');
   const [bootstrapSummary, setBootstrapSummary] = React.useState('');
+  const [credentialInput, setCredentialInput] = React.useState('');
+  const [persistCredential, setPersistCredential] = React.useState(true);
+  const [credentialError, setCredentialError] = React.useState('');
   const protocolQuery = useQuery({
     queryKey: ['account-mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -110,6 +119,23 @@ export function AccountPage(): React.JSX.Element {
     !bootstrapAuthorization.trim() ||
     (turnstile.enabled && turnstile.status !== 'verified');
 
+  function handleSaveCredential(): void {
+    const normalized = credentialInput.trim();
+    if (!normalized) {
+      setCredentialError('Paste an MCP access token or Bearer header value first.');
+      return;
+    }
+    setCredentialError('');
+    setToken(normalized, persistCredential);
+    setCredentialInput('');
+    toast(
+      persistCredential
+        ? 'Local MCP credential saved on this device.'
+        : 'Local MCP credential loaded for this browser tab.',
+      'ok',
+    );
+  }
+
   async function handleBootstrapSession(): Promise<void> {
     if (bootstrapDisabled) return;
     trackEvent('browser_session_bootstrap_attempted', {
@@ -159,14 +185,14 @@ export function AccountPage(): React.JSX.Element {
 
   return (
     <div className={stackClass}>
-      <PageHeader
+      <HeroPanel
         eyebrow="Workspace account"
         title="Account"
         description={accountDescription}
         actions={
           <InlineGroup>
-            <ButtonLink to="/app/credentials" variant="secondary">
-              Open credentials
+            <ButtonLink to="/app/playground" variant="secondary">
+              Open playground
             </ButtonLink>
             {hasServerSession ? (
               <Button
@@ -186,9 +212,32 @@ export function AccountPage(): React.JSX.Element {
             )}
           </InlineGroup>
         }
+        aside={
+          <PageHeroNote title="Account snapshot" description={accountSummary}>
+            <KeyValueList
+              entries={[
+                { label: 'Browser access', value: sessionSummary },
+                { label: 'Credential', value: credentialSummary },
+                { label: 'Runtime', value: protocolSummary },
+              ]}
+            />
+          </PageHeroNote>
+        }
       />
 
       <StatusBanner role="alert" message={sessionError} type="error" />
+
+      <MetricGrid>
+        <MetricCard label="Browser access" value={sessionSummary} accent={accountSummary}>
+          <p className={mutedCopyClass}>Hosted sign-in and browser session posture.</p>
+        </MetricCard>
+        <MetricCard label="Credential" value={credentialSummary} accent={recoverySummary}>
+          <p className={mutedCopyClass}>Local token storage for browser-side runtime checks.</p>
+        </MetricCard>
+        <MetricCard label="Runtime" value={protocolSummary} accent={diagnosticsSummary}>
+          <p className={mutedCopyClass}>MCP protocol surface when a credential is loaded.</p>
+        </MetricCard>
+      </MetricGrid>
       <div className={pageCardGridClass}>
         <Card title="Account access" subtitle={accountSummary}>
           <DefinitionList
@@ -197,10 +246,10 @@ export function AccountPage(): React.JSX.Element {
                 term: 'Browser access',
                 description:
                   loading || !sessionReady
-                    ? '… Checking browser access'
+                    ? 'Checking browser access'
                     : sessionError
-                      ? '⚠ Failed'
-                      : '✓ Ready',
+                      ? 'Failed'
+                      : 'Ready',
               },
               {
                 term: 'Status',
@@ -230,7 +279,10 @@ export function AccountPage(): React.JSX.Element {
           </InlineGroup>
         </Card>
 
-        <Card title="Credential status" subtitle={credentialSummary}>
+        <Card
+          title="Local MCP credential"
+          subtitle="Optional bearer token for Playground and direct browser-side MCP probes. Hosted sign-in stays separate."
+        >
           <DefinitionList
             entries={[
               {
@@ -249,25 +301,60 @@ export function AccountPage(): React.JSX.Element {
                 term: 'Use case',
                 description: hasToken
                   ? 'Available for browser-side runtime probes'
-                  : 'Optional unless you need direct browser diagnostics',
+                  : 'Required for Playground raw MCP calls and runtime diagnostics',
               },
             ]}
           />
-          <InlineGroup>
-            <ButtonLink to="/app/credentials" variant="secondary">
-              Manage credentials
-            </ButtonLink>
-            <Button
-              variant="secondary"
-              disabled={!hasToken}
-              onClick={() => {
-                clear();
-                toast('Token cleared', 'info');
-              }}
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSaveCredential();
+            }}
+          >
+            <FormField
+              id="mcpCredential"
+              label="MCP access token"
+              hint="Paste an OAuth access token from your MCP client, or the full Authorization header value (Bearer …)."
             >
-              Clear local credential
-            </Button>
-          </InlineGroup>
+              <Input
+                id="mcpCredential"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={credentialInput}
+                onChange={(event) => setCredentialInput(event.target.value)}
+                placeholder="Bearer eyJ…"
+              />
+            </FormField>
+            <CheckboxField
+              id="persistCredential"
+              label="Remember on this device"
+              checked={persistCredential}
+              onChange={(event) => setPersistCredential(event.target.checked)}
+            />
+            <InlineGroup>
+              <Button type="submit" disabled={!credentialInput.trim()}>
+                Save credential
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!hasToken}
+                onClick={() => {
+                  clear();
+                  setCredentialInput('');
+                  setCredentialError('');
+                  toast('Local MCP credential cleared', 'info');
+                }}
+              >
+                Clear saved credential
+              </Button>
+              <ButtonLink to="/app/playground" variant="secondary">
+                Open playground
+              </ButtonLink>
+            </InlineGroup>
+          </form>
+          <StatusBanner role="alert" message={credentialError} type="error" />
         </Card>
       </div>
 
@@ -372,12 +459,12 @@ export function AccountPage(): React.JSX.Element {
                   !hasServerSession || !hasToken
                     ? '—'
                     : protocolQuery.isLoading
-                      ? '… Checking protocol surface'
+                      ? 'Checking protocol surface'
                       : protocolQuery.isError
-                        ? '⚠ Protocol check failed'
+                        ? 'Protocol check failed'
                         : protocolMismatch
-                          ? `⚠ Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
-                          : `✓ ${protocolQuery.data?.protocolVersion || 'ready'}`,
+                          ? `Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
+                          : protocolQuery.data?.protocolVersion || 'ready',
               },
               ...(protocolQuery.data?.sessionId
                 ? [
