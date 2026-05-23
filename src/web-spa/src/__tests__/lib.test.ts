@@ -36,6 +36,7 @@ describe('storage', () => {
   let saveToken: typeof import('../lib/storage').saveToken;
   let clearToken: typeof import('../lib/storage').clearToken;
   let isPersistedToken: typeof import('../lib/storage').isPersistedToken;
+  let normalizeMcpCredential: typeof import('../lib/storage').normalizeMcpCredential;
 
   beforeEach(async () => {
     mockLocal = createStorageMock();
@@ -50,6 +51,7 @@ describe('storage', () => {
     saveToken = mod.saveToken;
     clearToken = mod.clearToken;
     isPersistedToken = mod.isPersistedToken;
+    normalizeMcpCredential = mod.normalizeMcpCredential;
   });
 
   afterEach(() => {
@@ -75,6 +77,16 @@ describe('storage', () => {
   it('saveToken trims whitespace', () => {
     saveToken('  tok  ', true);
     expect(mockLocal.getItem('courtlistenerMcpApiToken')).toBe('tok');
+  });
+
+  it('saveToken strips Bearer prefix', () => {
+    saveToken('Bearer eyJ.test', true);
+    expect(mockLocal.getItem('courtlistenerMcpApiToken')).toBe('eyJ.test');
+  });
+
+  it('normalizeMcpCredential strips Bearer prefix', () => {
+    expect(normalizeMcpCredential('Bearer abc')).toBe('abc');
+    expect(normalizeMcpCredential('abc')).toBe('abc');
   });
 
   it('saveToken ignores empty tokens', () => {

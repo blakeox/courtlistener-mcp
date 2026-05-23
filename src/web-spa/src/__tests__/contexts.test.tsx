@@ -182,6 +182,16 @@ describe('TokenProvider', () => {
     expect(result.current.persisted).toBe(true);
   });
 
+  it('setToken strips Bearer prefix from in-memory token', async () => {
+    const { TokenProvider, useToken } = await import('../lib/token-context');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <TokenProvider>{children}</TokenProvider>
+    );
+    const { result } = renderHook(() => useToken(), { wrapper });
+    act(() => result.current.setToken('Bearer eyJ.test', true));
+    expect(result.current.token).toBe('eyJ.test');
+  });
+
   it('clear removes token', async () => {
     const { TokenProvider, useToken } = await import('../lib/token-context');
     const wrapper = ({ children }: { children: React.ReactNode }) => (
