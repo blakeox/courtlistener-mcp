@@ -655,7 +655,7 @@ describe('AccountPage', () => {
     render(<AccountPage />, { wrapper: Wrapper });
 
     expect(screen.getByText('Session service temporarily unavailable.')).toBeInTheDocument();
-    expect(screen.getByText(/^Failed$/)).toBeInTheDocument();
+    expect(screen.getByText(/Failed/)).toBeInTheDocument();
     expect(screen.getByText('Diagnostics')).toBeInTheDocument();
     expect(screen.queryByText('Usage & activity')).not.toBeInTheDocument();
     expect(

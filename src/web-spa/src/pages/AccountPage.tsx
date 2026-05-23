@@ -25,17 +25,12 @@ import {
   CheckboxField,
   DefinitionList,
   FormField,
-  HeroPanel,
   Input,
   InlineGroup,
-  KeyValueList,
-  MetricCard,
-  MetricGrid,
-  PageHeroNote,
+  PageHeader,
   StatusBanner,
   TextLink,
 } from '../components/ui';
-import { mutedCopyClass } from '../lib/ui-classes';
 
 export function AccountPage(): React.JSX.Element {
   useDocumentTitle('Account');
@@ -185,14 +180,14 @@ export function AccountPage(): React.JSX.Element {
 
   return (
     <div className={stackClass}>
-      <HeroPanel
+      <PageHeader
         eyebrow="Workspace account"
         title="Account"
         description={accountDescription}
         actions={
           <InlineGroup>
-            <ButtonLink to="/app/playground" variant="secondary">
-              Open playground
+            <ButtonLink to="/app/credentials" variant="secondary">
+              Open credentials
             </ButtonLink>
             {hasServerSession ? (
               <Button
@@ -212,32 +207,9 @@ export function AccountPage(): React.JSX.Element {
             )}
           </InlineGroup>
         }
-        aside={
-          <PageHeroNote title="Account snapshot" description={accountSummary}>
-            <KeyValueList
-              entries={[
-                { label: 'Browser access', value: sessionSummary },
-                { label: 'Credential', value: credentialSummary },
-                { label: 'Runtime', value: protocolSummary },
-              ]}
-            />
-          </PageHeroNote>
-        }
       />
 
       <StatusBanner role="alert" message={sessionError} type="error" />
-
-      <MetricGrid>
-        <MetricCard label="Browser access" value={sessionSummary} accent={accountSummary}>
-          <p className={mutedCopyClass}>Hosted sign-in and browser session posture.</p>
-        </MetricCard>
-        <MetricCard label="Credential" value={credentialSummary} accent={recoverySummary}>
-          <p className={mutedCopyClass}>Local token storage for browser-side runtime checks.</p>
-        </MetricCard>
-        <MetricCard label="Runtime" value={protocolSummary} accent={diagnosticsSummary}>
-          <p className={mutedCopyClass}>MCP protocol surface when a credential is loaded.</p>
-        </MetricCard>
-      </MetricGrid>
       <div className={pageCardGridClass}>
         <Card title="Account access" subtitle={accountSummary}>
           <DefinitionList
@@ -246,10 +218,10 @@ export function AccountPage(): React.JSX.Element {
                 term: 'Browser access',
                 description:
                   loading || !sessionReady
-                    ? 'Checking browser access'
+                    ? '… Checking browser access'
                     : sessionError
-                      ? 'Failed'
-                      : 'Ready',
+                      ? '⚠ Failed'
+                      : '✓ Ready',
               },
               {
                 term: 'Status',
@@ -459,12 +431,12 @@ export function AccountPage(): React.JSX.Element {
                   !hasServerSession || !hasToken
                     ? '—'
                     : protocolQuery.isLoading
-                      ? 'Checking protocol surface'
+                      ? '… Checking protocol surface'
                       : protocolQuery.isError
-                        ? 'Protocol check failed'
+                        ? '⚠ Protocol check failed'
                         : protocolMismatch
-                          ? `Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
-                          : protocolQuery.data?.protocolVersion || 'ready',
+                          ? `⚠ Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
+                          : `✓ ${protocolQuery.data?.protocolVersion || 'ready'}`,
               },
               ...(protocolQuery.data?.sessionId
                 ? [
