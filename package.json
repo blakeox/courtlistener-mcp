@@ -202,7 +202,7 @@
     "sinon": "^21.0.1",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.22.3",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^7.3.2",
     "vitest": "^4.1.7",
     "vitest-axe": "^0.1.0",
