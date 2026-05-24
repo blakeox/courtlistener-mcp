@@ -10,8 +10,10 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
-      - .github/trigger-spa-regen
+      - src/web-spa/**
+      - scripts/web/build-spa-assets.mjs
 
 permissions:
   contents: write
