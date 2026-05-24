@@ -199,7 +199,7 @@
     "lint-staged": "^16.2.7",
     "playwright": "^1.55.0",
     "prettier": "^3.8.1",
-    "sinon": "^21.0.1",
+    "sinon": "^22.0.0",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
