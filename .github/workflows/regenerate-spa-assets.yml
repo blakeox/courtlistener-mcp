@@ -9,9 +9,11 @@ on:
         type: string
   push:
     branches:
-      - fix/mcp-credential-account-ui
+      - main
+      - dev
     paths:
-      - .github/trigger-spa-regen
+      - src/web-spa/**
+      - scripts/web/build-spa-assets.mjs
 
 permissions:
   contents: write
