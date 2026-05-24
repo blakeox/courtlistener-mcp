@@ -46,7 +46,6 @@ If you're the only committer, you still get strong protections without blocking
 yourself:
 
 - Recommended: Status checks only
-
   - In Branch protection: Do NOT enable “Require pull request reviews”.
   - Enable “Require status checks to pass before merging” and choose at least:
     - `required-checks-gate` (our CI gate)
@@ -55,7 +54,6 @@ yourself:
   - Result: PRs must be green on CI, but no review is required.
 
 - Keep PR flow but allow bypass (advanced)
-
   - Option A (simple): In the rule, uncheck “Include administrators”. As a repo
     admin, you can merge without a review if necessary. Note: this also lets you
     bypass failed checks—use with care.
@@ -71,3 +69,6 @@ yourself:
 
 Tip: Even solo, open PRs from feature branches and let CI run. This maintains
 history and keeps a clean main.
+
+See [Branch workflow](./BRANCH_WORKFLOW.md) for the dev → main promotion model
+and Dependabot targeting.
