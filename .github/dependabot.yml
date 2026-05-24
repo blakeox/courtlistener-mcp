@@ -10,7 +10,7 @@ updates:
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 5
     commit-message:
-      prefix: chore
+      prefix: chore(deps)
       include: scope
     labels:
       - dependencies
@@ -23,6 +23,9 @@ updates:
       dev-deps:
         applies-to: version-updates
         dependency-type: development
+        update-types:
+          - minor
+          - patch
         patterns:
           - '*'
 
@@ -36,7 +39,7 @@ updates:
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 3
     commit-message:
-      prefix: chore
+      prefix: chore(deps)
       include: scope
     labels:
       - dependencies
