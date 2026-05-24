@@ -1,7 +1,7 @@
 name: Regenerate SPA Assets (Dependabot PR)
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [dev]
     paths:
       - package.json
