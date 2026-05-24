@@ -251,7 +251,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: 🐳 Build Docker Image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -327,7 +327,7 @@ jobs:
 
       - name: 🚀 Build and Push Docker Image
         if: steps.deploy-config.outputs.enabled == 'true'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
