@@ -10,7 +10,7 @@ updates:
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 5
     commit-message:
-      prefix: chore
+      prefix: chore(deps)
       include: scope
     labels:
       - dependencies
@@ -36,7 +36,7 @@ updates:
       timezone: 'America/Los_Angeles'
     open-pull-requests-limit: 3
     commit-message:
-      prefix: chore
+      prefix: chore(deps)
       include: scope
     labels:
       - dependencies
