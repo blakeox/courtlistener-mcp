@@ -71,11 +71,6 @@ export function AccountPage(): React.JSX.Element {
       : hasServerSession
         ? 'Signed in'
         : 'Signed out';
-  const credentialSummary = hasToken
-    ? persisted
-      ? 'Local credential saved'
-      : 'Temporary credential loaded'
-    : 'No local credential';
   const protocolSummary =
     !hasServerSession || !hasToken
       ? 'Runtime checks locked'
