@@ -30,6 +30,16 @@ requires linear history.
   **`dev`**.
 - If Dependabot opens against **`main`**, retarget to **`dev`** or recreate the
   bump on a feature branch from **`dev`**.
+- **Grouped bumps:** production deps use the `minor-and-patch` group; dev deps
+  use the `dev-deps` group (minor/patch only). Major dev-tool upgrades (ESLint,
+  lefthook, etc.) are handled manually on a feature branch.
+- **SPA assets:** npm lockfile updates can change embedded SPA hashes. The
+  **Regenerate SPA Assets (Dependabot PR)** workflow commits Linux-built
+  `src/web/spa-assets.ts` back onto open Dependabot PRs. If CI still fails on
+  generated files, re-run that workflow or `pnpm run generate:web:spa` on Linux
+  before merge.
+- Commit messages use the `chore(deps)` prefix (see `commit-message` in
+  `.github/dependabot.yml`).
 
 ## Branch hygiene
 
