@@ -10,7 +10,8 @@
    - `pnpm run test:runtime-parity:certify` (artifact:
      `test-output/runtime-parity/certification-report.json`)
    - `pnpm run ci:auth-release-gate` for hosted auth regressions across handoff,
-     runtime trust boundaries, authorize flow, and server auth middleware
+     HTML CSP contract, and (when `OAUTH_BASE_URL` is set) production approve
+     probes runtime trust boundaries, authorize flow, and server auth middleware
 3. Cloudflare readiness:
    - `pnpm run cloudflare:check`
 4. Confirm required secrets:

@@ -26,11 +26,13 @@ describe('auth-release-gate', () => {
         'worker-oauth-contract',
         'worker-oauth-smoke',
         'worker-auth-handoff',
+        'hosted-auth-html-security',
         'worker-auth-runtime',
         'server-auth-middleware',
         'spa-auth-vitest',
         'spa-auth-playwright',
         'deployed-oauth-handshake',
+        'deployed-oauth-approve-contract',
       ],
     );
 
@@ -79,6 +81,9 @@ describe('auth-release-gate', () => {
   it('wires the deployed handshake check when a hosted remote env is configured', () => {
     const checks = buildChecks({ REMOTE_SERVER_URL: 'https://example.com/health' });
     const deployedHandshake = checks.find((entry) => entry.id === 'deployed-oauth-handshake');
+    const deployedApproveContract = checks.find(
+      (entry) => entry.id === 'deployed-oauth-approve-contract',
+    );
 
     assert.ok(deployedHandshake);
     assert.equal(deployedHandshake.skipReason, undefined);
@@ -87,5 +92,14 @@ describe('auth-release-gate', () => {
       'scripts/testing/e2e-remote-oauth-handshake.mjs',
     ]);
     assert.deepEqual(deployedHandshake.env, { OAUTH_BASE_URL: 'https://example.com' });
+
+    assert.ok(deployedApproveContract);
+    assert.equal(deployedApproveContract.skipReason, undefined);
+    assert.deepEqual(deployedApproveContract.command, [
+      'npx',
+      'tsx',
+      'scripts/testing/probe-production-approve-contract.ts',
+    ]);
+    assert.deepEqual(deployedApproveContract.env, { OAUTH_BASE_URL: 'https://example.com' });
   });
 });
