@@ -833,10 +833,9 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.ok(responseCookies.some((cookie) => cookie.startsWith('clauth_approve=')));
     assert.ok(responseCookies.some((cookie) => cookie.startsWith('clauth_flow=')));
     assert.ok(responseCookies.some((cookie) => cookie.startsWith('clmcp_csrf=csrf-token-123')));
-    assert.match(
-      getResponse.headers.get('content-security-policy') ?? '',
-      /form-action 'self' https:\/\/worker\.example https:\/\/chatgpt\.com/,
-    );
+    const approvalCsp = getResponse.headers.get('content-security-policy') ?? '';
+    assert.doesNotMatch(approvalCsp, /form-action/);
+    assert.match(approvalCsp, /sha256-CsRg1c\/uAShTQr6MSbfT26yXsxtsm7ZpMgc41yupCOo=/);
     const approvalCorrelationId = getResponse.headers.get('x-hosted-auth-correlation-id');
     assert.match(String(approvalCorrelationId), /^[A-Za-z0-9_-]{8,}$/);
     assert.equal(completionCount, 0);
@@ -994,9 +993,8 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.match(cursorApprovalHtml, /action="\/oauth\/approve"/);
     assert.match(cursorApprovalHtml, /anysphere\.cursor-mcp/);
     const cursorCsp = cursorApprovalResponse.headers.get('content-security-policy') ?? '';
-    assert.match(cursorCsp, /form-action 'self' https:\/\/worker\.example/);
+    assert.doesNotMatch(cursorCsp, /form-action/);
     assert.doesNotMatch(cursorCsp, /cursor:/);
-    assert.doesNotMatch(cursorCsp, /\bnull\b/);
 
     completionCount = 0;
     const returnToParam = new URL(approvalUrl).searchParams.get('return_to');

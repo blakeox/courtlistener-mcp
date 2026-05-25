@@ -1,7 +1,16 @@
 import { buildMcpCorsHeaders } from './transport-boundary-headers.js';
 
+/** Inline scripts injected by Cloudflare/captive portals on hosted auth pages (hashes from browser CSP reports). */
+const HOSTED_AUTH_INLINE_SCRIPT_HASHES = [
+  "'sha256-CsRg1c/uAShTQr6MSbfT26yXsxtsm7ZpMgc41yupCOo='",
+  "'sha256-PBIIO99gDQxCFzWUcG6igjK4mjItQrNaA+ccPy87s0M='",
+] as const;
+
 export interface HtmlResponseSecurityOptions {
   formActionOrigins?: string[];
+  /** Hosted auth pages use same-origin POST forms; omit form-action to avoid Chrome/Cursor CSP false blocks. */
+  omitFormAction?: boolean;
+  allowHostedAuthInlineScriptHashes?: boolean;
 }
 
 export function cloneHeadersPreservingSetCookie(source: Headers): Headers {
@@ -155,26 +164,32 @@ function applySecurityHeaders(
   headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   const nonce = securityOptions?.nonce;
+  const hostedAuthScriptHashes =
+    securityOptions?.allowHostedAuthInlineScriptHashes === true
+      ? ` ${HOSTED_AUTH_INLINE_SCRIPT_HASHES.join(' ')}`
+      : '';
   const scriptDirective = nonce
-    ? `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`
+    ? `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com${hostedAuthScriptHashes}`
     : "script-src 'none'";
   const styleDirective = nonce ? `style-src 'self' 'nonce-${nonce}'` : "style-src 'none'";
   const formActionOrigins = normalizeFormActionOrigins(securityOptions?.formActionOrigins ?? []);
-  headers.set(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "base-uri 'none'",
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      "img-src 'self' data:",
-      scriptDirective,
-      styleDirective,
-      "connect-src 'self'",
-      'frame-src https://challenges.cloudflare.com',
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    scriptDirective,
+    styleDirective,
+    "connect-src 'self'",
+    'frame-src https://challenges.cloudflare.com',
+  ];
+  if (securityOptions?.omitFormAction !== true) {
+    directives.push(
       `form-action 'self'${formActionOrigins.length > 0 ? ` ${formActionOrigins.join(' ')}` : ''}`,
-    ].join('; '),
-  );
+    );
+  }
+  headers.set('Content-Security-Policy', directives.join('; '));
 }
 
 export function normalizeFormActionOrigins(origins: string[]): string[] {
