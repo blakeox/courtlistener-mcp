@@ -274,9 +274,9 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
 
       nodeResponse.statusCode = 404;
       nodeResponse.end('Not found');
-    } catch (error) {
+    } catch {
       nodeResponse.statusCode = 500;
-      nodeResponse.end(error instanceof Error ? error.message : String(error));
+      nodeResponse.end('Internal server error');
     }
   });
 
