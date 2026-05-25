@@ -146,7 +146,7 @@ function appendHeaders(headers: Headers, extraHeaders?: HeadersInit): void {
 function createSecureResponseHeaders(
   baseHeaders: HeadersInit,
   extraHeaders?: HeadersInit,
-  securityOptions?: { nonce?: string; formActionOrigins?: string[] },
+  securityOptions?: HtmlResponseSecurityOptions & { nonce?: string },
 ): Headers {
   const headers = new Headers(baseHeaders);
   appendHeaders(headers, extraHeaders);
@@ -156,7 +156,7 @@ function createSecureResponseHeaders(
 
 function applySecurityHeaders(
   headers: Headers,
-  securityOptions?: { nonce?: string; formActionOrigins?: string[] },
+  securityOptions?: HtmlResponseSecurityOptions & { nonce?: string },
 ): void {
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Frame-Options', 'DENY');
