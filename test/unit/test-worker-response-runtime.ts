@@ -69,6 +69,21 @@ describe('worker response runtime', () => {
     );
   });
 
+  it('ignores opaque and custom-scheme origins in HTML form-action CSP', () => {
+    const response = htmlResponse('<html></html>', 'nonce', undefined, {
+      formActionOrigins: [
+        'null',
+        'cursor://anysphere.cursor-mcp/oauth/callback',
+        'https://worker.example',
+      ],
+    });
+
+    const csp = response.headers.get('content-security-policy') ?? '';
+    assert.match(csp, /form-action 'self' https:\/\/worker\.example/);
+    assert.doesNotMatch(csp, /cursor:/);
+    assert.doesNotMatch(csp, /\bnull\b/);
+  });
+
   it('preserves multiple Set-Cookie headers passed into HTML responses', () => {
     const extraHeaders = new Headers();
     extraHeaders.append('Set-Cookie', 'first=value-1; Path=/; HttpOnly');

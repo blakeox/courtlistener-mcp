@@ -2053,8 +2053,16 @@ async function buildApprovalPageResponse<
     headers.append('Set-Cookie', csrfCookieHeader);
   }
   const nonce = deps.generateCspNonce();
-  const approveActionUrl = new URL(HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve, request.url);
-  approveActionUrl.searchParams.set('return_to', returnTo);
+  const workerOrigin = new URL(request.url).origin;
+  const formActionOrigins = [workerOrigin];
+  if (
+    redirectUri &&
+    (redirectUri.protocol === 'http:' || redirectUri.protocol === 'https:') &&
+    redirectUri.origin !== 'null' &&
+    redirectUri.origin !== workerOrigin
+  ) {
+    formActionOrigins.push(redirectUri.origin);
+  }
 
   return deps.htmlResponse(
     renderAuthApprovalPage({
@@ -2063,14 +2071,13 @@ async function buildApprovalPageResponse<
       scope: Array.isArray(authRequest.scope) ? authRequest.scope : [],
       csrfToken,
       returnTo,
-      approveAction: `${approveActionUrl.pathname}${approveActionUrl.search}`,
+      approveAction: HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve,
       logoutHref: buildLogoutUrl(request, returnTo),
       nonce,
     }),
     nonce,
     headers,
-    // OAuth loopback and hosted callbacks rely on explicit callback origins in the CSP.
-    redirectUri ? { formActionOrigins: [redirectUri.origin] } : undefined,
+    { formActionOrigins },
   );
 }
 

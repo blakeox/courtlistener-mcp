@@ -822,7 +822,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     const approvalHtml = await getResponse.text();
     assert.match(approvalHtml, /Approve OAuth access/);
     assert.match(approvalHtml, /name="return_to"/);
-    assert.match(approvalHtml, /action="\/oauth\/approve\?return_to=/);
+    assert.match(approvalHtml, /action="\/oauth\/approve"/);
     assert.match(approvalHtml, /worker\.example\/authorize\?/);
     const responseCookies = getResponse.headers.getSetCookie();
     const setCookie = String(getResponse.headers.get('set-cookie'));
@@ -835,7 +835,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.ok(responseCookies.some((cookie) => cookie.startsWith('clmcp_csrf=csrf-token-123')));
     assert.match(
       getResponse.headers.get('content-security-policy') ?? '',
-      /form-action 'self' https:\/\/chatgpt\.com/,
+      /form-action 'self' https:\/\/worker\.example https:\/\/chatgpt\.com/,
     );
     const approvalCorrelationId = getResponse.headers.get('x-hosted-auth-correlation-id');
     assert.match(String(approvalCorrelationId), /^[A-Za-z0-9_-]{8,}$/);
@@ -949,6 +949,54 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.match(String(postResponse.headers.get('x-hosted-auth-approval-duration-ms')), /^\d+$/);
     assert.match(String(postResponse.headers.get('set-cookie')), /clauth_approve=;/);
     assert.equal(completionCount, 1);
+
+    completionCount = 0;
+    const cursorAuthorizeUrl =
+      'https://worker.example/oauth/authorize?response_type=code&client_id=cursor-client&redirect_uri=cursor%3A%2F%2Fanysphere.cursor-mcp%2Foauth%2Fcallback&state=cursor-state&scope=legal%3Aread&code_challenge=challenge&code_challenge_method=S256';
+    const cursorApprovalUrl = `https://worker.example/oauth/approve?return_to=${encodeURIComponent(cursorAuthorizeUrl)}`;
+    const cursorApprovalResponse = await handleWorkerAuthHandoffRoutes({
+      request: new Request(cursorApprovalUrl, {
+        headers: { cookie: 'clmcp_ui=signed-session' },
+      }),
+      url: new URL(cursorApprovalUrl),
+      env: {
+        OIDC_ISSUER: 'https://issuer.example',
+        OIDC_AUDIENCE: 'https://worker.example',
+        MCP_AUTH_OIDC_CLIENT_ID: 'oidc-client-id',
+        MCP_AUTH_OIDC_CLIENT_SECRET: 'oidc-client-secret',
+        MCP_UI_SESSION_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
+      },
+      deps: {
+        jsonError,
+        generateCspNonce: () => 'nonce',
+        htmlResponse,
+        workerUiSessionRuntime: {
+          getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
+          resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-123' }),
+          createUiSessionState: async () => null,
+          getOrCreateCsrfCookieHeader: () => 'clmcp_csrf=csrf-token-123; Path=/; SameSite=Lax',
+          isSecureCookieRequest: () => true,
+        },
+        getOAuthHelpers: () => ({
+          parseAuthRequest: async () => ({ scope: ['legal:read'] }),
+          completeAuthorization: async () => ({
+            redirectTo:
+              'cursor://anysphere.cursor-mcp/oauth/callback?code=worker-code&state=cursor-state',
+          }),
+        }),
+        buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+        resolveGrantedScopes: () => ['legal:read'],
+      },
+    });
+
+    assert.equal(cursorApprovalResponse.status, 200);
+    const cursorApprovalHtml = await cursorApprovalResponse.text();
+    assert.match(cursorApprovalHtml, /action="\/oauth\/approve"/);
+    assert.match(cursorApprovalHtml, /anysphere\.cursor-mcp/);
+    const cursorCsp = cursorApprovalResponse.headers.get('content-security-policy') ?? '';
+    assert.match(cursorCsp, /form-action 'self' https:\/\/worker\.example/);
+    assert.doesNotMatch(cursorCsp, /cursor:/);
+    assert.doesNotMatch(cursorCsp, /\bnull\b/);
 
     completionCount = 0;
     const returnToParam = new URL(approvalUrl).searchParams.get('return_to');
