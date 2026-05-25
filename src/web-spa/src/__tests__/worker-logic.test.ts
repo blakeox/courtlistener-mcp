@@ -4,6 +4,7 @@
  * for direct unit testing. Keep in sync with src/worker.ts.
  */
 import { describe, it, expect } from 'vitest';
+import { stripHtmlTags } from '../../../infrastructure/strip-html-tags.js';
 
 // ─── Duplicated pure functions from worker.ts ───────────────────
 
@@ -332,9 +333,7 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   if (status) parts.push(`   Status: ${status}`);
   if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
   if (snippet) {
-    const cleanSnippet = String(snippet)
-      .replace(/<[^>]+>/g, '')
-      .slice(0, 300);
+    const cleanSnippet = stripHtmlTags(String(snippet)).slice(0, 300);
     parts.push(`   Snippet: ${cleanSnippet}`);
   }
 
