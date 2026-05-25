@@ -31,6 +31,11 @@ import {
   type HtmlResponseSecurityOptions,
 } from './worker-response-runtime.js';
 
+const HOSTED_AUTH_HTML_SECURITY: HtmlResponseSecurityOptions = {
+  omitFormAction: true,
+  allowHostedAuthInlineScriptHashes: true,
+};
+
 const AUTH_STATE_COOKIE_NAME = 'clauth_state';
 const AUTH_APPROVAL_COOKIE_NAME = 'clauth_approve';
 const AUTH_FLOW_COOKIE_NAME = 'clauth_flow';
@@ -2053,16 +2058,6 @@ async function buildApprovalPageResponse<
     headers.append('Set-Cookie', csrfCookieHeader);
   }
   const nonce = deps.generateCspNonce();
-  const workerOrigin = new URL(request.url).origin;
-  const formActionOrigins = [workerOrigin];
-  if (
-    redirectUri &&
-    (redirectUri.protocol === 'http:' || redirectUri.protocol === 'https:') &&
-    redirectUri.origin !== 'null' &&
-    redirectUri.origin !== workerOrigin
-  ) {
-    formActionOrigins.push(redirectUri.origin);
-  }
 
   return deps.htmlResponse(
     renderAuthApprovalPage({
@@ -2077,7 +2072,7 @@ async function buildApprovalPageResponse<
     }),
     nonce,
     headers,
-    { formActionOrigins },
+    HOSTED_AUTH_HTML_SECURITY,
   );
 }
 
@@ -2390,6 +2385,7 @@ export async function handleWorkerAuthHandoffRoutes<
       }),
       nonce,
       headers,
+      HOSTED_AUTH_HTML_SECURITY,
     );
     const signal = withHostedAuthRequestDuration(
       {
@@ -2504,6 +2500,8 @@ export async function handleWorkerAuthHandoffRoutes<
           nonce,
         ),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       const signal = withHostedAuthRequestDuration(
         {
@@ -2546,6 +2544,8 @@ export async function handleWorkerAuthHandoffRoutes<
           nonce,
         ),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       const signal = withHostedAuthRequestDuration(
         {
@@ -2646,6 +2646,8 @@ export async function handleWorkerAuthHandoffRoutes<
           hasExplicitReturnTarget: resolvedReturnTo.isExplicit,
         }),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       return attachHostedAuthHeaders(
         response,
@@ -2746,6 +2748,8 @@ export async function handleWorkerAuthHandoffRoutes<
           nonce,
         ),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       const signal = withHostedAuthRequestDuration(
         {
@@ -3068,6 +3072,8 @@ export async function handleWorkerAuthHandoffRoutes<
           nonce,
         ),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       if (approveCorrelation.setCookieHeader) {
         response.headers.append('Set-Cookie', approveCorrelation.setCookieHeader);
@@ -3226,6 +3232,8 @@ export async function handleWorkerAuthHandoffRoutes<
           nonce,
         ),
         nonce,
+        undefined,
+        HOSTED_AUTH_HTML_SECURITY,
       );
       if (approveCorrelation.setCookieHeader) {
         response.headers.append('Set-Cookie', approveCorrelation.setCookieHeader);
