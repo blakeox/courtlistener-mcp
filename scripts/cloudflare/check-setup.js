@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { isCloudflareAccessLoginRedirect } from './url-helpers.js';
 
 const projectRoot = process.cwd();
 const wranglerConfigPath = join(projectRoot, 'wrangler.jsonc');
@@ -557,8 +558,7 @@ async function main() {
         const accessRedirectReady =
           authorizeAccessProbe.status >= 300 &&
           authorizeAccessProbe.status < 400 &&
-          (authorizeLocation.includes('/cdn-cgi/access/login') ||
-            authorizeLocation.includes('.cloudflareaccess.com'));
+          isCloudflareAccessLoginRedirect(authorizeLocation);
         if (accessRedirectReady) {
           ok('/oauth/authorize is protected by Cloudflare Access for browser auth.');
         } else {

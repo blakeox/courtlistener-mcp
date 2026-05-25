@@ -1,3 +1,5 @@
+import { stripHtmlTags } from '../infrastructure/strip-html-tags.js';
+
 export function buildMcpSystemPrompt(toolName: string, hasHistory: boolean): string {
   const commonRules = [
     'ACCURACY RULES:',
@@ -331,9 +333,7 @@ function formatSearchResult(num: number, item: Record<string, unknown>): string 
   if (status) parts.push(`   Status: ${status}`);
   if (url) parts.push(`   URL: https://www.courtlistener.com${url}`);
   if (snippet) {
-    const cleanSnippet = String(snippet)
-      .replace(/<[^>]+>/g, '')
-      .slice(0, 300);
+    const cleanSnippet = stripHtmlTags(String(snippet)).slice(0, 300);
     parts.push(`   Snippet: ${cleanSnippet}`);
   }
 

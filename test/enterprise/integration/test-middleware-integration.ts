@@ -69,9 +69,20 @@ class MockInputSanitizer {
     let sanitized = input;
 
     if (typeof input === 'string') {
-      if (/<script[\s>\/]/i.test(input)) {
+      const lowerInput = input.toLowerCase();
+      if (lowerInput.includes('<script')) {
         violations.push({ type: 'XSS', severity: 'high' });
-        sanitized = input.replace(/<script[\s>\/][^]*?<\/script>/gi, '[SCRIPT_REMOVED]');
+        let sanitizedText = input;
+        let scriptIndex = sanitizedText.toLowerCase().indexOf('<script');
+        while (scriptIndex !== -1) {
+          const endIndex = sanitizedText.toLowerCase().indexOf('</script>', scriptIndex);
+          if (endIndex === -1) {
+            break;
+          }
+          sanitizedText = `${sanitizedText.slice(0, scriptIndex)}[SCRIPT_REMOVED]${sanitizedText.slice(endIndex + '</script>'.length)}`;
+          scriptIndex = sanitizedText.toLowerCase().indexOf('<script');
+        }
+        sanitized = sanitizedText;
       }
       if (input.includes('DROP TABLE')) {
         violations.push({ type: 'SQL_INJECTION', severity: 'high' });
