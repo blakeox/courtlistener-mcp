@@ -2,7 +2,7 @@
 export function isCloudflareAccessLoginRedirect(location) {
   if (!location) return false;
   try {
-    const parsed = new URL(location);
+    const parsed = new URL(location, 'https://placeholder.invalid');
     if (parsed.pathname.includes('/cdn-cgi/access/login')) {
       return true;
     }
