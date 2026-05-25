@@ -276,7 +276,7 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
       nodeResponse.end('Not found');
     } catch (error) {
       nodeResponse.statusCode = 500;
-      nodeResponse.end(error instanceof Error ? error.stack || error.message : String(error));
+      nodeResponse.end(error instanceof Error ? error.message : String(error));
     }
   });
 

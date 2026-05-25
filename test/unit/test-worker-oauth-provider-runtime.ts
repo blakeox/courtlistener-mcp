@@ -146,12 +146,30 @@ describe('worker OAuth provider runtime', () => {
       {
         getRequestOrigin: (request) => request.headers.get('origin'),
         getCachedAllowedOrigins: () => ['https://auth.example'],
-        buildCorsHeaders: (origin, allowedOrigins) =>
-          new Headers({
-            'access-control-allow-origin':
-              origin && allowedOrigins.includes('https://auth.example') ? origin : 'null',
+        buildCorsHeaders: (origin, allowedOrigins) => {
+          let allowOrigin = 'null';
+          if (origin) {
+            try {
+              const normalizedOrigin = new URL(origin).origin;
+              const isAllowed = allowedOrigins.some((allowed) => {
+                try {
+                  return new URL(allowed).origin === normalizedOrigin;
+                } catch {
+                  return false;
+                }
+              });
+              if (isAllowed) {
+                allowOrigin = normalizedOrigin;
+              }
+            } catch {
+              // ignore invalid origin values in tests
+            }
+          }
+          return new Headers({
+            'access-control-allow-origin': allowOrigin,
             vary: 'Origin',
-          }),
+          });
+        },
       },
     );
 

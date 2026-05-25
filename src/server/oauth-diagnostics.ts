@@ -3,7 +3,7 @@ import {
   isHostedAuthorizePath,
   isHostedLogoutPath,
 } from '../auth/oauth-contract.js';
-import { redactSecretsInText } from '../infrastructure/secret-redaction.js';
+import { redactSecretsInText, isSensitiveKeyName } from '../infrastructure/secret-redaction.js';
 import type { WorkerHostedAuthConfigDiagnostics } from './worker-upstream-oidc-config.js';
 
 const MAX_ERROR_BODY_LENGTH = 512;
@@ -542,6 +542,28 @@ export function summarizeHostedAuthSignal(
   return metadata;
 }
 
+function redactDiagnosticMetadata(metadata: DiagnosticMetadata): DiagnosticMetadata {
+  const redacted: DiagnosticMetadata = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (isSensitiveKeyName(key)) {
+      redacted[key] = '[REDACTED]';
+      continue;
+    }
+    if (typeof value === 'string') {
+      redacted[key] = redactSecretsInText(value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      redacted[key] = value.map((entry) =>
+        typeof entry === 'string' ? redactSecretsInText(entry) : entry,
+      );
+      continue;
+    }
+    redacted[key] = value;
+  }
+  return redacted;
+}
+
 export function emitOAuthDiagnostic(
   env: DiagnosticEnv,
   event: string,
@@ -552,10 +574,12 @@ export function emitOAuthDiagnostic(
   }
 
   console.error(
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      event,
-      metadata,
-    }),
+    redactSecretsInText(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        event,
+        metadata: redactDiagnosticMetadata(metadata),
+      }),
+    ),
   );
 }
