@@ -69,6 +69,17 @@ describe('worker response runtime', () => {
     );
   });
 
+  it('omits form-action when requested for hosted auth HTML', () => {
+    const response = htmlResponse('<html></html>', 'nonce', undefined, {
+      omitFormAction: true,
+      allowHostedAuthInlineScriptHashes: true,
+    });
+
+    const csp = response.headers.get('content-security-policy') ?? '';
+    assert.doesNotMatch(csp, /form-action/);
+    assert.match(csp, /sha256-CsRg1c\/uAShTQr6MSbfT26yXsxtsm7ZpMgc41yupCOo=/);
+  });
+
   it('ignores opaque and custom-scheme origins in HTML form-action CSP', () => {
     const response = htmlResponse('<html></html>', 'nonce', undefined, {
       formActionOrigins: [
