@@ -177,14 +177,16 @@ function applySecurityHeaders(
   );
 }
 
-function normalizeFormActionOrigins(origins: string[]): string[] {
+export function normalizeFormActionOrigins(origins: string[]): string[] {
   const uniqueOrigins = new Set<string>();
   for (const candidate of origins) {
-    const normalized = candidate.trim();
-    if (!normalized) continue;
+    const normalized = String(candidate ?? '').trim();
+    if (!normalized || normalized === 'null') continue;
     try {
-      const origin = new URL(normalized).origin;
-      if (origin === 'null' || origin === 'file://') continue;
+      const parsed = new URL(normalized);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+      const origin = parsed.origin;
+      if (!origin || origin === 'null' || origin === 'file://') continue;
       uniqueOrigins.add(origin);
     } catch {
       continue;
