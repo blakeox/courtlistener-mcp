@@ -29,6 +29,39 @@ type SearchOpinionResult = OpinionCluster & {
   url?: string;
 };
 
+function hasCitationCount(result: SearchOpinionResult): boolean {
+  const count = result.citation_count ?? result.citationCount;
+  return count !== undefined && count !== null;
+}
+
+async function enrichSmartSearchResults(
+  api: CourtListenerAPI,
+  results: SearchOpinionResult[],
+): Promise<SearchOpinionResult[]> {
+  const enriched = [...results];
+  await Promise.all(
+    results.map(async (result, index) => {
+      if (hasCitationCount(result) || typeof result.id !== 'number') {
+        return;
+      }
+      try {
+        const cluster = await api.getOpinionCluster(result.id);
+        enriched[index] = {
+          ...result,
+          citation_count: cluster.citation_count,
+          absolute_url: result.absolute_url || cluster.absolute_url,
+          case_name: result.case_name || cluster.case_name,
+          date_filed: result.date_filed || cluster.date_filed,
+          court: result.court || cluster.court,
+        };
+      } catch {
+        // Keep search payload when cluster detail is unavailable.
+      }
+    }),
+  );
+  return enriched;
+}
+
 function formatSmartSearchOpinionLine(result: SearchOpinionResult): string {
   const caseName =
     result.case_name || result.caseName || result.case_name_short || result.name || 'Untitled';
@@ -149,7 +182,10 @@ export class SmartSearchHandler extends TypedToolHandler<typeof smartSearchSchem
     if (searchParams.precedential_status) apiParams.status = searchParams.precedential_status;
 
     const results = await this.api.searchOpinions(apiParams);
-    const limitedResults = results.results.slice(0, args.max_results);
+    const limitedResults = await enrichSmartSearchResults(
+      this.api,
+      results.results.slice(0, args.max_results) as SearchOpinionResult[],
+    );
 
     return {
       content: [
