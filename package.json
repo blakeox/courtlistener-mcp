@@ -50,6 +50,7 @@
     "test:spa:e2e:debug": "playwright test --project=chromium --debug",
     "test:ts": "npx tsx test/unit/test-cache.ts",
     "test:integration": "npx tsx test/integration/test-api-integration.ts",
+    "verify:shipped": "npx tsx scripts/testing/verify-shipped-release.mts",
     "test:performance": "echo 'Performance tests available in test/performance/'",
     "test:enterprise:full": "echo 'Enterprise tests available in test/enterprise/'",
     "test:enterprise:comprehensive": "echo 'Enterprise tests available in test/enterprise/'",
