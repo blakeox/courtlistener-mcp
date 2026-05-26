@@ -241,6 +241,8 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
     if (input.court_type) {
       delete pagination.count;
       delete pagination.total_pages;
+      delete pagination.has_next;
+      delete pagination.nextCursor;
     }
 
     return this.success({
