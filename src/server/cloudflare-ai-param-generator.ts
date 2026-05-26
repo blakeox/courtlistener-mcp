@@ -14,6 +14,29 @@ function extractAiText(completion: unknown): string {
   if (typeof direct === 'string' && direct.trim()) return direct.trim();
   const nested = (completion as { result?: { response?: string } }).result?.response;
   if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  const choicesText = (completion as { choices?: Array<{ message?: { content?: string } }> })
+    .choices;
+  if (Array.isArray(choicesText) && choicesText.length > 0) {
+    const first = choicesText[0]?.message?.content;
+    if (typeof first === 'string' && first.trim()) return first.trim();
+  }
+  const outputText = (
+    completion as {
+      output?: Array<{
+        content?: Array<{ type?: string; text?: string }>;
+      }>;
+    }
+  ).output;
+  if (Array.isArray(outputText) && outputText.length > 0) {
+    for (const block of outputText) {
+      if (!Array.isArray(block.content)) continue;
+      for (const part of block.content) {
+        if (part?.type === 'text' && typeof part.text === 'string' && part.text.trim()) {
+          return part.text.trim();
+        }
+      }
+    }
+  }
   return '';
 }
 
