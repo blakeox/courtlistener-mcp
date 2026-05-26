@@ -57,6 +57,22 @@ async function runIntegrationTests(): Promise<void> {
 
     const result: CallToolResult = await server.handleToolCall(request.params);
 
+    if (result.isError) {
+      const errText = result.content?.[0]?.text ?? '';
+      if (
+        !hasApiKey &&
+        (errText.includes('401') ||
+          errText.toLowerCase().includes('unauthorized') ||
+          errText.toLowerCase().includes('authentication'))
+      ) {
+        console.log(
+          '   ⚠️  Skipping: citation search fallback requires COURTLISTENER_API_KEY in CI',
+        );
+        return;
+      }
+      throw new Error(errText);
+    }
+
     if (!result || !result.content || !result.content[0]) {
       throw new Error('No results returned');
     }
