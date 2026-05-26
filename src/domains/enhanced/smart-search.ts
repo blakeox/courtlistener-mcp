@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { AdvancedSearchParams } from '../../types.js';
+import { AdvancedSearchParams, type OpinionCluster } from '../../types.js';
 import {
   buildSmartSearchParamUserPrompt,
   type LlmParamGenerator,
@@ -19,6 +19,35 @@ const smartSearchSchema = z.object({
     .default(5)
     .describe('Maximum number of results to return'),
 });
+
+type SearchOpinionResult = OpinionCluster & {
+  caseName?: string;
+  dateFiled?: string;
+  citationCount?: number;
+  court_id?: string;
+  name?: string;
+  url?: string;
+};
+
+function formatSmartSearchOpinionLine(result: SearchOpinionResult): string {
+  const caseName =
+    result.case_name || result.caseName || result.case_name_short || result.name || 'Untitled';
+  const dateFiled = result.date_filed || result.dateFiled || 'Date unknown';
+  const court = result.court || result.court_id || 'Court unknown';
+  const citationCount = result.citation_count ?? result.citationCount;
+  const citationLabel =
+    citationCount !== undefined && citationCount !== null
+      ? `${citationCount} cites`
+      : 'Citation count unavailable';
+  const rawUrl = result.absolute_url || result.url || '';
+  const url = rawUrl.startsWith('http')
+    ? rawUrl
+    : rawUrl
+      ? `https://www.courtlistener.com${rawUrl}`
+      : 'URL unavailable';
+
+  return `- ${caseName} (${dateFiled}) [${court}]\n  Citation: ${citationLabel}\n  URL: ${url}`;
+}
 
 function resolveParamGenerator(context: ToolContext): LlmParamGenerator | undefined {
   if (context.sampling) {
@@ -129,10 +158,7 @@ export class SmartSearchHandler extends TypedToolHandler<typeof smartSearchSchem
           text:
             `Smart Search Results for: "${args.query}"\nGenerated Parameters: ${JSON.stringify(apiParams, null, 2)}\n\nFound ${results.count} results. Showing top ${limitedResults.length}:\n\n` +
             limitedResults
-              .map(
-                (r) =>
-                  `- ${r.case_name} (${r.date_filed}) [${r.court}]\n  Citation: ${r.citation_count} cites\n  URL: ${r.absolute_url}`,
-              )
+              .map((result) => formatSmartSearchOpinionLine(result as SearchOpinionResult))
               .join('\n\n'),
         },
       ],

@@ -1015,6 +1015,47 @@ describe('SmartSearchHandler', () => {
     assert.ok(result.content[0].text.includes('Workers AI Case'));
   });
 
+  it('formats CourtListener search API camelCase result fields', async () => {
+    const mockApi = {
+      searchOpinions: async () => ({
+        count: 1,
+        results: [
+          {
+            caseName: 'Miranda v. Arizona',
+            dateFiled: '1966-06-13',
+            court_id: 'scotus',
+            citationCount: 1200,
+            absolute_url: '/opinion/107252/miranda-v-arizona/',
+          },
+        ],
+      }),
+    } as any;
+
+    const handler = new SmartSearchHandler(mockApi);
+    const result = await handler.execute(
+      { query: 'Miranda warnings', max_results: 1 },
+      {
+        ...mockContext,
+        llmParamGenerator: {
+          createMessage: async () => ({
+            content: {
+              type: 'text',
+              text: JSON.stringify({ q: 'miranda warnings', type: 'o' }),
+            },
+          }),
+        },
+      },
+    );
+
+    const text = result.content[0].text;
+    assert.ok(text.includes('Miranda v. Arizona'));
+    assert.ok(text.includes('1966-06-13'));
+    assert.ok(text.includes('[scotus]'));
+    assert.ok(text.includes('1200 cites'));
+    assert.ok(text.includes('https://www.courtlistener.com/opinion/107252/miranda-v-arizona/'));
+    assert.ok(!text.includes('undefined'));
+  });
+
   it('limits results to max_results', async () => {
     const mockApi = {
       searchOpinions: async () => ({

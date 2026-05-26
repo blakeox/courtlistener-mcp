@@ -38,7 +38,7 @@
     "test:unit": "npx tsx test/runners/run-unit-tests.ts",
     "test:spa": "node scripts/testing/run-spa-vitest.mjs",
     "test:spa:auth": "node scripts/testing/run-spa-auth-vitest.mjs",
-    "test:spa:focus": "pnpm run test:spa --",
+    "test:spa:focus": "node scripts/testing/run-spa-vitest.mjs",
     "test:spa:e2e": "playwright test",
     "test:spa:design": "playwright test src/web-spa/e2e/design-smoke.spec.ts",
     "test:spa:design:lint": "node scripts/reports/check-design-system.mjs",
