@@ -919,11 +919,15 @@ describe('SmartSearchHandler', () => {
 
   it('returns error when sampling is not available', async () => {
     const handler = new SmartSearchHandler({} as any);
-    const ctxNoSampling: ToolContext = { ...mockContext, sampling: undefined };
+    const ctxNoSampling: ToolContext = {
+      ...mockContext,
+      sampling: undefined,
+      llmParamGenerator: undefined,
+    };
     const result = await handler.execute({ query: 'test query', max_results: 5 }, ctxNoSampling);
 
     assert.strictEqual(result.isError, true);
-    assert.ok(result.content[0].text.includes('Sampling is not enabled'));
+    assert.ok(result.content[0].text.includes('Smart search requires'));
   });
 
   it('executes search when sampling is available', async () => {
@@ -972,6 +976,43 @@ describe('SmartSearchHandler', () => {
     assert.strictEqual(result.isError, undefined);
     assert.ok(result.content[0].text.includes('Smart Search Results'));
     assert.ok(result.content[0].text.includes('Test v. Case'));
+  });
+
+  it('executes search when Workers AI param generator is available', async () => {
+    const mockApi = {
+      searchOpinions: async () => ({
+        count: 1,
+        results: [
+          {
+            case_name: 'Workers AI Case',
+            date_filed: '2024-01-01',
+            court: 'scotus',
+            citation_count: 1,
+            absolute_url: '/opinion/99/',
+          },
+        ],
+      }),
+    } as any;
+
+    const handler = new SmartSearchHandler(mockApi);
+    const result = await handler.execute(
+      { query: 'Fourth Amendment search', max_results: 3 },
+      {
+        ...mockContext,
+        sampling: undefined,
+        llmParamGenerator: {
+          createMessage: async () => ({
+            content: {
+              type: 'text',
+              text: JSON.stringify({ q: 'fourth amendment', type: 'o' }),
+            },
+          }),
+        },
+      },
+    );
+
+    assert.strictEqual(result.isError, undefined);
+    assert.ok(result.content[0].text.includes('Workers AI Case'));
   });
 
   it('limits results to max_results', async () => {

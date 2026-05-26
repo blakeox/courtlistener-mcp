@@ -224,10 +224,28 @@ export class CourtListenerAPI {
     return `${baseUrl}?${searchParams.toString()}`;
   }
 
+  private buildRequestHeaders(contentType?: string): Record<string, string> {
+    const headers: Record<string, string> = {
+      'User-Agent': 'Legal-MCP-Server/1.0',
+      Accept: 'application/json',
+    };
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+    const apiKey = this.config.apiKey?.trim();
+    if (apiKey) {
+      headers.Authorization = `Token ${apiKey}`;
+    }
+    return headers;
+  }
+
   /**
    * Execute HTTP request with timeout and retry logic
    */
-  private async executeRequest(url: string): Promise<Response> {
+  private async executeRequest(
+    url: string,
+    init: { method?: string; body?: string; headers?: Record<string, string> } = {},
+  ): Promise<Response> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
@@ -236,11 +254,13 @@ export class CourtListenerAPI {
         const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
         const response = await fetch(url, {
+          method: init.method ?? 'GET',
           signal: controller.signal,
           headers: {
-            'User-Agent': 'Legal-MCP-Server/1.0',
-            Accept: 'application/json',
+            ...this.buildRequestHeaders(),
+            ...init.headers,
           },
+          ...(init.body !== undefined ? { body: init.body } : {}),
         });
 
         clearTimeout(timeoutId);
@@ -264,6 +284,48 @@ export class CourtListenerAPI {
     }
 
     throw lastError || new Error('Request failed after all retry attempts');
+  }
+
+  /**
+   * POST form-encoded requests (CourtListener citation-lookup and similar endpoints).
+   */
+  private async makeFormPostRequest<T>(
+    endpoint: string,
+    formFields: Record<string, string>,
+    options: { useCache?: boolean; cacheTtlOverride?: number } = {},
+  ): Promise<T> {
+    const timer = this.logger.startTimer(`API POST ${endpoint}`);
+    const { useCache: _useCache = false, cacheTtlOverride: _cacheTtlOverride } = options;
+    const operation = `courtlistener.${this.endpointToOperation(endpoint)}`;
+
+    try {
+      const url = `${this.config.baseUrl}${endpoint}`;
+      await this.rateLimit();
+      const body = new URLSearchParams(formFields).toString();
+      const response = await this.executeRequest(url, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw this.createApiError(response, endpoint, errorText);
+      }
+
+      const data = (await response.json()) as T;
+      const duration = timer.end();
+      this.metrics.recordRequest(duration, false, operation);
+      this.logger.apiCall('POST', endpoint, duration, response.status, { cached: false });
+      return data;
+    } catch (error) {
+      const duration = timer.endWithError(error as Error);
+      this.metrics.recordFailure(duration, operation);
+      if (error instanceof Error) {
+        this.logger.error(`API POST request failed: ${endpoint}`, error);
+      }
+      throw error;
+    }
   }
 
   private createParamLogMetadata(params?: object): Record<string, unknown> {
@@ -535,9 +597,13 @@ export class CourtListenerAPI {
     throw new Error('opinionId or id required for getOpinionText');
   }
 
-  // Lookup citation using citation-lookup endpoint
+  // Lookup citation using citation-lookup endpoint (POST + Token auth required by CourtListener)
   async lookupCitation(args: Record<string, unknown>): Promise<unknown> {
-    return this.makeRequest('/citation-lookup/', args);
+    const citation = typeof args.citation === 'string' ? args.citation.trim() : '';
+    if (!citation) {
+      throw new Error('citation is required for lookupCitation');
+    }
+    return this.makeFormPostRequest('/citation-lookup/', { text: citation });
   }
 
   // List courts (alias for getCourts)
@@ -764,7 +830,11 @@ export class CourtListenerAPI {
 
   // Citation parsing and validation
   async validateCitations(text: string): Promise<unknown> {
-    return this.makeRequest('/citation-lookup/', { text });
+    const normalized = text.trim();
+    if (!normalized) {
+      throw new Error('text is required for validateCitations');
+    }
+    return this.makeFormPostRequest('/citation-lookup/', { text: normalized });
   }
 
   // Enhanced visualization endpoints
