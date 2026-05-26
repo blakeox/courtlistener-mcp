@@ -78,9 +78,12 @@ describe('ListCourtsHandler (TypeScript)', () => {
       const result = await handler.execute(validated.data, makeContext());
       const payload = JSON.parse(result.content[0].text) as {
         courts: Array<{ id: string }>;
+        pagination: { count?: number; total_pages?: number };
       };
       assert.strictEqual(payload.courts.length, 1);
       assert.strictEqual(payload.courts[0].id, 'scotus');
+      assert.strictEqual(payload.pagination.count, undefined);
+      assert.strictEqual(payload.pagination.total_pages, undefined);
     }
   });
 
@@ -105,10 +108,12 @@ describe('ListCourtsHandler (TypeScript)', () => {
       const payload = JSON.parse(result.content[0].text) as {
         summary: string;
         courts: Array<{ id: number }>;
+        pagination: { count?: number };
       };
       assert.ok(payload.summary.includes('courts') || payload.summary.includes('Retrieved'));
       assert.ok(Array.isArray(payload.courts));
       assert.strictEqual(payload.courts.length, 2);
+      assert.strictEqual(payload.pagination.count, 35);
     }
   });
 });

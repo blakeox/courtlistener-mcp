@@ -237,11 +237,18 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
     const filteredCourts = input.court_type
       ? courts.filter((court) => matchesCourtType(court, input.court_type))
       : courts;
+    const pagination = createPaginationInfo(response, input.page, input.page_size);
+    if (input.court_type) {
+      delete pagination.count;
+      delete pagination.total_pages;
+      delete pagination.has_next;
+      delete pagination.nextCursor;
+    }
 
     return this.success({
       summary: `Retrieved ${filteredCourts.length} courts`,
       courts: filteredCourts,
-      pagination: createPaginationInfo(response, input.page, input.page_size),
+      pagination,
       filters_applied: {
         jurisdiction: input.jurisdiction,
         court_type: input.court_type,
