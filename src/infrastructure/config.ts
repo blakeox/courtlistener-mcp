@@ -24,6 +24,9 @@ const defaultConfig: ServerConfig = {
     timeout: parsePositiveInt(process.env.COURTLISTENER_TIMEOUT, 30000, 1000),
     retryAttempts: parsePositiveInt(process.env.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
     rateLimitPerMinute: parsePositiveInt(process.env.COURTLISTENER_RATE_LIMIT, 100, 1),
+    ...(process.env.COURTLISTENER_API_KEY?.trim()
+      ? { apiKey: process.env.COURTLISTENER_API_KEY.trim() }
+      : {}),
   },
   cache: {
     enabled: process.env.CACHE_ENABLED !== 'false',

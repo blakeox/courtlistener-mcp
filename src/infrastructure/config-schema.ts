@@ -27,6 +27,7 @@ export const CourtListenerConfigSchema = z.object({
     .int()
     .positive('Rate limit must be positive')
     .max(1000, 'Rate limit is very high, verify API limits'),
+  apiKey: z.string().min(1).optional(),
 });
 
 /**
