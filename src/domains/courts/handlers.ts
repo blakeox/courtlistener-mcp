@@ -3,6 +3,7 @@ import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { withDefaults } from '../../server/handler-decorators.js';
+import type { Court } from '../../types.js';
 import {
   createPaginationInfo,
   PaginatedApiResponse,
@@ -153,6 +154,57 @@ function resolvePagination(input: {
   };
 }
 
+type ListCourtsInput = z.infer<typeof listCourtsSchema>;
+
+function buildListCourtsApiParams(input: ListCourtsInput): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    page: input.page,
+    page_size: input.page_size,
+  };
+
+  if (input.jurisdiction?.trim()) {
+    params.jurisdiction = input.jurisdiction.trim();
+  }
+
+  if (input.cursor) {
+    params.cursor = input.cursor;
+  }
+  if (input.limit !== undefined) {
+    params.limit = input.limit;
+  }
+
+  return params;
+}
+
+function matchesCourtType(court: Court, courtType: ListCourtsInput['court_type']): boolean {
+  if (!courtType) {
+    return true;
+  }
+
+  const courtId = court.id.toLowerCase();
+  const jurisdiction = court.jurisdiction?.toLowerCase() ?? '';
+  const fullName = court.full_name.toLowerCase();
+
+  switch (courtType) {
+    case 'supreme':
+      return courtId === 'scotus' || fullName.includes('supreme court');
+    case 'appellate':
+      return (
+        /^(ca\d|usapp|cadc|cafc)/.test(courtId) ||
+        fullName.includes('court of appeals') ||
+        fullName.includes('circuit')
+      );
+    case 'district':
+      return courtId.endsWith('d') || fullName.includes('district court');
+    case 'federal':
+      return jurisdiction === 'f' || jurisdiction.includes('federal') || courtId.startsWith('us');
+    case 'state':
+      return jurisdiction === 's' || jurisdiction.includes('state');
+    default:
+      return true;
+  }
+}
+
 /**
  * Handler for listing courts
  */
@@ -177,12 +229,23 @@ export class ListCourtsHandler extends TypedToolHandler<typeof listCourtsSchema>
       requestId: context.requestId,
     });
 
-    const response = (await this.apiClient.listCourts(input)) as PaginatedApiResponse;
+    const response = (await this.apiClient.listCourts(
+      buildListCourtsApiParams(input),
+    )) as PaginatedApiResponse;
+
+    const courts = (response.results ?? []) as Court[];
+    const filteredCourts = input.court_type
+      ? courts.filter((court) => matchesCourtType(court, input.court_type))
+      : courts;
 
     return this.success({
-      summary: `Retrieved ${response.results?.length ?? 0} courts`,
-      courts: response.results,
+      summary: `Retrieved ${filteredCourts.length} courts`,
+      courts: filteredCourts,
       pagination: createPaginationInfo(response, input.page, input.page_size),
+      filters_applied: {
+        jurisdiction: input.jurisdiction,
+        court_type: input.court_type,
+      },
     });
   }
 }

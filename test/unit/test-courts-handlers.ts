@@ -53,6 +53,37 @@ describe('ListCourtsHandler (TypeScript)', () => {
     }
   });
 
+  it('does not pass court_type to CourtListener API and filters client-side', async () => {
+    const api = {
+      async listCourts(params: Record<string, unknown>): Promise<{
+        count: number;
+        results: Array<{ id: string; full_name: string; jurisdiction: string }>;
+      }> {
+        assert.strictEqual(params.court_type, undefined);
+        return {
+          count: 2,
+          results: [
+            { id: 'scotus', full_name: 'Supreme Court of the United States', jurisdiction: 'F' },
+            { id: 'ca9', full_name: 'Court of Appeals for the Ninth Circuit', jurisdiction: 'F' },
+          ],
+        };
+      },
+    };
+
+    const handler = new ListCourtsHandler(api);
+    const validated = handler.validate({ court_type: 'supreme' });
+    assert.strictEqual(validated.success, true);
+
+    if (validated.success) {
+      const result = await handler.execute(validated.data, makeContext());
+      const payload = JSON.parse(result.content[0].text) as {
+        courts: Array<{ id: string }>;
+      };
+      assert.strictEqual(payload.courts.length, 1);
+      assert.strictEqual(payload.courts[0].id, 'scotus');
+    }
+  });
+
   it('returns courts payload with pagination metadata', async () => {
     const api = {
       async listCourts(params: { page: number; page_size: number }): Promise<{

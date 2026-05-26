@@ -34,31 +34,39 @@ function hasCitationCount(result: SearchOpinionResult): boolean {
   return count !== undefined && count !== null;
 }
 
+const SMART_SEARCH_ENRICH_CONCURRENCY = 5;
+
 async function enrichSmartSearchResults(
   api: CourtListenerAPI,
   results: SearchOpinionResult[],
 ): Promise<SearchOpinionResult[]> {
   const enriched = [...results];
-  await Promise.all(
-    results.map(async (result, index) => {
-      if (hasCitationCount(result) || typeof result.id !== 'number') {
-        return;
-      }
-      try {
-        const cluster = await api.getOpinionCluster(result.id);
-        enriched[index] = {
-          ...result,
-          citation_count: cluster.citation_count,
-          absolute_url: result.absolute_url || cluster.absolute_url,
-          case_name: result.case_name || cluster.case_name,
-          date_filed: result.date_filed || cluster.date_filed,
-          court: result.court || cluster.court,
-        };
-      } catch {
-        // Keep search payload when cluster detail is unavailable.
-      }
-    }),
-  );
+
+  for (let offset = 0; offset < results.length; offset += SMART_SEARCH_ENRICH_CONCURRENCY) {
+    const batch = results.slice(offset, offset + SMART_SEARCH_ENRICH_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (result, batchIndex) => {
+        const index = offset + batchIndex;
+        if (hasCitationCount(result) || typeof result.id !== 'number') {
+          return;
+        }
+        try {
+          const cluster = await api.getOpinionCluster(result.id);
+          enriched[index] = {
+            ...result,
+            citation_count: cluster.citation_count,
+            absolute_url: result.absolute_url || cluster.absolute_url,
+            case_name: result.case_name || cluster.case_name,
+            date_filed: result.date_filed || cluster.date_filed,
+            court: result.court || cluster.court,
+          };
+        } catch {
+          // Keep search payload when cluster detail is unavailable.
+        }
+      }),
+    );
+  }
+
   return enriched;
 }
 

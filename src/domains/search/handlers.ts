@@ -133,6 +133,32 @@ const searchCasesSchema = z
     cursor: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
   })
+  .superRefine((value, ctx) => {
+    const meaningfulKeys = [
+      'query',
+      'q',
+      'court',
+      'judge',
+      'case_name',
+      'citation',
+      'date_filed_after',
+      'date_filed_before',
+      'precedential_status',
+    ] as const;
+
+    const hasSearchInput = meaningfulKeys.some((key) => {
+      const field = value[key];
+      return field !== undefined && field !== null && String(field).trim() !== '';
+    });
+
+    if (!hasSearchInput) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'At least one search parameter must be provided (e.g., query, citation, case_name).',
+      });
+    }
+  })
   .transform((parsed) => ({
     query: parsed.query ?? parsed.q,
     court: parsed.court,
@@ -144,6 +170,51 @@ const searchCasesSchema = z
     precedential_status: parsed.precedential_status,
     ...resolvePageFromCursor(parsed),
   }));
+
+type SearchCasesInput = z.infer<typeof searchCasesSchema>;
+
+function buildSearchCasesApiParams(input: SearchCasesInput): Record<string, unknown> {
+  const citation = input.citation?.trim();
+  const query = input.query?.trim();
+  const caseName = input.case_name?.trim();
+
+  const searchParams: Record<string, unknown> = {
+    page: input.page,
+    page_size: input.page_size,
+  };
+
+  if (query) {
+    searchParams.q = query;
+  } else if (citation) {
+    searchParams.q = citation;
+  } else if (caseName) {
+    searchParams.q = caseName;
+  }
+
+  if (input.court) searchParams.court = input.court;
+  if (input.judge) searchParams.judge = input.judge;
+  if (caseName) searchParams.case_name = caseName;
+  if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
+  if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
+  if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
+
+  return searchParams;
+}
+
+function clustersFromCitationLookup(lookup: unknown): unknown[] {
+  if (!lookup || typeof lookup !== 'object') {
+    return [];
+  }
+
+  const rows = (lookup as { results?: Array<{ clusters?: unknown[] }> }).results ?? [];
+  const clusters: unknown[] = [];
+  for (const row of rows) {
+    for (const cluster of row.clusters ?? []) {
+      clusters.push(cluster);
+    }
+  }
+  return clusters;
+}
 
 export class SearchOpinionsHandler extends TypedToolHandler<typeof searchOpinionsSchema> {
   readonly name = 'search_opinions';
@@ -267,30 +338,37 @@ export class SearchCasesHandler extends TypedToolHandler<typeof searchCasesSchem
     input: z.infer<typeof searchCasesSchema>,
     context: ToolContext,
   ): Promise<CallToolResult> {
+    const citation = input.citation?.trim();
     context.logger.info('Searching cases', {
       query: input.query,
+      citation,
       requestId: context.requestId,
     });
 
-    const searchParams: Record<string, unknown> = {
-      page: input.page,
-      page_size: input.page_size,
-    };
+    const searchParams = buildSearchCasesApiParams(input);
+    let response = (await this.apiClient.searchCases(searchParams)) as PaginatedApiResponse;
+    let results = response.results ?? [];
 
-    if (input.query) searchParams.q = input.query;
-    if (input.court) searchParams.court = input.court;
-    if (input.judge) searchParams.judge = input.judge;
-    if (input.case_name) searchParams.case_name = input.case_name;
-    if (input.citation) searchParams.citation = input.citation;
-    if (input.date_filed_after) searchParams.date_filed_after = input.date_filed_after;
-    if (input.date_filed_before) searchParams.date_filed_before = input.date_filed_before;
-    if (input.precedential_status) searchParams.precedential_status = input.precedential_status;
-
-    const response = (await this.apiClient.searchCases(searchParams)) as PaginatedApiResponse;
+    if (citation && results.length === 0) {
+      try {
+        const lookup = await this.apiClient.lookupCitation({ citation });
+        const fromLookup = clustersFromCitationLookup(lookup);
+        if (fromLookup.length > 0) {
+          results = fromLookup;
+          response = { ...response, count: fromLookup.length, results: fromLookup };
+        }
+      } catch (error) {
+        context.logger.warn('Citation lookup fallback failed after empty search', {
+          citation,
+          requestId: context.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     return this.success({
-      summary: `Found ${response.count ?? 0} cases`,
-      results: response.results,
+      summary: `Found ${response.count ?? results.length} cases`,
+      results,
       pagination: createPaginationInfoCamelCase(response, input.page, input.page_size),
       search_parameters: {
         query: input.query,
