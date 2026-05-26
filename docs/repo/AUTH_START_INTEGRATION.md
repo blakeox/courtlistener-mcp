@@ -122,3 +122,8 @@ recognized by the Worker, but the published browser-auth contract is now the
    `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true` is present in deploy config
    and intentional.
 9. Confirm `GET /api/usage` returns user counters after MCP calls.
+10. Confirm hosted auth HTML CSP omits `form-action` and the approve form uses
+    `action="/oauth/approve"` with `return_to` in the POST body (see
+    `docs/repo/HOSTED_AUTH_HTML_SECURITY.md`). Run
+    `pnpm run test:e2e:oauth-approve-contract` against production after auth
+    changes.

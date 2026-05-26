@@ -39,6 +39,16 @@ export function buildChecks(env = process.env) {
       command: ['npx', 'tsx', '--test', 'test/unit/test-worker-auth-handoff-routes.ts'],
     },
     {
+      id: 'hosted-auth-html-security',
+      command: [
+        'npx',
+        'tsx',
+        '--test',
+        'test/unit/test-hosted-auth-html-security.ts',
+        'test/unit/test-worker-response-runtime.ts',
+      ],
+    },
+    {
       id: 'worker-auth-runtime',
       command: [
         'npx',
@@ -79,12 +89,23 @@ export function buildChecks(env = process.env) {
       command: ['node', 'scripts/testing/e2e-remote-oauth-handshake.mjs'],
       env: { OAUTH_BASE_URL: deployedOauthBaseUrl },
     });
+    checks.push({
+      id: 'deployed-oauth-approve-contract',
+      command: ['npx', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
+      env: { OAUTH_BASE_URL: deployedOauthBaseUrl },
+    });
   } else {
     checks.push({
       id: 'deployed-oauth-handshake',
       command: ['node', 'scripts/testing/e2e-remote-oauth-handshake.mjs'],
       skipReason:
         'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to require hosted OAuth handshake validation.',
+    });
+    checks.push({
+      id: 'deployed-oauth-approve-contract',
+      command: ['npx', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
+      skipReason:
+        'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to require hosted OAuth approve/CSP contract validation.',
     });
   }
 

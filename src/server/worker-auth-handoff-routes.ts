@@ -30,11 +30,7 @@ import {
   cloneHeadersPreservingSetCookie,
   type HtmlResponseSecurityOptions,
 } from './worker-response-runtime.js';
-
-const HOSTED_AUTH_HTML_SECURITY: HtmlResponseSecurityOptions = {
-  omitFormAction: true,
-  allowHostedAuthInlineScriptHashes: true,
-};
+import { HOSTED_AUTH_HTML_SECURITY } from './hosted-auth-html-security.js';
 
 const AUTH_STATE_COOKIE_NAME = 'clauth_state';
 const AUTH_APPROVAL_COOKIE_NAME = 'clauth_approve';
