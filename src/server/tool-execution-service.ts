@@ -15,7 +15,7 @@ import {
   parseAsyncExecutionDirective,
 } from './async-tool-workflow.js';
 import { SamplingService } from './sampling-service.js';
-import { ToolHandlerRegistry } from './tool-handler.js';
+import { ToolHandlerRegistry, type ToolContext } from './tool-handler.js';
 
 export interface ToolExecutionService {
   execute(request: CallToolRequest, requestId: string): Promise<CallToolResult>;
@@ -37,6 +37,7 @@ interface DirectToolExecutionServiceParams {
   toolRegistry: ToolHandlerRegistry;
   logger: Logger;
   asyncWorkflow?: AsyncWorkflowController;
+  getToolContextExtras?: () => Partial<ToolContext>;
 }
 
 interface MiddlewareToolExecutionServiceParams extends DirectToolExecutionServiceParams {
@@ -89,9 +90,10 @@ function normalizeExecutableRequest(
 export function createDirectToolExecutionService(
   params: DirectToolExecutionServiceParams,
 ): ToolExecutionService {
-  const { toolRegistry, logger } = params;
+  const { toolRegistry, logger, getToolContextExtras } = params;
   const asyncWorkflow: AsyncWorkflowController =
     params.asyncWorkflow ?? new AsyncToolWorkflowOrchestrator(logger);
+  const toolContextExtras = () => getToolContextExtras?.() ?? {};
 
   return {
     execute: async (request, requestId) => {
@@ -123,6 +125,7 @@ export function createDirectToolExecutionService(
             await toolRegistry.execute(queuedRequest, {
               logger,
               requestId: queuedRequestId,
+              ...toolContextExtras(),
               ...(principal?.userId ? { userId: principal.userId } : {}),
             }),
           ...(principal?.userId ? { userId: principal.userId } : {}),
@@ -132,6 +135,7 @@ export function createDirectToolExecutionService(
       return await toolRegistry.execute(parsedRequest.request, {
         logger,
         requestId,
+        ...toolContextExtras(),
         ...(principal?.userId ? { userId: principal.userId } : {}),
       });
     },

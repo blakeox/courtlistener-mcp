@@ -9,6 +9,8 @@ export interface CourtListenerConfig {
   timeout: number;
   retryAttempts: number;
   rateLimitPerMinute: number;
+  /** CourtListener REST token (required for citation-lookup and recommended for production). */
+  apiKey?: string;
 }
 
 export interface CacheConfig {

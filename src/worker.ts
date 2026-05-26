@@ -135,6 +135,7 @@ import {
 } from './server/worker-durable-runtime.js';
 import { buildHostedOAuthCompletionDetails } from './auth/oauth-authorization-completion.js';
 import { resolveGrantedScopes } from './auth/oauth-scope-resolver.js';
+import { createCloudflareAiParamGenerator } from './server/cloudflare-ai-param-generator.js';
 
 // ---------------------------------------------------------------------------
 // MCP Agent — one Durable Object instance per client session
@@ -184,10 +185,12 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<Env>) {
             onAsyncJobUpdate: cloudflareTelemetryRuntime.recordAsyncJobUpdate,
           })
         : undefined;
+    const llmParamGenerator = createCloudflareAiParamGenerator(env);
     const toolExecutionService = createDirectToolExecutionService({
       toolRegistry,
       logger,
       ...(queueBackedAsyncWorkflow ? { asyncWorkflow: queueBackedAsyncWorkflow } : {}),
+      getToolContextExtras: () => (llmParamGenerator ? { llmParamGenerator } : {}),
     });
 
     // Wire all existing MCP protocol handlers onto the low-level Server

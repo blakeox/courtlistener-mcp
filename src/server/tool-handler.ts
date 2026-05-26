@@ -43,6 +43,7 @@ export interface ToolHandler<TInput = unknown> {
 }
 
 import { SamplingService } from './sampling-service.js';
+import type { LlmParamGenerator } from './llm-param-generator.js';
 
 export interface ToolContext {
   logger: Logger;
@@ -51,7 +52,10 @@ export interface ToolContext {
   metrics?: MetricsCollector;
   config?: ServerConfig;
   userId?: string;
+  /** MCP client sampling (stdio / clients that support sampling/createMessage). */
   sampling?: SamplingService;
+  /** Workers AI or other server-side LLM for smart_search when MCP sampling is unavailable. */
+  llmParamGenerator?: LlmParamGenerator;
 }
 
 export class ToolHandlerRegistry {
