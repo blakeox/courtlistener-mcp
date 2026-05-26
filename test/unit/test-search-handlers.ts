@@ -103,6 +103,51 @@ describe('SearchCasesHandler (TypeScript)', () => {
     }
   });
 
+  it('maps citation-only input to q and uses citation-lookup fallback', async () => {
+    const api = {
+      searchParams: null as Record<string, unknown> | null,
+      async searchCases(params: Record<string, unknown>): Promise<{ count: number; results: [] }> {
+        this.searchParams = params;
+        return { count: 0, results: [] };
+      },
+      async lookupCitation(args: { citation: string }): Promise<{
+        results: Array<{ clusters: Array<{ id: number; case_name: string }> }>;
+      }> {
+        assert.strictEqual(args.citation, '410 U.S. 113');
+        return {
+          results: [{ clusters: [{ id: 108713, case_name: 'Roe v. Wade' }] }],
+        };
+      },
+    };
+
+    const handler = new SearchCasesHandler(api);
+    const validated = handler.validate({ citation: '410 U.S. 113' });
+    assert.strictEqual(validated.success, true);
+
+    if (validated.success) {
+      const res = await handler.execute(validated.data, makeContext());
+      assert.strictEqual(res.isError, undefined);
+      assert.strictEqual(api.searchParams?.q, '410 U.S. 113');
+      assert.strictEqual(api.searchParams?.citation, undefined);
+
+      const payload = JSON.parse(res.content[0].text) as {
+        results: Array<{ id: number; case_name: string }>;
+      };
+      assert.strictEqual(payload.results.length, 1);
+      assert.strictEqual(payload.results[0].case_name, 'Roe v. Wade');
+    }
+  });
+
+  it('requires at least one meaningful search parameter', () => {
+    const handler = new SearchCasesHandler({});
+    const result = handler.validate({ page: 1 });
+
+    assert.strictEqual(result.success, false);
+    if (!result.success) {
+      assert.ok(result.error.message.includes('At least one'));
+    }
+  });
+
   it('returns error result when API throws', async () => {
     const api = {
       async searchCases(): Promise<never> {
