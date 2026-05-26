@@ -1056,6 +1056,51 @@ describe('SmartSearchHandler', () => {
     assert.ok(!text.includes('undefined'));
   });
 
+  it('enriches citation count from cluster detail when search omits it', async () => {
+    const mockApi = {
+      searchOpinions: async () => ({
+        count: 1,
+        results: [
+          {
+            id: 108713,
+            caseName: 'Roe v. Wade',
+            dateFiled: '1973-01-22',
+            court_id: 'scotus',
+            absolute_url: '/opinion/108713/roe-v-wade/',
+          },
+        ],
+      }),
+      getOpinionCluster: async (clusterId: number) => ({
+        id: clusterId,
+        case_name: 'Roe v. Wade',
+        citation_count: 5580,
+        absolute_url: '/opinion/108713/roe-v-wade/',
+        court: 'scotus',
+        date_filed: '1973-01-22',
+      }),
+    } as any;
+
+    const handler = new SmartSearchHandler(mockApi);
+    const result = await handler.execute(
+      { query: 'Roe v Wade', max_results: 1 },
+      {
+        ...mockContext,
+        llmParamGenerator: {
+          createMessage: async () => ({
+            content: {
+              type: 'text',
+              text: JSON.stringify({ q: 'Roe v Wade', type: 'o' }),
+            },
+          }),
+        },
+      },
+    );
+
+    const text = result.content[0].text;
+    assert.ok(text.includes('5580 cites'));
+    assert.ok(!text.includes('Citation count unavailable'));
+  });
+
   it('limits results to max_results', async () => {
     const mockApi = {
       searchOpinions: async () => ({
