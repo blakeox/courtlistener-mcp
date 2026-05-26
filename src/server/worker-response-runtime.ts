@@ -1,10 +1,7 @@
 import { buildMcpCorsHeaders } from './transport-boundary-headers.js';
+import { HOSTED_AUTH_INLINE_SCRIPT_HASHES } from './hosted-auth-html-security.js';
 
-/** Inline scripts injected by Cloudflare/captive portals on hosted auth pages (hashes from browser CSP reports). */
-const HOSTED_AUTH_INLINE_SCRIPT_HASHES = [
-  "'sha256-CsRg1c/uAShTQr6MSbfT26yXsxtsm7ZpMgc41yupCOo='",
-  "'sha256-PBIIO99gDQxCFzWUcG6igjK4mjItQrNaA+ccPy87s0M='",
-] as const;
+export { HOSTED_AUTH_INLINE_SCRIPT_HASHES } from './hosted-auth-html-security.js';
 
 export interface HtmlResponseSecurityOptions {
   formActionOrigins?: string[];
