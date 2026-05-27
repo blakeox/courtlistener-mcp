@@ -6,7 +6,7 @@ import type {
   SlowOperationSnapshot,
 } from './worker-runtime-contract.js';
 import type { WorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.js';
-import type { Env } from './worker-runtime-contract.js';
+import type { WorkerPlatformEnv } from './worker-runtime-contract.js';
 import { parseAllowedOrigins } from './worker-security.js';
 
 export interface CreateWorkerObservabilityRuntimeDeps {
@@ -15,7 +15,7 @@ export interface CreateWorkerObservabilityRuntimeDeps {
   exportTopSlowOperationLimit: number;
   doOutlierScoreThreshold: number;
   doOutlierMinSamples: number;
-  resolveWorkerMcpSessionTopologyV2: (env: Env) => WorkerMcpSessionTopologyV2;
+  resolveWorkerMcpSessionTopologyV2: (env: WorkerPlatformEnv) => WorkerMcpSessionTopologyV2;
   onRouteLatencyRecorded?: (route: string, elapsedMs: number) => void;
   onDurableObjectLatencyRecorded?: (
     dimension: DurableObjectLatencyDimension,
@@ -24,7 +24,7 @@ export interface CreateWorkerObservabilityRuntimeDeps {
   onDurableObjectUnavailable?: (dimension: DurableObjectLatencyDimension) => void;
 }
 
-export interface WorkerObservabilityRuntime<TEnv extends Env> {
+export interface WorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv> {
   getRequestOrigin(request: Request): string | null;
   getClientIdentifier(request: Request): string;
   buildWorkerRouteMetricKey(method: string, pathname: string): string;
@@ -77,7 +77,7 @@ function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
   };
 }
 
-export function createWorkerObservabilityRuntime<TEnv extends Env>(
+export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>(
   deps: CreateWorkerObservabilityRuntimeDeps,
 ): WorkerObservabilityRuntime<TEnv> {
   const workerRouteLatency = new Map<string, LatencyStats>();

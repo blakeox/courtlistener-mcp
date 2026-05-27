@@ -5,14 +5,22 @@ import { handleWorkerUiShellRoutes } from '../../src/server/worker-ui-shell-rout
 
 function createDeps() {
   return {
-    spaJs: '',
-    spaCss: '',
     spaBuildId: 'build-1',
     jsonError: (message: string, status: number, errorCode: string) =>
       Response.json({ error: message, error_code: errorCode }, { status }),
-    spaAssetResponse: (content: string, contentType?: string) =>
-      new Response(content, {
-        status: 200,
+    fetchSpaAsset: async (request: Request, _env: Record<string, never>) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith('spa.js')) {
+        return new Response('console.log("ok")', { status: 200 });
+      }
+      if (path.endsWith('spa.css')) {
+        return new Response('body{}', { status: 200 });
+      }
+      return new Response('not found', { status: 404 });
+    },
+    spaAssetResponse: (assetResponse: Response, contentType?: string) =>
+      new Response(assetResponse.body, {
+        status: assetResponse.status,
         ...(contentType ? { headers: { 'content-type': contentType } } : {}),
       }),
     generateCspNonce: () => 'nonce',
@@ -39,8 +47,6 @@ describe('handleWorkerUiShellRoutes', () => {
       env: {},
       deps: {
         ...createDeps(),
-        spaJs: 'console.log("ok")',
-        spaCss: 'body{}',
         getOrCreateCsrfCookieHeader: () => null,
         htmlResponse: (html: string) => new Response(html, { status: 200 }),
       },

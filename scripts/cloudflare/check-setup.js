@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { isCloudflareAccessLoginRedirect } from './url-helpers.js';
 
 const projectRoot = process.cwd();
-const wranglerConfigPath = join(projectRoot, 'wrangler.jsonc');
+const wranglerEdgeConfigPath = join(projectRoot, 'wrangler.edge.jsonc');
+const wranglerMcpConfigPath = join(projectRoot, 'wrangler.mcp.jsonc');
 
 const requiredSecrets = ['COURTLISTENER_API_KEY'];
 
@@ -45,12 +46,12 @@ function stripJsonComments(input) {
     .replace(/,\s*([}\]])/g, '$1');
 }
 
-function parseWranglerConfig() {
-  if (!existsSync(wranglerConfigPath)) {
-    throw new Error(`Missing wrangler config at ${wranglerConfigPath}`);
+function parseWranglerConfig(configPath) {
+  if (!existsSync(configPath)) {
+    throw new Error(`Missing wrangler config at ${configPath}`);
   }
 
-  const raw = readFileSync(wranglerConfigPath, 'utf-8');
+  const raw = readFileSync(configPath, 'utf-8');
   const cleaned = stripJsonComments(raw);
   return JSON.parse(cleaned);
 }
@@ -190,16 +191,20 @@ async function main() {
     ok('Cloudflare authentication is valid.');
   }
 
-  let config;
+  let edgeConfig;
+  let mcpConfig;
   try {
-    config = parseWranglerConfig();
-    ok(`Loaded wrangler config: ${wranglerConfigPath}`);
+    edgeConfig = parseWranglerConfig(wranglerEdgeConfigPath);
+    mcpConfig = parseWranglerConfig(wranglerMcpConfigPath);
+    ok(`Loaded edge wrangler config: ${wranglerEdgeConfigPath}`);
+    ok(`Loaded MCP wrangler config: ${wranglerMcpConfigPath}`);
   } catch (error) {
     fail(
       `Failed to parse wrangler config: ${error instanceof Error ? error.message : String(error)}`,
     );
     hasCriticalError = true;
   }
+  const config = edgeConfig;
   const configuredVars = config?.vars && typeof config.vars === 'object' ? config.vars : {};
   const trustCfAccessJwt = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION);
   const trustCfAccessHeaders = parseBoolean(
@@ -210,39 +215,70 @@ async function main() {
     configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED,
   );
 
-  if (config) {
-    if (config.main !== 'src/worker.ts') {
-      warn(`Expected main to be src/worker.ts, found ${String(config.main)}`);
+  if (edgeConfig && mcpConfig) {
+    if (edgeConfig.main !== 'src/worker-edge.ts') {
+      warn(`Expected edge main src/worker-edge.ts, found ${String(edgeConfig.main)}`);
     } else {
-      ok('Worker entrypoint is set to src/worker.ts.');
+      ok('Edge worker entrypoint is src/worker-edge.ts.');
+    }
+    if (mcpConfig.main !== 'src/worker-mcp.ts') {
+      warn(`Expected MCP main src/worker-mcp.ts, found ${String(mcpConfig.main)}`);
+    } else {
+      ok('MCP worker entrypoint is src/worker-mcp.ts.');
+    }
+
+    const hasMcpService =
+      Array.isArray(edgeConfig?.services) &&
+      edgeConfig.services.some(
+        (s) => s?.binding === 'MCP_SERVICE' && s?.service === 'courtlistener-mcp-mcp',
+      );
+    if (!hasMcpService) {
+      fail('Missing service binding MCP_SERVICE -> courtlistener-mcp-mcp on edge worker.');
+      hasCriticalError = true;
+    } else {
+      ok('Service binding is configured: MCP_SERVICE -> courtlistener-mcp-mcp.');
     }
 
     const hasMcpDoBinding =
-      Array.isArray(config?.durable_objects?.bindings) &&
-      config.durable_objects.bindings.some(
+      Array.isArray(mcpConfig?.durable_objects?.bindings) &&
+      mcpConfig.durable_objects.bindings.some(
         (b) => b?.name === 'MCP_OBJECT' && b?.class_name === 'CourtListenerMCP',
       );
     if (!hasMcpDoBinding) {
-      fail('Missing Durable Object binding MCP_OBJECT -> CourtListenerMCP.');
+      fail('Missing Durable Object binding MCP_OBJECT -> CourtListenerMCP on MCP worker.');
       hasCriticalError = true;
     } else {
-      ok('Durable Object binding is configured: MCP_OBJECT -> CourtListenerMCP.');
+      ok('MCP worker DO binding is configured: MCP_OBJECT -> CourtListenerMCP.');
     }
 
-    const hasAuthLimiterBinding =
-      Array.isArray(config?.durable_objects?.bindings) &&
-      config.durable_objects.bindings.some(
-        (b) => b?.name === 'AUTH_FAILURE_LIMITER' && b?.class_name === 'AuthFailureLimiterDO',
+    const authLimiterBinding = Array.isArray(edgeConfig?.durable_objects?.bindings)
+      ? config.durable_objects.bindings.find((b) => b?.name === 'AUTH_FAILURE_LIMITER')
+      : null;
+    if (
+      !authLimiterBinding ||
+      authLimiterBinding.class_name !== 'AuthFailureLimiterDO' ||
+      !authLimiterBinding.script_name
+    ) {
+      fail(
+        'Missing Durable Object binding AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO (script_name required).',
       );
-    if (!hasAuthLimiterBinding) {
-      fail('Missing Durable Object binding AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
       hasCriticalError = true;
     } else {
-      ok('Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO.');
+      ok(
+        `Durable Object binding is configured: AUTH_FAILURE_LIMITER -> AuthFailureLimiterDO@${authLimiterBinding.script_name}.`,
+      );
     }
 
-    const asyncJobsKvBinding = Array.isArray(config?.kv_namespaces)
-      ? config.kv_namespaces.find((ns) => ns?.binding === 'ASYNC_JOBS_KV')
+    const hasSpaAssets = config?.assets?.directory && config?.assets?.binding === 'SPA_ASSETS';
+    if (!hasSpaAssets) {
+      fail('Missing Workers Assets binding SPA_ASSETS (.spa-dist).');
+      hasCriticalError = true;
+    } else {
+      ok(`Workers Assets binding is configured: SPA_ASSETS -> ${config.assets.directory}.`);
+    }
+
+    const asyncJobsKvBinding = Array.isArray(mcpConfig?.kv_namespaces)
+      ? mcpConfig.kv_namespaces.find((ns) => ns?.binding === 'ASYNC_JOBS_KV')
       : null;
     if (asyncJobsKvBinding) {
       if (!asyncJobsKvBinding.id || /^0+$/.test(String(asyncJobsKvBinding.id))) {
@@ -256,8 +292,8 @@ async function main() {
     }
 
     const asyncQueueProducer =
-      Array.isArray(config?.queues?.producers) &&
-      config.queues.producers.find((producer) => producer?.binding === 'ASYNC_TOOL_QUEUE');
+      Array.isArray(mcpConfig?.queues?.producers) &&
+      mcpConfig.queues.producers.find((producer) => producer?.binding === 'ASYNC_TOOL_QUEUE');
     if (asyncQueueProducer) {
       ok(`ASYNC_TOOL_QUEUE producer binding is configured (${String(asyncQueueProducer.queue)}).`);
     } else {

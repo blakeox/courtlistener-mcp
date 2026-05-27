@@ -1,4 +1,4 @@
-import type { Env } from './worker-runtime-contract.js';
+import type { WorkerPlatformEnv } from './worker-runtime-contract.js';
 import type { PrincipalContext } from '../infrastructure/principal-context.js';
 
 interface McpJsonRpcResponse<T> {
@@ -13,19 +13,23 @@ interface McpJsonRpcResponse<T> {
 export interface CreateWorkerMcpAiRuntimeDeps {
   authorizeMcpGatewayRequest: (params: {
     request: Request;
-    env: Env;
+    env: WorkerPlatformEnv;
     supportedProtocolVersions: Set<string>;
   }) => Promise<{
     principal?: PrincipalContext;
     authError?: Response | null;
   }>;
   runWithPrincipalContext: <T>(principal: PrincipalContext | undefined, callback: () => T) => T;
-  mcpStreamableFetch: (request: Request, env: Env, ctx: ExecutionContext) => Promise<Response>;
+  mcpStreamableFetch: (
+    request: Request,
+    env: WorkerPlatformEnv,
+    ctx: ExecutionContext,
+  ) => Promise<Response>;
   preferredMcpProtocolVersion: string;
   supportedMcpProtocolVersions: Set<string>;
   redactSecretsInText: (value: string) => string;
   incrementUserUsage: (
-    env: Env,
+    env: WorkerPlatformEnv,
     userId: string,
     metadata?: { route?: string; method?: string },
   ) => Promise<void>;
@@ -33,7 +37,7 @@ export interface CreateWorkerMcpAiRuntimeDeps {
 
 export interface WorkerMcpAiRuntime {
   callMcpJsonRpc(
-    env: Env,
+    env: WorkerPlatformEnv,
     ctx: ExecutionContext,
     token: string,
     method: string,
@@ -43,7 +47,7 @@ export interface WorkerMcpAiRuntime {
   ): Promise<{ payload: unknown; sessionId: string | null }>;
   recordAuthorizedMcpUsage(
     request: Request,
-    env: Env,
+    env: WorkerPlatformEnv,
     principal: { userId?: string } | undefined,
   ): Promise<void>;
 }
@@ -188,7 +192,7 @@ export function hasValidMcpRpcShape(payload: unknown): boolean {
 export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): WorkerMcpAiRuntime {
   return {
     async callMcpJsonRpc(
-      env: Env,
+      env: WorkerPlatformEnv,
       ctx: ExecutionContext,
       token: string,
       method: string,
@@ -262,7 +266,7 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
 
     async recordAuthorizedMcpUsage(
       request: Request,
-      env: Env,
+      env: WorkerPlatformEnv,
       principal: { userId?: string } | undefined,
     ): Promise<void> {
       const pathname = new URL(request.url).pathname;

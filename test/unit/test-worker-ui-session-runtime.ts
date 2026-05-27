@@ -19,6 +19,7 @@ interface TestEnv {
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
 }
 
 function jsonError(
@@ -468,9 +469,19 @@ describe('worker UI session runtime', () => {
     assert.equal(response.headers.get('Retry-After'), '123');
   });
 
-  it('fails closed when bootstrap rate limiting is unavailable', async () => {
+  it('fails open when bootstrap rate limiting is unavailable', async () => {
     const runtime = createRuntime({ bootstrapLimiterUnavailable: true });
     const env: TestEnv = {};
+    const request = new Request('https://worker.example/api/session/bootstrap');
+
+    const response = await runtime.getSessionBootstrapRateLimitedResponse(request, env, Date.now());
+
+    assert.equal(response, null);
+  });
+
+  it('fails closed when bootstrap rate limiting is unavailable and fail-open is disabled', async () => {
+    const runtime = createRuntime({ bootstrapLimiterUnavailable: true });
+    const env: TestEnv = { MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'false' };
     const request = new Request('https://worker.example/api/session/bootstrap');
 
     const response = await runtime.getSessionBootstrapRateLimitedResponse(request, env, Date.now());

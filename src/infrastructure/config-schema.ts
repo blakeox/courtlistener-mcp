@@ -3,7 +3,7 @@
  * Provides type-safe configuration validation with comprehensive schema definitions
  */
 
-import { z } from 'zod';
+import { z } from '../common/zod.js';
 import { ServerConfig } from '../types.js';
 
 /**

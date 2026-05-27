@@ -168,6 +168,46 @@ describe('createWorkerDurableRuntime', () => {
     });
   });
 
+  it('fails open for OAuth frontdoor when auth rate limiter is unavailable', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async () => {
+        throw new Error('do offline');
+      }),
+    };
+
+    const response = await runtime.getAuthRouteRateLimitedResponse(
+      'authorize:GET:client-1',
+      env,
+      1_700_000_000_000,
+    );
+
+    assert.equal(response, null);
+  });
+
+  it('fails closed for OAuth frontdoor when fail-open is disabled', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async () => {
+        throw new Error('do offline');
+      }),
+      MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'false',
+    };
+
+    const response = await runtime.getAuthRouteRateLimitedResponse(
+      'authorize:GET:client-1',
+      env,
+      1_700_000_000_000,
+    );
+
+    assert.ok(response);
+    assert.equal(response?.status, 503);
+    assert.deepEqual(await response?.json(), {
+      error: 'Unable to validate OAuth route rate limit.',
+      error_code: 'oauth_route_rate_limit_unavailable',
+    });
+  });
+
   it('fails closed when auth rate limiter is unavailable', async () => {
     const runtime = createRuntime();
     const env: TestEnv = {

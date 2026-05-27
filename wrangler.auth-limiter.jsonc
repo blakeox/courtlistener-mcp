@@ -1,0 +1,16 @@
+{
+  "name": "courtlistener-mcp-auth-limiter",
+  "compatibility_date": "2026-03-02",
+  "main": "src/worker-auth-limiter.ts",
+  "workers_dev": false,
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "durable_objects": {
+    "bindings": [],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AuthFailureLimiterDO"],
+    },
+  ],
+}

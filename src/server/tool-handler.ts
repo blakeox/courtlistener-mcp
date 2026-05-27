@@ -11,9 +11,9 @@ import {
   ToolAnnotations,
   EmbeddedResource,
 } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z, type ZodIssue } from '../common/zod.js';
 import { Result, success, failure } from '../common/types.js';
+import { TOOL_INPUT_SCHEMAS } from './generated/tool-input-schemas.js';
 import { CacheManager } from '../infrastructure/cache.js';
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
@@ -346,7 +346,7 @@ export abstract class TypedToolHandler<
     } catch (error) {
       if (error instanceof z.ZodError) {
         const message = error.issues
-          .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
+          .map((e: ZodIssue) => `${e.path.join('.')}: ${e.message}`)
           .join(', ');
         return failure(new Error(`Validation failed: ${message}`));
       }
@@ -359,24 +359,15 @@ export abstract class TypedToolHandler<
    * This is automatically implemented - no need to override
    */
   override getSchema(): Record<string, unknown> {
-    const zodWithSchemaExport = z as typeof z & {
-      toJSONSchema?: (
-        schema: z.ZodTypeAny,
-        options?: { io?: 'input' | 'output'; unrepresentable?: 'any' | 'strip' },
-      ) => unknown;
-    };
-
-    // Prefer native Zod v4 JSON Schema generation to keep schemas MCP-compatible.
-    if (typeof zodWithSchemaExport.toJSONSchema === 'function') {
-      return zodWithSchemaExport.toJSONSchema(this.schema, {
-        io: 'input',
-        unrepresentable: 'any',
-      }) as Record<string, unknown>;
+    const precomputed = TOOL_INPUT_SCHEMAS[this.name];
+    if (precomputed) {
+      return precomputed;
     }
 
-    // Fallback for environments where native export is unavailable.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return zodToJsonSchema(this.schema as any) as Record<string, unknown>;
+    return z.toJSONSchema(this.schema, {
+      io: 'input',
+      unrepresentable: 'any',
+    }) as Record<string, unknown>;
   }
 
   /**
