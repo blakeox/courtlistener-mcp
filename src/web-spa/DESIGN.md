@@ -142,9 +142,10 @@ npm run dev:spa
 ```
 
 Opens Vite at `http://127.0.0.1:5173`. Worker routes (`/api`, `/auth`, `/oauth`,
-`/mcp`, `/health`, `/.well-known`, …) proxy to `http://localhost:3001` when
-`wrangler dev` (or the local HTTP transport) is running — required for hosted
-sign-in and MCP OAuth from the dev SPA.
+`/mcp`, `/health`, `/.well-known`, …) proxy to the **edge** worker at
+`http://localhost:8787` (`pnpm run dev:edge` or `pnpm run dev:workers`). The MCP
+worker runs on `:3001` and is reached by the edge worker via `MCP_SERVICE` or
+the local dev upstream default.
 
 ## Accessibility (WCAG 2.2 AA target)
 

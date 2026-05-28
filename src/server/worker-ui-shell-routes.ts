@@ -1,10 +1,9 @@
 export interface HandleWorkerUiShellRoutesDeps<TEnv> {
-  spaJs: string;
-  spaCss: string;
   spaBuildId: string;
   jsonError: (message: string, status: number, errorCode: string) => Response;
+  fetchSpaAsset: (request: Request, env: TEnv) => Promise<Response>;
   spaAssetResponse: (
-    content: string,
+    assetResponse: Response,
     contentType: string,
     buildId: string,
     extraHeaders?: HeadersInit,
@@ -23,6 +22,9 @@ export interface HandleWorkerUiShellRoutesParams<TEnv> {
   deps: HandleWorkerUiShellRoutesDeps<TEnv>;
 }
 
+const SPA_JS_PATH = '/app/spa.js';
+const SPA_CSS_PATH = '/app/spa.css';
+
 export async function handleWorkerUiShellRoutes<TEnv>(
   params: HandleWorkerUiShellRoutesParams<TEnv>,
 ): Promise<Response | null> {
@@ -31,15 +33,19 @@ export async function handleWorkerUiShellRoutes<TEnv>(
   const hostedAuthRedirectPath = `/auth/start?${new URLSearchParams({ return_to: '/app/account' }).toString()}`;
 
   if (request.method === 'GET' && url.pathname === '/app/assets/spa.js') {
-    return deps.spaAssetResponse(
-      deps.spaJs,
-      'application/javascript; charset=utf-8',
-      deps.spaBuildId,
+    const asset = await deps.fetchSpaAsset(
+      new Request(new URL(SPA_JS_PATH, request.url), request),
+      env,
     );
+    return deps.spaAssetResponse(asset, 'application/javascript; charset=utf-8', deps.spaBuildId);
   }
 
   if (request.method === 'GET' && url.pathname === '/app/assets/spa.css') {
-    return deps.spaAssetResponse(deps.spaCss, 'text/css; charset=utf-8', deps.spaBuildId);
+    const asset = await deps.fetchSpaAsset(
+      new Request(new URL(SPA_CSS_PATH, request.url), request),
+      env,
+    );
+    return deps.spaAssetResponse(asset, 'text/css; charset=utf-8', deps.spaBuildId);
   }
 
   if (url.pathname.startsWith('/app/assets/') && request.method !== 'GET') {

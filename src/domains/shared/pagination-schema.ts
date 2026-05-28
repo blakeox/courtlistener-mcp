@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../../common/zod.js';
 
 /**
  * Shared pagination schema fields used across domain handlers.

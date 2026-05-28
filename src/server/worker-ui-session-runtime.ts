@@ -1,4 +1,5 @@
 import { parsePositiveInt } from '../common/validation.js';
+import { shouldFailOpenOnAuthLimiterUnavailable } from './worker-durable-runtime.js';
 import {
   extractBearerToken,
   parseBoolean,
@@ -69,6 +70,7 @@ export interface WorkerUiSessionRuntimeEnv {
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
 }
 
 interface WorkerUiSessionRuntimeDeps<TEnv extends WorkerUiSessionRuntimeEnv> {
@@ -667,6 +669,16 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       const clientId = deps.getClientIdentifier(request);
       const limiterState = await deps.recordSessionBootstrapRateLimit(env, clientId, nowMs, cfg);
       if (limiterState.kind === 'unavailable') {
+        if (shouldFailOpenOnAuthLimiterUnavailable(env)) {
+          console.error(
+            JSON.stringify({
+              event: 'auth_limiter_fail_open',
+              surface: 'session_bootstrap',
+              client_id: clientId,
+            }),
+          );
+          return null;
+        }
         return deps.jsonError(
           'Unable to validate session bootstrap rate limit.',
           503,

@@ -68,6 +68,18 @@ jobs:
               - 'src/infrastructure/**'
               - 'src/security/**'
               - 'src/worker.ts'
+              - 'src/worker-edge.ts'
+              - 'src/worker-mcp.ts'
+              - 'src/worker-auth-limiter.ts'
+              - 'src/worker/**'
+              - 'wrangler.edge.jsonc'
+              - 'wrangler.mcp.jsonc'
+              - 'wrangler.auth-limiter.jsonc'
+              - 'wrangler.jsonc'
+              - 'scripts/dev/run-split-workers.mjs'
+              - 'scripts/reports/analyze-worker-bundle.mjs'
+              - 'docs/repo/WORKER_SPLIT.md'
+              - 'docs/repo/WORKER_BUNDLE_AUDIT.md'
               - 'src/index.ts'
               - 'scripts/reports/runtime-safety-gate.js'
               - 'scripts/reports/release-readiness-gate.js'
@@ -152,7 +164,18 @@ jobs:
         run: pnpm run typecheck
 
       - name: Build
+        if: matrix.node-version != 18
         run: pnpm run build
+
+      - name: Build (Node 18 — skip Vite; requires Node 20+)
+        if: matrix.node-version == 18
+        run: |
+          pnpm run clean
+          pnpm run generate:tool-schemas
+          pnpm run generate:hosted-auth-styles
+          pnpm exec tsc
+          pnpm run generate:manifest
+          pnpm run format:generated
 
       - name: Run unit tests
         run: pnpm run test:unit
@@ -289,6 +312,9 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Build SPA assets for Playwright
+        run: pnpm run generate:web:spa
+
       - name: Run SPA auth browser tests
         run: pnpm run test:spa:e2e:auth
 
@@ -358,7 +384,8 @@ jobs:
         run: |
           case "${{ matrix.gate }}" in
             protocol-contract)
-              pnpm run test:mcp
+              # Live MCP stdio tests run in full-validation and mcp-compliance; avoid
+              # parallel CourtListener calls that flake when duplicated here.
               npx tsx --test test/unit/test-protocol-governance.ts
               ;;
             auth-security-matrix)

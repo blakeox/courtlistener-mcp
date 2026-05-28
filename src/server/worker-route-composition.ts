@@ -96,6 +96,45 @@ export async function runWorkerRouteHandlers(
   return null;
 }
 
+export type WorkerEdgeDelegatedRouteDeps<TEnv extends WorkerDelegatedRouteEnv> = Omit<
+  WorkerDelegatedRouteDeps<TEnv>,
+  'mcpBoundaryPolicy'
+>;
+
+export async function handleDelegatedEdgeWorkerRoutes<TEnv extends WorkerDelegatedRouteEnv>(
+  context: WorkerDelegatedRouteContext<TEnv>,
+  deps: WorkerEdgeDelegatedRouteDeps<TEnv>,
+): Promise<Response | null> {
+  const { request, url, origin, allowedOrigins, env, ctx } = context;
+
+  return runWorkerRouteHandlers(
+    composeWorkerDelegatedRouteHandlers({
+      oauth: async () =>
+        handleWorkerOAuthRoutes({ request, url, origin, allowedOrigins, env }, deps),
+      aiUi: async () =>
+        handleWorkerAiUiRoutes({
+          context: { request, url, origin, allowedOrigins, env, ctx },
+          deps,
+        }),
+      authHandoff: async () =>
+        handleWorkerAuthHandoffRoutes({
+          request,
+          url,
+          env,
+          deps,
+        }),
+      uiShell: async () =>
+        handleWorkerUiShellRoutes({
+          request,
+          url,
+          env,
+          deps,
+        }),
+      mcpGateway: async () => null,
+    }),
+  );
+}
+
 export async function handleDelegatedWorkerRoutes<TEnv extends WorkerDelegatedRouteEnv>(
   context: WorkerDelegatedRouteContext<TEnv>,
   deps: WorkerDelegatedRouteDeps<TEnv>,

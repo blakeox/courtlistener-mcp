@@ -89,7 +89,7 @@ export function redirectResponse(
 }
 
 export function spaAssetResponse(
-  content: string,
+  assetResponse: Response,
   contentType: string,
   buildId: string,
   extraHeaders?: HeadersInit,
@@ -102,7 +102,15 @@ export function spaAssetResponse(
     },
     extraHeaders,
   );
-  return new Response(content, { status: 200, headers });
+  for (const [key, value] of assetResponse.headers.entries()) {
+    if (key.toLowerCase() === 'content-encoding' || key.toLowerCase() === 'content-length') {
+      headers.set(key, value);
+    }
+  }
+  return new Response(assetResponse.body, {
+    status: assetResponse.status,
+    headers,
+  });
 }
 
 export function buildCorsHeaders(origin: string | null, allowedOrigins: string[]): Headers {

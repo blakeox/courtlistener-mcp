@@ -1,0 +1,18 @@
+# Copy to `.dev.vars` for `wrangler dev` (not committed).
+# Required secrets for hosted sign-in: use `wrangler secret put` in production.
+
+# CourtListener API access
+# COURTLISTENER_API_KEY=
+
+# Hosted auth (Worker-native OIDC)
+# OIDC_ISSUER=
+# OIDC_AUDIENCE=
+# MCP_AUTH_OIDC_CLIENT_ID=
+# MCP_AUTH_OIDC_CLIENT_SECRET=
+# MCP_UI_SESSION_SECRET=
+
+# Local development: disable Durable Object rate limits when the limiter is unavailable
+# (avoids oauth_route_rate_limit_unavailable during partial local setups).
+MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false
+
+# Split workers: `pnpm run dev:workers` (edge :8787, MCP :3001). Vite proxies to :8787.

@@ -109,10 +109,10 @@ function buildLegacyFetchHandler(routeLatency: Array<{ route: string; elapsedMs:
       defaultCfAiModelCheap: '',
       cheapModeMaxTokens: 1,
       balancedModeMaxTokens: 1,
-      spaJs: '',
-      spaCss: '',
       spaBuildId: 'test',
-      spaAssetResponse: () => new Response(),
+      fetchSpaAsset: async (_request: Request, _env: Record<string, never>) =>
+        new Response('', { status: 200 }),
+      spaAssetResponse: (asset: Response) => asset,
       generateCspNonce: () => 'nonce',
       getOrCreateCsrfCookieHeader: () => null,
       htmlResponse: () => new Response(),

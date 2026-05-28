@@ -1,0 +1,73 @@
+{
+  "name": "courtlistener-mcp",
+  "compatibility_date": "2026-03-02",
+  "main": "src/worker-edge.ts",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "vars": {
+    "MCP_OAUTH_BACKEND": "cloudflare",
+    "MCP_ALLOW_DEV_FALLBACK": "false",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300",
+  },
+  "services": [
+    {
+      "binding": "MCP_SERVICE",
+      "service": "courtlistener-mcp-mcp",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "56b997590e3344c98bf6875ae8b522c0",
+    },
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "courtlistener_mcp",
+    },
+  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_FAILURE_LIMITER",
+        "class_name": "AuthFailureLimiterDO",
+        "script_name": "courtlistener-mcp-auth-limiter",
+      },
+    ],
+  },
+  "assets": {
+    "directory": ".spa-dist",
+    "binding": "SPA_ASSETS",
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CourtListenerMCP"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["AuthFailureLimiterDO"],
+    },
+    {
+      "tag": "v3",
+      "deleted_classes": ["AuthFailureLimiterDO"],
+    },
+    {
+      "tag": "v4",
+      "deleted_classes": ["CourtListenerMCP"],
+    },
+  ],
+  "routes": [
+    {
+      "pattern": "courtlistenermcp.blakeoxford.com",
+      "custom_domain": true,
+    },
+  ],
+}

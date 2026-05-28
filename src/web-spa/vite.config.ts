@@ -3,8 +3,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-/** Local Worker (`wrangler dev` / HTTP transport on port 3001). */
-const workerDevTarget = 'http://localhost:3001';
+/** Local edge worker (`pnpm run dev:edge`, default port 8787). */
+const workerDevTarget = process.env.VITE_WORKER_DEV_TARGET ?? 'http://localhost:8787';
 
 const workerDevProxy = {
   target: workerDevTarget,
@@ -34,6 +34,11 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
+      output: {
+        entryFileNames: 'app/spa.js',
+        chunkFileNames: 'app/chunks/[name]-[hash].js',
+        assetFileNames: 'app/spa.[ext]',
+      },
     },
   },
   server: {
