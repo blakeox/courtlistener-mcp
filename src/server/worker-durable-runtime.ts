@@ -7,11 +7,14 @@ import {
 import type {
   AuthFailureLimiterRequestBody,
   AuthFailureLimiterResponseBody,
+  AuthRateLimitProbeResult,
   BrowserBootstrapConsumeRequestBody,
   BrowserBootstrapConsumeResponseBody,
   DurableObjectLatencyDimension,
   LifetimeQuotaRequestBody,
   LifetimeQuotaResponseBody,
+  McpBoundaryEvaluateRequestBody,
+  McpBoundaryEvaluateResponseBody,
   McpSessionLifecycleAction,
   McpSessionLifecycleRequestBody,
   McpSessionLifecycleResponseBody,
@@ -133,13 +136,23 @@ export interface WorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv> {
     env: TEnv,
     nowMs: number,
   ) => Promise<Response | null>;
+  probeAuthRateLimit: (
+    clientId: string,
+    env: TEnv,
+    nowMs: number,
+  ) => Promise<AuthRateLimitProbeResult>;
   getAuthRouteRateLimitedResponse: (
     bucketId: string,
     env: TEnv,
     nowMs: number,
   ) => Promise<Response | null>;
   recordAuthFailure: (clientId: string, env: TEnv, nowMs: number) => Promise<void>;
-  clearAuthFailures: (clientId: string, env: TEnv, nowMs: number) => Promise<void>;
+  clearAuthFailures: (
+    clientId: string,
+    env: TEnv,
+    nowMs: number,
+    hadFailureState?: boolean,
+  ) => Promise<void>;
   evaluateMcpBoundaryRequest: (
     request: Request,
     env: TEnv,
@@ -332,6 +345,50 @@ async function callAuthLimiter<TEnv extends WorkerDurableRuntimeEnv>(
         message: error instanceof Error ? error.message : String(error),
       }),
     );
+    return { kind: 'unavailable' };
+  } finally {
+    deps.recordDurableObjectLatency('auth_limiter', deps.now() - startedAt);
+  }
+}
+
+function hasAuthFailureState(state: AuthFailureLimiterResponseBody['state']): boolean {
+  return state.count > 0 || state.windowStartedAtMs > 0 || state.blockedUntilMs > 0;
+}
+
+async function callMcpBoundaryEvaluate<TEnv extends WorkerDurableRuntimeEnv>(
+  env: TEnv,
+  clientId: string,
+  body: Omit<McpBoundaryEvaluateRequestBody, 'action'>,
+  deps: Pick<
+    CreateWorkerDurableRuntimeDeps<TEnv>,
+    'now' | 'recordDurableObjectLatency' | 'recordDurableObjectUnavailable'
+  >,
+): Promise<DurableObjectCheckResult<McpBoundaryEvaluateResponseBody>> {
+  const stub = getAuthLimiterStub(env, `mcp-boundary-bundle:${clientId}`);
+  const startedAt = deps.now();
+  try {
+    const response = await stub.fetch('https://auth-failure-limiter/internal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'mcp_boundary_evaluate',
+        ...body,
+      } satisfies McpBoundaryEvaluateRequestBody),
+    });
+    if (!response.ok) {
+      deps.recordDurableObjectUnavailable('auth_limiter');
+      logDurableObjectFailure(
+        'auth_limiter',
+        'mcp_boundary_evaluate',
+        'http_error',
+        response.status,
+      );
+      return { kind: 'unavailable' };
+    }
+    return { kind: 'ok', value: (await response.json()) as McpBoundaryEvaluateResponseBody };
+  } catch {
+    deps.recordDurableObjectUnavailable('auth_limiter');
+    logDurableObjectFailure('auth_limiter', 'mcp_boundary_evaluate', 'fetch_error');
     return { kind: 'unavailable' };
   } finally {
     deps.recordDurableObjectLatency('auth_limiter', deps.now() - startedAt);
@@ -560,26 +617,46 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
     },
 
     async getAuthRateLimitedResponse(clientId, env, nowMs) {
+      const probe = await this.probeAuthRateLimit(clientId, env, nowMs);
+      if (probe.kind === 'allowed') {
+        return null;
+      }
+      return probe.response;
+    },
+
+    async probeAuthRateLimit(clientId, env, nowMs): Promise<AuthRateLimitProbeResult> {
       const cfg = getAuthFailureRateLimitConfig(env);
-      if (!cfg.enabled) return null;
+      if (!cfg.enabled) {
+        return { kind: 'allowed', hasFailureState: false };
+      }
       const limiterState = await callAuthLimiter(env, clientId, 'check', nowMs, deps);
       if (limiterState.kind === 'unavailable') {
-        return deps.jsonError(
-          'Unable to validate authentication rate limit.',
-          503,
-          'auth_rate_limiter_unavailable',
-        );
+        return {
+          kind: 'unavailable',
+          response: deps.jsonError(
+            'Unable to validate authentication rate limit.',
+            503,
+            'auth_rate_limiter_unavailable',
+          ),
+        };
       }
-      if (!limiterState.value.blocked) return null;
-
-      const retryAfterSeconds = limiterState.value.retryAfterSeconds;
-      return deps.jsonError(
-        'Too many failed authentication attempts',
-        429,
-        'auth_rate_limited',
-        { retry_after_seconds: retryAfterSeconds },
-        { 'Retry-After': String(retryAfterSeconds) },
-      );
+      if (limiterState.value.blocked) {
+        const retryAfterSeconds = limiterState.value.retryAfterSeconds;
+        return {
+          kind: 'blocked',
+          response: deps.jsonError(
+            'Too many failed authentication attempts',
+            429,
+            'auth_rate_limited',
+            { retry_after_seconds: retryAfterSeconds },
+            { 'Retry-After': String(retryAfterSeconds) },
+          ),
+        };
+      }
+      return {
+        kind: 'allowed',
+        hasFailureState: hasAuthFailureState(limiterState.value.state),
+      };
     },
 
     async getAuthRouteRateLimitedResponse(bucketId, env, nowMs) {
@@ -626,9 +703,9 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
       await callAuthLimiter(env, clientId, 'record', nowMs, deps);
     },
 
-    async clearAuthFailures(clientId, env, nowMs) {
+    async clearAuthFailures(clientId, env, nowMs, hadFailureState = true) {
       const cfg = getAuthFailureRateLimitConfig(env);
-      if (!cfg.enabled) return;
+      if (!cfg.enabled || !hadFailureState) return;
       await callAuthLimiter(env, clientId, 'clear', nowMs, deps);
     },
 
@@ -646,69 +723,56 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
       }
 
       const adaptiveMaxAttempts = deriveAdaptiveBoundaryRateLimit(request, cfg, contentLength);
-      const boundaryRateLimit = await callAuthLimiter(
-        env,
-        `mcp-boundary:${clientId}`,
-        'record',
-        nowMs,
-        deps,
-        {
-          maxAttempts: adaptiveMaxAttempts,
-          windowMs: cfg.windowMs,
-          blockMs: cfg.blockMs,
-        },
+      const replayFingerprint = await buildMcpReplayFingerprint(
+        request,
+        contentLength,
+        cfg.heavyPayloadBytes,
       );
-      if (boundaryRateLimit.kind === 'unavailable') {
+      const boundaryResult = await callMcpBoundaryEvaluate(
+        env,
+        clientId,
+        {
+          nowMs,
+          boundary: {
+            maxAttempts: adaptiveMaxAttempts,
+            windowMs: cfg.windowMs,
+            blockMs: cfg.blockMs,
+          },
+          ...(replayFingerprint
+            ? {
+                replay: {
+                  fingerprint: hashBoundaryReplayFingerprint(replayFingerprint),
+                  maxAttempts: 2,
+                  windowMs: cfg.replayWindowMs,
+                  blockMs: cfg.replayWindowMs,
+                },
+              }
+            : {}),
+        },
+        deps,
+      );
+      if (boundaryResult.kind === 'unavailable') {
         return deps.jsonError(
           'Unable to enforce MCP boundary protections.',
           503,
           'mcp_boundary_unavailable',
         );
       }
-      if (boundaryRateLimit.value.blocked) {
-        const retryAfterSeconds = boundaryRateLimit.value.retryAfterSeconds;
+      if (boundaryResult.value.blocked) {
+        if (boundaryResult.value.reason === 'replay_detected') {
+          return deps.jsonError(
+            'Replay request detected at MCP boundary.',
+            409,
+            'mcp_replay_detected',
+          );
+        }
+        const retryAfterSeconds = boundaryResult.value.retryAfterSeconds;
         return deps.jsonError(
           'MCP boundary rate limit exceeded.',
           429,
           'mcp_rate_limited',
           { retry_after_seconds: retryAfterSeconds },
           { 'Retry-After': String(retryAfterSeconds) },
-        );
-      }
-
-      const replayFingerprint = await buildMcpReplayFingerprint(
-        request,
-        contentLength,
-        cfg.heavyPayloadBytes,
-      );
-      if (!replayFingerprint) {
-        return null;
-      }
-
-      const replayState = await callAuthLimiter(
-        env,
-        `mcp-replay:${clientId}:${hashBoundaryReplayFingerprint(replayFingerprint)}`,
-        'record',
-        nowMs,
-        deps,
-        {
-          maxAttempts: 2,
-          windowMs: cfg.replayWindowMs,
-          blockMs: cfg.replayWindowMs,
-        },
-      );
-      if (replayState.kind === 'unavailable') {
-        return deps.jsonError(
-          'Unable to enforce MCP replay protections.',
-          503,
-          'mcp_replay_guard_unavailable',
-        );
-      }
-      if (replayState.value.blocked) {
-        return deps.jsonError(
-          'Replay request detected at MCP boundary.',
-          409,
-          'mcp_replay_detected',
         );
       }
 

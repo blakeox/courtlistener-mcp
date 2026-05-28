@@ -92,6 +92,7 @@ const handleMcpWorkerFetch = createWorkerMcpFetchHandler<WorkerMcpEnv>({
     buildCorsHeaders,
     getClientIdentifier: platform.workerObservabilityRuntime.getClientIdentifier,
     getAuthRateLimitedResponse: platform.workerDurableRuntime.getAuthRateLimitedResponse,
+    probeAuthRateLimit: platform.workerDurableRuntime.probeAuthRateLimit,
     recordAuthFailure: platform.workerDurableRuntime.recordAuthFailure,
     clearAuthFailures: platform.workerDurableRuntime.clearAuthFailures,
     evaluateMcpBoundaryRequest: platform.workerDurableRuntime.evaluateMcpBoundaryRequest,

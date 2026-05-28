@@ -105,6 +105,38 @@ recognized by the Worker, but the published browser-auth contract is now the
 
 ## Troubleshooting
 
+### Durable Objects free-tier duration quota (HTTP 503 / alert email)
+
+Cloudflare bills Durable Object **duration** (CPU + storage I/O time while a DO
+is active). This repo uses two DO classes:
+
+- **`AuthFailureLimiterDO`** — auth rate limits, MCP session registry, usage
+  counters (called many times per MCP request)
+- **`CourtListenerMCP`** — one DO per connected MCP client session
+
+If you receive a “90% of daily Durable Objects free tier limit” email, check
+`/health` → `metrics.latency_ms.durable_objects.*` on the edge and MCP workers.
+
+**Immediate mitigation (no deploy):**
+
+1. Wait for the quota reset (midnight UTC).
+2. Upgrade to the **Workers Paid** plan for production traffic.
+3. Temporarily reduce DO load via env vars:
+   - `MCP_BOUNDARY_GUARDS_ENABLED=false` — removes bundled boundary/replay DO
+     calls per MCP request
+   - `MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false` — disables auth/OAuth limiter
+     DO calls
+
+**Code-side optimizations (deploy auth-limiter + MCP workers):**
+
+- MCP session **touch** no longer runs eviction sweeps on every request (alarms
+  handle cleanup).
+- MCP boundary + replay checks are bundled into **one** DO call per request.
+- Successful MCP auth skips a redundant **clear** DO call when the client has no
+  failure state.
+
+See `docs/repo/WORKER_BUNDLE_AUDIT.md` for architecture context.
+
 ### `oauth_route_rate_limit_unavailable` (HTTP 503)
 
 ```json

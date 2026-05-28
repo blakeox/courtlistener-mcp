@@ -305,14 +305,8 @@ describe('createWorkerDurableRuntime', () => {
   it('returns a 503 when MCP replay protections are unavailable', async () => {
     const runtime = createRuntime();
     const env: TestEnv = {
-      AUTH_FAILURE_LIMITER: createLimiterNamespace(async (_request, objectName) => {
-        if (objectName?.includes('mcp-boundary:')) {
-          return Response.json({ blocked: false, retryAfterSeconds: 0 });
-        }
-        if (objectName?.includes('mcp-replay:')) {
-          return new Response('unavailable', { status: 503 });
-        }
-        throw new Error(`Unexpected Durable Object name: ${objectName}`);
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async () => {
+        return new Response('unavailable', { status: 503 });
       }),
       MCP_BOUNDARY_GUARDS_ENABLED: 'true',
     };
@@ -335,9 +329,29 @@ describe('createWorkerDurableRuntime', () => {
     assert.ok(response);
     assert.equal(response?.status, 503);
     assert.deepEqual(await response?.json(), {
-      error: 'Unable to enforce MCP replay protections.',
-      error_code: 'mcp_replay_guard_unavailable',
+      error: 'Unable to enforce MCP boundary protections.',
+      error_code: 'mcp_boundary_unavailable',
     });
+  });
+
+  it('skips auth failure clear when the client has no failure state', async () => {
+    const runtime = createRuntime();
+    const capturedActions: string[] = [];
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async (request) => {
+        const body = (await request.json()) as { action?: string };
+        capturedActions.push(body.action ?? 'unknown');
+        return Response.json({
+          blocked: false,
+          retryAfterSeconds: 0,
+          state: { count: 0, windowStartedAtMs: 0, blockedUntilMs: 0 },
+        });
+      }),
+    };
+
+    await runtime.clearAuthFailures('client-1', env, 1_700_000_000_000, false);
+
+    assert.deepEqual(capturedActions, []);
   });
 
   it('treats session lifecycle validation failures as unavailable', async () => {
@@ -633,5 +647,41 @@ describe('AuthFailureLimiterDO cleanup', () => {
     assert.equal(await storage.get('auth_failure_window_ms'), undefined);
     assert.equal(await storage.get('auth_failure_cleanup_at_ms'), undefined);
     assert.equal(storage.alarmAt, null);
+  });
+
+  it('does not sweep expired MCP sessions on touch', async () => {
+    const { object, storage } = createLimiterObject();
+    await storage.put('mcp_session:expired', {
+      sessionId: 'expired',
+      createdAtMs: 0,
+      lastSeenAtMs: 0,
+      idleExpiresAtMs: 1_000,
+      absoluteExpiresAtMs: 1_000,
+    });
+    await storage.put('mcp_session:active', {
+      sessionId: 'active',
+      createdAtMs: 5_000,
+      lastSeenAtMs: 5_000,
+      idleExpiresAtMs: 60_000,
+      absoluteExpiresAtMs: 120_000,
+    });
+
+    await object.fetch(
+      new Request('https://auth-failure-limiter/internal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mcp_session_touch',
+          nowMs: 10_000,
+          sessionId: 'active',
+          idleTtlMs: 30_000,
+          absoluteTtlMs: 120_000,
+          evictionSweepLimit: 64,
+        }),
+      }),
+    );
+
+    assert.ok(await storage.get('mcp_session:expired'), 'touch should not sweep stale sessions');
+    assert.ok(await storage.get('mcp_session:active'));
   });
 });

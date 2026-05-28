@@ -11,6 +11,8 @@ import type {
   BrowserBootstrapConsumeResponseBody,
   LifetimeQuotaRequestBody,
   LifetimeQuotaResponseBody,
+  McpBoundaryEvaluateRequestBody,
+  McpBoundaryEvaluateResponseBody,
   McpSessionEvictionReason,
   McpSessionLifecycleRequestBody,
   McpSessionLifecycleResponseBody,
@@ -101,6 +103,115 @@ export class AuthFailureLimiterDO {
       this.state.storage.delete(AuthFailureLimiterDO.AUTH_FAILURE_WINDOW_MS_KEY),
       this.state.storage.delete(AuthFailureLimiterDO.AUTH_FAILURE_CLEANUP_AT_MS_KEY),
     ]);
+  }
+
+  private getNamedAuthStateKey(scope: 'boundary' | 'replay', replayFingerprint?: string): string {
+    if (scope === 'boundary') {
+      return 'auth_failure_state';
+    }
+    const fingerprint = typeof replayFingerprint === 'string' ? replayFingerprint.trim() : '';
+    return fingerprint ? `mcp_replay_state:${fingerprint}` : 'mcp_replay_state:invalid';
+  }
+
+  private getNamedAuthWindowKey(scope: 'boundary' | 'replay', replayFingerprint?: string): string {
+    if (scope === 'boundary') {
+      return AuthFailureLimiterDO.AUTH_FAILURE_WINDOW_MS_KEY;
+    }
+    const fingerprint = typeof replayFingerprint === 'string' ? replayFingerprint.trim() : '';
+    return fingerprint ? `mcp_replay_window_ms:${fingerprint}` : 'mcp_replay_window_ms:invalid';
+  }
+
+  private async loadNamedAuthState(
+    scope: 'boundary' | 'replay',
+    replayFingerprint?: string,
+  ): Promise<AuthFailureState> {
+    const key = this.getNamedAuthStateKey(scope, replayFingerprint);
+    const stored = await this.state.storage.get<AuthFailureState>(key);
+    if (!stored) return { ...DEFAULT_AUTH_FAILURE_STATE };
+    return {
+      count: typeof stored.count === 'number' ? stored.count : 0,
+      windowStartedAtMs:
+        typeof stored.windowStartedAtMs === 'number' ? stored.windowStartedAtMs : 0,
+      blockedUntilMs: typeof stored.blockedUntilMs === 'number' ? stored.blockedUntilMs : 0,
+    };
+  }
+
+  private async loadNamedAuthWindowMs(
+    scope: 'boundary' | 'replay',
+    replayFingerprint?: string,
+  ): Promise<number | null> {
+    const key = this.getNamedAuthWindowKey(scope, replayFingerprint);
+    const stored = await this.state.storage.get<number>(key);
+    return typeof stored === 'number' && Number.isFinite(stored) ? stored : null;
+  }
+
+  private async saveNamedAuthState(
+    scope: 'boundary' | 'replay',
+    nextState: AuthFailureState,
+    windowMs: number,
+    replayFingerprint?: string,
+  ): Promise<void> {
+    await Promise.all([
+      this.state.storage.put(this.getNamedAuthStateKey(scope, replayFingerprint), nextState),
+      this.state.storage.put(this.getNamedAuthWindowKey(scope, replayFingerprint), windowMs),
+    ]);
+  }
+
+  private async clearNamedAuthState(
+    scope: 'boundary' | 'replay',
+    replayFingerprint?: string,
+  ): Promise<void> {
+    await Promise.all([
+      this.state.storage.delete(this.getNamedAuthStateKey(scope, replayFingerprint)),
+      this.state.storage.delete(this.getNamedAuthWindowKey(scope, replayFingerprint)),
+    ]);
+  }
+
+  private async recordNamedAuthLimit(
+    scope: 'boundary' | 'replay',
+    nowMs: number,
+    maxAttempts: number,
+    windowMs: number,
+    blockMs: number,
+    replayFingerprint?: string,
+  ): Promise<{ blocked: boolean; retryAfterSeconds: number; state: AuthFailureState }> {
+    let current = await this.loadNamedAuthState(scope, replayFingerprint);
+    const storedWindowMs = await this.loadNamedAuthWindowMs(scope, replayFingerprint);
+    const effectiveWindowMs =
+      storedWindowMs && storedWindowMs > 0 ? Math.max(1_000, storedWindowMs) : windowMs;
+    const currentCleanupAt = this.getAuthFailureCleanupAtMs(current, effectiveWindowMs);
+    if (currentCleanupAt > 0 && currentCleanupAt <= nowMs) {
+      current = { ...DEFAULT_AUTH_FAILURE_STATE };
+      await this.clearNamedAuthState(scope, replayFingerprint);
+    }
+
+    if (current.windowStartedAtMs <= 0 || nowMs - current.windowStartedAtMs >= windowMs) {
+      current = {
+        count: 0,
+        windowStartedAtMs: nowMs,
+        blockedUntilMs: 0,
+      };
+    }
+    const nextCount = current.count + 1;
+    const shouldBlock = nextCount >= maxAttempts;
+    current = {
+      count: nextCount,
+      windowStartedAtMs: current.windowStartedAtMs || nowMs,
+      blockedUntilMs: shouldBlock ? nowMs + blockMs : current.blockedUntilMs,
+    };
+    await this.saveNamedAuthState(scope, current, windowMs, replayFingerprint);
+    if (scope === 'boundary') {
+      await this.scheduleAuthFailureCleanupAlarm(this.getAuthFailureCleanupAtMs(current, windowMs));
+    }
+
+    const blocked = current.blockedUntilMs > nowMs;
+    return {
+      blocked,
+      retryAfterSeconds: blocked
+        ? Math.max(1, Math.ceil((current.blockedUntilMs - nowMs) / 1000))
+        : 0,
+      state: current,
+    };
   }
 
   private getMcpSessionStorageKey(sessionId: string): string {
@@ -204,6 +315,7 @@ export class AuthFailureLimiterDO {
       | BrowserBootstrapConsumeRequestBody
       | UsageCounterRequestBody
       | LifetimeQuotaRequestBody
+      | McpBoundaryEvaluateRequestBody
       | McpSessionLifecycleRequestBody
     >(request);
     if (!body) {
@@ -234,7 +346,10 @@ export class AuthFailureLimiterDO {
         return Response.json({ error: 'invalid_session_id' }, { status: 400 });
       }
 
-      await this.evictExpiredMcpSessions(nowMs, sweepLimit);
+      // Touch is the hot path; rely on alarms for periodic eviction sweeps.
+      if (body.action !== 'mcp_session_touch') {
+        await this.evictExpiredMcpSessions(nowMs, sweepLimit);
+      }
       const storageKey = this.getMcpSessionStorageKey(sessionId);
       const existing = await this.loadMcpSessionState(sessionId);
 
@@ -444,6 +559,57 @@ export class AuthFailureLimiterDO {
 
       await this.state.storage.put(browserBootstrapKey, next);
       return Response.json({ ok: true });
+    }
+
+    if (body.action === 'mcp_boundary_evaluate') {
+      const boundaryBody = body as McpBoundaryEvaluateRequestBody;
+      const nowMs = Number.isFinite(boundaryBody.nowMs) ? boundaryBody.nowMs : Date.now();
+      const boundary = boundaryBody.boundary;
+      const boundaryMaxAttempts = Math.max(1, boundary?.maxAttempts ?? 1);
+      const boundaryWindowMs = Math.max(1_000, boundary?.windowMs ?? 60_000);
+      const boundaryBlockMs = Math.max(1_000, boundary?.blockMs ?? 120_000);
+
+      const boundaryResult = await this.recordNamedAuthLimit(
+        'boundary',
+        nowMs,
+        boundaryMaxAttempts,
+        boundaryWindowMs,
+        boundaryBlockMs,
+      );
+      if (boundaryResult.blocked) {
+        return Response.json({
+          blocked: true,
+          retryAfterSeconds: boundaryResult.retryAfterSeconds,
+          reason: 'boundary_rate_limit',
+        } satisfies McpBoundaryEvaluateResponseBody);
+      }
+
+      const replay = boundaryBody.replay;
+      const replayFingerprint =
+        typeof replay?.fingerprint === 'string' ? replay.fingerprint.trim() : '';
+      if (replay && replayFingerprint) {
+        const replayResult = await this.recordNamedAuthLimit(
+          'replay',
+          nowMs,
+          Math.max(1, replay.maxAttempts ?? 2),
+          Math.max(1_000, replay.windowMs ?? 120_000),
+          Math.max(1_000, replay.blockMs ?? 120_000),
+          replayFingerprint,
+        );
+        if (replayResult.blocked) {
+          return Response.json({
+            blocked: true,
+            retryAfterSeconds: replayResult.retryAfterSeconds,
+            reason: 'replay_detected',
+          } satisfies McpBoundaryEvaluateResponseBody);
+        }
+      }
+
+      return Response.json({
+        blocked: false,
+        retryAfterSeconds: 0,
+        reason: null,
+      } satisfies McpBoundaryEvaluateResponseBody);
     }
 
     if (body.action === 'quota_increment_check') {

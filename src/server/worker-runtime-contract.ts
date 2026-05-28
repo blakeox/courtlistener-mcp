@@ -159,6 +159,35 @@ export interface AuthFailureLimiterResponseBody {
   state: AuthFailureState;
 }
 
+export interface McpBoundaryEvaluateRequestBody {
+  action: 'mcp_boundary_evaluate';
+  nowMs: number;
+  boundary: {
+    maxAttempts: number;
+    windowMs: number;
+    blockMs: number;
+  };
+  replay?: {
+    fingerprint: string;
+    maxAttempts: number;
+    windowMs: number;
+    blockMs: number;
+  };
+}
+
+export type McpBoundaryEvaluateBlockReason = 'boundary_rate_limit' | 'replay_detected';
+
+export interface McpBoundaryEvaluateResponseBody {
+  blocked: boolean;
+  retryAfterSeconds: number;
+  reason: McpBoundaryEvaluateBlockReason | null;
+}
+
+export type AuthRateLimitProbeResult =
+  | { kind: 'allowed'; hasFailureState: boolean }
+  | { kind: 'blocked'; response: Response }
+  | { kind: 'unavailable'; response: Response };
+
 export interface SessionRevocationResponseBody {
   revoked: boolean;
 }
