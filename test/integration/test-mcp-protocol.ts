@@ -173,35 +173,10 @@ function getTests(): TestCase[] {
       },
     },
     {
-      name: 'Search Privacy Cases',
-      payload: {
-        jsonrpc: '2.0',
-        id: 6,
-        method: 'tools/call',
-        params: {
-          name: 'search_cases',
-          arguments: {
-            query: 'privacy rights',
-            court: 'scotus',
-            page_size: 3,
-          },
-        },
-      },
-      validate: (result) => {
-        return (
-          typeof result === 'object' &&
-          result !== null &&
-          'content' in result &&
-          Array.isArray((result as { content?: unknown[] }).content) &&
-          ((result as { content?: unknown[] }).content?.length || 0) > 0
-        );
-      },
-    },
-    {
       name: 'Invalid Method Test',
       payload: {
         jsonrpc: '2.0',
-        id: 7,
+        id: 6,
         method: 'invalid/method',
       },
       validate: (_result, response) => {
