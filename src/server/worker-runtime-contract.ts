@@ -1,7 +1,8 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { WorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.js';
 
-export interface Env {
+/** Shared secrets and feature flags for both edge and MCP workers. */
+export interface WorkerPlatformEnv {
   COURTLISTENER_API_KEY?: string;
   MCP_AUTH_TOKEN?: string;
   MCP_SERVICE_TOKEN_HEADER?: string;
@@ -57,17 +58,38 @@ export interface Env {
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
   MCP_CF_ANALYTICS_ENABLED?: string;
-  MCP_OBJECT: DurableObjectNamespace;
   AUTH_FAILURE_LIMITER: DurableObjectNamespace;
+}
+
+/** Portal worker: OAuth, hosted auth, SPA assets, UI API (no tool registry in bundle). */
+export interface WorkerEdgeEnv extends WorkerPlatformEnv {
+  SPA_ASSETS: Fetcher;
+  /** Service binding to the MCP worker (`courtlistener-mcp-mcp`). */
+  MCP_SERVICE?: Fetcher;
+  /** Local dev fallback when `MCP_SERVICE` is unset (wrangler edge + mcp on two ports). */
+  MCP_DEV_UPSTREAM_URL?: string;
   OAUTH_KV: KVNamespace;
+  ANALYTICS?: AnalyticsEngineDataset;
+  OAUTH_PROVIDER?: OAuthHelpers;
+}
+
+/** MCP worker: `/mcp`, `/sse`, CourtListenerMCP DO, async tool queue. */
+export interface WorkerMcpEnv extends WorkerPlatformEnv {
+  MCP_OBJECT: DurableObjectNamespace;
   ASYNC_JOBS_KV?: KVNamespace;
   ASYNC_TOOL_QUEUE?: Queue<import('./worker-async-queue-runtime.js').AsyncJobMessage>;
   ANALYTICS?: AnalyticsEngineDataset;
-  OAUTH_PROVIDER?: OAuthHelpers;
   AI?: {
     run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   CLOUDFLARE_AI_MODEL?: string;
+}
+
+/** @deprecated Prefer WorkerEdgeEnv or WorkerMcpEnv for new code. */
+export interface Env extends WorkerEdgeEnv, WorkerMcpEnv {
+  MCP_OBJECT: DurableObjectNamespace;
+  SPA_ASSETS: Fetcher;
+  MCP_SERVICE: Fetcher;
 }
 
 export const DEFAULT_AUTH_FAILURE_LIMIT_MAX = 20;
@@ -136,6 +158,35 @@ export interface AuthFailureLimiterResponseBody {
   retryAfterSeconds: number;
   state: AuthFailureState;
 }
+
+export interface McpBoundaryEvaluateRequestBody {
+  action: 'mcp_boundary_evaluate';
+  nowMs: number;
+  boundary: {
+    maxAttempts: number;
+    windowMs: number;
+    blockMs: number;
+  };
+  replay?: {
+    fingerprint: string;
+    maxAttempts: number;
+    windowMs: number;
+    blockMs: number;
+  };
+}
+
+export type McpBoundaryEvaluateBlockReason = 'boundary_rate_limit' | 'replay_detected';
+
+export interface McpBoundaryEvaluateResponseBody {
+  blocked: boolean;
+  retryAfterSeconds: number;
+  reason: McpBoundaryEvaluateBlockReason | null;
+}
+
+export type AuthRateLimitProbeResult =
+  | { kind: 'allowed'; hasFailureState: boolean }
+  | { kind: 'blocked'; response: Response }
+  | { kind: 'unavailable'; response: Response };
 
 export interface SessionRevocationResponseBody {
   revoked: boolean;

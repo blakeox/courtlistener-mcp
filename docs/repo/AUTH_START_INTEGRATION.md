@@ -103,6 +103,73 @@ recognized by the Worker, but the published browser-auth contract is now the
   `hosted_auth_failure`, and `hosted_auth_terminal` so alerts can aggregate by
   stable fields instead of parsing free-form event names.
 
+## Troubleshooting
+
+### Durable Objects free-tier duration quota (HTTP 503 / alert email)
+
+Cloudflare bills Durable Object **duration** (CPU + storage I/O time while a DO
+is active). This repo uses two DO classes:
+
+- **`AuthFailureLimiterDO`** — auth rate limits, MCP session registry, usage
+  counters (called many times per MCP request)
+- **`CourtListenerMCP`** — one DO per connected MCP client session
+
+If you receive a “90% of daily Durable Objects free tier limit” email, check
+`/health` → `metrics.latency_ms.durable_objects.*` on the edge and MCP workers.
+
+**Immediate mitigation (no deploy):**
+
+1. Wait for the quota reset (midnight UTC).
+2. Upgrade to the **Workers Paid** plan for production traffic.
+3. Temporarily reduce DO load via env vars:
+   - `MCP_BOUNDARY_GUARDS_ENABLED=false` — removes bundled boundary/replay DO
+     calls per MCP request
+   - `MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false` — disables auth/OAuth limiter
+     DO calls
+
+**Code-side optimizations (deploy auth-limiter + MCP workers):**
+
+- MCP session **touch** no longer runs eviction sweeps on every request (alarms
+  handle cleanup).
+- MCP boundary + replay checks are bundled into **one** DO call per request.
+- Successful MCP auth skips a redundant **clear** DO call when the client has no
+  failure state.
+
+See `docs/repo/WORKER_BUNDLE_AUDIT.md` for architecture context.
+
+### `oauth_route_rate_limit_unavailable` (HTTP 503)
+
+```json
+{
+  "error": "Unable to validate OAuth route rate limit.",
+  "error_code": "oauth_route_rate_limit_unavailable"
+}
+```
+
+**Root cause (production):** the `AUTH_FAILURE_LIMITER` Durable Object could not
+run. On the Workers **free tier**, tail logs often show:
+
+`Exceeded allowed duration in Durable Objects free tier.`
+
+**Fix options:**
+
+1. Upgrade the Cloudflare Workers plan (recommended for production hosted auth).
+2. Wait for the free-tier DO duration quota to reset.
+3. Set `MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false` to skip limiter calls
+   entirely.
+4. Keep the default `MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN=true` so OAuth and
+   session bootstrap continue when the limiter is down (throttling disabled
+   until the limiter works again). Set to `false` only if you require strict
+   fail-closed behavior.
+
+Check `/health` on the **edge** worker →
+`metrics.latency_ms.durable_objects.auth_limiter.unavailable_count` and
+`pnpm run cloudflare:tail:edge` (or `cloudflare:tail:mcp` for MCP-only issues)
+for `auth_limiter_fetch_error`.
+
+Hosted auth (`/auth/start`) runs on the **edge** worker (`courtlistener-mcp`),
+not the MCP worker — see `docs/repo/WORKER_SPLIT.md`.
+
 ## Verification checklist
 
 1. Open MCP OAuth flow from ChatGPT/Codex.

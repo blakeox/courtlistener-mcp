@@ -17,7 +17,17 @@ import { handleWorkerAuthHandoffRoutes } from '../../../../src/server/worker-aut
 import { handleWorkerOAuthAuthorizeRoute } from '../../../../src/server/worker-oauth-authorize.js';
 import { createWorkerUiSessionRuntime } from '../../../../src/server/worker-ui-session-runtime.js';
 import { renderSpaShellHtml } from '../../../../src/web/spa-shell.js';
-import { SPA_BUILD_ID, SPA_CSS, SPA_JS } from '../../../../src/web/spa-assets.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { SPA_BUILD_ID } from '../../../../src/web/spa-build-id.js';
+
+const spaDistRoot = resolve(process.cwd(), '.spa-dist');
+const spaJs = existsSync(resolve(spaDistRoot, 'app/spa.js'))
+  ? readFileSync(resolve(spaDistRoot, 'app/spa.js'), 'utf8')
+  : '';
+const spaCss = existsSync(resolve(spaDistRoot, 'app/spa.css'))
+  ? readFileSync(resolve(spaDistRoot, 'app/spa.css'), 'utf8')
+  : '';
 
 interface LocalAuthFlowEnv {
   MCP_UI_SESSION_SECRET: string;
@@ -227,13 +237,21 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
         url,
         env,
         deps: {
-          spaJs: SPA_JS,
-          spaCss: SPA_CSS,
           spaBuildId: SPA_BUILD_ID,
           jsonError,
-          spaAssetResponse: (content, contentType, buildId, extraHeaders) =>
-            new Response(content, {
-              status: 200,
+          fetchSpaAsset: async (assetRequest: Request, _env: LocalAuthFlowEnv) => {
+            const path = new URL(assetRequest.url).pathname;
+            if (path.endsWith('spa.js')) {
+              return new Response(spaJs, { status: spaJs ? 200 : 404 });
+            }
+            if (path.endsWith('spa.css')) {
+              return new Response(spaCss, { status: spaCss ? 200 : 404 });
+            }
+            return new Response('not found', { status: 404 });
+          },
+          spaAssetResponse: (assetResponse, contentType, buildId, extraHeaders) =>
+            new Response(assetResponse.body, {
+              status: assetResponse.status,
               headers: {
                 'content-type': contentType,
                 etag: `"${buildId}"`,

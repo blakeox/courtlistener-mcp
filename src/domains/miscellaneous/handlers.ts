@@ -1,5 +1,5 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { z } from '../../common/zod.js';
 import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { withDefaults } from '../../server/handler-decorators.js';

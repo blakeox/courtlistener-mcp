@@ -1,7 +1,7 @@
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { z } from '../../common/zod.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 import type { Court } from '../../types.js';
 import {

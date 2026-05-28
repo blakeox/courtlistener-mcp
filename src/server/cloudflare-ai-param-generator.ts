@@ -1,4 +1,4 @@
-import type { Env } from './worker-runtime-contract.js';
+import type { WorkerMcpEnv } from './worker-runtime-contract.js';
 import { DEFAULT_CF_AI_MODEL_BALANCED } from './worker-runtime-contract.js';
 import {
   type LlmParamGenerator,
@@ -40,7 +40,7 @@ function extractAiText(completion: unknown): string {
   return '';
 }
 
-export function createCloudflareAiParamGenerator(env: Env): LlmParamGenerator | undefined {
+export function createCloudflareAiParamGenerator(env: WorkerMcpEnv): LlmParamGenerator | undefined {
   const ai = env.AI;
   if (!ai || typeof ai.run !== 'function') {
     return undefined;

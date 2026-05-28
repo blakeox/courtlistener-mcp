@@ -4,7 +4,7 @@
  */
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { z } from '../../common/zod.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { AdvancedSearchParams } from '../../types.js';
 import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';

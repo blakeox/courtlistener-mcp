@@ -158,9 +158,11 @@ describe('worker response runtime', () => {
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   });
 
-  it('builds SPA asset responses with cache metadata', () => {
-    const response = spaAssetResponse('body{}', 'text/css; charset=utf-8', 'build-7');
+  it('builds SPA asset responses with cache metadata', async () => {
+    const asset = new Response('body{}', { status: 200 });
+    const response = spaAssetResponse(asset, 'text/css; charset=utf-8', 'build-7');
 
+    assert.equal(await response.text(), 'body{}');
     assert.equal(response.headers.get('etag'), '"build-7"');
     assert.equal(response.headers.get('cache-control'), 'public, max-age=300');
   });

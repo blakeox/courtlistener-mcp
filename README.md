@@ -280,19 +280,24 @@ pnpm run ci:auth-release-gate
 
 ## Deployment (Cloudflare Workers)
 
+Production uses **three** Worker scripts (edge portal, MCP, auth limiter). See
+[`docs/repo/WORKER_SPLIT.md`](docs/repo/WORKER_SPLIT.md).
+
 ```bash
 pnpm install
-wrangler secret put COURTLISTENER_API_KEY
-wrangler secret put MCP_UI_SESSION_SECRET
-wrangler secret put OIDC_ISSUER
-wrangler secret put OIDC_AUDIENCE
-wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET
+pnpm run generate:web:spa
+pnpm run generate:tool-schemas
+pnpm run generate:hosted-auth-styles
+# Secrets (apply to edge + MCP workers as needed)
+wrangler secret put COURTLISTENER_API_KEY -c wrangler.mcp.jsonc
+wrangler secret put MCP_UI_SESSION_SECRET -c wrangler.edge.jsonc
+wrangler secret put OIDC_ISSUER -c wrangler.edge.jsonc
+wrangler secret put OIDC_AUDIENCE -c wrangler.edge.jsonc
+wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET -c wrangler.edge.jsonc
 # Optional shared token auth
-wrangler secret put MCP_AUTH_TOKEN
-# Optional: set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (defaults to 86400)
-# Optional: set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only if intentionally trusting Cloudflare Access assertions/identity headers
+wrangler secret put MCP_AUTH_TOKEN -c wrangler.mcp.jsonc
 pnpm run cloudflare:check
-pnpm run cloudflare:deploy
+pnpm run deploy   # limiter → mcp → edge
 ```
 
 Endpoints after deploy:
@@ -455,11 +460,15 @@ Before promoting a hosted Worker deploy, verify:
 
 ## Runtime and Observability
 
-When metrics are enabled, local server endpoints include:
+When metrics are enabled, local split-worker endpoints include:
 
-- `GET http://localhost:3001/health`
-- `GET http://localhost:3001/metrics`
-- `GET http://localhost:3001/cache`
+- Edge (portal, OAuth, SPA shell): `GET http://localhost:8787/health`
+  (`pnpm run health`)
+- MCP (`/mcp`, `/sse`, queue): `GET http://localhost:3001/health`
+  (`pnpm run health:mcp`)
+
+Start both with `pnpm run dev:workers`; point the Vite SPA dev server at the
+edge worker (default `http://localhost:8787`).
 
 Useful runtime variables:
 

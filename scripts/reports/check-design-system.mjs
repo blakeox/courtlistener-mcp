@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = process.cwd();
@@ -26,7 +26,7 @@ const shellPath = path.join(spaRoot, 'src/components/Shell.tsx');
 const toastClassesPath = path.join(spaRoot, 'src/lib/toast-classes.ts');
 const toastPath = path.join(spaRoot, 'src/components/Toast.tsx');
 const workspacePagesDir = path.join(spaRoot, 'src/pages');
-const spaDistAssetsDir = path.join(repoRoot, '.spa-dist/assets');
+const spaDistRoot = path.join(repoRoot, '.spa-dist');
 const maxProductionCssBytes = 92 * 1024;
 
 const errors = [];
@@ -547,6 +547,25 @@ function checkLandingClassesExports() {
   ]);
 }
 
+function collectSpaDistCssBytes(dir) {
+  if (!existsSync(dir)) {
+    return 0;
+  }
+  let cssBytes = 0;
+  for (const fileName of readdirSync(dir)) {
+    const fullPath = path.join(dir, fileName);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      cssBytes += collectSpaDistCssBytes(fullPath);
+      continue;
+    }
+    if (fileName.endsWith('.css')) {
+      cssBytes += stats.size;
+    }
+  }
+  return cssBytes;
+}
+
 function checkProductionCssBudget() {
   try {
     execFileSync('pnpm', ['exec', 'vite', 'build', '--config', 'src/web-spa/vite.config.ts'], {
@@ -557,15 +576,9 @@ function checkProductionCssBudget() {
     errors.push('Production CSS budget check failed: SPA build did not complete.');
     return;
   }
-  let cssBytes = 0;
-  for (const fileName of readdirSync(spaDistAssetsDir)) {
-    if (!fileName.endsWith('.css')) {
-      continue;
-    }
-    cssBytes += statSync(path.join(spaDistAssetsDir, fileName)).size;
-  }
+  const cssBytes = collectSpaDistCssBytes(spaDistRoot);
   if (cssBytes === 0) {
-    errors.push('Production CSS budget check failed: no CSS assets in .spa-dist/assets.');
+    errors.push('Production CSS budget check failed: no CSS assets under .spa-dist/.');
     return;
   }
   if (cssBytes > maxProductionCssBytes) {

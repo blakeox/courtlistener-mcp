@@ -8,6 +8,7 @@ import type {
   ProtocolHeaderNegotiationDiagnostics,
   WorkerSecurityEnv,
 } from './worker-security.js';
+import type { AuthRateLimitProbeResult } from './worker-runtime-contract.js';
 import { isAllowedOrigin } from './worker-security.js';
 
 export interface McpHandler<Env extends WorkerSecurityEnv> {
@@ -249,8 +250,18 @@ export interface HandleMcpTransportBoundaryParams<
     env: Env,
     nowMs: number,
   ) => Promise<Response | null>;
+  probeAuthRateLimit?: (
+    clientId: string,
+    env: Env,
+    nowMs: number,
+  ) => Promise<AuthRateLimitProbeResult>;
   recordAuthFailure: (clientId: string, env: Env, nowMs: number) => Promise<void>;
-  clearAuthFailures: (clientId: string, env: Env, nowMs: number) => Promise<void>;
+  clearAuthFailures: (
+    clientId: string,
+    env: Env,
+    nowMs: number,
+    hadFailureState?: boolean,
+  ) => Promise<void>;
   skipGatewayAuth?: boolean;
   evaluateMcpBoundaryRequest?: (
     request: Request,
@@ -292,6 +303,7 @@ export async function handleMcpTransportBoundary<
     buildCorsHeaders,
     getClientIdentifier,
     getAuthRateLimitedResponse,
+    probeAuthRateLimit,
     recordAuthFailure,
     clearAuthFailures,
     skipGatewayAuth,
@@ -346,10 +358,16 @@ export async function handleMcpTransportBoundary<
     // Standard direct-access path: validate credentials via gateway auth
     // with rate-limiting and protocol-version enforcement.
     const clientId = getClientIdentifier(request);
-    const rateLimited = await getAuthRateLimitedResponse(clientId, env, nowMs);
-    if (rateLimited) {
-      return withCors(rateLimited, origin, allowedOrigins);
+    const authRateLimitProbe = probeAuthRateLimit
+      ? await probeAuthRateLimit(clientId, env, nowMs)
+      : ({
+          kind: 'allowed',
+          hasFailureState: false,
+        } satisfies AuthRateLimitProbeResult);
+    if (authRateLimitProbe.kind !== 'allowed') {
+      return withCors(authRateLimitProbe.response, origin, allowedOrigins);
     }
+    const hadAuthFailureState = authRateLimitProbe.hasFailureState;
 
     if (evaluateMcpBoundaryRequest) {
       const abuseError = await evaluateMcpBoundaryRequest(request, env, clientId, nowMs);
@@ -379,7 +397,7 @@ export async function handleMcpTransportBoundary<
       );
     }
 
-    await clearAuthFailures(clientId, env, nowMs);
+    await clearAuthFailures(clientId, env, nowMs, hadAuthFailureState);
     principal = authResult.principal;
     protocolNegotiation = authResult.protocolNegotiation;
   }
