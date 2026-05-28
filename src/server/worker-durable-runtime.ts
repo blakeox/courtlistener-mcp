@@ -61,6 +61,8 @@ export interface WorkerDurableRuntimeEnv {
   MCP_BOUNDARY_HEAVY_PAYLOAD_BYTES?: string;
   MCP_BOUNDARY_MAX_PAYLOAD_BYTES?: string;
   MCP_BOUNDARY_REPLAY_WINDOW_SECONDS?: string;
+  MCP_SESSION_LIFECYCLE_FAIL_OPEN?: string;
+  MCP_BOUNDARY_FAIL_OPEN?: string;
   MCP_UI_RATE_LIMIT_ENABLED?: string;
   MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
 }
@@ -200,6 +202,25 @@ export function shouldFailOpenOnAuthLimiterUnavailable(env: {
     return parseBoolean(env.MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN);
   }
   return true;
+}
+
+function shouldFailOpenOnSessionLifecycleUnavailable(env: {
+  MCP_SESSION_LIFECYCLE_FAIL_OPEN?: string;
+}): boolean {
+  if (env.MCP_SESSION_LIFECYCLE_FAIL_OPEN !== undefined) {
+    return parseBoolean(env.MCP_SESSION_LIFECYCLE_FAIL_OPEN);
+  }
+  return true;
+}
+
+function shouldFailOpenOnMcpBoundaryUnavailable(env: {
+  MCP_BOUNDARY_FAIL_OPEN?: string;
+  MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
+}): boolean {
+  if (env.MCP_BOUNDARY_FAIL_OPEN !== undefined) {
+    return parseBoolean(env.MCP_BOUNDARY_FAIL_OPEN);
+  }
+  return shouldFailOpenOnAuthLimiterUnavailable(env);
 }
 
 function logAuthLimiterFailOpen(surface: string, context: Record<string, unknown>): void {
@@ -579,6 +600,10 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
             deps,
           );
           if (result.kind === 'unavailable') {
+            if (shouldFailOpenOnSessionLifecycleUnavailable(env)) {
+              logAuthLimiterFailOpen('mcp_session_touch', { session_id: sessionId });
+              return 'active' satisfies McpSessionValidationState;
+            }
             return 'unavailable' satisfies McpSessionValidationState;
           }
           return result.value.active ? 'active' : 'invalid';
@@ -598,7 +623,9 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
             deps,
           );
           return result.kind === 'unavailable'
-            ? ('unavailable' satisfies McpSessionMutationState)
+            ? shouldFailOpenOnSessionLifecycleUnavailable(env)
+              ? ('ok' satisfies McpSessionMutationState)
+              : ('unavailable' satisfies McpSessionMutationState)
             : 'ok';
         },
         closeSession: async (sessionId) => {
@@ -610,7 +637,9 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
             deps,
           );
           return result.kind === 'unavailable'
-            ? ('unavailable' satisfies McpSessionMutationState)
+            ? shouldFailOpenOnSessionLifecycleUnavailable(env)
+              ? ('ok' satisfies McpSessionMutationState)
+              : ('unavailable' satisfies McpSessionMutationState)
             : 'ok';
         },
       });
@@ -752,6 +781,10 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
         deps,
       );
       if (boundaryResult.kind === 'unavailable') {
+        if (shouldFailOpenOnMcpBoundaryUnavailable(env)) {
+          logAuthLimiterFailOpen('mcp_boundary', { client_id: clientId });
+          return null;
+        }
         return deps.jsonError(
           'Unable to enforce MCP boundary protections.',
           503,

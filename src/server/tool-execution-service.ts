@@ -13,6 +13,7 @@ import {
   createAsyncEnvelope,
   isAsyncControlToolName,
   parseAsyncExecutionDirective,
+  DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES,
 } from './async-tool-workflow.js';
 import { SamplingService } from './sampling-service.js';
 import { ToolHandlerRegistry, type ToolContext } from './tool-handler.js';
@@ -105,8 +106,12 @@ export function createDirectToolExecutionService(
 
       const parsedRequest = parseAsyncExecutionDirective(normalizedRequest);
       const principal = getPrincipalContext();
+      const shouldQueueByDefault =
+        asyncWorkflow.isEnabled() &&
+        !parsedRequest.directive?.mode &&
+        DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES.has(parsedRequest.request.params.name);
 
-      if (parsedRequest.directive?.mode === 'async') {
+      if (parsedRequest.directive?.mode === 'async' || shouldQueueByDefault) {
         if (!asyncWorkflow.isEnabled()) {
           return createAsyncEnvelope(
             {
@@ -120,7 +125,7 @@ export function createDirectToolExecutionService(
         return await asyncWorkflow.enqueueToolCall({
           request: parsedRequest.request,
           requestId,
-          directive: parsedRequest.directive,
+          directive: parsedRequest.directive ?? { mode: 'async' },
           execute: async (queuedRequest, queuedRequestId) =>
             await toolRegistry.execute(queuedRequest, {
               logger,
