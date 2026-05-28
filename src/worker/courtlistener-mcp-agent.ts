@@ -48,12 +48,17 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<CourtListener
   /** Set from `worker-mcp.ts` before handling requests. */
   static telemetry: CourtListenerMcpAgentTelemetry | null = null;
 
+  private servicesInitialized = false;
+
   server = new McpServer(
     { name: SERVER_INFO.name, version: SERVER_INFO.version },
     { capabilities: SERVER_CAPABILITIES },
   ) as unknown as InstanceType<typeof McpAgent>['server'];
 
   async init(): Promise<void> {
+    if (this.servicesInitialized) {
+      return;
+    }
     const env = (this as unknown as { env: CourtListenerMcpAgentEnv }).env;
     if (env.COURTLISTENER_API_KEY) {
       process.env.COURTLISTENER_API_KEY = env.COURTLISTENER_API_KEY;
@@ -136,6 +141,7 @@ export class CourtListenerMCP extends (McpAgent as typeof McpAgent<CourtListener
         }
       },
     });
+    this.servicesInitialized = true;
   }
 }
 
