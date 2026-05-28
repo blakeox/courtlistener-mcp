@@ -58,7 +58,8 @@ interface TestCase {
 }
 
 const DEFAULT_STDIO_TIMEOUT_MS = 10_000;
-const TOOL_CALL_TIMEOUT_MS = 30_000;
+const TOOL_CALL_TIMEOUT_MS = 60_000;
+const TOOL_CALL_MAX_ATTEMPTS = 2;
 
 function resolveTestTimeoutMs(test: TestCase): number {
   if (test.timeoutMs !== undefined) {
@@ -331,7 +332,28 @@ async function testMCPServer(): Promise<boolean> {
       for (const test of tests) {
         console.log(`🔍 Testing: ${test.name}`);
         try {
-          const response = await client.send(test.payload, resolveTestTimeoutMs(test));
+          const timeoutMs = resolveTestTimeoutMs(test);
+          const maxAttempts = test.payload.method === 'tools/call' ? TOOL_CALL_MAX_ATTEMPTS : 1;
+          let response: MCPResponse | undefined;
+          let lastError: unknown;
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+              response = await client.send(test.payload, timeoutMs);
+              lastError = undefined;
+              break;
+            } catch (error) {
+              lastError = error;
+              if (attempt < maxAttempts) {
+                console.log(`     ↻ Retrying after transient timeout (attempt ${attempt + 1})`);
+              }
+            }
+          }
+          if (lastError) {
+            throw lastError;
+          }
+          if (!response) {
+            throw new Error('No MCP response received');
+          }
           if (test.validate(response.result, response)) {
             console.log('  ✅ PASSED');
             passed++;

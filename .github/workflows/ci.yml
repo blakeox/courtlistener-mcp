@@ -384,7 +384,8 @@ jobs:
         run: |
           case "${{ matrix.gate }}" in
             protocol-contract)
-              pnpm run test:mcp
+              # Live MCP stdio tests run in full-validation and mcp-compliance; avoid
+              # parallel CourtListener calls that flake when duplicated here.
               npx tsx --test test/unit/test-protocol-governance.ts
               ;;
             auth-security-matrix)
