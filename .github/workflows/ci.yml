@@ -164,7 +164,18 @@ jobs:
         run: pnpm run typecheck
 
       - name: Build
+        if: matrix.node-version != 18
         run: pnpm run build
+
+      - name: Build (Node 18 — skip Vite; requires Node 20+)
+        if: matrix.node-version == 18
+        run: |
+          pnpm run clean
+          pnpm run generate:tool-schemas
+          pnpm run generate:hosted-auth-styles
+          pnpm exec tsc
+          pnpm run generate:manifest
+          pnpm run format:generated
 
       - name: Run unit tests
         run: pnpm run test:unit
@@ -300,6 +311,9 @@ jobs:
 
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build SPA assets for Playwright
+        run: pnpm run generate:web:spa
 
       - name: Run SPA auth browser tests
         run: pnpm run test:spa:e2e:auth
