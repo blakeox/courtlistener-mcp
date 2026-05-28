@@ -49,10 +49,22 @@ interface TestCase {
       arguments?: Record<string, unknown>;
     };
   };
+  /** Stdio/HTTP wait budget; CourtListener tool calls need more headroom in CI. */
+  timeoutMs?: number;
   validate: (
     result: unknown,
     response?: { error?: { code?: number; message?: string } },
   ) => boolean;
+}
+
+const DEFAULT_STDIO_TIMEOUT_MS = 10_000;
+const TOOL_CALL_TIMEOUT_MS = 30_000;
+
+function resolveTestTimeoutMs(test: TestCase): number {
+  if (test.timeoutMs !== undefined) {
+    return test.timeoutMs;
+  }
+  return test.payload.method === 'tools/call' ? TOOL_CALL_TIMEOUT_MS : DEFAULT_STDIO_TIMEOUT_MS;
 }
 
 function buildMcpRequestHeaders(): Record<string, string> {
@@ -147,7 +159,7 @@ function getTests(): TestCase[] {
         method: 'tools/call',
         params: {
           name: 'list_courts',
-          arguments: { jurisdiction: 'F' },
+          arguments: { jurisdiction: 'F', page_size: 1 },
         },
       },
       validate: (result) => {
@@ -266,12 +278,15 @@ function createStdioClient(): {
     // Server logs to stderr; keep output clean for test status lines.
   });
 
-  const send = (payload: { id: number; [key: string]: unknown }): Promise<MCPResponse> => {
+  const send = (
+    payload: { id: number; [key: string]: unknown },
+    timeoutMs = DEFAULT_STDIO_TIMEOUT_MS,
+  ): Promise<MCPResponse> => {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pending.delete(payload.id);
         reject(new Error(`Timeout waiting for response to request id=${payload.id}`));
-      }, 10000);
+      }, timeoutMs);
 
       pending.set(payload.id, (response) => {
         clearTimeout(timeout);
@@ -341,7 +356,7 @@ async function testMCPServer(): Promise<boolean> {
       for (const test of tests) {
         console.log(`🔍 Testing: ${test.name}`);
         try {
-          const response = await client.send(test.payload);
+          const response = await client.send(test.payload, resolveTestTimeoutMs(test));
           if (test.validate(response.result, response)) {
             console.log('  ✅ PASSED');
             passed++;
@@ -414,7 +429,7 @@ async function testSpecificFunction(
 
     const client = createStdioClient();
     try {
-      const response = await client.send(payload);
+      const response = await client.send(payload, TOOL_CALL_TIMEOUT_MS);
       if (response.error) {
         console.log(`❌ Error: ${response.error.message}`);
         return false;
