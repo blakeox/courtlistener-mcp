@@ -367,6 +367,17 @@ function evaluateThresholds(comparison, thresholds, p95MinDeltaMs) {
   return { warnings, failures };
 }
 
+const DEFAULT_UNRELIABLE_CLASS_ERROR_RATE_PCT = 50;
+
+function isUnreliableEndpointClass(baseline, current, thresholdPct) {
+  return (
+    Number.isFinite(baseline.errorRate) &&
+    Number.isFinite(current.errorRate) &&
+    baseline.errorRate >= thresholdPct &&
+    current.errorRate >= thresholdPct
+  );
+}
+
 function evaluateEndpointClassThresholds(
   baselineClasses,
   currentClasses,
@@ -376,11 +387,22 @@ function evaluateEndpointClassThresholds(
   const warnings = [];
   const failures = [];
   const evaluatedClasses = [];
+  const skippedClasses = [];
+  const unreliableErrorRatePct = Number(
+    process.env.PERF_GATE_UNRELIABLE_CLASS_ERROR_RATE_PCT ??
+      DEFAULT_UNRELIABLE_CLASS_ERROR_RATE_PCT,
+  );
 
   for (const [className, thresholds] of Object.entries(classThresholds)) {
     const baseline = baselineClasses[className];
     const current = currentClasses[className];
     if (!baseline || !current) continue;
+
+    if (isUnreliableEndpointClass(baseline, current, unreliableErrorRatePct)) {
+      skippedClasses.push(className);
+      continue;
+    }
+
     evaluatedClasses.push(className);
 
     if (
@@ -438,7 +460,7 @@ function evaluateEndpointClassThresholds(
     }
   }
 
-  return { warnings, failures, evaluatedClasses };
+  return { warnings, failures, evaluatedClasses, skippedClasses };
 }
 
 function resolvePolicyMode(options) {
@@ -548,6 +570,11 @@ function generateReport(comparison, options = {}) {
   if (endpointThresholdResult.evaluatedClasses.length > 0) {
     console.log(
       `   Endpoint classes evaluated: ${endpointThresholdResult.evaluatedClasses.join(', ')}`,
+    );
+  }
+  if (endpointThresholdResult.skippedClasses?.length > 0) {
+    console.log(
+      `   Endpoint classes skipped (error rate >= ${options.unreliableClassErrorRatePct ?? DEFAULT_UNRELIABLE_CLASS_ERROR_RATE_PCT}%): ${endpointThresholdResult.skippedClasses.join(', ')}`,
     );
   }
 
