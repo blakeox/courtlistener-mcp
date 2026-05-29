@@ -24,6 +24,7 @@ function parseArgs(argv) {
     outputPath: '',
     dryRun: false,
     light: false,
+    classes: [],
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -48,6 +49,18 @@ function parseArgs(argv) {
     else if (arg.startsWith('--auth-token=')) options.authToken = (arg.split('=')[1] || '').trim();
     else if (arg === '--output') options.outputPath = argv[++i] || '';
     else if (arg.startsWith('--output=')) options.outputPath = arg.split('=')[1] || '';
+    else if (arg === '--classes') {
+      options.classes = (argv[++i] || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    } else if (arg.startsWith('--classes=')) {
+      options.classes = arg
+        .split('=')[1]
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
   }
 
   if (options.light) {
@@ -74,7 +87,35 @@ function printUsage() {
   console.log('  --auth-token <token>   Optional bearer token for MCP/API requests');
   console.log('  --output <file>        Optional output JSON path');
   console.log('  --light                Small local validation run');
+  console.log('  --classes <mcp,api>    Limit scenarios (default: auto-detect worker API routes)');
   console.log('  --dry-run              Print planned scenarios only, no HTTP requests');
+}
+
+function scenarioClass(name) {
+  if (name.startsWith('mcp_')) return 'mcp';
+  if (name.startsWith('api_')) return 'api';
+  if (name.startsWith('auth_')) return 'auth';
+  return '';
+}
+
+async function probeWorkerApiRoutes(baseUrl, timeoutMs) {
+  const session = await fetchWithTiming(`${baseUrl}/api/session`, { method: 'GET' }, timeoutMs);
+  return session.status === 200;
+}
+
+async function resolveEnabledClasses(baseUrl, timeoutMs, explicitClasses) {
+  if (explicitClasses.length > 0) return explicitClasses;
+  const hasWorkerApi = await probeWorkerApiRoutes(baseUrl, timeoutMs);
+  if (hasWorkerApi) return ['mcp', 'api', 'auth'];
+  console.log(
+    'Worker UI API routes unavailable at this base URL; running MCP load scenarios only.',
+  );
+  return ['mcp'];
+}
+
+function filterScenariosByClass(scenarios, enabledClasses) {
+  const allowed = new Set(enabledClasses);
+  return scenarios.filter((scenario) => allowed.has(scenarioClass(scenario.name)));
 }
 
 function percentile(values, p) {
@@ -478,8 +519,22 @@ async function main() {
   }
 
   const healthBefore = await fetchHealthMetrics(options.baseUrl, options.timeoutMs);
-  const csrfToken = await getCsrfToken(options.baseUrl, options.timeoutMs);
-  const scenarios = await createScenarioRunners(options, csrfToken);
+  const enabledClasses = await resolveEnabledClasses(
+    options.baseUrl,
+    options.timeoutMs,
+    options.classes,
+  );
+  const csrfToken = enabledClasses.includes('auth')
+    ? await getCsrfToken(options.baseUrl, options.timeoutMs)
+    : '';
+  const scenarios = filterScenariosByClass(
+    await createScenarioRunners(options, csrfToken),
+    enabledClasses,
+  );
+  if (scenarios.length === 0) {
+    throw new Error(`No load scenarios enabled for classes: ${enabledClasses.join(', ')}`);
+  }
+  console.log(`Enabled scenario classes: ${enabledClasses.join(', ')}`);
 
   const results = [];
   for (const scenario of scenarios) {
@@ -498,6 +553,7 @@ async function main() {
     concurrency: options.concurrency,
     timeout_ms: options.timeoutMs,
     scenario_count: scenarios.length,
+    enabled_classes: enabledClasses,
     summary: buildSummary(results),
     results,
     worker_latency_health: {
