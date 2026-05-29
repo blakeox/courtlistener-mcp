@@ -5,6 +5,22 @@ import type { Logger } from '../infrastructure/logger.js';
 
 export type AsyncJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'expired';
 
+/** CourtListener tools that should leave the MCP session DO when async queue bindings exist. */
+export const DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES = new Set([
+  'search_cases',
+  'search_opinions',
+  'advanced_search',
+  'smart_search',
+  'get_comprehensive_case_analysis',
+  'analyze_case_authorities',
+  'get_citation_network',
+  'get_comprehensive_judge_profile',
+  'get_enhanced_recap_data',
+  'validate_citations',
+  'get_case_details',
+  'get_opinion_text',
+]);
+
 export interface AsyncExecutionDirective {
   mode?: 'sync' | 'async';
   idempotencyKey?: string;

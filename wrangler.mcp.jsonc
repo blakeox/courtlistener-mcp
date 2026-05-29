@@ -10,6 +10,9 @@
   "vars": {
     "MCP_OAUTH_BACKEND": "cloudflare",
     "MCP_ALLOW_DEV_FALLBACK": "false",
+    "MCP_SESSION_IDLE_TTL_SECONDS": "900",
+    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "true",
+    "MCP_BOUNDARY_FAIL_OPEN": "true",
   },
   "ai": {
     "binding": "AI",
