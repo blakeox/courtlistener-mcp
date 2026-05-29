@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION_FILE: '.nvmrc'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -21,9 +21,6 @@ jobs:
   unit-tests:
     name: 🧪 Unit & Infrastructure Tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '["20"]' || '["18","20"]') }}
 
     steps:
       - name: 📥 Checkout Repository
@@ -31,10 +28,10 @@ jobs:
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
-      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+      - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: 'pnpm'
 
       - name: 📦 Install Dependencies
@@ -79,9 +76,6 @@ jobs:
     name: 📊 Comprehensive Testing & Coverage
     runs-on: ubuntu-latest
     needs: unit-tests
-    env:
-      COMPREHENSIVE_NODE_VERSION: '20'
-
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v6
@@ -91,7 +85,7 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.COMPREHENSIVE_NODE_VERSION }}
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: 'pnpm'
 
       - name: 📦 Install Dependencies
@@ -127,7 +121,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports-node-${{ env.COMPREHENSIVE_NODE_VERSION }}
+          name: test-reports-node-22
           path: |
             test-report.json
             TEST-REPORT.md
@@ -159,7 +153,7 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: 'pnpm'
 
       - name: 📦 Install Dependencies
@@ -202,7 +196,7 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: 'pnpm'
 
       - name: 📦 Install Dependencies
@@ -389,7 +383,7 @@ jobs:
 
 # Workflow Summary
 # 📋 This comprehensive CI/CD pipeline provides:
-# ✅ Multi-node version testing (Node 18, 20)
+# ✅ Node 22 LTS (see .nvmrc; Vite SPA build requires Node 20+)
 # 🧪 Complete test suite execution (Weeks 1-4)
 # 📊 Coverage reporting and analysis
 # 🔒 Security auditing and quality checks

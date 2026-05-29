@@ -110,6 +110,7 @@ describe('GitHub workflow hardening', () => {
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
     assert.match(ciWorkflow, /name: Smoke Matrix/);
+    assert.match(ciWorkflow, /node-version-file: '\.nvmrc'/);
     assert.match(ciWorkflow, /full-validation:/);
     assert.match(ciWorkflow, /concurrency:/);
     assert.match(ciWorkflow, /cancel-in-progress: true/);
