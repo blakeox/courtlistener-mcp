@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '["20"]' || '["18","20"]') }}
+        node-version: ${{ fromJSON('["20","22"]') }}
 
     steps:
       - name: 📥 Checkout Repository
@@ -389,7 +389,7 @@ jobs:
 
 # Workflow Summary
 # 📋 This comprehensive CI/CD pipeline provides:
-# ✅ Multi-node version testing (Node 18, 20)
+# ✅ Multi-node version testing (Node 20, 22; Vite SPA build requires Node 20+)
 # 🧪 Complete test suite execution (Weeks 1-4)
 # 📊 Coverage reporting and analysis
 # 🔒 Security auditing and quality checks
