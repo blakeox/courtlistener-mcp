@@ -31,6 +31,14 @@ async function parseJsonBody<T>(request: Request): Promise<T | null> {
   }
 }
 
+const MCP_REPLAY_STATE_PREFIX = 'mcp_replay_state:';
+const USAGE_BY_ROUTE_MAX_ENTRIES = 32;
+const SESSION_TOUCH_EVICTION_SAMPLE_MODULO = 8;
+const SESSION_TOUCH_EVICTION_SWEEP_LIMIT = 16;
+const MCP_SESSION_ALARM_SCAN_LIMIT = 64;
+const MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT = 128;
+const MCP_REPLAY_EVICTION_SWEEP_LIMIT = 64;
+
 export class AuthFailureLimiterDO {
   private static readonly AUTH_FAILURE_WINDOW_MS_KEY = 'auth_failure_window_ms';
   private static readonly AUTH_FAILURE_CLEANUP_AT_MS_KEY = 'auth_failure_cleanup_at_ms';
@@ -186,6 +194,9 @@ export class AuthFailureLimiterDO {
     }
 
     if (current.windowStartedAtMs <= 0 || nowMs - current.windowStartedAtMs >= windowMs) {
+      if (scope === 'replay' && replayFingerprint && !this.hasAuthFailureState(current)) {
+        await this.clearNamedAuthState(scope, replayFingerprint);
+      }
       current = {
         count: 0,
         windowStartedAtMs: nowMs,
@@ -244,6 +255,52 @@ export class AuthFailureLimiterDO {
     return { active: true, reason: 'active' };
   }
 
+  private capUsageByRoute(byRoute: Record<string, number>): Record<string, number> {
+    const entries = Object.entries(byRoute);
+    if (entries.length <= USAGE_BY_ROUTE_MAX_ENTRIES) {
+      return byRoute;
+    }
+    return Object.fromEntries(
+      entries.sort((left, right) => right[1] - left[1]).slice(0, USAGE_BY_ROUTE_MAX_ENTRIES),
+    );
+  }
+
+  private shouldRunTouchEvictionSweep(sessionId: string): boolean {
+    let hash = 2166136261;
+    for (let i = 0; i < sessionId.length; i += 1) {
+      hash ^= sessionId.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) % SESSION_TOUCH_EVICTION_SAMPLE_MODULO === 0;
+  }
+
+  private async evictExpiredReplayStates(nowMs: number, sweepLimit: number): Promise<void> {
+    const entries = await this.state.storage.list<AuthFailureState>({
+      prefix: MCP_REPLAY_STATE_PREFIX,
+      limit: Math.max(1, sweepLimit),
+    });
+    const deleteKeys: string[] = [];
+    for (const [stateKey, value] of entries.entries()) {
+      const fingerprint = stateKey.slice(MCP_REPLAY_STATE_PREFIX.length);
+      if (!fingerprint) {
+        deleteKeys.push(stateKey);
+        continue;
+      }
+      const state = value as AuthFailureState;
+      const windowMs =
+        (await this.loadNamedAuthWindowMs('replay', fingerprint)) ??
+        DEFAULT_AUTH_FAILURE_WINDOW_SECONDS * 1000;
+      const cleanupAt = this.getAuthFailureCleanupAtMs(state, windowMs);
+      if (cleanupAt > 0 && cleanupAt <= nowMs) {
+        deleteKeys.push(stateKey);
+        deleteKeys.push(this.getNamedAuthWindowKey('replay', fingerprint));
+      }
+    }
+    if (deleteKeys.length > 0) {
+      await Promise.all(deleteKeys.map((key) => this.state.storage.delete(key)));
+    }
+  }
+
   private async evictExpiredMcpSessions(nowMs: number, sweepLimit: number): Promise<void> {
     const entries = await this.state.storage.list<McpSessionLifecycleState>({
       prefix: 'mcp_session:',
@@ -282,7 +339,7 @@ export class AuthFailureLimiterDO {
   private async refreshMcpSessionAlarm(): Promise<void> {
     const entries = await this.state.storage.list<McpSessionLifecycleState>({
       prefix: 'mcp_session:',
-      limit: 256,
+      limit: MCP_SESSION_ALARM_SCAN_LIMIT,
     });
     let nextAtMs = Number.POSITIVE_INFINITY;
     for (const value of entries.values()) {
@@ -346,8 +403,11 @@ export class AuthFailureLimiterDO {
         return Response.json({ error: 'invalid_session_id' }, { status: 400 });
       }
 
-      // Touch is the hot path; rely on alarms for periodic eviction sweeps.
-      if (body.action !== 'mcp_session_touch') {
+      if (body.action === 'mcp_session_touch') {
+        if (this.shouldRunTouchEvictionSweep(sessionId)) {
+          await this.evictExpiredMcpSessions(nowMs, SESSION_TOUCH_EVICTION_SWEEP_LIMIT);
+        }
+      } else {
         await this.evictExpiredMcpSessions(nowMs, sweepLimit);
       }
       const storageKey = this.getMcpSessionStorageKey(sessionId);
@@ -496,10 +556,10 @@ export class AuthFailureLimiterDO {
           typeof body.route === 'string' && body.route.trim().length > 0
             ? body.route.trim()
             : '/mcp';
-        byRoute = {
+        byRoute = this.capUsageByRoute({
           ...byRoute,
           [route]: (byRoute[route] ?? 0) + 1,
-        };
+        });
 
         await this.state.storage.put(totalKey, totalRequests);
         await this.state.storage.put(dayDateKey, activeDayDate);
@@ -710,7 +770,8 @@ export class AuthFailureLimiterDO {
     const mcpSessionAlarmAt =
       (await this.state.storage.get<number>(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY)) ?? 0;
     if (mcpSessionAlarmAt > 0) {
-      await this.evictExpiredMcpSessions(nowMs, 256);
+      await this.evictExpiredMcpSessions(nowMs, MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT);
+      await this.evictExpiredReplayStates(nowMs, MCP_REPLAY_EVICTION_SWEEP_LIMIT);
       await this.refreshMcpSessionAlarm();
       return;
     }
@@ -755,13 +816,15 @@ export class AuthFailureLimiterDO {
       if (cleanupAt <= nowMs) {
         await this.clearState();
         await this.clearAuthFailureAlarm();
+        await this.evictExpiredReplayStates(nowMs, MCP_REPLAY_EVICTION_SWEEP_LIMIT);
       } else {
         await this.scheduleAuthFailureCleanupAlarm(cleanupAt, true);
       }
       return;
     }
 
-    await this.evictExpiredMcpSessions(nowMs, 256);
+    await this.evictExpiredMcpSessions(nowMs, MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT);
+    await this.evictExpiredReplayStates(nowMs, MCP_REPLAY_EVICTION_SWEEP_LIMIT);
     await this.refreshMcpSessionAlarm();
   }
 }

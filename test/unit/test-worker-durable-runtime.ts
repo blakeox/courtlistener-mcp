@@ -277,6 +277,8 @@ describe('createWorkerDurableRuntime', () => {
         throw new Error('do offline');
       }),
       MCP_BOUNDARY_GUARDS_ENABLED: 'true',
+      MCP_BOUNDARY_FAIL_OPEN: 'false',
+      MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'false',
     };
     const request = new Request('https://worker.example/mcp', {
       method: 'POST',
@@ -309,6 +311,8 @@ describe('createWorkerDurableRuntime', () => {
         return new Response('unavailable', { status: 503 });
       }),
       MCP_BOUNDARY_GUARDS_ENABLED: 'true',
+      MCP_BOUNDARY_FAIL_OPEN: 'false',
+      MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'false',
     };
     const request = new Request('https://worker.example/mcp', {
       method: 'POST',
@@ -332,6 +336,24 @@ describe('createWorkerDurableRuntime', () => {
       error: 'Unable to enforce MCP boundary protections.',
       error_code: 'mcp_boundary_unavailable',
     });
+  });
+
+  it('fails open when MCP session lifecycle checks are unavailable', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(
+        async () => new Response('unavailable', { status: 503 }),
+      ),
+      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'true',
+    };
+    const request = new Request('https://worker.example/mcp', {
+      method: 'POST',
+      headers: { 'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000' },
+    });
+
+    const response = await runtime.validateSessionRequest(request, env, 1_700_000_000_000);
+
+    assert.equal(response, null);
   });
 
   it('skips auth failure clear when the client has no failure state', async () => {
@@ -360,6 +382,7 @@ describe('createWorkerDurableRuntime', () => {
       AUTH_FAILURE_LIMITER: createLimiterNamespace(
         async () => new Response('unavailable', { status: 503 }),
       ),
+      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'false',
     };
     const request = new Request('https://worker.example/mcp', {
       method: 'POST',
@@ -385,6 +408,7 @@ describe('createWorkerDurableRuntime', () => {
       AUTH_FAILURE_LIMITER: createLimiterNamespace(
         async () => new Response('unavailable', { status: 503 }),
       ),
+      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'false',
     };
 
     const registerOverride = await runtime.finalizeSessionResponse(
@@ -683,5 +707,53 @@ describe('AuthFailureLimiterDO cleanup', () => {
 
     assert.ok(await storage.get('mcp_session:expired'), 'touch should not sweep stale sessions');
     assert.ok(await storage.get('mcp_session:active'));
+  });
+
+  it('evicts expired replay state keys on alarm', async () => {
+    const { object, storage } = createLimiterObject();
+    await storage.put('mcp_replay_state:deadbeef', {
+      count: 1,
+      windowStartedAtMs: 1_000,
+      blockedUntilMs: 0,
+    });
+    await storage.put('mcp_replay_window_ms:deadbeef', 120_000);
+    await storage.put('mcp_session_alarm_at_ms', 5_000);
+
+    const originalNow = Date.now;
+    Date.now = () => 200_000;
+    try {
+      await object.alarm();
+    } finally {
+      Date.now = originalNow;
+    }
+
+    assert.equal(await storage.get('mcp_replay_state:deadbeef'), undefined);
+    assert.equal(await storage.get('mcp_replay_window_ms:deadbeef'), undefined);
+  });
+
+  it('caps usage_by_route growth during usage increments', async () => {
+    const { object, storage } = createLimiterObject();
+    const byRoute: Record<string, number> = {};
+    for (let i = 0; i < 40; i += 1) {
+      byRoute[`/route-${i}`] = i;
+    }
+    await storage.put('usage_by_route', byRoute);
+
+    await object.fetch(
+      new Request('https://auth-failure-limiter/internal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'usage_increment',
+          nowMs: 10_000,
+          route: '/route-39',
+        }),
+      }),
+    );
+
+    const stored = (await storage.get('usage_by_route')) as Record<string, number>;
+    assert.ok(stored);
+    assert.equal(Object.keys(stored).length, 32);
+    assert.equal(stored['/route-39'], 40);
   });
 });
