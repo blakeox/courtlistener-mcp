@@ -129,10 +129,6 @@ jobs:
   test:
     name: Smoke Matrix
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18, 20, 22]
-      fail-fast: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -140,10 +136,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -153,29 +149,16 @@ jobs:
         run: pnpm run ci:version-check
 
       - name: Format check
-        if: matrix.node-version == 20
         run: pnpm run format:check
 
       - name: Lint (critical files)
-        if: matrix.node-version == 20
         run: pnpm run lint:critical
 
       - name: Typecheck
         run: pnpm run typecheck
 
       - name: Build
-        if: matrix.node-version != 18
         run: pnpm run build
-
-      - name: Build (Node 18 — skip Vite; requires Node 20+)
-        if: matrix.node-version == 18
-        run: |
-          pnpm run clean
-          pnpm run generate:tool-schemas
-          pnpm run generate:hosted-auth-styles
-          pnpm exec tsc
-          pnpm run generate:manifest
-          pnpm run format:generated
 
       - name: Run unit tests
         run: pnpm run test:unit
@@ -196,7 +179,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -241,7 +224,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: coverage-node-20
+          name: coverage-node-22
           path: |
             coverage/
             coverage/lcov.info
@@ -255,7 +238,7 @@ jobs:
             LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json || echo 0)
             FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json || echo 0)
             STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json || echo 0)
-            echo "## Coverage Summary (Node 20)" >> $GITHUB_STEP_SUMMARY
+            echo "## Coverage Summary (Node 22)" >> $GITHUB_STEP_SUMMARY
             echo "- Lines: ${LINES}%" >> $GITHUB_STEP_SUMMARY
             echo "- Statements: ${STMTS}%" >> $GITHUB_STEP_SUMMARY
             echo "- Functions: ${FUNCS}%" >> $GITHUB_STEP_SUMMARY
@@ -272,7 +255,7 @@ jobs:
           PERF_BASELINE_FILE: ${{ vars.PERF_BASELINE_FILE }}
           PERF_CURRENT_FILE: ${{ vars.PERF_CURRENT_FILE }}
           PERF_COMMIT_SHA: ${{ github.sha }}
-          PERF_RUNTIME_MODE: node-20
+          PERF_RUNTIME_MODE: node-22
         run: pnpm run ci:perf-gate
 
       - name: Install MCP Inspector
@@ -303,7 +286,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -349,7 +332,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -511,7 +494,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -573,7 +556,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -609,7 +592,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
       - name: Install dependencies
