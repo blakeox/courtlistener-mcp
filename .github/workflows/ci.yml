@@ -158,7 +158,18 @@ jobs:
         run: pnpm run typecheck
 
       - name: Build
+        if: matrix.node-version != 18
         run: pnpm run build
+
+      - name: Build (Node 18 — skip Vite; requires Node 20+)
+        if: matrix.node-version == 18
+        run: |
+          pnpm run clean
+          pnpm run generate:tool-schemas
+          pnpm run generate:hosted-auth-styles
+          pnpm exec tsc
+          pnpm run generate:manifest
+          pnpm run format:generated
 
       - name: Run unit tests
         run: pnpm run test:unit
