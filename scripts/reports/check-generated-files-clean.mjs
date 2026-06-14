@@ -4,7 +4,6 @@ import { execFileSync } from 'node:child_process';
 
 const trackedGeneratedFiles = [
   'manifest.json',
-  'src/web/spa-build-id.ts',
   'src/server/generated/tool-input-schemas.ts',
   'src/server/hosted-auth-page-styles.generated.ts',
 ];
