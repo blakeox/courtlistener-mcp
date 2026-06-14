@@ -362,7 +362,7 @@ export function MetricCard(
   return (
     <Card className={props.className}>
       <Eyebrow>{props.label}</Eyebrow>
-      <strong>{props.value}</strong>
+      <strong className={statCardValueClass}>{props.value}</strong>
       {props.accent ? <p className={metricCardAccentClass}>{props.accent}</p> : null}
       {props.children}
     </Card>

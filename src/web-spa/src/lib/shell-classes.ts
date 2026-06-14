@@ -65,7 +65,7 @@ export const menuGroupDisclosureClass = cn(
 
 export function menuGroupLabelClassName(active: boolean): string {
   return cn(
-    'menu-group-label m-0 text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-wide)] text-[color:var(--shell-sidebar-text-muted)] uppercase',
+    'menu-group-label m-0 text-[length:var(--text-base-plus)] font-bold tracking-[var(--tracking-wide)] text-[color:var(--shell-sidebar-text-muted)] uppercase',
     active &&
       'inline-flex items-center gap-(--space-1-5) text-[color:var(--shell-sidebar-text-strong)] before:size-[var(--size-dot-sm)] before:rounded-full before:bg-[color:var(--shell-sidebar-link-active-indicator)] before:content-[""]',
   );
@@ -92,9 +92,9 @@ export function sidebarSecondaryLabelClassName(variant: string): string {
     'sidebar-secondary-label m-0 uppercase',
     `sidebar-${variant}-label`,
     variant === 'utility' &&
-      'text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-strong)]',
+      'text-[length:var(--text-base-plus)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-strong)]',
     variant === 'support' &&
-      'text-[length:var(--text-xs)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)]',
+      'text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)]',
   );
 }
 
@@ -125,7 +125,7 @@ export const accountSupportCardClass = cn(
 export const navCardLinkTextClass = 'nav-card-link-text inline';
 
 export const navCardLinkMetaClass = cn(
-  'nav-card-link-meta ml-auto text-[length:var(--text-2xs)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)] uppercase',
+  'nav-card-link-meta ml-auto text-[length:var(--text-xs)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)] uppercase',
 );
 
 export const shellMainColumnClass = cn(
@@ -152,7 +152,7 @@ export const topbarContextValueClass = cn(
 );
 
 export const topbarContextDescriptionClass = cn(
-  'topbar-context-description max-w-[var(--width-prose-sm)] text-[length:var(--text-base-plus)] leading-[var(--leading-ui)] text-[color:var(--shell-account-menu-text-subtle)]',
+  'topbar-context-description max-w-[var(--width-prose-sm)] text-[length:var(--text-md)] leading-[var(--leading-ui)] text-[color:var(--shell-account-menu-text-subtle)]',
   'max-shell:text-[length:var(--text-md-sm)] max-topbar:max-w-none',
 );
 
@@ -239,7 +239,7 @@ export const accountStatusBlockClass =
 export const accountMenuPrimaryClass = 'account-menu-primary grid gap-(--space-2-5)';
 
 export const accountStatusEyebrowClass =
-  'account-status-eyebrow m-0 text-[length:var(--text-xs-tight)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)] uppercase';
+  'account-status-eyebrow m-0 text-[length:var(--text-base-sm)] font-bold tracking-[var(--tracking-label)] text-[color:var(--shell-sidebar-text-muted)] uppercase';
 
 export const accountStatusTitleClass =
   'account-status-title m-0 text-[length:var(--text-lg)] font-bold leading-[var(--leading-medium)] text-[color:var(--shell-sidebar-text-strong)]';
