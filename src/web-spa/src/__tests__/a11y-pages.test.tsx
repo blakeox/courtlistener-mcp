@@ -1,4 +1,7 @@
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
@@ -112,6 +115,11 @@ vi.mock('../lib/turnstile', () => ({
   }),
 }));
 
+const tokensCssPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../styles/tokens.css',
+);
+
 describe('axe accessibility scans', () => {
   beforeEach(() => {
     stubBrowserStorage();
@@ -168,5 +176,29 @@ describe('axe accessibility scans', () => {
     const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/onboarding');
     await screen.findByRole('heading', { name: 'Runtime Diagnostics', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('workspace chrome keeps muted and utility text above the unreadable floor', async () => {
+    renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app/control-center');
+    await screen.findByRole('heading', { name: 'Overview', level: 1 });
+
+    const utilityLabel = screen.getByText('Workspace utilities');
+    const utilityLink = screen.getByRole('link', { name: 'Diagnostics' });
+    const mutedCopy = screen.getByText('Your environment is fully agent-ready.');
+    const topbarDescription = screen.getByText('Legacy overview route.');
+    const tokensCss = readFileSync(tokensCssPath, 'utf8');
+    const readRemToken = (name: string) => {
+      const match = tokensCss.match(new RegExp(`${name}:\\s*([0-9.]+)rem;`));
+      return match ? Number.parseFloat(match[1]) * 16 : Number.NaN;
+    };
+
+    expect(readRemToken('--text-base-sm')).toBeGreaterThanOrEqual(14);
+    expect(readRemToken('--text-base-plus')).toBeGreaterThanOrEqual(16);
+    expect(readRemToken('--text-md')).toBeGreaterThanOrEqual(16);
+
+    expect(utilityLabel.className).toContain('text-[length:var(--text-base-plus)]');
+    expect(utilityLink.className).toContain('sidebar-secondary-link');
+    expect(mutedCopy.className).toContain('text-muted');
+    expect(topbarDescription.className).toContain('text-[length:var(--text-md)]');
   });
 });
