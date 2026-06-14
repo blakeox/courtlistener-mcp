@@ -255,7 +255,7 @@ export const emptyStateClass = cn(
 export const emptyStateIconClass = 'empty-state-icon text-[length:var(--text-display-sm)]';
 
 export const emptyStateHintClass =
-  'empty-state-hint text-[length:var(--text-base-plus)] opacity-60';
+  'empty-state-hint text-[length:var(--text-base-plus)] opacity-80';
 
 export function comparisonCardClassName(
   tone: 'default' | 'mcp',
@@ -320,7 +320,7 @@ export const keyValueListClass = cn(
 export const metricCardAccentClass = 'metric-card-accent m-0 font-bold text-foreground';
 
 export const metaNoteClass = cn(
-  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-border bg-panel px-1.5 py-0.5 text-[length:var(--text-xs)] text-muted',
+  'meta-note mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-[4px] border border-border bg-panel px-1.5 py-0.5 text-[length:var(--text-base-sm)] text-muted',
 );
 
 export const metaNoteLgClass = cn(
@@ -358,11 +358,11 @@ export function statusPillClassName(
   className?: string,
 ): string {
   return cn(
-    'status-pill inline-block rounded-full px-(--space-2) py-0.5 text-[length:var(--text-xs)] font-bold',
+    'status-pill inline-block rounded-full px-(--space-2) py-0.5 text-[length:var(--text-base-sm)] font-bold',
     variant === 'soft' && 'soft',
     variant === 'solid' &&
       cn(
-        'solid px-1.5 py-px text-[length:var(--text-2xs)] font-semibold text-[color:var(--surface-button-primary-fg)]',
+        'solid px-1.5 py-px text-[length:var(--text-xs)] font-semibold text-[color:var(--surface-button-primary-fg)]',
         tone === 'mcp' && 'tone-mcp bg-brand',
         tone === 'plain' && 'tone-plain bg-muted',
       ),
@@ -494,7 +494,7 @@ export const brandLinkTitleRowClass =
   'brand-link-title-row inline-flex flex-wrap items-center gap-(--space-3)';
 export const brandLinkNameClass = 'brand-link-name font-extrabold tracking-[var(--tracking-snug)]';
 export const brandLinkSubtitleClass =
-  'brand-link-subtitle text-[length:var(--text-xs)] text-faint uppercase tracking-[var(--tracking-label)]';
+  'brand-link-subtitle text-[length:var(--text-base-sm)] text-faint uppercase tracking-[var(--tracking-label)]';
 
 export function navCardLinkClassName(active: boolean, className?: string): string {
   return cn(
@@ -564,4 +564,5 @@ export const landingFeatureCardDescriptionClass = cn(
   'mt-(--space-3-5) text-[color:var(--landing-color-text-secondary)]',
 );
 
-export const statCardValueClass = 'text-[length:var(--text-title)] tracking-[var(--tracking-snug)]';
+export const statCardValueClass =
+  'stat-card-value mt-(--space-1-5) block text-[length:var(--text-title)] leading-[var(--leading-snug)] tracking-[var(--tracking-snug)]';
