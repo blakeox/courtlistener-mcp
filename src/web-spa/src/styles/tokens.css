@@ -34,8 +34,8 @@
  */
 :root {
   --text-primary: #11253f;
-  --text-secondary: #4a6078;
-  --text-tertiary: #4b5563;
+  --text-secondary: #3d5670;
+  --text-tertiary: #42566c;
   --bg-canvas: #f5f0e8;
   --bg-canvas-soft: #faf7f2;
   --bg-panel: #fffdf9;
@@ -127,7 +127,7 @@
   --shell-sidebar-brand-mark-bg: rgba(96, 165, 250, 0.18);
   --shell-sidebar-brand-mark-text: #eff6ff;
   --shell-sidebar-text-strong: #f8fafc;
-  --shell-sidebar-text-muted: rgba(226, 232, 240, 0.72);
+  --shell-sidebar-text-muted: rgba(226, 232, 240, 0.86);
   --shell-sidebar-divider: rgba(255, 255, 255, 0.08);
   --shell-sidebar-overlay: rgba(15, 23, 42, 0.42);
   --shell-topbar-bg: var(--bg-glass);
@@ -138,7 +138,7 @@
   --shell-account-menu-border: rgba(226, 232, 240, 0.88);
   --shell-account-menu-bg: rgba(255, 255, 255, 0.98);
   --shell-account-menu-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
-  --shell-account-menu-text-subtle: #64748b;
+  --shell-account-menu-text-subtle: #475569;
   --shell-focus-ring: rgba(59, 130, 246, 0.45);
   --space-0-5: 2px;
   --space-1: 4px;
@@ -211,24 +211,24 @@
   --easing-standard: ease;
   --easing-in-out: ease-in-out;
   --easing-out: ease-out;
-  --text-3xs: 0.65rem;
-  --text-2xs: 0.68rem;
-  --text-xs: 0.72rem;
-  --text-xs-tight: 0.7rem;
-  --text-sm: 0.74rem;
-  --text-sm-plus: 0.76rem;
-  --text-sm-tight: 0.75rem;
-  --text-base-sm: 0.78rem;
-  --text-base: 0.85rem;
-  --text-base-compact: 0.82rem;
-  --text-base-display: 0.86rem;
-  --text-base-plus: 0.88rem;
-  --text-base-ui: 0.95rem;
-  --text-md-sm: 0.84rem;
-  --text-md: 0.92rem;
-  --text-md-plus: 0.96rem;
-  --text-lg: 1rem;
-  --text-lg-plus: 1.05rem;
+  --text-3xs: 0.72rem;
+  --text-2xs: 0.78rem;
+  --text-xs: 0.82rem;
+  --text-xs-tight: 0.8rem;
+  --text-sm: 0.84rem;
+  --text-sm-plus: 0.86rem;
+  --text-sm-tight: 0.84rem;
+  --text-base-sm: 0.9rem;
+  --text-base: 0.96rem;
+  --text-base-compact: 0.92rem;
+  --text-base-display: 0.96rem;
+  --text-base-plus: 1rem;
+  --text-base-ui: 1rem;
+  --text-md-sm: 0.96rem;
+  --text-md: 1rem;
+  --text-md-plus: 1.04rem;
+  --text-lg: 1.06rem;
+  --text-lg-plus: 1.1rem;
   --text-xl: 1.08rem;
   --text-title: 1.2rem;
   --text-2xl: 1.28rem;
@@ -468,8 +468,8 @@
 }
 [data-theme='dark'] {
   --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #cbd5e1;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #e2e8f0;
   --bg-canvas: #1a1e2e;
   --bg-canvas-soft: #232838;
   --bg-panel: #1e293b;
@@ -549,7 +549,7 @@
   --shell-sidebar-brand-mark-bg: rgba(96, 165, 250, 0.18);
   --shell-sidebar-brand-mark-text: #eff6ff;
   --shell-sidebar-text-strong: #f8fafc;
-  --shell-sidebar-text-muted: rgba(226, 232, 240, 0.72);
+  --shell-sidebar-text-muted: rgba(226, 232, 240, 0.9);
   --shell-sidebar-divider: rgba(51, 65, 85, 0.84);
   --shell-sidebar-overlay: rgba(15, 23, 42, 0.56);
   --shell-topbar-bg: var(--bg-glass);
