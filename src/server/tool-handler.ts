@@ -18,6 +18,23 @@ import { CacheManager } from '../infrastructure/cache.js';
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ServerConfig } from '../types.js';
+import { ResponseBuilder } from '../common/response-builder.js';
+
+export const READ_ONLY_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: true,
+};
+
+export const MUTATING_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: false,
+  openWorldHint: true,
+};
+
+export const DESTRUCTIVE_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  openWorldHint: true,
+};
 
 export interface ToolHandler<TInput = unknown> {
   readonly name: string;
@@ -44,6 +61,7 @@ export interface ToolHandler<TInput = unknown> {
 
 import { SamplingService } from './sampling-service.js';
 import type { LlmParamGenerator } from './llm-param-generator.js';
+import type { McpProgressReporter } from './mcp-progress-reporter.js';
 
 export interface ToolContext {
   logger: Logger;
@@ -56,11 +74,18 @@ export interface ToolContext {
   sampling?: SamplingService;
   /** Workers AI or other server-side LLM for smart_search when MCP sampling is unavailable. */
   llmParamGenerator?: LlmParamGenerator;
+  /** Optional MCP progress reporter when the client supplied `_meta.progressToken`. */
+  progress?: McpProgressReporter;
 }
 
 export class ToolHandlerRegistry {
   private handlers = new Map<string, ToolHandler>();
   private categories = new Map<string, Set<string>>();
+  private onCatalogListChanged: (() => void) | undefined;
+
+  setOnCatalogListChanged(callback: (() => void) | undefined): void {
+    this.onCatalogListChanged = callback;
+  }
 
   /**
    * Register a tool handler
@@ -75,6 +100,7 @@ export class ToolHandlerRegistry {
       this.categories.set(handler.category, categorySet);
     }
     categorySet.add(handler.name);
+    this.onCatalogListChanged?.();
   }
 
   /**
@@ -206,14 +232,7 @@ export abstract class BaseToolHandler<
    * Helper method to create success result
    */
   protected success(content: string | Record<string, unknown> | Array<unknown>): CallToolResult {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
-        },
-      ],
-    };
+    return ResponseBuilder.success(content);
   }
 
   /**
@@ -232,14 +251,10 @@ export abstract class BaseToolHandler<
         text: JSON.stringify(resourceData),
       },
     };
+    const base = ResponseBuilder.success(content);
     return {
-      content: [
-        {
-          type: 'text',
-          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
-        },
-        resource,
-      ],
+      ...base,
+      content: [...base.content, resource],
     };
   }
 
@@ -250,22 +265,14 @@ export abstract class BaseToolHandler<
     message: string,
     details?: Record<string, unknown> | string | number | boolean | null,
   ): CallToolResult {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              error: message,
-              details: details || null,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-      isError: true,
-    };
+    const normalizedDetails =
+      details === null || details === undefined
+        ? undefined
+        : typeof details === 'object'
+          ? details
+          : { value: details };
+
+    return ResponseBuilder.error(message, normalizedDetails);
   }
 }
 
@@ -313,10 +320,7 @@ export abstract class TypedToolHandler<
   protected abstract readonly schema: TSchema;
 
   /** MCP ToolAnnotations — defaults mark all tools as read-only, open-world */
-  readonly annotations: ToolAnnotations = {
-    readOnlyHint: true,
-    openWorldHint: true,
-  };
+  readonly annotations: ToolAnnotations = READ_ONLY_TOOL_ANNOTATIONS;
 
   /**
    * Optional: Tool metadata for enriched definitions

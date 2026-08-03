@@ -18,6 +18,10 @@ import { InMemoryEventStore } from '../infrastructure/event-store.js';
 import { Logger } from '../infrastructure/logger.js';
 import { getConfig } from '../infrastructure/config.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from '../infrastructure/protocol-constants.js';
+import {
+  buildNodeStreamableHttpHealthPayload,
+  buildSharedRuntimeDiagnostics,
+} from '../infrastructure/runtime-health-contract.js';
 import type { PrincipalContext } from '../infrastructure/principal-context.js';
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
 import { LegalOAuthProvider } from '../auth/oauth-provider.js';
@@ -36,6 +40,7 @@ import {
 } from './mcp-transport-runtime-facade.js';
 import { buildMcpCorsHeaders } from './transport-boundary-headers.js';
 import { createInvalidSessionLifecycleResponse } from './mcp-session-lifecycle-contract.js';
+import { runMcpSessionCleanup } from './mcp-session-cleanup.js';
 
 export interface HttpTransportConfig {
   port: number;
@@ -181,6 +186,8 @@ class HttpMcpSessionManager {
 
     this.sessions.delete(sessionId);
     this.closingSessions.add(sessionId);
+
+    runMcpSessionCleanup(context.server, sessionId);
 
     try {
       await context.transport.close();
@@ -358,8 +365,25 @@ export async function startHttpTransport(
       }),
     );
 
+    const shared = buildSharedRuntimeDiagnostics(process.env, {
+      latencyMs: {
+        routes: Object.fromEntries(
+          [...operationTelemetry.entries()].map(([operation, stats]) => [
+            operation,
+            {
+              count: stats.total,
+              success: stats.success,
+              failed: stats.failed,
+              rejected: stats.rejected,
+            },
+          ]),
+        ),
+      },
+    });
+
     return {
-      shuttingDown: isClosing,
+      ...shared,
+      shutting_down: isClosing,
       limits: {
         maxConcurrentRequests,
         maxConcurrentSessionInitializations,
@@ -416,7 +440,8 @@ export async function startHttpTransport(
 
   // Health endpoint
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', transport: 'streamable-http', diagnostics: getDiagnosticsSnapshot() });
+    const status = isClosing ? 'degraded' : 'ok';
+    res.json(buildNodeStreamableHttpHealthPayload(getDiagnosticsSnapshot(), status));
   });
 
   // Mount MCP endpoint — protect with bearer auth when OAuth is enabled

@@ -16,12 +16,12 @@ const DEFAULT_URL = 'https://courtlistenermcp.blakeoxford.com/mcp';
 const url = process.env.MCP_REMOTE_URL || DEFAULT_URL;
 
 const bearerToken = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
-const args = ['@modelcontextprotocol/inspector', 'mcp-remote', url];
+const args = ['exec', 'mcp-inspector', 'mcp-remote', url];
 if (bearerToken) {
   args.push('--header', `Authorization: Bearer ${bearerToken}`);
 }
 
-const child = spawn('npx', args, {
+const child = spawn('pnpm', args, {
   stdio: 'inherit',
   env: process.env,
 });

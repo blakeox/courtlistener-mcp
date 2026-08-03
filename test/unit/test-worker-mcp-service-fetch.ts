@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { fetchMcpWorkerService } from '../../src/server/worker-mcp-service-fetch.js';
+import {
+  fetchMcpWorkerReadiness,
+  fetchMcpWorkerService,
+} from '../../src/server/worker-mcp-service-fetch.js';
 import type { WorkerEdgeEnv } from '../../src/server/worker-runtime-contract.js';
 
 describe('fetchMcpWorkerService', () => {
@@ -39,6 +42,22 @@ describe('fetchMcpWorkerService', () => {
         assert.ok(error instanceof Error);
         return true;
       },
+    );
+  });
+
+  it('bounds a stalled MCP readiness binding probe', async () => {
+    const env = {
+      MCP_SERVICE: {
+        fetch: async (request: Request) =>
+          new Promise<Response>((_resolve, reject) => {
+            request.signal.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      },
+    } as WorkerEdgeEnv;
+
+    await assert.rejects(
+      () => fetchMcpWorkerReadiness(new Request('https://portal.example/ready'), env, 5),
+      /aborted|mcp_readiness_timeout/,
     );
   });
 });

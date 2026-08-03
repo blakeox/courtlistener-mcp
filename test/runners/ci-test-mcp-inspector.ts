@@ -83,8 +83,9 @@ const testCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - Tools List',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,
@@ -103,8 +104,9 @@ const testCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - Tool Call (List Courts)',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,
@@ -123,8 +125,9 @@ const testCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - Tool Call (Search Cases)',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,
@@ -149,8 +152,9 @@ const extendedTestCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - All Core Tools',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,
@@ -174,8 +178,9 @@ const extendedTestCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - Advanced Tools',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,
@@ -191,8 +196,9 @@ const extendedTestCases: TestCase[] = [
   {
     name: 'MCP Inspector CLI - Error Handling',
     args: [
-      'npx',
-      '@modelcontextprotocol/inspector',
+      'pnpm',
+      'exec',
+      'mcp-inspector',
       '--cli',
       localServerRuntime.command,
       ...localServerRuntime.args,

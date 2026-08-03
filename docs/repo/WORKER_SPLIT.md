@@ -8,15 +8,19 @@ Production uses **three** Worker scripts:
 | `courtlistener-mcp-mcp`          | `wrangler.mcp.jsonc`          | `/mcp`, `/sse`, `CourtListenerMCP` DO, async tool queue |
 | `courtlistener-mcp`              | `wrangler.edge.jsonc`         | OAuth, hosted auth, SPA assets, UI API                  |
 
+Code Mode is not part of either public contract. `CODEMODE_ENABLED=false` is
+explicitly set in both split Worker configurations until an isolated preview
+implementation passes separate capability, resource, audit, and result-parity
+gates.
+
 ## Routing (same hostname)
 
 - **Edge** uses a
   [Custom Domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
   on `courtlistenermcp.blakeoxford.com` (see `wrangler.edge.jsonc`).
-- **MCP** uses **zone routes** on `blakeoxford.com` for `/mcp`, `/mcp/*`,
-  `/sse`, and `/sse/*` (see `wrangler.mcp.jsonc`). Zone routes are more specific
-  than the custom-domain worker, so MCP traffic hits `courtlistener-mcp-mcp`
-  while everything else stays on the edge worker.
+- **Edge** owns the public custom domain, including `/mcp` and `/sse`.
+  Authenticated MCP requests are forwarded privately through `MCP_SERVICE` to
+  `courtlistener-mcp-mcp`; the MCP Worker has no public zone routes.
 
 If your zone name differs, update `zone_name` in `wrangler.mcp.jsonc`.
 
@@ -29,6 +33,12 @@ The edge worker calls the MCP worker for in-app AI tool RPC:
   { "binding": "MCP_SERVICE", "service": "courtlistener-mcp-mcp" }
 ]
 ```
+
+The MCP worker owns `COURTLISTENER_API_KEY` directly. Stage the secret with
+`pnpm run cloudflare:secrets:sync-mcp` (reads from the process environment or
+`.dev.vars`). The command fails closed when the secret is absent; no internal
+HTTP secret endpoint, reverse service binding, or local sibling-Worker fallback
+exists in the active runtime.
 
 ## Local development
 
@@ -54,6 +64,16 @@ service binding only (no dev upstream in `wrangler.edge.jsonc`).
 Vite (`src/web-spa/vite.config.ts`) proxies `/api`, `/auth`, `/oauth`, etc. to
 **port 8787** (edge), not 3001.
 
+Run the local Workerd topology smoke before changing either Worker:
+
+```bash
+pnpm run test:workers
+```
+
+This runs the MCP Worker binding smoke, builds the test MCP bundle, and then
+proves that Edge `/ready` reaches the MCP Worker through a named local
+`MCP_SERVICE` binding. It does not prove a deployed Cloudflare service binding.
+
 ## Deploy order
 
 ```bash
@@ -71,8 +91,8 @@ queue consumer from `courtlistener-mcp` before the edge deploy:
 wrangler queues consumer remove courtlistener-mcp-async-tool-jobs courtlistener-mcp
 ```
 
-Deploy order is **auth-limiter → edge → mcp** so the queue consumer moves off
-the portal script.
+Deploy order is **auth-limiter → edge → mcp** so the public Edge ingress and its
+private service binding are live before the MCP Worker is promoted.
 
 ## Entry files
 
@@ -80,7 +100,6 @@ the portal script.
 - `src/worker-mcp.ts` — MCP fetch + queue consumer
 - `src/worker/courtlistener-mcp-agent.ts` — `CourtListenerMCP` Durable Object
   class
-- `src/worker.ts` — deprecated re-export of edge default + `CourtListenerMCP`
 
 Bundle audit: `pnpm run ci:analyze:worker-bundle` (edge) and dry-run MCP config
 separately.
@@ -89,6 +108,7 @@ separately.
 
 ```bash
 curl -fsS https://courtlistenermcp.blakeoxford.com/health
+curl -fsS https://courtlistenermcp.blakeoxford.com/ready
 curl -fsS -o /dev/null -w '%{http_code}\n' 'https://courtlistenermcp.blakeoxford.com/auth/start?return_to=https%3A%2F%2Fexample.com'
 curl -fsS -X POST https://courtlistenermcp.blakeoxford.com/mcp \
   -H 'Content-Type: application/json' \
@@ -97,5 +117,8 @@ curl -fsS -X POST https://courtlistenermcp.blakeoxford.com/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"verify","version":"1.0.0"}}}'
 ```
 
-Expect `/health` JSON from the edge worker, `/auth/start` **302** (not 503), and
-MCP `initialize` with a `result` from the MCP worker routes.
+Expect `/health` JSON from the edge worker, `/ready` with `status: "ready"` only
+when the Edge-to-MCP service binding probe succeeds, `/auth/start` **302** (not
+503), and MCP `initialize` with a `result` from the MCP worker routes. The MCP
+worker's `/ready` response is an internal dependency receipt, not proof that the
+public Edge route is healthy.

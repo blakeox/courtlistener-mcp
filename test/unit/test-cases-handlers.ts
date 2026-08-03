@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const { GetCaseDetailsHandler, GetRelatedCasesHandler, AnalyzeCaseAuthoritiesHandler } =
   await import('../../src/domains/cases/handlers.ts');
@@ -77,7 +78,7 @@ describe('GetCaseDetailsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         case: { id: number };
       };
@@ -100,7 +101,7 @@ describe('GetCaseDetailsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as { error: string };
+      const payload = getStructuredPayload(result) as { error: string };
       // @withErrorHandling decorator wraps errors with generic message
       assert.ok(payload.error.includes('failed') || payload.error.includes('Case not found'));
     }
@@ -156,7 +157,7 @@ describe('GetRelatedCasesHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         relatedCases?: Array<{ id: number }>;
         related_cases?: Array<{ id: number }>;
@@ -198,7 +199,7 @@ describe('AnalyzeCaseAuthoritiesHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         analysis?: Array<unknown> | Record<string, unknown>;
         authorities?: Array<unknown>;

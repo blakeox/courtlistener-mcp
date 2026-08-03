@@ -1,286 +1,94 @@
 # MCP Current State Analysis
 
-**Date**: November 22, 2025  
-**SDK Version**: 1.27.0  
-**Target Version**: 1.27.0
+**Date**: June 16, 2026 **SDK Version**: 1.29.0
 
 ---
 
-## 📊 Current Implementation
+## Current Capabilities
 
-### SDK Version
-
-- **Current**: `@modelcontextprotocol/sdk` `^1.27.0`
-- **Latest**: `1.27.0`
-- **Upgrade Type**: **Up to date**
-
-### Current Capabilities
-
-- ✅ **Tools**: Fully implemented (32 handlers)
-- ✅ **Resources**: Implemented (7 resources: opinion, case, docket, court,
-  judge, recent opinions, API status)
-- ✅ **Prompts**: Implemented (8 prompts: summarize_statute, compare_precedents,
-  legal_research_workflow, citation_analysis, jurisdiction_comparison,
-  case_brief, motion_drafting, judicial_due_diligence)
-- ❌ **Sampling**: Not implemented
-- ⚠️ **Logging**: Partial (server-side only)
-
-### Transport Support
-
-- ✅ **Stdio**: Working (CLI mode)
-- ✅ **HTTP**: Working (StreamableHTTPServerTransport on /mcp)
-- ✅ **OAuth**: Implemented (OAuth 2.1 with PKCE, scopes: legal:read,
-  legal:search, legal:analyze)
+- **Tools**: 49 governed research handlers + 3 async control tools (52 total)
+- **Resources**: Static examples + URI templates via `resources/templates/list`
+- **Prompts**: 12 governed prompts
+- **Logging**: `logging/setLevel` + `notifications/message` bridge
+- **Sampling**: Optional (`SAMPLING_ENABLED=true`)
+- **Instructions**: Returned on `initialize` (`MCP_SERVER_INSTRUCTIONS`)
 
 ---
 
-## 🔍 Current Architecture
+## Best-Practice Alignment
 
-### Server Implementation
+### Implemented
 
-- **Main Server**: `BestPracticeLegalMCPServer`
-- **Entry Points**:
-  - `src/index.ts` - Stdio mode
-  - `src/worker.ts` - Cloudflare Worker (SSE)
-- **Protocol Version**: Locked to SDK 0.6.x
-
-### Tool Surface
-
-- **Total Handlers**: 32
-- **Response Format**: Structured content via ResponseBuilder (structuredContent
-  support)
-- **Schema Definition**: Zod-generated JSON schemas
-- **Error Format**: `McpError` for validation and unknown tool errors
-- **ToolAnnotations**: readOnlyHint: true, openWorldHint: true
-
-### Metadata Management
-
-- **Tool Definitions**: Static table in `tool-definitions.ts`
-- **Schemas**: Manually maintained alongside Zod
-- **Examples**: Hard-coded
-- **Version**: Hard-coded string
-
----
-
-## 🎯 Gaps Identified
-
-### Protocol Surface
-
-1. **~~No Resource Providers~~** ✅ Resolved
-   - 7 resources implemented (opinion, case, docket, court, judge, recent
-     opinions, API status)
-
-2. **~~No Prompt Templates~~** ✅ Resolved
-   - 8 prompts implemented
-
-3. **Limited Logging**
-   - Server-side logging only
-   - No bi-directional logging
-   - Missing SDK logging hooks
-
-4. **No Sampling**
-   - No LLM assistance hooks
-   - No workflow capabilities
-
-### Transport Issues
-
-1. **~~Hand-Rolled SSE Bridge~~** ✅ Resolved
-   - Now using StreamableHTTPServerTransport on /mcp
-   - OAuth 2.1 with PKCE implemented
-
-2. **~~Transport Divergence~~** ✅ Resolved
-   - Unified via server-factory with centralized SERVER_INFO/SERVER_CAPABILITIES
-
-### Tool Surface Issues
-
-1. **~~JSON-in-Text Responses~~** ✅ Resolved
-   - structuredContent added to ResponseBuilder
-   - Markdown summaries included
-
-2. **~~Duplicate Metadata~~** ✅ Resolved
-   - Schemas generated from Zod
-
-3. **No Streaming**
-   - All responses synchronous
-   - No progress notifications
-   - Large result issues
-
-4. **~~Generic Errors~~** ✅ Resolved
-   - McpError used for validation and unknown tool errors
-
-5. **~~Limited Tool Metadata~~** ✅ Resolved
-   - ToolAnnotations added (readOnlyHint: true, openWorldHint: true)
-
-### Configuration
-
-1. **Hard-Coded Values**
-   - Version string in code
-   - Protocol constants scattered
-   - URLs in config files
-
-2. **Missing Validation**
-   - No validation for new surfaces
-   - Limited fail-fast checks
-
-### Testing
-
-1. **Limited Protocol Tests**
-   - No resource tests
-   - No prompt tests
-   - No structured content tests
-   - No Worker transport tests
-
-2. **Outdated Assertions**
-   - Expecting string responses
-   - Generic error checks
-   - Missing content type tests
+1. Honest capability advertisement (`buildServerCapabilities`)
+2. Human-readable text + `structuredContent` in tool responses
+3. Accurate tool annotations for mutating/destructive tools
+4. Per-session resource subscriptions + `notifications/resources/updated`
+5. Build-time package version injection for Workers
+6. Unified `SAMPLING_ENABLED` flag
+7. **Server instructions** on initialize
+8. **`resources/templates/list`** for dynamic URI discovery
+9. **Session subscription cleanup** on HTTP session close
+10. **Integration tests** (`test/integration/test-mcp-surface-protocol.ts`,
+    wired into `npm run test:integration`)
+11. **`outputSchema` on all governed tools** — generated via
+    `tool-output-schema-contract.ts` + `generate-tool-schemas.mjs`, attached in
+    `buildToolDefinitions`
+12. **Runtime `/health` unified contract** — shared core fields plus
+    `diagnostics.session_topology`, `diagnostics.cloudflare`, and
+    `diagnostics.metrics` across Worker, streamable HTTP, and diagnostics HTTP
+13. **Proactive resource refresh notifications** — TTL-driven
+    `resources/updated` while subscriptions remain active
+14. **MCP progress notifications** — `notifications/progress` when the client
+    requests progress tracking during `tools/call`
+15. **Native MCP tasks (optional)** — `MCP_NATIVE_TASKS_ENABLED=true` bridges
+    async jobs to `tasks/*` for in-memory and queue-backed Worker workflows
+16. **Diagnostics `/health` contract** — diagnostics HTTP server uses the same
+    unified payload envelope as streamable HTTP and Worker
+17. **Session topology validation** — shared `session-topology-config.ts` for
+    startup diagnostics and deploy checks; Worker-vs-Node invalid-session
+    contract in `test:integration`
+18. **`listChanged` notifications (optional)** — `MCP_LIST_CHANGED_ENABLED=true`
+    advertises and emits `notifications/*/list_changed` when catalogs mutate
 
 ---
 
-## 📈 Migration Complexity
+## Feature Flags
 
-### High Impact
-
-1. **SDK Upgrade** ✅ Complete (now at 1.27.0)
-
-2. **Response Format Change**
-   - All 32 handlers affected
-   - Test updates required
-   - Client compatibility concerns
-
-3. **Transport Replacement** ✅ Complete
-   - StreamableHTTPServerTransport on /mcp
-   - OAuth 2.1 with PKCE
-
-### Medium Impact
-
-1. **Schema Generation**
-   - Automated from Zod
-   - Removes duplication
-   - Test updates
-
-2. **Error Standardization** ✅ Complete
-   - McpError used throughout
-
-3. **Resource/Prompt Addition** ✅ Complete
-   - 7 resources, 8 prompts implemented
-
-### Low Impact
-
-1. **Constants Centralization**
-   - Code reorganization
-   - No functionality change
-
-2. **Tool Metadata**
-   - Metadata additions
-   - Non-breaking
-
-3. **Config Validation**
-   - Additional checks
-   - Improved errors
+| Variable                     | Default | Effect                                                                             |
+| ---------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `LOGGING_ENABLED`            | `true`  | Advertise logging + forward server logs                                            |
+| `SAMPLING_ENABLED`           | `false` | Advertise sampling + enable `SamplingService`                                      |
+| `MCP_RESOURCE_SUBSCRIPTIONS` | `true`  | Advertise `resources.subscribe`                                                    |
+| `MCP_NATIVE_TASKS_ENABLED`   | `false` | Advertise native MCP `tasks/*` and map async jobs to task records                  |
+| `MCP_LIST_CHANGED_ENABLED`   | `false` | Advertise `listChanged` for tools/resources/prompts and emit catalog notifications |
 
 ---
 
-## 🚧 Migration Risks
+## Testing
 
-### Breaking Changes
-
-- **SDK 1.x**: Likely breaking API changes
-- **Response Format**: Clients expect JSON strings
-- **Transport**: Custom SSE bridge incompatible
-
-### Compatibility
-
-- **Existing Clients**: May need updates
-- **MCP Inspector**: Needs testing
-- **Claude Desktop**: Needs validation
-
-### Performance
-
-- **Structured Content**: Slightly larger payloads
-- **Streaming**: Additional overhead
-- **Resources**: Cache implications
-
----
-
-## 🎯 Recommended Approach
-
-### Phase 1: Foundation ✅ Complete
-
-1. ✅ Create comprehensive roadmap (DONE)
-2. ✅ Upgrade SDK to 1.27.0
-3. ✅ Fix breaking changes
-4. ✅ Centralize constants (SERVER_INFO/SERVER_CAPABILITIES)
-5. ✅ Update lifecycle hooks
-
-### Phase 2: Tool Modernization ✅ Complete
-
-1. ✅ Structured JSON responses (structuredContent in ResponseBuilder)
-2. ✅ Schema generation from Zod
-3. ✅ Error standardization (McpError)
-4. ✅ Tool metadata (ToolAnnotations)
-
-### Phase 3: Surface Expansion ✅ Complete
-
-1. ✅ Resource providers (7 resources)
-2. ✅ Prompt templates (8 prompts)
-3. ✅ Configuration validation
-
-### Phase 4: Transport & Cloud ✅ Complete
-
-1. ✅ StreamableHTTPServerTransport on /mcp
-2. ✅ OAuth 2.1 with PKCE
-3. ✅ Manifest generation
-
-### Phase 5: Testing & Docs (Week 5)
-
-1. Comprehensive tests
-2. Documentation updates
-3. Migration guide
-4. Deprecation notices
+- `test/unit/test-mcp-best-practices.ts`
+- `test/unit/test-subscription-manager.ts`
+- `test/unit/test-handler-registry.ts`
+- `test/unit/test-runtime-health-contract.ts` — unified `/health` diagnostics
+  envelope across runtimes
+- `test/unit/test-http-server.ts`
+- `test/unit/test-async-workflow-task-store.ts`
+- `test/unit/test-mcp-progress-and-tasks.ts`
+- `test/unit/test-session-topology-config.ts`
+- `test/unit/test-startup-session-topology.ts`
+- `test/unit/test-protocol-list-changed-notifier.ts`
+- `test/integration/test-mcp-surface-protocol.ts` — instructions, templates,
+  logging, subscribe, structuredContent, outputSchema, initialize capabilities,
+  progress notifications, proactive refresh TTL, native tasks flag, listChanged
+  notifications
+- `test:transport:http` — streamable HTTP transport contract (also in
+  `test:integration` and `startup-diagnostics` CI gate)
+- `test:protocol` — bundles surface + session contract + HTTP transport
+- `test:session:contract` — Worker-vs-Node invalid-session lifecycle parity
+  (also in `test:integration`)
+- `test/unit/test-manifest-contract.ts` — governed tool outputSchema +
+  regenerated manifest metadata
 
 ---
 
-## 📝 Feature Flags
-
-Implement gradual rollout:
-
-```typescript
-ENABLE_MCP_RESOURCES = true; // ✅ Implemented
-ENABLE_MCP_PROMPTS = true; // ✅ Implemented
-ENABLE_MCP_SAMPLING = false;
-ENABLE_MCP_STREAMING = false;
-ENABLE_STRUCTURED_CONTENT = true; // ✅ Implemented
-```
-
----
-
-## 🎯 Success Criteria
-
-### Technical
-
-- ✅ SDK 1.27.0 integrated
-- ✅ All tests passing
-- ✅ Zero TypeScript errors
-- ✅ Full capability advertisement
-- ✅ Backward compatibility maintained
-
-### Quality
-
-- ✅ Comprehensive tests
-- ✅ Complete documentation
-- ✅ Migration guide
-- ✅ Performance maintained
-
-### Deployment
-
-- ✅ Stdio mode works
-- ✅ HTTP mode works
-- ✅ Worker mode works
-- ✅ MCP Inspector compatible
-- ✅ Claude Desktop validated
-
----
-
-_Current state documented: November 3, 2025_  
-_Ready for modernization implementation_
+_Last updated: June 16, 2026_

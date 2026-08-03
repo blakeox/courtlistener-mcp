@@ -201,7 +201,7 @@ export function shouldFailOpenOnAuthLimiterUnavailable(env: {
   if (env.MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN !== undefined) {
     return parseBoolean(env.MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN);
   }
-  return true;
+  return false;
 }
 
 function shouldFailOpenOnSessionLifecycleUnavailable(env: {
@@ -210,7 +210,7 @@ function shouldFailOpenOnSessionLifecycleUnavailable(env: {
   if (env.MCP_SESSION_LIFECYCLE_FAIL_OPEN !== undefined) {
     return parseBoolean(env.MCP_SESSION_LIFECYCLE_FAIL_OPEN);
   }
-  return true;
+  return false;
 }
 
 function shouldFailOpenOnMcpBoundaryUnavailable(env: {
@@ -793,10 +793,13 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
       }
       if (boundaryResult.value.blocked) {
         if (boundaryResult.value.reason === 'replay_detected') {
+          const retryAfterSeconds = boundaryResult.value.retryAfterSeconds;
           return deps.jsonError(
             'Replay request detected at MCP boundary.',
             409,
             'mcp_replay_detected',
+            { retry_after_seconds: retryAfterSeconds },
+            { 'Retry-After': String(retryAfterSeconds) },
           );
         }
         const retryAfterSeconds = boundaryResult.value.retryAfterSeconds;

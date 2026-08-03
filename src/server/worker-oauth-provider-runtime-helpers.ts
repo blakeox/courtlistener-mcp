@@ -87,10 +87,10 @@ export function handleOAuthProviderApiRequest<TEnv extends OAuthRuntimeEnv>(
     );
   }
 
-  const headers = new Headers(request.headers);
-  headers.delete('Authorization');
-  const enrichedRequest = new Request(request, { headers });
-  return deps.handleLegacyWorkerFetch(enrichedRequest, env, ctx, { skipGatewayAuth: true });
+  // Keep the bearer token available to the private MCP Worker for defense in
+  // depth. The Edge OAuth provider already validated it; skipGatewayAuth only
+  // suppresses duplicate validation when the request stays in this Worker.
+  return deps.handleLegacyWorkerFetch(request, env, ctx, { skipGatewayAuth: true });
 }
 
 export function handleOAuthProviderDefaultRequest<TEnv extends OAuthRuntimeEnv>(

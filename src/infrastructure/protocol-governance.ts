@@ -115,7 +115,7 @@ export const GOVERNED_PROMPT_NAMES = [
 const BASE_SURFACE_CONTRACT = Object.freeze({
   capabilities: {
     required: ['tools', 'resources', 'prompts', 'logging'] as const,
-    optional: ['sampling'] as const,
+    optional: ['sampling', 'tasks'] as const,
   },
   tools: GOVERNED_TOOL_NAMES,
   resources: GOVERNED_RESOURCE_URIS,

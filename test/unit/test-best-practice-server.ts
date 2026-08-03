@@ -7,7 +7,7 @@
 
 import assert from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import type { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool, CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from '../../src/infrastructure/logger.js';
 import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
@@ -75,6 +75,7 @@ interface StubToolDefinition {
   name: string;
   description: string;
   inputSchema: { type: string; properties: Record<string, unknown> };
+  annotations: ToolAnnotations;
 }
 
 class StubRegistry {
@@ -86,6 +87,7 @@ class StubRegistry {
         name: 'stub_tool',
         description: 'stub',
         inputSchema: { type: 'object', properties: {} },
+        annotations: { readOnlyHint: true, openWorldHint: false },
       },
     ];
   }

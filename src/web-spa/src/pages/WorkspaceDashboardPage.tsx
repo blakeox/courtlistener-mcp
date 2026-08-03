@@ -86,9 +86,11 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
     }
     return left[0].localeCompare(right[0]);
   });
-  const cloudflareSummary = healthQuery.data
-    ? `${healthQuery.data.cloudflare.analytics_enabled ? 'Analytics' : 'No analytics'} · ${
-        healthQuery.data.cloudflare.async_queue_configured ? 'Queue ready' : 'Queue missing'
+  const cloudflareSummary = healthQuery.data?.diagnostics
+    ? `${healthQuery.data.diagnostics.cloudflare.analytics_enabled ? 'Analytics' : 'No analytics'} · ${
+        healthQuery.data.diagnostics.cloudflare.async_queue_configured
+          ? 'Queue ready'
+          : 'Queue missing'
       }`
     : 'Loading Cloudflare posture';
 
@@ -97,7 +99,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
       <HeroPanel
         eyebrow="Workspace overview"
         title="Overview"
-        description="Start research work, check session and runtime posture, and jump into the parts of the workspace that need attention."
+        description="Start research, review access, and move into the part of the workspace that needs attention."
         actions={
           <InlineGroup>
             <ButtonLink to="/app/playground">Open playground</ButtonLink>
@@ -116,8 +118,8 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
         }
         aside={
           <PageHeroNote
-            title="Operational surface"
-            description="Terminal, MCP, and court research in one workspace with explicit control points."
+            title="Research desk"
+            description="Case research, account controls, and runtime posture in one workspace."
           >
             <Eyebrow>Current posture</Eyebrow>
             <KeyValueList
@@ -155,8 +157,8 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
             <MetricCard
               label="Cloudflare Controls"
               value={
-                healthQuery.data?.cloudflare.turnstile_enforced_routes.length
-                  ? `${healthQuery.data.cloudflare.turnstile_enforced_routes.length} gated routes`
+                healthQuery.data?.diagnostics.cloudflare.turnstile_enforced_routes.length
+                  ? `${healthQuery.data.diagnostics.cloudflare.turnstile_enforced_routes.length} gated routes`
                   : 'No challenge gates'
               }
               accent={cloudflareSummary}

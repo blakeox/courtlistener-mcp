@@ -3,11 +3,16 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  SubscribeRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import { setupHandlers } from '../../src/server/handler-registry.js';
+import { ProtocolListChangedNotifier } from '../../src/server/protocol-list-changed-notifier.js';
 
-type RegisteredHandler = (request?: unknown) => Promise<unknown>;
+type RegisteredHandler = (request?: unknown, extra?: unknown) => Promise<unknown>;
 
 class TestServer {
   private readonly handlers = new Map<unknown, RegisteredHandler>();
@@ -40,9 +45,12 @@ function createDeps(server: TestServer) {
     subscriptionManager: {
       subscribe: () => {},
       unsubscribe: () => {},
+      bindServer: () => {},
     } as never,
+    listChangedNotifier: new ProtocolListChangedNotifier(false),
     listTools: async () => ({ tools: [], metadata: { categories: [] } }),
     listResources: async () => ({ resources: [] }),
+    listResourceTemplates: async () => ({ resourceTemplates: [] }),
     readResource: async () => ({ contents: [] }),
     listPrompts: async () => ({ prompts: [] }),
   };
@@ -99,5 +107,39 @@ describe('setupHandlers', () => {
 
     await callTool(request);
     assert.strictEqual(forwardedRequest, request);
+  });
+
+  it('uses transport session id for resource subscriptions', async () => {
+    const server = new TestServer();
+    let subscribedSessionId: string | undefined;
+
+    setupHandlers({
+      ...createDeps(server),
+      subscriptionManager: {
+        subscribe: (_uri: string, sessionId: string) => {
+          subscribedSessionId = sessionId;
+        },
+        unsubscribe: () => {},
+        bindServer: () => {},
+      } as never,
+      listChangedNotifier: new ProtocolListChangedNotifier(false),
+      getPrompt: async () => ({ messages: [] }),
+      executeTool: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+
+    const subscribe = server.get(SubscribeRequestSchema);
+    await subscribe(
+      {
+        params: {
+          uri: 'courtlistener://status/api',
+        },
+      },
+      {
+        sessionId: 'worker-session-1',
+        requestInfo: { headers: {} },
+      },
+    );
+
+    assert.equal(subscribedSessionId, 'worker-session-1');
   });
 });

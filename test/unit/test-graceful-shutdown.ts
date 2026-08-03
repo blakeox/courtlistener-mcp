@@ -17,19 +17,28 @@ interface ProcessEventHandler {
 
 describe('GracefulShutdown', () => {
   let originalOn: typeof process.on;
+  let originalRemoveListener: typeof process.removeListener;
   let registeredHandlers: ProcessEventHandler[];
+  let removedHandlers: ProcessEventHandler[];
 
   beforeEach(() => {
     originalOn = process.on;
+    originalRemoveListener = process.removeListener;
     registeredHandlers = [];
+    removedHandlers = [];
     process.on = ((event: string, handler: (...args: unknown[]) => void) => {
       registeredHandlers.push({ event, handler });
       return process;
     }) as typeof process.on;
+    process.removeListener = ((event: string, handler: (...args: unknown[]) => void) => {
+      removedHandlers.push({ event, handler });
+      return process;
+    }) as typeof process.removeListener;
   });
 
   afterEach(() => {
     process.on = originalOn;
+    process.removeListener = originalRemoveListener;
   });
 
   it('registers process listeners when enabled', () => {
@@ -49,6 +58,26 @@ describe('GracefulShutdown', () => {
     assert.ok(events.includes('SIGTERM'));
     assert.ok(events.includes('uncaughtException'));
     assert.ok(events.includes('unhandledRejection'));
+  });
+
+  it('disposes only the process listeners owned by the coordinator', () => {
+    const logger = createTestLogger();
+    const shutdown = new GracefulShutdown(
+      {
+        enabled: true,
+        timeout: 100,
+        forceTimeout: 25,
+        signals: ['SIGINT', 'SIGTERM'],
+      },
+      logger,
+    );
+
+    shutdown.dispose();
+
+    assert.deepEqual(
+      removedHandlers.map((entry) => entry.event),
+      ['SIGINT', 'SIGTERM', 'uncaughtException', 'unhandledRejection'],
+    );
   });
 
   it('tracks hooks and status', () => {

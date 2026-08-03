@@ -47,7 +47,10 @@ describe('mcp-boundary-abuse-guard', () => {
     const body = JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'tools/call' });
     const request = new Request('https://example.com/mcp', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'mcp-session-id': 'session-1',
+      },
       body,
     });
     const fingerprint = await buildMcpReplayFingerprint(
@@ -55,6 +58,38 @@ describe('mcp-boundary-abuse-guard', () => {
       getRequestContentLength(request),
       64 * 1024,
     );
-    assert.equal(fingerprint, 'POST|-|rpc:tools/call|id:42');
+    assert.equal(fingerprint, 'POST|session-1|rpc:tools/call|id:42');
+  });
+
+  it('does not share sessionless replay state across clients in one rate-limit bucket', async () => {
+    const request = new Request('https://example.com/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'tools/call' }),
+    });
+
+    const fingerprint = await buildMcpReplayFingerprint(
+      request,
+      getRequestContentLength(request),
+      64 * 1024,
+    );
+
+    assert.equal(fingerprint, null);
+  });
+
+  it('does not classify sessionless initialize retries as replay', async () => {
+    const request = new Request('https://example.com/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+    });
+
+    const fingerprint = await buildMcpReplayFingerprint(
+      request,
+      getRequestContentLength(request),
+      64 * 1024,
+    );
+
+    assert.equal(fingerprint, null);
   });
 });

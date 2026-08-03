@@ -4,15 +4,11 @@
  * MCP worker — `/mcp`, `/sse`, CourtListenerMCP Durable Object, async tool queue.
  */
 
-import { bootstrapServices } from './infrastructure/bootstrap.js';
-import { container } from './infrastructure/container.js';
 import { runWithPrincipalContext } from './infrastructure/principal-context.js';
 import {
   PREFERRED_MCP_PROTOCOL_VERSION,
   SUPPORTED_MCP_PROTOCOL_VERSIONS as SUPPORTED_MCP_PROTOCOL_VERSION_LIST,
 } from './infrastructure/protocol-constants.js';
-import type { Logger } from './infrastructure/logger.js';
-import { ToolHandlerRegistry } from './server/tool-handler.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
 import { createWorkerMcpAiRuntime } from './server/worker-mcp-ai-runtime.js';
 import { createWorkerMcpFetchHandler } from './server/worker-mcp-fetch-runtime.js';
@@ -30,6 +26,11 @@ import {
 import { CourtListenerMCP } from './worker/courtlistener-mcp-agent.js';
 import type { HandleWorkerCoreRoutesDeps } from './server/worker-core-routes.js';
 import { isAllowedOrigin } from './server/worker-security.js';
+import { createWorkerRuntime } from './server/worker-runtime-factory.js';
+import {
+  buildRuntimeReadinessPayload,
+  runtimeReadinessStatusCode,
+} from './infrastructure/runtime-readiness-contract.js';
 
 const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set(SUPPORTED_MCP_PROTOCOL_VERSION_LIST);
 const platform = createWorkerPlatformRuntime<WorkerMcpEnv>();
@@ -75,6 +76,25 @@ const workerCoreRouteDeps = {
   getClientIdentifier: platform.workerObservabilityRuntime.getClientIdentifier,
   recordTurnstileVerdict: platform.cloudflareTelemetryRuntime.recordTurnstileVerdict,
   recordUiEvent: platform.cloudflareTelemetryRuntime.recordUiEvent,
+  workerRole: 'mcp',
+  getReadinessResponse: async (_request: Request, env: WorkerMcpEnv) => {
+    const payload = buildRuntimeReadinessPayload({
+      workerRole: 'mcp',
+      checks: {
+        runtime: { status: 'pass', message: 'MCP Worker request runtime is available.' },
+        mcp_object: {
+          status: env.MCP_OBJECT ? 'pass' : 'fail',
+          message: env.MCP_OBJECT
+            ? 'MCP Durable Object binding is configured.'
+            : 'MCP Durable Object binding is missing.',
+        },
+      },
+    });
+    return new Response(JSON.stringify(payload), {
+      status: runtimeReadinessStatusCode(payload.status),
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  },
 } satisfies HandleWorkerCoreRoutesDeps<WorkerMcpEnv>;
 
 const handleMcpWorkerFetch = createWorkerMcpFetchHandler<WorkerMcpEnv>({
@@ -112,12 +132,12 @@ export default {
   },
   async queue(batch: MessageBatch<AsyncJobMessage>, env: WorkerMcpEnv): Promise<void> {
     platform.cloudflareTelemetryRuntime.setCurrentEnv(env);
-    bootstrapServices();
-    const toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
-    const logger = container.get<Logger>('logger');
+    const runtime = createWorkerRuntime(env);
+    const { logger, toolRegistry } = runtime;
 
     for (const message of batch.messages) {
       await processAsyncQueueMessage({
+        // Cloudflare Queue, rather than application code, owns redelivery.
         env,
         logger,
         message: message.body,
@@ -128,8 +148,24 @@ export default {
             ...(userId ? { userId } : {}),
           }),
         onAsyncJobUpdate: platform.cloudflareTelemetryRuntime.recordAsyncJobUpdate,
-      });
-      message.ack();
+      })
+        .then((disposition) => {
+          if (disposition.action === 'retry') {
+            message.retry(
+              disposition.delaySeconds > 0 ? { delaySeconds: disposition.delaySeconds } : undefined,
+            );
+            return;
+          }
+          message.ack();
+        })
+        .catch((error: unknown) => {
+          logger.error(
+            'Async queue consumer failed before terminal disposition',
+            error instanceof Error ? error : new Error(String(error)),
+            { jobId: message.body.jobId, attempts: message.attempts },
+          );
+          message.retry();
+        });
     }
   },
 };

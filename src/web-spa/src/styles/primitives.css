@@ -20,6 +20,7 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 code,
@@ -33,11 +34,9 @@ a {
 
 @keyframes fade-in {
   from {
-    opacity: 0;
     transform: translateY(var(--motion-drop-sm));
   }
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }

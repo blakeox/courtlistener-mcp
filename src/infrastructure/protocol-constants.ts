@@ -8,41 +8,66 @@
  * NOTE: This file is Workers-compatible (no filesystem access)
  */
 
-/**
- * Get version
- * In Workers environment, use env var or default
- * In Node.js, this will be injected at build time
- */
-function getPackageVersion(): string {
-  // Check if running in Cloudflare Workers
-  if (typeof process === 'undefined' || typeof process.versions === 'undefined') {
-    // Workers environment - use env or default
-    return '1.0.5';
-  }
+import { PACKAGE_VERSION } from './package-version.js';
 
-  // Node.js environment - try to read package.json
-  try {
-    // Dynamic import only in Node.js
-    const { readFileSync } = require('fs') as typeof import('fs');
-    const { join, dirname } = require('path') as typeof import('path');
-    const { fileURLToPath } = require('url') as typeof import('url');
+export type ProtocolFeatureFlags = {
+  TOOLS: boolean;
+  LOGGING: boolean;
+  RESOURCES: boolean;
+  PROMPTS: boolean;
+  SAMPLING: boolean;
+  RESOURCE_SUBSCRIPTIONS: boolean;
+  NATIVE_TASKS: boolean;
+  LIST_CHANGED: boolean;
+};
 
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const packageJsonPath = join(__dirname, '../../package.json');
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-    return packageJson.version || '1.0.5';
-  } catch {
-    return '1.0.5';
+export interface ProtocolEnvironment {
+  LOGGING_ENABLED?: string;
+  SAMPLING_ENABLED?: string;
+  MCP_RESOURCE_SUBSCRIPTIONS?: string;
+  MCP_NATIVE_TASKS_ENABLED?: string;
+  MCP_LIST_CHANGED_ENABLED?: string;
+}
+
+function parseBooleanFlag(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
   }
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  return defaultValue;
 }
 
 /**
- * Server metadata derived from package.json
+ * Resolve MCP feature flags from environment variables.
+ * Uses a single SAMPLING_ENABLED flag for both runtime and capability advertisement.
+ */
+export function resolveProtocolFeatureFlags(
+  env: ProtocolEnvironment = typeof process !== 'undefined' ? process.env : {},
+): ProtocolFeatureFlags {
+  return {
+    TOOLS: true,
+    LOGGING: parseBooleanFlag(env.LOGGING_ENABLED, true),
+    RESOURCES: true,
+    PROMPTS: true,
+    SAMPLING: parseBooleanFlag(env.SAMPLING_ENABLED, false),
+    RESOURCE_SUBSCRIPTIONS: parseBooleanFlag(env.MCP_RESOURCE_SUBSCRIPTIONS, true),
+    NATIVE_TASKS: parseBooleanFlag(env.MCP_NATIVE_TASKS_ENABLED, false),
+    LIST_CHANGED: parseBooleanFlag(env.MCP_LIST_CHANGED_ENABLED, false),
+  };
+}
+
+/**
+ * Server metadata derived from package.json (injected at build time for Workers).
  */
 export const SERVER_INFO = {
   name: 'courtlistener-mcp',
-  version: getPackageVersion(),
+  version: PACKAGE_VERSION,
   description: 'Model Context Protocol server for CourtListener API',
 } as const;
 
@@ -60,48 +85,59 @@ export const PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
 export const PREFERRED_MCP_PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[2];
 
 /**
- * Feature flags for MCP capabilities
- * Enable/disable features during gradual rollout
+ * Build MCP server capabilities from resolved feature flags.
+ * Only advertises optional surfaces when they are actually supported.
  */
-export const FEATURE_FLAGS = {
-  // Core features (always enabled)
-  TOOLS: true,
-  LOGGING: true,
+export function buildServerCapabilities(
+  flags: ProtocolFeatureFlags = resolveProtocolFeatureFlags(),
+) {
+  return {
+    tools: flags.TOOLS
+      ? {
+          ...(flags.LIST_CHANGED ? { listChanged: true as const } : {}),
+        }
+      : undefined,
 
-  // New features (enable gradually)
-  RESOURCES: true,
-  PROMPTS: true,
-  SAMPLING: process.env.ENABLE_MCP_SAMPLING === 'true',
+    resources: flags.RESOURCES
+      ? {
+          ...(flags.RESOURCE_SUBSCRIPTIONS ? { subscribe: true as const } : {}),
+          ...(flags.LIST_CHANGED ? { listChanged: true as const } : {}),
+        }
+      : undefined,
 
-  // Response format features
-  STREAMING: process.env.ENABLE_MCP_STREAMING === 'true',
-  STRUCTURED_CONTENT: process.env.ENABLE_STRUCTURED_CONTENT === 'true',
-} as const;
+    prompts: flags.PROMPTS
+      ? {
+          ...(flags.LIST_CHANGED ? { listChanged: true as const } : {}),
+        }
+      : undefined,
+
+    logging: flags.LOGGING ? {} : undefined,
+
+    sampling: flags.SAMPLING ? {} : undefined,
+
+    tasks: flags.NATIVE_TASKS
+      ? {
+          list: {},
+          cancel: {},
+          requests: {
+            tools: {
+              call: {},
+            },
+          },
+        }
+      : undefined,
+  } as const;
+}
 
 /**
- * MCP Server Capabilities
- * Defines what the server advertises to clients
+ * Feature flags for MCP capabilities (default runtime resolution).
  */
-export const SERVER_CAPABILITIES = {
-  tools: FEATURE_FLAGS.TOOLS ? {} : undefined,
+export const FEATURE_FLAGS = resolveProtocolFeatureFlags();
 
-  resources: FEATURE_FLAGS.RESOURCES
-    ? {
-        subscribe: true,
-        listChanged: true,
-      }
-    : undefined,
-
-  prompts: FEATURE_FLAGS.PROMPTS
-    ? {
-        listChanged: true,
-      }
-    : undefined,
-
-  logging: FEATURE_FLAGS.LOGGING ? {} : undefined,
-
-  sampling: FEATURE_FLAGS.SAMPLING ? {} : undefined,
-} as const;
+/**
+ * MCP Server Capabilities advertised to clients by default.
+ */
+export const SERVER_CAPABILITIES = buildServerCapabilities(FEATURE_FLAGS);
 
 /**
  * Transport configuration
@@ -134,7 +170,7 @@ export const SESSION = {
  * Error codes
  */
 export const ERROR_CODES = {
-  // MCP standard error codes
+  // MCP standard JSON-RPC error codes
   PARSE_ERROR: -32700,
   INVALID_REQUEST: -32600,
   METHOD_NOT_FOUND: -32601,
@@ -152,15 +188,15 @@ export const ERROR_CODES = {
 /**
  * Check if a feature is enabled
  */
-export function isFeatureEnabled(feature: keyof typeof FEATURE_FLAGS): boolean {
+export function isFeatureEnabled(feature: keyof ProtocolFeatureFlags): boolean {
   return FEATURE_FLAGS[feature];
 }
 
 /**
  * Get enabled capabilities for server advertisement
  */
-export function getEnabledCapabilities(): typeof SERVER_CAPABILITIES {
-  return SERVER_CAPABILITIES;
+export function getEnabledCapabilities() {
+  return buildServerCapabilities(FEATURE_FLAGS);
 }
 
 /**

@@ -208,25 +208,27 @@ class MockMetricsCollector {
   }
 
   getHealth(): {
-    status: string;
-    uptime: number;
-    failure_rate: number;
-    total_requests: number;
-    total_failures: number;
+    status: 'healthy' | 'warning' | 'critical';
+    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }>;
+    metrics: ReturnType<typeof this.getMetrics>;
   } {
     const stats = this.getStats();
     const failureRate = stats.totalRequests > 0 ? stats.totalFailures / stats.totalRequests : 0;
 
-    let status = 'healthy';
+    let status: 'healthy' | 'warning' | 'critical' = 'healthy';
     if (failureRate > 0.1) status = 'critical';
     else if (failureRate > 0.05) status = 'warning';
 
     return {
       status,
-      uptime: Date.now() - (this.requests[0]?.timestamp || Date.now()),
-      failure_rate: failureRate,
-      total_requests: stats.totalRequests,
-      total_failures: stats.totalFailures,
+      checks: {
+        failure_rate: {
+          status: failureRate < 0.25 ? 'pass' : 'fail',
+          message: `Request failure rate is ${(failureRate * 100).toFixed(1)}%`,
+          value: failureRate,
+        },
+      },
+      metrics: this.getMetrics(),
     };
   }
 
@@ -382,15 +384,29 @@ describe('🏢 Server Integration Testing', () => {
       assert.ok(
         typeof response.data === 'object' &&
           response.data !== null &&
-          'cache_stats' in response.data,
+          'diagnostics' in response.data,
       );
       assert.ok(
         typeof response.data === 'object' && response.data !== null && 'timestamp' in response.data,
       );
 
-      // Should include health status
-      const data = response.data as { status?: string };
-      assert.ok(data.status && ['healthy', 'warning', 'critical'].includes(data.status));
+      const data = response.data as {
+        status?: string;
+        service?: string;
+        runtime?: string;
+        diagnostics?: { metrics_health?: { status?: string }; cache_stats?: unknown };
+      };
+      assert.equal(data.service, 'courtlistener-mcp');
+      assert.equal(data.runtime, 'node');
+      assert.ok(data.status && ['ok', 'degraded', 'unhealthy'].includes(data.status));
+      assert.ok(
+        data.diagnostics?.metrics_health?.status &&
+          ['healthy', 'warning', 'critical'].includes(data.diagnostics.metrics_health.status),
+      );
+      assert.ok(data.diagnostics?.cache_stats !== undefined);
+      assert.ok(data.diagnostics?.session_topology);
+      assert.ok(data.diagnostics?.cloudflare);
+      assert.ok(data.diagnostics?.metrics);
 
       console.log('✓ Health endpoint response:', JSON.stringify(response.data, null, 2));
     });
@@ -634,25 +650,30 @@ describe('🏢 Server Integration Testing', () => {
 
       const response = await HTTPClient.request(`http://localhost:${serverPort}/health`);
 
-      // With 1 failure out of 5 requests (20% failure rate), should be critical (503)
-      // This is correct behavior - high failure rate should result in unhealthy status
+      // With 1 failure out of 5 requests (20% failure rate), should be unhealthy (503)
       assert.strictEqual(response.status, 503);
 
       const health = response.data as {
         status?: string;
-        uptime?: number;
-        failure_rate?: number;
-        total_requests?: number;
-        total_failures?: number;
+        diagnostics?: {
+          metrics_health?: {
+            status?: string;
+            checks?: Record<string, { status?: string; value?: unknown }>;
+          };
+          session_topology?: unknown;
+          cloudflare?: unknown;
+          metrics?: unknown;
+        };
       };
-      assert.strictEqual(health.status, 'critical');
-      assert.ok(typeof health.uptime === 'number' || health.uptime === undefined);
-      assert.ok(typeof health.failure_rate === 'number');
-      assert.strictEqual(health.total_requests, 4);
-      assert.strictEqual(health.total_failures, 1);
-      assert.ok(health.failure_rate && health.failure_rate > 0.1); // Should be 0.2 (20%)
+      assert.strictEqual(health.status, 'unhealthy');
+      assert.strictEqual(health.diagnostics?.metrics_health?.status, 'critical');
+      assert.ok(health.diagnostics?.session_topology);
+      assert.ok(health.diagnostics?.cloudflare);
+      assert.ok(health.diagnostics?.metrics);
+      const failureRate = health.diagnostics?.metrics_health?.checks?.failure_rate?.value;
+      assert.ok(typeof failureRate === 'number' && failureRate > 0.1);
 
-      console.log('✓ Health status correctly identifies critical state with high failure rate');
+      console.log('✓ Health status correctly identifies unhealthy state with high failure rate');
     });
 
     it('should provide detailed performance metrics', async () => {

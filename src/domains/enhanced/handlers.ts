@@ -5,7 +5,11 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from '../../common/zod.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import {
+  TypedToolHandler,
+  ToolContext,
+  MUTATING_TOOL_ANNOTATIONS,
+} from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 export * from './smart-search.js';
 
@@ -299,6 +303,7 @@ export class GetEnhancedRECAPDataHandler extends TypedToolHandler<typeof enhance
   readonly description = 'Access advanced RECAP datasets and utilities';
   readonly category = 'dockets';
   protected readonly schema = enhancedRecapSchema;
+  override readonly annotations = MUTATING_TOOL_ANNOTATIONS;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();

@@ -81,13 +81,32 @@ describe('HTTP Transport Server', () => {
     if (close) await close();
   });
 
-  it('GET /health returns 200 with status ok', async () => {
+  it('GET /health returns 200 with unified runtime contract fields', async () => {
     const res = await fetch(`${baseUrl}/health`);
     assert.equal(res.status, 200);
 
-    const data = (await res.json()) as { status: string; transport: string };
+    const data = (await res.json()) as {
+      status: string;
+      transport: string;
+      service: string;
+      runtime: string;
+      version: string;
+      timestamp: string;
+      diagnostics?: {
+        session_topology?: Record<string, unknown>;
+        cloudflare?: Record<string, unknown>;
+        metrics?: { latency_ms?: unknown };
+      };
+    };
     assert.equal(data.status, 'ok');
     assert.equal(data.transport, 'streamable-http');
+    assert.equal(data.service, 'courtlistener-mcp');
+    assert.equal(data.runtime, 'node');
+    assert.match(data.version, /^\d+\.\d+\.\d+/);
+    assert.ok(Date.parse(data.timestamp));
+    assert.ok(data.diagnostics?.session_topology);
+    assert.ok(data.diagnostics?.cloudflare);
+    assert.ok(data.diagnostics?.metrics?.latency_ms);
   });
 
   it('OPTIONS /mcp returns consolidated CORS headers', async () => {
@@ -405,11 +424,11 @@ describe('HTTP Transport Server shutdown race handling', () => {
     const payload = (await duringClose.json()) as {
       reason?: string;
       diagnostics?: {
-        shuttingDown?: boolean;
+        shutting_down?: boolean;
       };
     };
     assert.equal(payload.reason, 'shutdown_in_progress');
-    assert.equal(payload.diagnostics?.shuttingDown, true);
+    assert.equal(payload.diagnostics?.shutting_down, true);
 
     await closePromise;
   });

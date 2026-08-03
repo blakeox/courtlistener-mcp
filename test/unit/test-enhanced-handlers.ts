@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 import {
   GetVisualizationDataHandler,
   GetBulkDataHandler,
@@ -107,7 +108,7 @@ describe('GetVisualizationDataHandler', () => {
       mockContext,
     );
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.deepStrictEqual(capturedParams, {
       data_type: 'case_timeline',
       start_date: '2020-01-01',
@@ -154,7 +155,7 @@ describe('GetVisualizationDataHandler', () => {
     const handler = new GetVisualizationDataHandler(mockApi);
     const result = await handler.execute({ data_type: 'judge_statistics' }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.total_judges, 3);
     assert.strictEqual(content.active_judges, 2);
     assert.strictEqual(content.appointed_by_president.Obama, 2);
@@ -173,7 +174,7 @@ describe('GetVisualizationDataHandler', () => {
     const handler = new GetVisualizationDataHandler(mockApi);
     const result = await handler.execute({ data_type: 'judge_statistics' }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.appointed_by_president.Unknown, 1);
   });
 
@@ -189,7 +190,7 @@ describe('GetVisualizationDataHandler', () => {
     const handler = new GetVisualizationDataHandler(mockApi);
     const result = await handler.execute({ data_type: 'judge_statistics' }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.total_judges, 0);
     assert.strictEqual(content.active_judges, 0);
   });
@@ -250,7 +251,7 @@ describe('GetBulkDataHandler', () => {
     } as any);
     const result = await handler.execute({ data_type: 'opinions' }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.data_type, 'opinions');
     assert.strictEqual(content.sample_size, 10);
     assert.ok(Array.isArray(content.data));
@@ -263,7 +264,7 @@ describe('GetBulkDataHandler', () => {
     } as any);
     const result = await handler.execute({ data_type: 'dockets', sample_size: 25 }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.sample_size, 25);
   });
 
@@ -324,7 +325,7 @@ describe('GetBankruptcyDataHandler', () => {
       mockContext,
     );
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.court, 'nysb');
     assert.strictEqual(content.case_name, 'Acme Corp');
     assert.strictEqual(content.docket_number, '22-00001');
@@ -337,7 +338,7 @@ describe('GetBankruptcyDataHandler', () => {
     } as any);
     const result = await handler.execute({ page: 1, page_size: 20 }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.court, undefined);
     assert.strictEqual(content.case_name, undefined);
     assert.strictEqual(content.page, 1);
@@ -391,7 +392,7 @@ describe('GetComprehensiveJudgeProfileHandler', () => {
     const result = await handler.execute({ judge_id: 100 }, mockContext);
 
     assert.strictEqual(result.isError, undefined);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.ok(content.judge);
     assert.strictEqual(content.judge.name_first, 'Ruth');
     assert.deepStrictEqual(content.positions, [{ id: 1 }]);
@@ -408,7 +409,8 @@ describe('GetComprehensiveJudgeProfileHandler', () => {
     const result = await handler.execute({ judge_id: 99999 }, mockContext);
 
     assert.strictEqual(result.isError, true);
-    assert.ok(result.content[0].text.includes('Judge not found'));
+    const payload = getStructuredPayload<{ error: string }>(result);
+    assert.match(payload.error, /failed|Judge not found/i);
   });
 
   it('has correct metadata', () => {
@@ -457,7 +459,7 @@ describe('GetComprehensiveCaseAnalysisHandler', () => {
     const result = await handler.execute({ cluster_id: 200 }, mockContext);
 
     assert.strictEqual(result.isError, undefined);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.case_name, 'Roe v. Wade');
     assert.strictEqual(content.docket_entries, 42);
   });
@@ -540,7 +542,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       mockContext,
     );
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'investments');
   });
 
@@ -551,7 +553,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'debts', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'debts');
   });
 
@@ -562,7 +564,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'gifts', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'gifts');
   });
 
@@ -573,7 +575,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'agreements', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'agreements');
   });
 
@@ -584,7 +586,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'positions', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'positions');
   });
 
@@ -595,7 +597,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'reimbursements', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'reimbursements');
   });
 
@@ -606,7 +608,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'spouse_incomes', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'spouse_incomes');
   });
 
@@ -619,7 +621,7 @@ describe('GetFinancialDisclosureDetailsHandler', () => {
       { disclosure_type: 'non_investment_incomes', page: 1, page_size: 20 },
       mockContext,
     );
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.type, 'non_investment_incomes');
   });
 
@@ -702,7 +704,7 @@ describe('ValidateCitationsHandler', () => {
     const result = await handler.execute({ text: 'See 410 U.S. 113' }, mockContext);
 
     assert.strictEqual(result.isError, undefined);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.valid, true);
     assert.strictEqual(content.citations.length, 1);
   });
@@ -715,7 +717,7 @@ describe('ValidateCitationsHandler', () => {
     const handler = new ValidateCitationsHandler(mockApi);
     const result = await handler.execute({ text: 'No citations here' }, mockContext);
 
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.valid, false);
     assert.deepStrictEqual(content.citations, []);
   });
@@ -778,7 +780,7 @@ describe('GetEnhancedRECAPDataHandler', () => {
     const result = await handler.execute({ action: 'fetch' }, mockContext);
 
     assert.ok(called);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.action, 'fetch');
   });
 
@@ -795,7 +797,7 @@ describe('GetEnhancedRECAPDataHandler', () => {
     const result = await handler.execute({ action: 'query' }, mockContext);
 
     assert.ok(called);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.action, 'query');
   });
 
@@ -812,7 +814,7 @@ describe('GetEnhancedRECAPDataHandler', () => {
     const result = await handler.execute({ action: 'email' }, mockContext);
 
     assert.ok(called);
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.strictEqual(content.action, 'email');
   });
 
@@ -885,7 +887,7 @@ describe('GetVisualizationMetadataHandler', () => {
       page: 2,
       page_size: 5,
     });
-    const content = JSON.parse(result.content[0].text);
+    const content = getStructuredPayload(result);
     assert.deepStrictEqual(content, { results: [{ slug: 'court-distribution' }] });
   });
 });

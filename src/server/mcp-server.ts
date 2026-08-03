@@ -11,6 +11,7 @@ import {
   Resource,
   McpError,
   ReadResourceResult,
+  ResourceTemplate,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 
@@ -30,9 +31,21 @@ import { ResourceHandlerRegistry } from './resource-handler.js';
 import { PromptHandlerRegistry } from './prompt-handler.js';
 import { SamplingService } from './sampling-service.js';
 import { SubscriptionManager } from './subscription-manager.js';
-import { getServerInfo, logConfiguration, SESSION } from '../infrastructure/protocol-constants.js';
+import {
+  getServerInfo,
+  logConfiguration,
+  resolveProtocolFeatureFlags,
+  SESSION,
+} from '../infrastructure/protocol-constants.js';
 import { setupHandlers } from './handler-registry.js';
+import { attachMcpLoggingBridge } from './mcp-logging-bridge.js';
 import { buildToolDefinitions, buildEnhancedMetadata, ToolMetadata } from './tool-builder.js';
+import { AsyncToolWorkflowOrchestrator } from './async-tool-workflow.js';
+import { AsyncWorkflowTaskStore } from './async-workflow-task-store.js';
+import { ProtocolListChangedNotifier } from './protocol-list-changed-notifier.js';
+import { wireCatalogListChangedNotifiers } from './catalog-list-changed-wiring.js';
+import { createOrchestratorPublicJobPort } from './async-public-job-port.js';
+import type { McpProgressReporter } from './mcp-progress-reporter.js';
 import {
   createMiddlewareToolExecutionService,
   type ToolExecutionService,
@@ -84,6 +97,10 @@ export class BestPracticeLegalMCPServer {
   private readonly cache: CacheManager;
   private readonly samplingService: SamplingService;
   private readonly subscriptionManager: SubscriptionManager;
+  private readonly listChangedNotifier: ProtocolListChangedNotifier;
+  private readonly asyncWorkflow: AsyncToolWorkflowOrchestrator;
+  private readonly taskStore?: AsyncWorkflowTaskStore;
+  private readonly nativeTasksEnabled: boolean;
   private readonly toolExecutionService: ToolExecutionService;
 
   private healthServer?: HealthServer;
@@ -119,11 +136,39 @@ export class BestPracticeLegalMCPServer {
     this.circuitBreakers = container.get<CircuitBreakerManager>('circuitBreakerManager');
     this.cache = container.get<CacheManager>('cache');
 
+    const protocolFlags = resolveProtocolFeatureFlags();
+    this.nativeTasksEnabled = protocolFlags.NATIVE_TASKS;
+    this.asyncWorkflow = new AsyncToolWorkflowOrchestrator(this.logger, {
+      ...this.config.asyncExecution,
+      recordLatencyMetric: (metric, durationMs) => {
+        this.metrics.recordLatencyMetric(metric, durationMs);
+      },
+      recordCostGuardrail: (metric, value, threshold) => {
+        this.metrics.recordCostGuardrail(`async.${metric}`, value, threshold);
+      },
+    });
+    if (this.nativeTasksEnabled) {
+      this.taskStore = new AsyncWorkflowTaskStore(
+        createOrchestratorPublicJobPort(this.asyncWorkflow),
+      );
+    }
+
     const serverFactory = container.get<MCPServerFactory>('serverFactory');
-    this.server = serverFactory.createServer(this.config);
+    this.server = serverFactory.createServer(this.config, {
+      ...(this.taskStore ? { taskStore: this.taskStore } : {}),
+    });
 
     this.samplingService = new SamplingService(this.server, this.config, this.logger);
     this.subscriptionManager = new SubscriptionManager();
+    this.subscriptionManager.setRefreshTtlResolver((uri) =>
+      this.resourceRegistry.getSubscriptionRefreshTtlMs(uri),
+    );
+    this.listChangedNotifier = wireCatalogListChangedNotifiers({
+      enabled: protocolFlags.LIST_CHANGED,
+      toolRegistry: this.toolRegistry,
+      resourceRegistry: this.resourceRegistry,
+      promptRegistry: this.promptRegistry,
+    });
     this.toolExecutionService = createMiddlewareToolExecutionService({
       toolRegistry: this.toolRegistry,
       logger: this.logger,
@@ -132,21 +177,28 @@ export class BestPracticeLegalMCPServer {
       config: this.config,
       cache: this.cache,
       sampling: this.samplingService,
+      asyncWorkflow: this.asyncWorkflow,
     });
 
     this.setupHealthServer();
+
+    attachMcpLoggingBridge(this.server, this.logger, {
+      enabled: this.config.logging.enabled,
+    });
 
     setupHandlers({
       server: this.server,
       logger: this.logger,
       metrics: this.metrics,
       subscriptionManager: this.subscriptionManager,
+      listChangedNotifier: this.listChangedNotifier,
       listTools: () => this.listToolsCore(),
       listResources: () => this.listResourcesCore(),
+      listResourceTemplates: () => this.listResourceTemplatesCore(),
       readResource: (uri) => this.readResourceCore(uri),
       listPrompts: () => this.listPromptsCore(),
       getPrompt: (name, args) => this.getPromptCore(name, args),
-      executeTool: (request) => this.executeToolCore(request),
+      executeTool: (request, context) => this.executeToolCore(request, context),
     });
 
     this.setupLifecycleHooks();
@@ -167,6 +219,10 @@ export class BestPracticeLegalMCPServer {
    */
   getServer(): Server {
     return this.server;
+  }
+
+  getListChangedNotifier(): ProtocolListChangedNotifier {
+    return this.listChangedNotifier;
   }
 
   /**
@@ -244,10 +300,14 @@ export class BestPracticeLegalMCPServer {
     }
 
     await this.server.close();
+    this.subscriptionManager.destroy();
+    this.listChangedNotifier.destroy();
 
     if (this.healthServer) {
       await this.healthServer.stop();
     }
+
+    this.gracefulShutdown.dispose();
 
     this.logger.info('Legal MCP Server stopped');
   }
@@ -257,6 +317,7 @@ export class BestPracticeLegalMCPServer {
    */
   destroy(): void {
     this.stopHeartbeat();
+    this.gracefulShutdown.dispose();
     this.isShuttingDown = true;
   }
 
@@ -371,6 +432,10 @@ export class BestPracticeLegalMCPServer {
     return { resources: this.resourceRegistry.getAllResources() };
   }
 
+  private async listResourceTemplatesCore(): Promise<{ resourceTemplates: ResourceTemplate[] }> {
+    return { resourceTemplates: this.resourceRegistry.getAllResourceTemplates() };
+  }
+
   private async readResourceCore(uri: string): Promise<ReadResourceResult> {
     const handler = this.resourceRegistry.findHandler(uri);
     if (!handler) {
@@ -397,7 +462,12 @@ export class BestPracticeLegalMCPServer {
     return handler.getMessages(args);
   }
 
-  private async executeToolCore(request: CallToolRequest): Promise<CallToolResult> {
+  private async executeToolCore(
+    request: CallToolRequest,
+    context?: {
+      progress?: McpProgressReporter;
+    },
+  ): Promise<CallToolResult> {
     if (this.isShuttingDown) {
       throw new McpError(ErrorCode.InternalError, 'Server is shutting down');
     }
@@ -406,7 +476,12 @@ export class BestPracticeLegalMCPServer {
     this.activeRequests.add(requestId);
 
     try {
-      return await this.toolExecutionService.execute(request, requestId);
+      const result = await this.toolExecutionService.execute(request, requestId, {
+        ...(context?.progress ? { progress: context.progress } : {}),
+        nativeTasksEnabled: this.nativeTasksEnabled,
+        ...(this.taskStore ? { taskStore: this.taskStore } : {}),
+      });
+      return result as CallToolResult;
     } catch (error) {
       if (error instanceof McpError) {
         throw error;

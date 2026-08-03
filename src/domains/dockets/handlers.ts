@@ -1,7 +1,11 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from '../../common/zod.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
-import { TypedToolHandler, ToolContext } from '../../server/tool-handler.js';
+import {
+  TypedToolHandler,
+  ToolContext,
+  MUTATING_TOOL_ANNOTATIONS,
+} from '../../server/tool-handler.js';
 import { withDefaults } from '../../server/handler-decorators.js';
 import {
   createPaginationInfo,
@@ -426,6 +430,7 @@ export class CreateDocketAlertHandler extends TypedToolHandler<typeof createDock
   readonly description = 'Create a docket-specific alert subscription';
   readonly category = 'dockets';
   protected readonly schema = createDocketAlertSchema;
+  override readonly annotations = MUTATING_TOOL_ANNOTATIONS;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();

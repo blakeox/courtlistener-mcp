@@ -198,7 +198,7 @@ describe('worker OAuth provider runtime', () => {
     });
   });
 
-  it('forwards provider-authenticated requests without the bearer token', async () => {
+  it('forwards provider-authenticated requests with the bearer token for MCP defense in depth', async () => {
     let forwardedAuthorization: string | null = null;
     let forwardedOptions: { skipGatewayAuth?: boolean } | undefined;
 
@@ -223,7 +223,7 @@ describe('worker OAuth provider runtime', () => {
     );
 
     assert.equal(await response.text(), 'legacy-ok');
-    assert.equal(forwardedAuthorization, null);
+    assert.equal(forwardedAuthorization, 'Bearer token');
     assert.deepEqual(forwardedOptions, { skipGatewayAuth: true });
   });
 

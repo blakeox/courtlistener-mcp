@@ -115,7 +115,8 @@ is active). This repo uses two DO classes:
 - **`CourtListenerMCP`** — one DO per connected MCP client session
 
 If you receive a “90% of daily Durable Objects free tier limit” email, check
-`/health` → `metrics.latency_ms.durable_objects.*` on the edge and MCP workers.
+`/health` → `diagnostics.metrics.latency_ms.durable_objects.*` on the edge and
+MCP workers.
 
 **Immediate mitigation (no deploy):**
 
@@ -163,9 +164,9 @@ run. On the Workers **free tier**, tail logs often show:
    fail-closed behavior.
 
 Check `/health` on the **edge** worker →
-`metrics.latency_ms.durable_objects.auth_limiter.unavailable_count` and
-`pnpm run cloudflare:tail:edge` (or `cloudflare:tail:mcp` for MCP-only issues)
-for `auth_limiter_fetch_error`.
+`diagnostics.metrics.latency_ms.durable_objects.auth_limiter.unavailable_count`
+and `pnpm run cloudflare:tail:edge` (or `cloudflare:tail:mcp` for MCP-only
+issues) for `auth_limiter_fetch_error`.
 
 Hosted auth (`/auth/start`) runs on the **edge** worker (`courtlistener-mcp`),
 not the MCP worker — see `docs/repo/WORKER_SPLIT.md`.

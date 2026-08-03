@@ -54,6 +54,14 @@ export interface WorkerPlatformEnv {
   MCP_OAUTH_DEV_USER_ID?: string;
   MCP_ALLOW_DEV_FALLBACK?: string;
   MCP_OAUTH_DIAGNOSTICS?: string;
+  LOGGING_ENABLED?: string;
+  SAMPLING_ENABLED?: string;
+  MCP_RESOURCE_SUBSCRIPTIONS?: string;
+  MCP_NATIVE_TASKS_ENABLED?: string;
+  MCP_ASYNC_QUEUE_ENABLED?: string;
+  /** Code Mode is an isolated future capability and must remain disabled by default. */
+  CODEMODE_ENABLED?: string;
+  MCP_LIST_CHANGED_ENABLED?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;

@@ -297,7 +297,7 @@ wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET -c wrangler.edge.jsonc
 # Optional shared token auth
 wrangler secret put MCP_AUTH_TOKEN -c wrangler.mcp.jsonc
 pnpm run cloudflare:check
-pnpm run deploy   # limiter → mcp → edge
+pnpm run deploy   # auth-limiter → edge → mcp
 ```
 
 Endpoints after deploy:
@@ -310,6 +310,17 @@ Endpoints after deploy:
 - `POST /register`
 - `GET /.well-known/oauth-authorization-server`
 - `GET /.well-known/oauth-protected-resource`
+
+`GET /health` returns a unified runtime contract on Worker, streamable HTTP, and
+diagnostics HTTP:
+
+- Core fields: `status`, `service`, `timestamp`, `version`, `runtime`,
+  `transport`
+- Shared diagnostics: `diagnostics.session_topology`, `diagnostics.cloudflare`,
+  `diagnostics.metrics.latency_ms`
+- Runtime-specific diagnostics (for example `diagnostics.backpressure` on
+  streamable HTTP or `diagnostics.metrics_health` on diagnostics HTTP) live
+  alongside those shared sections
 
 ## Web UX Wave (SPA)
 

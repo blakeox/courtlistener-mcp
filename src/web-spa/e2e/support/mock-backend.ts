@@ -1,5 +1,5 @@
 import type { Page, Route } from 'playwright/test';
-import { sessionSchema, usageSnapshotSchema, workerHealthSchema } from '../../src/lib/api';
+import { sessionSchema, usageSnapshotSchema } from '../../src/lib/api';
 
 interface MockSessionResponse {
   authenticated: boolean;
@@ -14,36 +14,6 @@ interface MockUsageSnapshot {
   currentDay: string;
   lastSeenAt: string | null;
   byRoute: Record<string, number>;
-  browserBootstrap: {
-    attempted: number;
-    succeeded: number;
-    failed: number;
-    turnstileRefreshed: number;
-    lastOutcome: string | null;
-    lastEventAt: string | null;
-  };
-}
-
-interface MockWorkerHealth {
-  status: 'ok';
-  service: 'courtlistener-mcp';
-  transport: 'cloudflare-agents-streamable-http';
-  cloudflare: {
-    analytics_enabled: boolean;
-    async_queue_configured: boolean;
-    async_jobs_kv_configured: boolean;
-    turnstile_enforced_routes: string[];
-  };
-  metrics: {
-    latency_ms: Record<string, unknown>;
-  };
-  session_topology: {
-    version: string;
-    shard_count: number;
-    idle_ttl_ms: number;
-    absolute_ttl_ms: number;
-    eviction_sweep_limit: number;
-  };
 }
 
 interface MockRuntimeCatalog {
@@ -74,7 +44,6 @@ interface MockRuntimeCatalog {
 interface InstallSpaMocksOptions {
   session?: MockSessionResponse;
   usage?: MockUsageSnapshot;
-  health?: MockWorkerHealth;
   runtime?: MockRuntimeCatalog;
   sessionFailure?: {
     status?: number;
@@ -112,42 +81,13 @@ async function fulfillJson(
   });
 }
 
-function validateMockContract(type: 'session' | 'usage' | 'health', body: unknown): void {
+function validateMockContract(type: 'session' | 'usage', body: unknown): void {
   if (type === 'session') {
     sessionSchema.parse(body);
     return;
   }
-  if (type === 'health') {
-    workerHealthSchema.parse(body);
-    return;
-  }
   usageSnapshotSchema.parse(body);
 }
-
-const defaultWorkerHealth: MockWorkerHealth = {
-  status: 'ok',
-  service: 'courtlistener-mcp',
-  transport: 'cloudflare-agents-streamable-http',
-  cloudflare: {
-    analytics_enabled: true,
-    async_queue_configured: true,
-    async_jobs_kv_configured: true,
-    turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
-  },
-  metrics: {
-    latency_ms: {
-      route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
-      runtime_latency_ms: { queue_latency_ms: { count: 2, avg_ms: 40 } },
-    },
-  },
-  session_topology: {
-    version: 'v1',
-    shard_count: 4,
-    idle_ttl_ms: 1_800_000,
-    absolute_ttl_ms: 43_200_000,
-    eviction_sweep_limit: 100,
-  },
-};
 
 export async function seedBrowserToken(page: Page, token: string, persist = false): Promise<void> {
   await page.addInitScript(
@@ -174,7 +114,6 @@ export async function installSpaMocks(
     user: null,
     turnstile_site_key: '',
   };
-  const health = options.health ?? defaultWorkerHealth;
   const usage = options.usage ?? {
     userId: sessionState.user?.id ?? 'signed-out',
     totalRequests: 0,
@@ -182,14 +121,6 @@ export async function installSpaMocks(
     currentDay: '2026-04-23',
     lastSeenAt: null,
     byRoute: {},
-    browserBootstrap: {
-      attempted: 0,
-      succeeded: 0,
-      failed: 0,
-      turnstileRefreshed: 0,
-      lastOutcome: null,
-      lastEventAt: null,
-    },
   };
   const runtime = options.runtime;
   const sessionFailure = options.sessionFailure;
@@ -215,11 +146,6 @@ export async function installSpaMocks(
   await page.route('**/api/usage', async (route) => {
     validateMockContract('usage', usage);
     await fulfillJson(route, usage);
-  });
-
-  await page.route('**/health', async (route) => {
-    validateMockContract('health', health);
-    await fulfillJson(route, health);
   });
 
   await page.route('**/api/logout', async (route) => {

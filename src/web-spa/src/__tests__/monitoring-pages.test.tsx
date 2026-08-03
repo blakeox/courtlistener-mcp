@@ -32,24 +32,26 @@ vi.mock('../lib/api', () => ({
     status: 'ok',
     service: 'courtlistener-mcp',
     transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
-    },
-    metrics: {
-      latency_ms: {
-        route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
-        runtime_latency_ms: { queue_latency_ms: { count: 2, avg_ms: 40 } },
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
       },
-    },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+      metrics: {
+        latency_ms: {
+          route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
+          runtime_latency_ms: { queue_latency_ms: { count: 2, avg_ms: 40 } },
+        },
+      },
+      session_topology: {
+        version: 'v1',
+        shard_count: 4,
+        idle_ttl_ms: 1800000,
+        absolute_ttl_ms: 43200000,
+        eviction_sweep_limit: 100,
+      },
     },
   }),
   toErrorMessage: vi.fn().mockReturnValue('Error'),

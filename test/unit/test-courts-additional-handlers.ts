@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 import {
   GetAbaRatingsHandler,
   GetJudgeEducationsHandler,
@@ -48,7 +49,7 @@ describe('Additional courts handlers', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as { positions: Array<{ id: number }> };
+      const payload = getStructuredPayload(result) as { positions: Array<{ id: number }> };
       assert.deepStrictEqual(capturedParams, {
         person: '9',
         cursor,
@@ -69,7 +70,7 @@ describe('Additional courts handlers', () => {
     } as any);
 
     const result = await handler.execute({ position_id: '7' }, makeContext());
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       position: { id: number; title: string };
     };
     assert.deepStrictEqual(payload.position, { id: 7, title: 'Justice' });
@@ -88,7 +89,7 @@ describe('Additional courts handlers', () => {
       { person: '11', school: 'Yale', degree_level: 'JD', page: 2, page_size: 5 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as { educations: Array<{ school: string }> };
+    const payload = getStructuredPayload(result) as { educations: Array<{ school: string }> };
     assert.deepStrictEqual(capturedParams, {
       person: '11',
       school: 'Yale',
@@ -116,7 +117,7 @@ describe('Additional courts handlers', () => {
       { person: '12', political_party: 'Independent', page: 1, page_size: 20 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       political_affiliations: Array<{ party: string }>;
     };
     assert.deepStrictEqual(payload.political_affiliations, [{ party: 'Independent' }]);
@@ -134,7 +135,7 @@ describe('Additional courts handlers', () => {
     assert.strictEqual(validated.success, true);
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as { ratings: Array<{ rating: string }> };
+      const payload = getStructuredPayload(result) as { ratings: Array<{ rating: string }> };
       assert.deepStrictEqual(payload.ratings, [{ rating: 'Well Qualified' }]);
     }
   });
@@ -151,7 +152,7 @@ describe('Additional courts handlers', () => {
       { person: '14', court: 'scotus', page: 1, page_size: 20 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       retention_events: Array<{ result: string }>;
     };
     assert.deepStrictEqual(payload.retention_events, [{ result: 'retained' }]);
@@ -174,7 +175,7 @@ describe('Additional courts handlers', () => {
       { name: 'Harvard', city: 'Cambridge', page: 1, page_size: 20 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as { schools: Array<{ name: string }> };
+    const payload = getStructuredPayload(result) as { schools: Array<{ name: string }> };
     assert.deepStrictEqual(payload.schools, [{ name: 'Harvard Law School' }]);
   });
 
@@ -195,7 +196,7 @@ describe('Additional courts handlers', () => {
       { person: '21', organization: 'ABA', page: 1, page_size: 20 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       memberships: Array<{ organization: string }>;
     };
     assert.deepStrictEqual(payload.memberships, [{ organization: 'ABA' }]);

@@ -27,6 +27,11 @@ export class GracefulShutdown {
   private signalShutdownInitiated = false;
   private exitInitiated = false;
   private forceExitTimer: NodeJS.Timeout | undefined;
+  private readonly signalHandlers = new Map<NodeJS.Signals, () => void>();
+  private uncaughtExceptionHandler: ((error: Error) => void) | undefined;
+  private unhandledRejectionHandler:
+    | ((reason: unknown, promise: Promise<unknown>) => void)
+    | undefined;
 
   constructor(
     private config: ShutdownConfig,
@@ -82,6 +87,33 @@ export class GracefulShutdown {
 
     this.shutdownPromise = this.performShutdown(reason);
     return this.shutdownPromise;
+  }
+
+  /**
+   * Remove process listeners owned by this coordinator.
+   *
+   * This is required when multiple server instances share a Node process, such
+   * as tests, local worker harnesses, and embedded integrations.
+   */
+  dispose(): void {
+    for (const [signal, handler] of this.signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+    this.signalHandlers.clear();
+
+    if (this.uncaughtExceptionHandler) {
+      process.removeListener('uncaughtException', this.uncaughtExceptionHandler);
+      this.uncaughtExceptionHandler = undefined;
+    }
+    if (this.unhandledRejectionHandler) {
+      process.removeListener('unhandledRejection', this.unhandledRejectionHandler);
+      this.unhandledRejectionHandler = undefined;
+    }
+
+    if (this.forceExitTimer) {
+      clearTimeout(this.forceExitTimer);
+      this.forceExitTimer = undefined;
+    }
   }
 
   /**
@@ -181,7 +213,7 @@ export class GracefulShutdown {
    */
   private setupSignalHandlers(): void {
     for (const signal of this.config.signals) {
-      process.on(signal as NodeJS.Signals, () => {
+      const handler = () => {
         this.logger.info(`Received ${signal} signal`);
 
         if (this.signalShutdownInitiated) {
@@ -203,23 +235,27 @@ export class GracefulShutdown {
             });
             this.forceExit();
           });
-      });
+      };
+      process.on(signal as NodeJS.Signals, handler);
+      this.signalHandlers.set(signal as NodeJS.Signals, handler);
     }
 
     // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
+    this.uncaughtExceptionHandler = (error) => {
       this.logger.error('Uncaught exception', error);
       this.shutdown('Uncaught exception').finally(() => this.forceExit());
-    });
+    };
+    process.on('uncaughtException', this.uncaughtExceptionHandler);
 
     // Handle unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
+    this.unhandledRejectionHandler = (reason, promise) => {
       this.logger.error('Unhandled promise rejection', undefined, {
         reason: String(reason),
         promise: promise.toString(),
       });
       this.shutdown('Unhandled promise rejection').finally(() => this.forceExit());
-    });
+    };
+    process.on('unhandledRejection', this.unhandledRejectionHandler);
   }
 
   /**

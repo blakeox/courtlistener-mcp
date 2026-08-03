@@ -69,6 +69,3 @@ yourself:
 
 Tip: Even solo, open PRs from feature branches and let CI run. This maintains
 history and keeps a clean main.
-
-See [Branch workflow](./BRANCH_WORKFLOW.md) for the dev → main promotion model
-and Dependabot targeting.

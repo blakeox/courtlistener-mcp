@@ -7,6 +7,7 @@ export class RecentOpinionsResourceHandler implements ResourceHandler {
   readonly name = 'Recent Opinions';
   readonly description = 'List recent opinions from the last 7 days';
   readonly mimeType = 'application/json';
+  readonly subscriptionRefreshTtlMs = 300_000;
 
   constructor(private api: CourtListenerAPI) {}
 

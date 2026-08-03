@@ -17,6 +17,8 @@ type ToolUxMeta = {
   category?: string;
   complexity?: string;
   async?: boolean;
+  asyncEligible?: boolean;
+  capability?: 'read_only' | 'external_mutation';
   costHint?: string;
   rateLimitWeight?: number;
 };
@@ -51,6 +53,8 @@ describe('MCP protocol UX metadata', () => {
         assert.equal(typeof uxMeta?.category, 'string');
         assert.equal(typeof uxMeta?.complexity, 'string');
         assert.equal(typeof uxMeta?.async, 'boolean');
+        assert.equal(typeof uxMeta?.asyncEligible, 'boolean');
+        assert.ok(['read_only', 'external_mutation'].includes(uxMeta?.capability ?? ''));
         assert.equal(typeof uxMeta?.costHint, 'string');
         assert.equal(typeof uxMeta?.rateLimitWeight, 'number');
 
@@ -59,6 +63,17 @@ describe('MCP protocol UX metadata', () => {
         } else {
           assert.equal(uxMeta?.async, true, `${tool.name} should support optional async execution`);
         }
+      }
+
+      const mutatingNames = new Set(['create_docket_alert', 'get_enhanced_recap_data']);
+      for (const tool of tools.filter((entry) => mutatingNames.has(entry.name))) {
+        const uxMeta = (tool._meta as Record<string, unknown>)['courtlistener/ux'] as ToolUxMeta;
+        assert.equal(
+          uxMeta.capability,
+          'external_mutation',
+          `${tool.name} must be mutation-classified`,
+        );
+        assert.equal(uxMeta.asyncEligible, false, `${tool.name} must not be queue-eligible`);
       }
     } finally {
       await server.stop();

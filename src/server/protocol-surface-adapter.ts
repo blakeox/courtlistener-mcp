@@ -3,43 +3,69 @@ import {
   CallToolRequest,
   CallToolRequestSchema,
   CallToolResult,
+  CreateTaskResult,
   GetPromptRequestSchema,
   GetPromptResult,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   Prompt,
   ReadResourceResult,
   ReadResourceRequestSchema,
   Resource,
+  ResourceTemplate,
   SubscribeRequestSchema,
   Tool,
   UnsubscribeRequestSchema,
+  ServerNotification,
+  ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
+import { resolveMcpSessionId } from './mcp-session-context.js';
+import { registerMcpSessionCleanup } from './mcp-session-cleanup.js';
+import { createMcpProgressReporter, type McpProgressReporter } from './mcp-progress-reporter.js';
 import { SubscriptionManager } from './subscription-manager.js';
+import type { AsyncWorkflowTaskStore } from './async-workflow-task-store.js';
+import { ProtocolListChangedNotifier } from './protocol-list-changed-notifier.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 
 interface BaseHandlerDependencies {
   server: Server;
   logger: Logger;
   metrics: MetricsCollector;
   subscriptionManager: SubscriptionManager;
+  listChangedNotifier: ProtocolListChangedNotifier;
 }
 
 interface ProtocolSurfaceOperations {
   listTools: () => Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;
   listResources: () => Promise<{ resources: Resource[] }>;
+  listResourceTemplates: () => Promise<{ resourceTemplates: ResourceTemplate[] }>;
   readResource: (uri: string) => Promise<ReadResourceResult>;
   listPrompts: () => Promise<{ prompts: Prompt[] }>;
   getPrompt: (name: string, args?: Record<string, string>) => Promise<GetPromptResult>;
-  executeTool: (request: CallToolRequest) => Promise<CallToolResult>;
+  executeTool: (
+    request: CallToolRequest,
+    context?: {
+      extra?: RequestHandlerExtra<ServerRequest, ServerNotification>;
+      progress?: McpProgressReporter;
+      nativeTasksEnabled?: boolean;
+      taskStore?: AsyncWorkflowTaskStore;
+    },
+  ) => Promise<CallToolResult | CreateTaskResult>;
 }
 
 export type HandlerDependencies = BaseHandlerDependencies & ProtocolSurfaceOperations;
 
 export function registerProtocolSurfaceHandlers(deps: HandlerDependencies): void {
+  deps.subscriptionManager.bindServer(deps.server);
+  deps.listChangedNotifier.bindServer(deps.server);
+  registerMcpSessionCleanup(deps.server, (sessionId) => {
+    deps.subscriptionManager.removeSession(sessionId);
+  });
   registerDiscoveryHandlers(deps, deps);
   registerResourceHandlers(deps, deps);
   registerSubscriptionHandlers(deps);
@@ -69,7 +95,7 @@ function registerDiscoveryHandlers(
 }
 
 function registerResourceHandlers(
-  { server, logger, metrics }: BaseHandlerDependencies,
+  { server, logger, metrics, subscriptionManager }: BaseHandlerDependencies,
   operations: ProtocolSurfaceOperations,
 ): void {
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
@@ -86,7 +112,23 @@ function registerResourceHandlers(
     }
   });
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    const timer = logger.startTimer('list_resource_templates');
+    try {
+      const result = await operations.listResourceTemplates();
+      const duration = timer.end(true, {
+        resourceTemplateCount: result.resourceTemplates.length,
+      });
+      metrics.recordRequest(duration, false, 'mcp.list_resource_templates');
+      return result;
+    } catch (error) {
+      const duration = timer.endWithError(error as Error);
+      metrics.recordFailure(duration, 'mcp.list_resource_templates');
+      throw error;
+    }
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request, extra) => {
     const timer = logger.startTimer('read_resource');
     const uri = request.params.uri;
 
@@ -95,6 +137,13 @@ function registerResourceHandlers(
 
       const duration = timer.end(true);
       metrics.recordRequest(duration, false, 'mcp.read_resource');
+
+      const sessionId = resolveMcpSessionId(extra);
+      if (subscriptionManager.getSubscribers(uri).has(sessionId)) {
+        await subscriptionManager.notifyResourceUpdated(uri);
+        subscriptionManager.markResourceActivity(uri);
+      }
+
       return result;
     } catch (error) {
       const duration = timer.endWithError(error as Error);
@@ -109,17 +158,19 @@ function registerSubscriptionHandlers({
   logger,
   subscriptionManager,
 }: BaseHandlerDependencies): void {
-  server.setRequestHandler(SubscribeRequestSchema, async (request) => {
+  server.setRequestHandler(SubscribeRequestSchema, async (request, extra) => {
     const uri = request.params.uri;
-    subscriptionManager.subscribe(uri, 'default');
-    logger.info('Client subscribed to resource', { uri });
+    const sessionId = resolveMcpSessionId(extra);
+    subscriptionManager.subscribe(uri, sessionId);
+    logger.info('Client subscribed to resource', { uri, sessionId });
     return {};
   });
 
-  server.setRequestHandler(UnsubscribeRequestSchema, async (request) => {
+  server.setRequestHandler(UnsubscribeRequestSchema, async (request, extra) => {
     const uri = request.params.uri;
-    subscriptionManager.unsubscribe(uri, 'default');
-    logger.info('Client unsubscribed from resource', { uri });
+    const sessionId = resolveMcpSessionId(extra);
+    subscriptionManager.unsubscribe(uri, sessionId);
+    logger.info('Client unsubscribed from resource', { uri, sessionId });
     return {};
   });
 }
@@ -142,7 +193,7 @@ function registerPromptHandlers(
     }
   });
 
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler(GetPromptRequestSchema, async (request, extra) => {
     const timer = logger.startTimer('get_prompt');
     const name = request.params.name;
     const args = request.params.arguments || {};
@@ -155,7 +206,7 @@ function registerPromptHandlers(
 
       const result = await operations.getPrompt(name, stringArgs);
 
-      const duration = timer.end(true);
+      const duration = timer.end(true, { sessionId: resolveMcpSessionId(extra) });
       metrics.recordRequest(duration, false, 'mcp.get_prompt');
       return result;
     } catch (error) {
@@ -170,5 +221,8 @@ function registerToolExecutionHandler(
   { server }: BaseHandlerDependencies,
   operations: ProtocolSurfaceOperations,
 ): void {
-  server.setRequestHandler(CallToolRequestSchema, operations.executeTool);
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const progress = createMcpProgressReporter(extra);
+    return operations.executeTool(request, { extra, progress });
+  });
 }

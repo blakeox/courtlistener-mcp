@@ -46,11 +46,29 @@ jobs:
       - name: Run shared local gate
         run: pnpm run ci:local-gate
 
+      - name: Verify Cloudflare IaC ownership boundary
+        run: pnpm run cloudflare:check:iac
+
+      - name: Verify Cloudflare environment isolation
+        run: pnpm run cloudflare:check:environments -- --require-provisioned
+
+      - name: Verify live Cloudflare inventory
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READONLY_API_TOKEN }}
+        run: pnpm run cloudflare:check:live
+
+      - name: Typecheck Workers runtime harness
+        run: pnpm exec tsc -p test/tsconfig.workers.json --noEmit
+
+      - name: Verify generated Workers bindings
+        run: pnpm exec wrangler types test/worker-configuration.d.ts --config wrangler.mcp.test.jsonc --env-interface MpcTestEnv --check
+
+      - name: Run Workers runtime tests
+        run: pnpm run test:workers
+
       - name: Install Chromium for auth browser validation
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install MCP Inspector
-        run: pnpm add -g @modelcontextprotocol/inspector
 
       - name: Browser + integration release suite
         run: |
@@ -118,6 +136,7 @@ jobs:
       - name: Generate release validation report
         run: |
           echo "📋 Generating release validation report..."
+          TOOL_COUNT=$(node -e "const fs=require('fs');const manifest=JSON.parse(fs.readFileSync('manifest.json','utf8'));console.log(Array.isArray(manifest.tools)?manifest.tools.length:0)")
 
           cat > release-validation-report.md << EOF
           # Release Validation Report
@@ -137,10 +156,9 @@ jobs:
 
           ## MCP Protocol Compliance
 
-          All 25 tools tested successfully:
-          - Core Research Tools (7/7) ✅
-          - Comprehensive Data Access (11/11) ✅  
-          - Advanced Features (7/7) ✅
+          - Generated MCP catalog: ${TOOL_COUNT} tools
+          - Tool definitions and output schemas validated by the shared local gate
+          - Inspector and focused protocol probes recorded in the workflow logs
 
           ## Performance Metrics
 

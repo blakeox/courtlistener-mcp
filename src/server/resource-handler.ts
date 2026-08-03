@@ -3,7 +3,7 @@
  * Modular resource handlers that can be dynamically registered and executed
  */
 
-import { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
+import { ReadResourceResult, Resource, ResourceTemplate } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '../infrastructure/logger.js';
 
 export interface ResourceHandler {
@@ -29,6 +29,12 @@ export interface ResourceHandler {
    * List available resources (optional, for static lists or examples)
    */
   list(): Resource[];
+
+  /**
+   * When set, subscribed clients receive proactive resources/updated notifications
+   * on this interval while the subscription remains active.
+   */
+  readonly subscriptionRefreshTtlMs?: number;
 }
 
 export interface ResourceContext {
@@ -38,12 +44,18 @@ export interface ResourceContext {
 
 export class ResourceHandlerRegistry {
   private handlers: ResourceHandler[] = [];
+  private onCatalogListChanged: (() => void) | undefined;
+
+  setOnCatalogListChanged(callback: (() => void) | undefined): void {
+    this.onCatalogListChanged = callback;
+  }
 
   /**
    * Register a resource handler
    */
   register(handler: ResourceHandler): void {
     this.handlers.push(handler);
+    this.onCatalogListChanged?.();
   }
 
   /**
@@ -81,5 +93,22 @@ export class ResourceHandlerRegistry {
         };
       }),
     );
+  }
+
+  /**
+   * List URI templates for dynamic resource discovery (resources/templates/list).
+   */
+  getAllResourceTemplates(): ResourceTemplate[] {
+    return this.handlers.map((handler) => ({
+      uriTemplate: handler.uriTemplate,
+      name: handler.name,
+      title: handler.title ?? handler.name,
+      description: handler.description,
+      mimeType: handler.mimeType,
+    }));
+  }
+
+  getSubscriptionRefreshTtlMs(uri: string): number | undefined {
+    return this.findHandler(uri)?.subscriptionRefreshTtlMs;
   }
 }

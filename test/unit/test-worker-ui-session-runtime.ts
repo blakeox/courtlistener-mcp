@@ -471,7 +471,7 @@ describe('worker UI session runtime', () => {
 
   it('fails open when bootstrap rate limiting is unavailable', async () => {
     const runtime = createRuntime({ bootstrapLimiterUnavailable: true });
-    const env: TestEnv = {};
+    const env: TestEnv = { MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'true' };
     const request = new Request('https://worker.example/api/session/bootstrap');
 
     const response = await runtime.getSessionBootstrapRateLimitedResponse(request, env, Date.now());

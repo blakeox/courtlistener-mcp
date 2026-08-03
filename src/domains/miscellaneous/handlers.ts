@@ -3,7 +3,11 @@ import { z } from '../../common/zod.js';
 import { createPaginationInfo, PaginatedApiResponse } from '../../common/pagination-utils.js';
 import { CourtListenerAPI } from '../../courtlistener.js';
 import { withDefaults } from '../../server/handler-decorators.js';
-import { ToolContext, TypedToolHandler } from '../../server/tool-handler.js';
+import {
+  ToolContext,
+  TypedToolHandler,
+  MUTATING_TOOL_ANNOTATIONS,
+} from '../../server/tool-handler.js';
 
 /**
  * Zod schemas for miscellaneous handlers
@@ -145,6 +149,7 @@ export class ManageAlertsHandler extends TypedToolHandler<typeof manageAlertsSch
   readonly description = 'Manage legal alerts and notifications';
   readonly category = 'alerts';
   protected readonly schema = manageAlertsSchema;
+  override readonly annotations = MUTATING_TOOL_ANNOTATIONS;
 
   constructor(private apiClient: CourtListenerAPI) {
     super();

@@ -148,9 +148,10 @@ async function runTest(
 
     if (isRemote && 'url' in serverConfig) {
       // Test remote server
-      cmd = 'npx';
+      cmd = 'pnpm';
       args = [
-        '@modelcontextprotocol/inspector',
+        'exec',
+        'mcp-inspector',
         '--cli',
         serverConfig.url,
         '--transport',
@@ -169,9 +170,10 @@ async function runTest(
       }
     } else if ('command' in serverConfig) {
       // Test local server
-      cmd = 'npx';
+      cmd = 'pnpm';
       args = [
-        '@modelcontextprotocol/inspector',
+        'exec',
+        'mcp-inspector',
         '--cli',
         serverConfig.command,
         ...serverConfig.args,

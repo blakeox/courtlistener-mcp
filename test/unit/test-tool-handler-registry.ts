@@ -9,6 +9,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const { ToolHandlerRegistry, BaseToolHandler } = await import('../../dist/server/tool-handler.js');
 
@@ -95,8 +96,7 @@ describe('ToolHandlerRegistry (TypeScript)', () => {
       requestId: 'req-1',
     });
     assert.ok(Array.isArray(result.content));
-    const text = result.content[0].text;
-    const payload = JSON.parse(text) as { ok: boolean; input: { a: number }; id: string };
+    const payload = getStructuredPayload<{ ok: boolean; input: { a: number }; id: string }>(result);
     assert.strictEqual(payload.ok, true);
     assert.strictEqual(payload.input.a, 1);
   });

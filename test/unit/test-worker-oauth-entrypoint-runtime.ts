@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
   handleWorkerOAuthEntrypoint,
   isWorkerManagedRegistrationPath,
+  shouldBypassOAuthProvider,
 } from '../../src/server/worker-oauth-entrypoint-runtime.js';
 
 describe('handleWorkerOAuthEntrypoint', () => {
@@ -53,5 +54,16 @@ describe('isWorkerManagedRegistrationPath', () => {
 
   it('does not claim unrelated oauth routes', () => {
     assert.equal(isWorkerManagedRegistrationPath('/authorize'), false);
+  });
+});
+
+describe('shouldBypassOAuthProvider', () => {
+  it('lets health and readiness reach the core route layer', () => {
+    assert.equal(shouldBypassOAuthProvider('/health'), true);
+    assert.equal(shouldBypassOAuthProvider('/ready'), true);
+  });
+
+  it('keeps unrelated routes behind the OAuth provider', () => {
+    assert.equal(shouldBypassOAuthProvider('/'), false);
   });
 });

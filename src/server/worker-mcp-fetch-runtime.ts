@@ -37,7 +37,8 @@ export function createWorkerMcpFetchHandler<TEnv extends WorkerMcpFetchRuntimeEn
     const requestMethod = request.method;
     const pathname = url.pathname;
 
-    if (!isMcpPath(pathname)) {
+    const mcpPath = isMcpPath(pathname);
+    if (!mcpPath && pathname !== '/health' && pathname !== '/ready') {
       return new Response('Not found', { status: 404 });
     }
 
@@ -57,7 +58,7 @@ export function createWorkerMcpFetchHandler<TEnv extends WorkerMcpFetchRuntimeEn
           ctx,
           pathname,
           requestMethod,
-          mcpPath: true,
+          mcpPath,
         },
         deps.workerCoreRouteDeps,
       );

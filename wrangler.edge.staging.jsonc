@@ -1,0 +1,54 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "courtlistener-mcp-staging-edge",
+  "compatibility_date": "2026-03-02",
+  "main": "src/worker-edge.ts",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "vars": {
+    "MCP_OAUTH_BACKEND": "cloudflare",
+    "MCP_ALLOW_DEV_FALLBACK": "false",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
+    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300",
+    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "false",
+    "MCP_BOUNDARY_FAIL_OPEN": "false",
+    "CODEMODE_ENABLED": "false",
+    "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
+  },
+  "services": [
+    {
+      "binding": "MCP_SERVICE",
+      "service": "courtlistener-mcp-staging-mcp",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "5d6b587f16d74ac6ae5ad78d5765d5f4",
+    },
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "courtlistener_mcp_staging",
+    },
+  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_FAILURE_LIMITER",
+        "class_name": "AuthFailureLimiterDO",
+        "script_name": "courtlistener-mcp-staging-auth-limiter",
+      },
+    ],
+  },
+  "assets": {
+    "directory": ".spa-dist",
+    "binding": "SPA_ASSETS",
+  },
+}

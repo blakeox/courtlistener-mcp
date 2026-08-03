@@ -11,8 +11,10 @@
     "MCP_OAUTH_BACKEND": "cloudflare",
     "MCP_ALLOW_DEV_FALLBACK": "false",
     "MCP_SESSION_IDLE_TTL_SECONDS": "900",
-    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "true",
-    "MCP_BOUNDARY_FAIL_OPEN": "true",
+    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "false",
+    "MCP_BOUNDARY_FAIL_OPEN": "false",
+    "CODEMODE_ENABLED": "false",
+    "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
   },
   "ai": {
     "binding": "AI",
@@ -43,6 +45,10 @@
     "consumers": [
       {
         "queue": "courtlistener-mcp-async-tool-jobs",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "courtlistener-mcp-async-tool-jobs-dlq",
       },
     ],
   },
@@ -64,24 +70,6 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CourtListenerMCP"],
-    },
-  ],
-  "routes": [
-    {
-      "pattern": "courtlistenermcp.blakeoxford.com/mcp",
-      "zone_name": "blakeoxford.com",
-    },
-    {
-      "pattern": "courtlistenermcp.blakeoxford.com/mcp/*",
-      "zone_name": "blakeoxford.com",
-    },
-    {
-      "pattern": "courtlistenermcp.blakeoxford.com/sse",
-      "zone_name": "blakeoxford.com",
-    },
-    {
-      "pattern": "courtlistenermcp.blakeoxford.com/sse/*",
-      "zone_name": "blakeoxford.com",
     },
   ],
 }

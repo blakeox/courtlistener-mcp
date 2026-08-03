@@ -33,7 +33,7 @@ async function launchInspector(mode = 'remote') {
     console.log('🚀 Starting inspector server...');
 
     // Start the inspector
-    const inspectorProcess = spawn('npx', ['@modelcontextprotocol/inspector'], {
+    const inspectorProcess = spawn('pnpm', ['exec', 'mcp-inspector'], {
       stdio: 'inherit',
     });
 
@@ -53,8 +53,8 @@ async function launchInspector(mode = 'remote') {
     console.log('🏠 Testing local server');
 
     // Start inspector with local server
-    command = 'npx';
-    args = ['@modelcontextprotocol/inspector', 'node', 'dist/index.js'];
+    command = 'pnpm';
+    args = ['exec', 'mcp-inspector', 'node', 'dist/index.js'];
 
     const inspectorProcess = spawn(command, args, {
       stdio: 'inherit',

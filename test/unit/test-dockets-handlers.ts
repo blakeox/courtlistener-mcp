@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
 import type { MetricsCollector } from '../../src/infrastructure/metrics.js';
 
@@ -87,7 +88,7 @@ describe('GetDocketsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         dockets: Array<{ id: string }>;
         pagination: { total_pages?: number };
@@ -112,7 +113,7 @@ describe('GetDocketsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -149,7 +150,7 @@ describe('GetDocketHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         docket: { case_name: string };
       };
@@ -172,7 +173,7 @@ describe('GetDocketHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -213,7 +214,7 @@ describe('GetRecapDocumentsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         pagination: { total_pages?: number; page?: number };
       };
@@ -235,7 +236,7 @@ describe('GetRecapDocumentsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -271,7 +272,7 @@ describe('GetRecapDocumentHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         document: { title: string };
       };
@@ -294,7 +295,7 @@ describe('GetRecapDocumentHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -366,7 +367,7 @@ describe('GetDocketEntriesHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, context);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         docket_id: string;
         docket_entries?: { count?: number };
         pagination: { total_results?: number };
@@ -407,7 +408,7 @@ describe('GetDocketEntriesHandler (TypeScript)', () => {
       const result = await handler.execute(validated.data, context);
 
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };

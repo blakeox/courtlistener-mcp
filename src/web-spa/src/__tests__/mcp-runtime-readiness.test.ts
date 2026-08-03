@@ -61,7 +61,7 @@ describe('verifyMcpRuntimeReadiness', () => {
           result: {
             protocolVersion: '2025-06-18',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.0' },
-            capabilities: { tools: {}, prompts: { listChanged: true } },
+            capabilities: { tools: {}, prompts: {}, logging: {} },
           },
         },
         sessionId: 'sid-1',

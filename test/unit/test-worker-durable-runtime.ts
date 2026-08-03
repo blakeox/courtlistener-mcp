@@ -14,7 +14,10 @@ interface TestEnv {
   MCP_AUTH_FAILURE_RATE_LIMIT_MAX?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_WINDOW_SECONDS?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
   MCP_BOUNDARY_GUARDS_ENABLED?: string;
+  MCP_BOUNDARY_FAIL_OPEN?: string;
+  MCP_SESSION_LIFECYCLE_FAIL_OPEN?: string;
   MCP_UI_RATE_LIMIT_ENABLED?: string;
   MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
 }
@@ -174,6 +177,7 @@ describe('createWorkerDurableRuntime', () => {
       AUTH_FAILURE_LIMITER: createLimiterNamespace(async () => {
         throw new Error('do offline');
       }),
+      MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'true',
     };
 
     const response = await runtime.getAuthRouteRateLimitedResponse(
@@ -335,6 +339,48 @@ describe('createWorkerDurableRuntime', () => {
     assert.deepEqual(await response?.json(), {
       error: 'Unable to enforce MCP boundary protections.',
       error_code: 'mcp_boundary_unavailable',
+    });
+  });
+
+  it('returns retry metadata when the MCP replay limiter blocks a request', async () => {
+    const runtime = createRuntime();
+    const env: TestEnv = {
+      AUTH_FAILURE_LIMITER: createLimiterNamespace(async (request) => {
+        const body = (await request.json()) as { action?: string; replay?: unknown };
+        assert.equal(body.action, 'mcp_boundary_evaluate');
+        assert.ok(body.replay);
+        return Response.json({
+          blocked: true,
+          retryAfterSeconds: 23,
+          reason: 'replay_detected',
+        });
+      }),
+      MCP_BOUNDARY_GUARDS_ENABLED: 'true',
+      MCP_BOUNDARY_FAIL_OPEN: 'false',
+    };
+    const request = new Request('https://worker.example/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'mcp-session-id': 'session-1',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'tools/call', id: 1 }),
+    });
+
+    const response = await runtime.evaluateMcpBoundaryRequest(
+      request,
+      env,
+      'client-1',
+      1_700_000_000_000,
+    );
+
+    assert.ok(response);
+    assert.equal(response?.status, 409);
+    assert.equal(response?.headers.get('Retry-After'), '23');
+    assert.deepEqual(await response?.json(), {
+      error: 'Replay request detected at MCP boundary.',
+      error_code: 'mcp_replay_detected',
+      retry_after_seconds: 23,
     });
   });
 

@@ -42,12 +42,13 @@ export function ObservabilityPage(): React.JSX.Element {
     retry: false,
   });
 
-  const queueConfigured = Boolean(healthQuery.data?.cloudflare.async_queue_configured);
-  const analyticsEnabled = Boolean(healthQuery.data?.cloudflare.analytics_enabled);
-  const kvConfigured = Boolean(healthQuery.data?.cloudflare.async_jobs_kv_configured);
-  const enforcedRoutes = healthQuery.data?.cloudflare.turnstile_enforced_routes ?? [];
+  const diagnostics = healthQuery.data?.diagnostics;
+  const queueConfigured = Boolean(diagnostics?.cloudflare.async_queue_configured);
+  const analyticsEnabled = Boolean(diagnostics?.cloudflare.analytics_enabled);
+  const kvConfigured = Boolean(diagnostics?.cloudflare.async_jobs_kv_configured);
+  const enforcedRoutes = diagnostics?.cloudflare.turnstile_enforced_routes ?? [];
   const latencyKeys = Object.keys(
-    (healthQuery.data?.metrics.latency_ms as Record<string, unknown> | null) ?? {},
+    (diagnostics?.metrics.latency_ms as Record<string, unknown> | null) ?? {},
   );
 
   return (
@@ -182,30 +183,30 @@ export function ObservabilityPage(): React.JSX.Element {
               entries={[
                 {
                   term: 'Topology version',
-                  description: healthQuery.data?.session_topology.version ?? 'Loading',
+                  description: diagnostics?.session_topology.version ?? 'Loading',
                 },
                 {
                   term: 'Shard count',
-                  description: healthQuery.data
-                    ? String(healthQuery.data.session_topology.shard_count)
+                  description: diagnostics
+                    ? String(diagnostics.session_topology.shard_count)
                     : 'Loading',
                 },
                 {
                   term: 'Idle TTL',
-                  description: healthQuery.data
-                    ? `${healthQuery.data.session_topology.idle_ttl_ms} ms`
+                  description: diagnostics
+                    ? `${diagnostics.session_topology.idle_ttl_ms} ms`
                     : 'Loading',
                 },
                 {
                   term: 'Absolute TTL',
-                  description: healthQuery.data
-                    ? `${healthQuery.data.session_topology.absolute_ttl_ms} ms`
+                  description: diagnostics
+                    ? `${diagnostics.session_topology.absolute_ttl_ms} ms`
                     : 'Loading',
                 },
                 {
                   term: 'Eviction sweep limit',
-                  description: healthQuery.data
-                    ? String(healthQuery.data.session_topology.eviction_sweep_limit)
+                  description: diagnostics
+                    ? String(diagnostics.session_topology.eviction_sweep_limit)
                     : 'Loading',
                 },
               ]}

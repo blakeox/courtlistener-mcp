@@ -57,19 +57,32 @@ describe('HealthServer endpoints (TypeScript)', () => {
     }
   });
 
-  it('GET /health returns 200 with status and timestamp', async () => {
+  it('GET /health returns 200 with shared runtime contract fields', async () => {
     const res = await fetch(`${baseUrl}/health`);
     assert.equal(res.status, 200);
     const data = (await res.json()) as {
       status: string;
+      service: string;
+      runtime: string;
+      transport: string;
+      version: string;
       timestamp: string;
-      cache_stats?: unknown;
+      diagnostics?: {
+        metrics_health?: { status?: string };
+        cache_stats?: unknown;
+      };
     };
-    assert.ok(
-      data.status === 'healthy' || data.status === 'warning' || data.status === 'unhealthy',
-    );
+    assert.equal(data.service, 'courtlistener-mcp');
+    assert.equal(data.runtime, 'node');
+    assert.equal(data.transport, 'diagnostics-http');
+    assert.ok(['ok', 'degraded', 'unhealthy'].includes(data.status));
+    assert.ok(typeof data.version === 'string');
     assert.ok(typeof data.timestamp === 'string');
-    assert.ok(data.cache_stats !== undefined);
+    assert.ok(data.diagnostics?.metrics_health?.status);
+    assert.ok(data.diagnostics?.cache_stats !== undefined);
+    assert.ok(data.diagnostics?.session_topology);
+    assert.ok(data.diagnostics?.cloudflare);
+    assert.ok(data.diagnostics?.metrics);
   });
 
   it('GET /metrics returns 200 and includes metrics and cache_stats', async () => {

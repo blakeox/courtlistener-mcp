@@ -16,3 +16,17 @@
 MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false
 
 # Split workers: `pnpm run dev:workers` (edge :8787, MCP :3001). Vite proxies to :8787.
+
+# MCP protocol surface (optional; defaults shown in MCP_CURRENT_STATE.md)
+# LOGGING_ENABLED=true
+# SAMPLING_ENABLED=false
+# MCP_RESOURCE_SUBSCRIPTIONS=true
+# MCP_NATIVE_TASKS_ENABLED=false
+# MCP_LIST_CHANGED_ENABLED=false
+# MCP_TEST_SUBSCRIPTION_REFRESH_MS=
+
+# Session topology (Worker / streamable HTTP; validated at startup and in check-setup)
+# MCP_SESSION_IDLE_TTL_SECONDS=1800
+# MCP_SESSION_ABSOLUTE_TTL_SECONDS=43200
+# MCP_SESSION_SHARD_COUNT=4
+# MCP_SESSION_EVICTION_SWEEP_LIMIT=100

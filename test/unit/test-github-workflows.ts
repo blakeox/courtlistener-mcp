@@ -76,6 +76,10 @@ describe('GitHub workflow hardening', () => {
     assert.doesNotMatch(releaseWorkflow, /ci-test-mcp-inspector\.js/);
     assert.match(inspectorWorkflow, /pnpm run ci:test-inspector/);
     assert.doesNotMatch(inspectorWorkflow, /ci-test-mcp-inspector\.js/);
+    assert.doesNotMatch(releaseWorkflow, /pnpm add -g @modelcontextprotocol\/inspector/);
+    assert.doesNotMatch(inspectorWorkflow, /pnpm add -g @modelcontextprotocol\/inspector/);
+    assert.match(inspectorWorkflow, /node -e .*inspector\/package\.json/);
+    assert.match(inspectorWorkflow, /inspector-version: \['locked'\]/);
   });
 
   it('does not advertise an unpublished npm install path in the README', () => {
@@ -109,7 +113,7 @@ describe('GitHub workflow hardening', () => {
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
-    assert.match(ciWorkflow, /name: Smoke Matrix/);
+    assert.match(ciWorkflow, /name: Smoke Tests/);
     assert.match(ciWorkflow, /node-version-file: '\.nvmrc'/);
     assert.match(ciWorkflow, /full-validation:/);
     assert.match(ciWorkflow, /concurrency:/);
@@ -123,7 +127,27 @@ describe('GitHub workflow hardening', () => {
     assert.doesNotMatch(releaseWorkflow, /pnpm install --frozen-lockfile --dry-run/);
     assert.match(releaseWorkflow, /Run shared local gate/);
     assert.match(releaseWorkflow, /pnpm run ci:local-gate/);
+    assert.match(
+      releaseWorkflow,
+      /pnpm run cloudflare:check:environments -- --require-provisioned/,
+    );
+    assert.match(releaseWorkflow, /pnpm run cloudflare:check:live/);
+    assert.match(releaseWorkflow, /CLOUDFLARE_READONLY_API_TOKEN/);
+    assert.doesNotMatch(ciWorkflow, /pnpm run cloudflare:check:live/);
     assert.match(releaseWorkflow, /pnpm run test:spa:e2e:auth/);
+    assert.doesNotMatch(releaseWorkflow, /All 25 tools tested successfully/);
+    assert.match(releaseWorkflow, /Array\.isArray\(manifest\.tools\)/);
+  });
+
+  it('runs the Workers-runtime harness in CI and release validation', () => {
+    const ciWorkflow = read('../../.github/workflows/ci.yml');
+    const releaseWorkflow = read('../../.github/workflows/release.yml');
+
+    for (const workflow of [ciWorkflow, releaseWorkflow]) {
+      assert.match(workflow, /test\/tsconfig\.workers\.json/);
+      assert.match(workflow, /wrangler types test\/worker-configuration\.d\.ts/);
+      assert.match(workflow, /pnpm run test:workers/);
+    }
   });
 
   it('skips auto-assign reviewer requests when the only reviewer is the PR author', () => {

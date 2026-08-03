@@ -30,6 +30,18 @@ import {
 } from '../../src/server/tool-handler.js';
 import { handleMcpGatewayRoute } from '../../src/server/worker-mcp-gateway.js';
 import { getConfig } from '../../src/infrastructure/config.js';
+import {
+  buildNodeDiagnosticsHealthPayload,
+  buildNodeStreamableHttpHealthPayload,
+  buildSharedRuntimeDiagnostics,
+  extractRuntimeHealthCore,
+  validateRuntimeHealthExtendedPayload,
+} from '../../src/infrastructure/runtime-health-contract.js';
+import {
+  buildServerCapabilities,
+  resolveProtocolFeatureFlags,
+} from '../../src/infrastructure/protocol-constants.js';
+import { buildWorkerHealthPayload } from '../../src/server/worker-health-runtime.js';
 
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 interface JsonObject {
@@ -356,6 +368,204 @@ async function runAsyncEnvelopeParityCase(): Promise<RuntimeParityCaseResult> {
   };
 }
 
+function runHealthCoreParityCase(): RuntimeParityCaseResult {
+  const nodeHealth = buildNodeStreamableHttpHealthPayload({
+    ...buildSharedRuntimeDiagnostics({}),
+    backpressure: { activeRequests: 0 },
+  });
+  const workerHealth = buildWorkerHealthPayload(
+    {
+      version: 'v2',
+      shardCount: 4,
+      idleTtlMs: 1_800_000,
+      absoluteTtlMs: 43_200_000,
+      evictionSweepLimit: 100,
+    },
+    { route_latency_ms: {} },
+    {
+      analyticsEnabled: false,
+      asyncQueueConfigured: false,
+      asyncJobsKvConfigured: false,
+      turnstileEnforcedRoutes: [],
+    },
+  );
+
+  const nodeCore = extractRuntimeHealthCore(nodeHealth as unknown as JsonObject);
+  const workerCore = extractRuntimeHealthCore(workerHealth as unknown as JsonObject);
+  const diffs = createDiffs(
+    (nodeCore ?? {}) as JsonObject,
+    (workerCore ?? {}) as JsonObject,
+  ).filter((diff) => !diff.includes('runtime') && !diff.includes('transport'));
+
+  return {
+    id: 'health-core-contract',
+    description: 'shared /health core fields parity between node and worker payloads',
+    node: (nodeCore ?? {}) as JsonObject,
+    worker: (workerCore ?? {}) as JsonObject,
+    diffs,
+    passed: nodeCore !== null && workerCore !== null && diffs.length === 0,
+  };
+}
+
+function runSharedHealthDiagnosticsParityCase(): RuntimeParityCaseResult {
+  const nodeHealth = buildNodeStreamableHttpHealthPayload({
+    ...buildSharedRuntimeDiagnostics({}),
+    backpressure: { activeRequests: 0 },
+  });
+  const workerHealth = buildWorkerHealthPayload(
+    {
+      version: 'v2',
+      shardCount: 4,
+      idleTtlMs: 1_800_000,
+      absoluteTtlMs: 43_200_000,
+      evictionSweepLimit: 100,
+    },
+    { route_latency_ms: {} },
+    {
+      analyticsEnabled: false,
+      asyncQueueConfigured: false,
+      asyncJobsKvConfigured: false,
+      turnstileEnforcedRoutes: [],
+    },
+  );
+
+  const nodeShared = {
+    session_topology_keys: Object.keys(nodeHealth.diagnostics.session_topology).sort(),
+    cloudflare_keys: Object.keys(nodeHealth.diagnostics.cloudflare).sort(),
+  };
+  const workerShared = {
+    session_topology_keys: Object.keys(workerHealth.diagnostics.session_topology).sort(),
+    cloudflare_keys: Object.keys(workerHealth.diagnostics.cloudflare).sort(),
+  };
+  const diffs = createDiffs(nodeShared as JsonObject, workerShared as JsonObject);
+
+  return {
+    id: 'health-shared-diagnostics',
+    description: 'shared diagnostics.session_topology and diagnostics.cloudflare key parity',
+    node: nodeShared as JsonObject,
+    worker: workerShared as JsonObject,
+    diffs,
+    passed:
+      validateRuntimeHealthExtendedPayload(nodeHealth).ok &&
+      validateRuntimeHealthExtendedPayload(workerHealth).ok &&
+      diffs.length === 0,
+  };
+}
+
+function runProtocolCapabilitiesParityCase(): RuntimeParityCaseResult {
+  const env = {
+    LOGGING_ENABLED: 'true',
+    SAMPLING_ENABLED: 'false',
+    MCP_RESOURCE_SUBSCRIPTIONS: 'true',
+    MCP_NATIVE_TASKS_ENABLED: 'false',
+    MCP_LIST_CHANGED_ENABLED: 'false',
+  };
+
+  const nodeCapabilities = buildServerCapabilities(resolveProtocolFeatureFlags(env));
+  const workerCapabilities = buildServerCapabilities(resolveProtocolFeatureFlags(env));
+  const diffs = createDiffs(
+    nodeCapabilities as unknown as JsonObject,
+    workerCapabilities as unknown as JsonObject,
+  );
+
+  return {
+    id: 'protocol-capabilities-default',
+    description: 'default MCP capability advertisement parity between node and worker builders',
+    node: nodeCapabilities as unknown as JsonObject,
+    worker: workerCapabilities as unknown as JsonObject,
+    diffs,
+    passed: diffs.length === 0,
+  };
+}
+
+function runDiagnosticsHealthCoreParityCase(): RuntimeParityCaseResult {
+  const streamable = buildNodeStreamableHttpHealthPayload({
+    ...buildSharedRuntimeDiagnostics({}),
+    backpressure: { activeRequests: 0 },
+  });
+  const diagnostics = buildNodeDiagnosticsHealthPayload(
+    {
+      status: 'healthy',
+      checks: { uptime: { status: 'pass', message: 'running' } },
+      metrics: { uptime_seconds: 10 },
+    },
+    { enabled: true, totalEntries: 0 },
+  );
+  const worker = buildWorkerHealthPayload(
+    {
+      version: 'v2',
+      shardCount: 4,
+      idleTtlMs: 1_800_000,
+      absoluteTtlMs: 43_200_000,
+      evictionSweepLimit: 100,
+    },
+    { route_latency_ms: {} },
+    {
+      analyticsEnabled: false,
+      asyncQueueConfigured: false,
+      asyncJobsKvConfigured: false,
+      turnstileEnforcedRoutes: [],
+    },
+  );
+
+  const nodeStreamableCore = extractRuntimeHealthCore(streamable as unknown as JsonObject);
+  const nodeDiagnosticsCore = extractRuntimeHealthCore(diagnostics as unknown as JsonObject);
+  const workerCore = extractRuntimeHealthCore(worker as unknown as JsonObject);
+
+  const normalizeCore = (
+    core: NonNullable<ReturnType<typeof extractRuntimeHealthCore>> | null,
+  ): JsonObject | null => {
+    if (!core) {
+      return null;
+    }
+    return {
+      status: core.status,
+      service: core.service,
+      version: core.version,
+      runtime: core.runtime,
+    };
+  };
+
+  const nodeDiagnosticsNormalized = normalizeCore(nodeDiagnosticsCore);
+  const workerNormalized = normalizeCore(workerCore);
+  const streamableNormalized = normalizeCore(
+    extractRuntimeHealthCore(streamable as unknown as JsonObject),
+  );
+  const diffs = createDiffs(
+    (nodeDiagnosticsNormalized ?? {}) as JsonObject,
+    (workerNormalized ?? {}) as JsonObject,
+  ).filter((diff) => !diff.includes('runtime'));
+
+  const sharedDiagnosticsDiffs = createDiffs(
+    {
+      session_topology: streamable.diagnostics.session_topology,
+      cloudflare: streamable.diagnostics.cloudflare,
+    } as JsonObject,
+    {
+      session_topology: diagnostics.diagnostics.session_topology,
+      cloudflare: diagnostics.diagnostics.cloudflare,
+    } as JsonObject,
+  );
+
+  return {
+    id: 'health-core-diagnostics-worker',
+    description:
+      'diagnostics /health and worker /health share runtime health core fields and unified diagnostics sections',
+    node: (nodeDiagnosticsNormalized ?? {}) as JsonObject,
+    worker: (workerNormalized ?? {}) as JsonObject,
+    diffs: [...diffs, ...sharedDiagnosticsDiffs],
+    passed:
+      streamableNormalized !== null &&
+      nodeStreamableCore !== null &&
+      nodeDiagnosticsCore !== null &&
+      workerCore !== null &&
+      nodeDiagnosticsCore.service === workerCore.service &&
+      nodeDiagnosticsCore.version === workerCore.version &&
+      diffs.length === 0 &&
+      sharedDiagnosticsDiffs.length === 0,
+  };
+}
+
 async function ensureDir(filePath: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
@@ -392,6 +602,10 @@ async function main(): Promise<void> {
       { MCP_AUTH_TOKEN: 'secret', MCP_REQUIRE_PROTOCOL_VERSION: 'true' },
     ),
     await runAsyncEnvelopeParityCase(),
+    runHealthCoreParityCase(),
+    runSharedHealthDiagnosticsParityCase(),
+    runDiagnosticsHealthCoreParityCase(),
+    runProtocolCapabilitiesParityCase(),
   ];
 
   const failed = cases.filter((item) => !item.passed);

@@ -8,8 +8,11 @@ import { ServerConfig } from '../types.js';
 import { validateConfigWithZod } from './config-schema.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from './protocol-constants.js';
 import { type AuthPolicyDiagnostics, evaluateAuthPolicyMatrix } from './auth-policy-matrix.js';
+import { validateSessionTopologyEnvironment } from './session-topology-config.js';
 import { redactSecretsInText } from './secret-redaction.js';
 import { evaluateWorkerHostedAuthConfig } from '../server/worker-upstream-oidc-config.js';
+
+export type ConfigEnvironment = Readonly<Record<string, string | undefined>>;
 
 function parseBooleanEnv(value: string | undefined): boolean {
   if (!value) return false;
@@ -17,180 +20,192 @@ function parseBooleanEnv(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-const defaultConfig: ServerConfig = {
-  courtListener: {
-    baseUrl: process.env.COURTLISTENER_BASE_URL || 'https://www.courtlistener.com/api/rest/v4',
-    version: 'v4',
-    timeout: parsePositiveInt(process.env.COURTLISTENER_TIMEOUT, 30000, 1000),
-    retryAttempts: parsePositiveInt(process.env.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
-    rateLimitPerMinute: parsePositiveInt(process.env.COURTLISTENER_RATE_LIMIT, 100, 1),
-    ...(process.env.COURTLISTENER_API_KEY?.trim()
-      ? { apiKey: process.env.COURTLISTENER_API_KEY.trim() }
-      : {}),
-  },
-  cache: {
-    enabled: process.env.CACHE_ENABLED !== 'false',
-    ttl: parsePositiveInt(process.env.CACHE_TTL, 300, 0), // 5 minutes default
-    maxSize: parsePositiveInt(process.env.CACHE_MAX_SIZE, 1000, 1),
-  },
-  logging: {
-    level: parseLogLevel(process.env.LOG_LEVEL),
-    format: parseLogFormat(process.env.LOG_FORMAT),
-    enabled: process.env.LOGGING_ENABLED !== 'false',
-  },
-  metrics: {
-    enabled: process.env.METRICS_ENABLED === 'true',
-    ...(process.env.METRICS_PORT !== undefined && {
-      port: parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535),
-    }),
-  },
-  // Enhanced security and middleware configuration
-  security: {
-    authEnabled: process.env.AUTH_ENABLED === 'true',
-    apiKeys: process.env.AUTH_API_KEYS
-      ? process.env.AUTH_API_KEYS.split(',')
-          .map((key) => key.trim())
-          .filter((key) => key.length > 0)
-      : [],
-    allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
-    headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
-    corsEnabled: process.env.CORS_ENABLED !== 'false',
-    corsOrigins: process.env.CORS_ORIGINS
-      ? process.env.CORS_ORIGINS.split(',')
-          .map((origin) => origin.trim())
-          .filter((origin) => origin.length > 0)
-      : ['*'],
-    rateLimitEnabled: process.env.RATE_LIMIT_ENABLED === 'true',
-    maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
-    sanitizationEnabled: process.env.SANITIZATION_ENABLED !== 'false',
-  },
-  audit: {
-    enabled: process.env.AUDIT_ENABLED === 'true',
-    logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
-    includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
-    includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
-    maxBodyLength: parsePositiveInt(process.env.AUDIT_MAX_BODY_LENGTH, 2000, 0),
-    sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
-      ? process.env.AUDIT_SENSITIVE_FIELDS.split(',')
-          .map((f) => f.trim())
-          .filter((f) => f.length > 0)
-      : ['password', 'token', 'secret', 'key', 'auth'],
-  },
-  circuitBreaker: {
-    enabled: process.env.CIRCUIT_BREAKER_ENABLED === 'true',
-    failureThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5, 1),
-    successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 3, 1),
-    timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1),
-    resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
-  },
-  compression: {
-    enabled: process.env.COMPRESSION_ENABLED !== 'false',
-    threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
-    level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 0, 9),
-    types: process.env.COMPRESSION_TYPES
-      ? process.env.COMPRESSION_TYPES.split(',')
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0)
-      : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
-  },
-  sampling: {
-    enabled: process.env.SAMPLING_ENABLED === 'true',
-    maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
-    ...(process.env.SAMPLING_DEFAULT_MODEL !== undefined && {
-      defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
-    }),
-  },
-  correlation: {
-    enabled: process.env.CORRELATION_ENABLED !== 'false',
-    headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
-    generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
-  },
-  sanitization: {
-    enabled: process.env.SANITIZATION_ENABLED !== 'false',
-    maxStringLength: parsePositiveInt(process.env.SANITIZATION_MAX_STRING_LENGTH, 10000, 1),
-    maxArrayLength: parsePositiveInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH, 1000, 1),
-    maxObjectDepth: parsePositiveInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH, 10, 1),
-  },
-  rateLimit: {
-    enabled: process.env.RATE_LIMIT_ENABLED === 'true',
-    maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
-    maxRequestsPerHour: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR, 1000, 1),
-    maxRequestsPerDay: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY, 10000, 1),
-    windowSizeMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60000, 1),
-    clientIdentification: process.env.RATE_LIMIT_CLIENT_ID || 'ip',
-    identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
-    whitelistedClients: process.env.RATE_LIMIT_WHITELIST
-      ? process.env.RATE_LIMIT_WHITELIST.split(',')
-          .map((c) => c.trim())
-          .filter((c) => c.length > 0)
-      : [],
-    penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
-    persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
-  },
-  gracefulShutdown: {
-    enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
-    timeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT, 30000, 1),
-    forceTimeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT, 5000, 1),
-    signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
-      ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
-      : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
-  },
-  httpTransport: {
-    port: parsePositiveInt(process.env.MCP_HTTP_PORT, 3002, 1024, 65535),
-    host: process.env.MCP_HTTP_HOST || '0.0.0.0',
-    enableJsonResponse: process.env.MCP_JSON_RESPONSE === 'true',
-    enableSessions: process.env.MCP_SESSIONS !== 'false',
-    enableResumability: process.env.MCP_RESUMABILITY === 'true',
-    enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
-    ...(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS !== undefined && {
-      maxConcurrentRequests: parsePositiveInt(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS, 256, 1),
-    }),
-    ...(process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS !== undefined && {
-      maxConcurrentSessionInitializations: parsePositiveInt(
-        process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS,
-        32,
+function createConfig(environment: ConfigEnvironment = process.env): ServerConfig {
+  const process = { env: environment };
+
+  return {
+    courtListener: {
+      baseUrl: process.env.COURTLISTENER_BASE_URL || 'https://www.courtlistener.com/api/rest/v4',
+      version: 'v4',
+      timeout: parsePositiveInt(process.env.COURTLISTENER_TIMEOUT, 30000, 1000),
+      retryAttempts: parsePositiveInt(process.env.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
+      rateLimitPerMinute: parsePositiveInt(process.env.COURTLISTENER_RATE_LIMIT, 100, 1),
+      ...(process.env.COURTLISTENER_API_KEY?.trim()
+        ? { apiKey: process.env.COURTLISTENER_API_KEY.trim() }
+        : {}),
+    },
+    cache: {
+      enabled: process.env.CACHE_ENABLED !== 'false',
+      ttl: parsePositiveInt(process.env.CACHE_TTL, 300, 0), // 5 minutes default
+      maxSize: parsePositiveInt(process.env.CACHE_MAX_SIZE, 1000, 1),
+    },
+    logging: {
+      level: parseLogLevel(process.env.LOG_LEVEL),
+      format: parseLogFormat(process.env.LOG_FORMAT),
+      enabled: process.env.LOGGING_ENABLED !== 'false',
+    },
+    metrics: {
+      enabled: process.env.METRICS_ENABLED === 'true',
+      ...(process.env.METRICS_PORT !== undefined && {
+        port: parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535),
+      }),
+    },
+    // Enhanced security and middleware configuration
+    security: {
+      authEnabled: process.env.AUTH_ENABLED === 'true',
+      apiKeys: process.env.AUTH_API_KEYS
+        ? process.env.AUTH_API_KEYS.split(',')
+            .map((key) => key.trim())
+            .filter((key) => key.length > 0)
+        : [],
+      allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
+      headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
+      corsEnabled: process.env.CORS_ENABLED !== 'false',
+      corsOrigins: process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(',')
+            .map((origin) => origin.trim())
+            .filter((origin) => origin.length > 0)
+        : ['*'],
+      rateLimitEnabled: process.env.RATE_LIMIT_ENABLED === 'true',
+      maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
+      sanitizationEnabled: process.env.SANITIZATION_ENABLED !== 'false',
+    },
+    audit: {
+      enabled: process.env.AUDIT_ENABLED === 'true',
+      logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
+      includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
+      includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
+      maxBodyLength: parsePositiveInt(process.env.AUDIT_MAX_BODY_LENGTH, 2000, 0),
+      sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
+        ? process.env.AUDIT_SENSITIVE_FIELDS.split(',')
+            .map((f) => f.trim())
+            .filter((f) => f.length > 0)
+        : ['password', 'token', 'secret', 'key', 'auth'],
+    },
+    circuitBreaker: {
+      enabled: process.env.CIRCUIT_BREAKER_ENABLED === 'true',
+      failureThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5, 1),
+      successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 3, 1),
+      timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1),
+      resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
+    },
+    compression: {
+      enabled: process.env.COMPRESSION_ENABLED !== 'false',
+      threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
+      level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 0, 9),
+      types: process.env.COMPRESSION_TYPES
+        ? process.env.COMPRESSION_TYPES.split(',')
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0)
+        : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
+    },
+    sampling: {
+      enabled: process.env.SAMPLING_ENABLED === 'true',
+      maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
+      ...(process.env.SAMPLING_DEFAULT_MODEL !== undefined && {
+        defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
+      }),
+    },
+    correlation: {
+      enabled: process.env.CORRELATION_ENABLED !== 'false',
+      headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
+      generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
+    },
+    sanitization: {
+      enabled: process.env.SANITIZATION_ENABLED !== 'false',
+      maxStringLength: parsePositiveInt(process.env.SANITIZATION_MAX_STRING_LENGTH, 10000, 1),
+      maxArrayLength: parsePositiveInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH, 1000, 1),
+      maxObjectDepth: parsePositiveInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH, 10, 1),
+    },
+    rateLimit: {
+      enabled: process.env.RATE_LIMIT_ENABLED === 'true',
+      maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
+      maxRequestsPerHour: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR, 1000, 1),
+      maxRequestsPerDay: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY, 10000, 1),
+      windowSizeMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60000, 1),
+      clientIdentification: process.env.RATE_LIMIT_CLIENT_ID || 'ip',
+      identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
+      whitelistedClients: process.env.RATE_LIMIT_WHITELIST
+        ? process.env.RATE_LIMIT_WHITELIST.split(',')
+            .map((c) => c.trim())
+            .filter((c) => c.length > 0)
+        : [],
+      penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
+      persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
+    },
+    gracefulShutdown: {
+      enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
+      timeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT, 30000, 1),
+      forceTimeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT, 5000, 1),
+      signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
+        ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
+        : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
+    },
+    httpTransport: {
+      port: parsePositiveInt(process.env.MCP_HTTP_PORT, 3002, 1024, 65535),
+      host: process.env.MCP_HTTP_HOST || '0.0.0.0',
+      enableJsonResponse: process.env.MCP_JSON_RESPONSE === 'true',
+      enableSessions: process.env.MCP_SESSIONS !== 'false',
+      enableResumability: process.env.MCP_RESUMABILITY === 'true',
+      enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
+      ...(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS !== undefined && {
+        maxConcurrentRequests: parsePositiveInt(
+          process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS,
+          256,
+          1,
+        ),
+      }),
+      ...(process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS !== undefined && {
+        maxConcurrentSessionInitializations: parsePositiveInt(
+          process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS,
+          32,
+          1,
+        ),
+      }),
+      ...(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS !== undefined && {
+        maxActiveSessions: parsePositiveInt(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS, 1024, 1),
+      }),
+      ...(process.env.MCP_ALLOWED_ORIGINS !== undefined && {
+        allowedOrigins: process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
+      }),
+      ...(process.env.MCP_ALLOWED_HOSTS !== undefined && {
+        allowedHosts: process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim()),
+      }),
+    },
+    oauth: {
+      enabled: process.env.OAUTH_ENABLED === 'true',
+      ...(process.env.OAUTH_ISSUER_URL !== undefined && {
+        issuerUrl: process.env.OAUTH_ISSUER_URL,
+      }),
+      ...(process.env.OAUTH_CLIENT_ID !== undefined && { clientId: process.env.OAUTH_CLIENT_ID }),
+      ...(process.env.OAUTH_CLIENT_SECRET !== undefined && {
+        clientSecret: process.env.OAUTH_CLIENT_SECRET,
+      }),
+    },
+    asyncExecution: {
+      enabled: process.env.MCP_ASYNC_EXECUTION_ENABLED !== 'false',
+      queueConcurrency: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_CONCURRENCY, 1, 1),
+      queueBatchSize: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_BATCH_SIZE, 1, 1),
+      defaultMaxAttempts: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_MAX_ATTEMPTS, 3, 1),
+      defaultRetryDelayMs: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_RETRY_DELAY_MS, 500, 0),
+      defaultTtlSeconds: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
+      maxStoredJobs: parsePositiveInt(process.env.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
+      maxQueueDepth: parsePositiveInt(process.env.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
+      queueLatencyGuardrailMs: parsePositiveInt(
+        process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS,
+        2_000,
         1,
       ),
-    }),
-    ...(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS !== undefined && {
-      maxActiveSessions: parsePositiveInt(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS, 1024, 1),
-    }),
-    ...(process.env.MCP_ALLOWED_ORIGINS !== undefined && {
-      allowedOrigins: process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
-    }),
-    ...(process.env.MCP_ALLOWED_HOSTS !== undefined && {
-      allowedHosts: process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim()),
-    }),
-  },
-  oauth: {
-    enabled: process.env.OAUTH_ENABLED === 'true',
-    ...(process.env.OAUTH_ISSUER_URL !== undefined && { issuerUrl: process.env.OAUTH_ISSUER_URL }),
-    ...(process.env.OAUTH_CLIENT_ID !== undefined && { clientId: process.env.OAUTH_CLIENT_ID }),
-    ...(process.env.OAUTH_CLIENT_SECRET !== undefined && {
-      clientSecret: process.env.OAUTH_CLIENT_SECRET,
-    }),
-  },
-  asyncExecution: {
-    enabled: process.env.MCP_ASYNC_EXECUTION_ENABLED !== 'false',
-    queueConcurrency: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_CONCURRENCY, 1, 1),
-    queueBatchSize: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_BATCH_SIZE, 1, 1),
-    defaultMaxAttempts: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_MAX_ATTEMPTS, 3, 1),
-    defaultRetryDelayMs: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_RETRY_DELAY_MS, 500, 0),
-    defaultTtlSeconds: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
-    maxStoredJobs: parsePositiveInt(process.env.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
-    maxQueueDepth: parsePositiveInt(process.env.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
-    queueLatencyGuardrailMs: parsePositiveInt(
-      process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS,
-      2_000,
-      1,
-    ),
-    completionLatencyGuardrailMs: parsePositiveInt(
-      process.env.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
-      15_000,
-      1,
-    ),
-  },
-};
+      completionLatencyGuardrailMs: parsePositiveInt(
+        process.env.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
+        15_000,
+        1,
+      ),
+    },
+  };
+}
+
+const defaultConfig: ServerConfig = createConfig();
 
 /**
  * Get the server configuration
@@ -220,8 +235,11 @@ const defaultConfig: ServerConfig = {
  *
  * @see {@link ServerConfig} for complete configuration structure
  */
-export function getConfig(): ServerConfig {
-  const config = validateConfig(defaultConfig);
+export function getConfig(environment: ConfigEnvironment = process.env): ServerConfig {
+  const config = validateConfig(
+    environment === process.env ? defaultConfig : createConfig(environment),
+    environment,
+  );
   return validateConfigWithZod(config);
 }
 
@@ -231,7 +249,10 @@ interface StartupInvariantReport {
   authPolicy: AuthPolicyDiagnostics;
 }
 
-function evaluateStartupInvariants(config: ServerConfig): StartupInvariantReport {
+function evaluateStartupInvariants(
+  config: ServerConfig,
+  environment: ConfigEnvironment = process.env,
+): StartupInvariantReport {
   const errors: string[] = [];
   const warnings: string[] = [];
   const sessionsEnabled = config.httpTransport?.enableSessions ?? true;
@@ -248,7 +269,7 @@ function evaluateStartupInvariants(config: ServerConfig): StartupInvariantReport
     errors.push('MCP resumability requires sessions to be enabled');
   }
 
-  const requireProtocolVersion = process.env.MCP_REQUIRE_PROTOCOL_VERSION;
+  const requireProtocolVersion = environment.MCP_REQUIRE_PROTOCOL_VERSION;
   if (
     requireProtocolVersion !== undefined &&
     requireProtocolVersion !== 'true' &&
@@ -263,6 +284,10 @@ function evaluateStartupInvariants(config: ServerConfig): StartupInvariantReport
     );
   }
 
+  const sessionTopology = validateSessionTopologyEnvironment(environment, 'MCP session topology');
+  errors.push(...sessionTopology.errors);
+  warnings.push(...sessionTopology.warnings);
+
   return {
     errors: errors.map((message) => redactSecretsInText(message)),
     warnings: warnings.map((message) => redactSecretsInText(message)),
@@ -270,7 +295,7 @@ function evaluateStartupInvariants(config: ServerConfig): StartupInvariantReport
   };
 }
 
-function validateConfig(config: ServerConfig): ServerConfig {
+function validateConfigShape(config: ServerConfig): ServerConfig {
   // Validate CourtListener config
   if (!config.courtListener.baseUrl) {
     throw new Error('CourtListener base URL is required');
@@ -339,12 +364,30 @@ function validateConfig(config: ServerConfig): ServerConfig {
     throw new Error('Compression threshold must be non-negative');
   }
 
-  const startupInvariants = evaluateStartupInvariants(config);
+  return config;
+}
+
+function assertStartupInvariants(
+  config: ServerConfig,
+  environment: ConfigEnvironment = process.env,
+): void {
+  const startupInvariants = evaluateStartupInvariants(config, environment);
   if (startupInvariants.errors.length > 0) {
     throw new Error(`Startup invariants failed:\n${startupInvariants.errors.join('\n')}`);
   }
+}
 
-  return config;
+function validateConfig(
+  config: ServerConfig,
+  environment: ConfigEnvironment = process.env,
+): ServerConfig {
+  const shaped = validateConfigShape(config);
+  assertStartupInvariants(shaped, environment);
+  return shaped;
+}
+
+function resolveConfigForDiagnostics(): ServerConfig {
+  return validateConfigWithZod(validateConfigShape(defaultConfig));
 }
 
 export function getEnvironmentInfo() {
@@ -411,7 +454,7 @@ export function getConfigSummary() {
 
 export function getStartupDiagnostics() {
   try {
-    const config = getConfig();
+    const config = resolveConfigForDiagnostics();
     const invariants = evaluateStartupInvariants(config);
 
     return {

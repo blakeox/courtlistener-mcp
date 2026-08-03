@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { redactSecretsInText } from '../../src/infrastructure/secret-redaction.js';
 
 describe('secret-redaction', () => {
+  it('does not read process.env implicitly in the Worker-shared helper', () => {
+    const source = readFileSync('src/infrastructure/secret-redaction.ts', 'utf8');
+    assert.doesNotMatch(source, /process\.env/);
+  });
+
   it('redacts bearer tokens and JWT-like values', () => {
     const jwt = [
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',

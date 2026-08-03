@@ -76,26 +76,31 @@ export async function getWorkerHealth(): Promise<WorkerHealthResponse> {
   return {
     status: 'ok',
     service: 'courtlistener-mcp',
+    timestamp: new Date().toISOString(),
+    version: '1.0.5',
+    runtime: 'cloudflare-worker',
     transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
-    },
-    metrics: {
-      latency_ms: {
-        route_latency_ms: {
-          '/mcp': { count: 4, avg_ms: 120 },
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
+      },
+      metrics: {
+        latency_ms: {
+          route_latency_ms: {
+            '/mcp': { count: 4, avg_ms: 120 },
+          },
         },
       },
-    },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+      session_topology: {
+        version: 'v1',
+        shard_count: 4,
+        idle_ttl_ms: 1800000,
+        absolute_ttl_ms: 43200000,
+        eviction_sweep_limit: 100,
+      },
     },
   };
 }

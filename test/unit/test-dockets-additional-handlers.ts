@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 import {
   CreateDocketAlertHandler,
   GetDocketAlertsHandler,
@@ -39,7 +40,7 @@ describe('Additional dockets handlers', () => {
     } as any);
 
     const result = await handler.execute({ entry_id: '55' }, makeContext());
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       docket_entry: { id: number; entry_number: string };
     };
     assert.deepStrictEqual(payload.docket_entry, { id: 55, entry_number: '12' });
@@ -60,7 +61,7 @@ describe('Additional dockets handlers', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         originating_court_info: Array<{ id: number }>;
       };
       assert.deepStrictEqual(capturedParams, {
@@ -86,7 +87,7 @@ describe('Additional dockets handlers', () => {
       { name: 'bankruptcy', page: 1, page_size: 20 },
       makeContext(),
     );
-    const payload = JSON.parse(result.content[0].text) as { tags: Array<{ name: string }> };
+    const payload = getStructuredPayload(result) as { tags: Array<{ name: string }> };
     assert.deepStrictEqual(payload.tags, [{ name: 'bankruptcy' }]);
   });
 
@@ -99,7 +100,7 @@ describe('Additional dockets handlers', () => {
     } as any);
 
     const result = await handler.execute({ docket: '44', page: 1, page_size: 20 }, makeContext());
-    const payload = JSON.parse(result.content[0].text) as {
+    const payload = getStructuredPayload(result) as {
       docket_alerts: Array<{ id: number; docket: string }>;
     };
     assert.deepStrictEqual(payload.docket_alerts, [{ id: 3, docket: '44' }]);
@@ -128,7 +129,7 @@ describe('Additional dockets handlers', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         result: { id: number; status: string };
       };
       assert.deepStrictEqual(payload.result, { id: 9, status: 'created' });

@@ -95,8 +95,8 @@ const featureItems = [
     icon: CourtIcon,
   },
   {
-    title: 'AI-Ready',
-    description: 'Built for LLMs and agents using the Model Context Protocol.',
+    title: 'Protocol-ready',
+    description: 'Built for structured legal research workflows over the Model Context Protocol.',
     icon: BracketsIcon,
   },
 ] as const;

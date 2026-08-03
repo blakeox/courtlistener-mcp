@@ -9,6 +9,10 @@ import { MetricsCollector } from './infrastructure/metrics.js';
 import { CacheManager } from './infrastructure/cache.js';
 import { getConfigSummary, getStartupDiagnostics } from './infrastructure/config.js';
 import { CircuitBreakerManager } from './infrastructure/circuit-breaker.js';
+import {
+  buildNodeDiagnosticsHealthPayload,
+  diagnosticsHealthStatusCode,
+} from './infrastructure/runtime-health-contract.js';
 
 export class HealthServer {
   private server: http.Server;
@@ -68,21 +72,12 @@ export class HealthServer {
   }
 
   private handleHealthCheck(res: http.ServerResponse) {
-    const health = this.metrics.getHealth();
-    const statusCode = health.status === 'healthy' ? 200 : health.status === 'warning' ? 200 : 503;
+    const metricsHealth = this.metrics.getHealth();
+    const payload = buildNodeDiagnosticsHealthPayload(metricsHealth, this.cache.getStats());
+    const statusCode = diagnosticsHealthStatusCode(payload.status);
 
     res.writeHead(statusCode);
-    res.end(
-      JSON.stringify(
-        {
-          ...health,
-          cache_stats: this.cache.getStats(),
-          timestamp: new Date().toISOString(),
-        },
-        null,
-        2,
-      ),
-    );
+    res.end(JSON.stringify(payload, null, 2));
   }
 
   private handleMetrics(res: http.ServerResponse) {

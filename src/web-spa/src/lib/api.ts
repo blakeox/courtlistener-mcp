@@ -55,24 +55,31 @@ export const usageSnapshotSchema = z.object({
 });
 
 export const workerHealthSchema = z.object({
-  status: z.literal('ok'),
+  status: z.enum(['ok', 'degraded', 'unhealthy']),
   service: z.literal('courtlistener-mcp'),
-  transport: z.literal('cloudflare-agents-streamable-http'),
-  cloudflare: z.object({
-    analytics_enabled: z.boolean(),
-    async_queue_configured: z.boolean(),
-    async_jobs_kv_configured: z.boolean(),
-    turnstile_enforced_routes: z.array(z.string()),
-  }),
-  metrics: z.object({
-    latency_ms: z.unknown(),
-  }),
-  session_topology: z.object({
-    version: z.string(),
-    shard_count: z.number(),
-    idle_ttl_ms: z.number(),
-    absolute_ttl_ms: z.number(),
-    eviction_sweep_limit: z.number(),
+  timestamp: z.string(),
+  version: z.string(),
+  runtime: z.enum(['node', 'cloudflare-worker']),
+  transport: z.string(),
+  diagnostics: z.object({
+    session_topology: z.object({
+      version: z.string(),
+      shard_count: z.number(),
+      idle_ttl_ms: z.number(),
+      absolute_ttl_ms: z.number(),
+      eviction_sweep_limit: z.number(),
+    }),
+    cloudflare: z.object({
+      analytics_enabled: z.boolean(),
+      async_queue_configured: z.boolean(),
+      async_jobs_kv_configured: z.boolean(),
+      turnstile_enforced_routes: z.array(z.string()),
+    }),
+    metrics: z.object({
+      latency_ms: z.unknown(),
+    }),
+    metrics_health: z.unknown().optional(),
+    cache_stats: z.unknown().optional(),
   }),
 });
 

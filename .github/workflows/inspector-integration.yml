@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        inspector-version: ['latest']
+        inspector-version: ['locked']
         node-version: ['22']
       fail-fast: false
 
@@ -52,13 +52,10 @@ jobs:
       - name: Build project
         run: pnpm run build
 
-      - name: Install MCP Inspector ${{ matrix.inspector-version }}
+      - name: Verify locked MCP compatibility lane
         run: |
-          if [ "${{ matrix.inspector-version }}" == "latest" ]; then
-            pnpm add -g @modelcontextprotocol/inspector@latest
-          else
-            pnpm add -g @modelcontextprotocol/inspector@${{ matrix.inspector-version }}
-          fi
+          node -e "console.log('Inspector', require('./node_modules/@modelcontextprotocol/inspector/package.json').version)"
+          node -e "const p=require('./package.json'); console.log(JSON.stringify({sdk:p.dependencies['@modelcontextprotocol/sdk'], agents:p.dependencies.agents, inspector:p.devDependencies['@modelcontextprotocol/inspector']}, null, 2))"
 
       - name: Test Inspector compatibility
         run: |
@@ -76,25 +73,27 @@ jobs:
           curl -f http://localhost:6274/health || echo "Web interface compatibility issue"
 
           # Test CLI functionality
-          npx @modelcontextprotocol/inspector --version
+          node -e "console.log('Inspector', require('./node_modules/@modelcontextprotocol/inspector/package.json').version)"
 
           # Clean up
           kill $INSPECTOR_PID || true
 
       - name: Generate compatibility report
         run: |
-          echo "# Inspector Compatibility Report" > compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "**Inspector Version:** ${{ matrix.inspector-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "**Node Version:** ${{ matrix.node-version }}" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "**Test Date:** $(date)" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          echo "" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-
-          if [ -f test-output/ci-mcp-inspector-report.json ]; then
-            echo "## Test Results" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-            echo "\`\`\`json" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-            cat test-output/ci-mcp-inspector-report.json >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-            echo "\`\`\`" >> compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md
-          fi
+          report_path="compatibility-report-${{ matrix.inspector-version }}-node${{ matrix.node-version }}.md"
+          {
+            echo "# Inspector Compatibility Report"
+            echo "**Inspector Version:** ${{ matrix.inspector-version }}"
+            echo "**Node Version:** ${{ matrix.node-version }}"
+            echo "**Test Date:** $(date)"
+            echo ""
+            if [ -f test-output/ci-mcp-inspector-report.json ]; then
+              echo "## Test Results"
+              echo "\`\`\`json"
+              cat test-output/ci-mcp-inspector-report.json
+              echo "\`\`\`"
+            fi
+          } > "$report_path"
 
       - name: Upload compatibility artifacts
         uses: actions/upload-artifact@v7
@@ -128,7 +127,6 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
-          pnpm add -g @modelcontextprotocol/inspector
           # Install Playwright for visual testing
           npx playwright install --with-deps chromium
 
@@ -237,7 +235,6 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
-          pnpm add -g @modelcontextprotocol/inspector
 
       - name: Build project
         run: pnpm run build
@@ -258,15 +255,15 @@ jobs:
             while ! curl -f -s http://localhost:6274/health > /dev/null; do
               sleep 1
               current_time=$(date +%s%N)
-              elapsed=$((($current_time - $start_time) / 1000000))
-              if [ $elapsed -gt 30000 ]; then
+              elapsed=$(( (current_time - start_time) / 1000000 ))
+              if [ "$elapsed" -gt 30000 ]; then
                 echo "Timeout waiting for Inspector"
                 break
               fi
             done
             
             end_time=$(date +%s%N)
-            startup_time=$((($end_time - $start_time) / 1000000))
+            startup_time=$(( (end_time - start_time) / 1000000 ))
             echo "Startup time: ${startup_time}ms"
             echo "${startup_time}" >> inspector-startup-times.txt
             
@@ -286,9 +283,9 @@ jobs:
 
           # Quick tool sample run timings
           start_time=$(date +%s%N)
-          pnpm dlx @modelcontextprotocol/inspector --cli node dist/index.js --method tools/call --tool-name list_courts --tool-arg jurisdiction=F >/dev/null 2>&1 || true
+          pnpm exec mcp-inspector --cli node dist/index.js --method tools/call --tool-name list_courts --tool-arg jurisdiction=F >/dev/null 2>&1 || true
           end_time=$(date +%s%N)
-          echo $((($end_time - $start_time) / 1000000)) > tool-sample-time.txt
+          echo $(( (end_time - start_time) / 1000000 )) > tool-sample-time.txt
 
           # Clean up
           kill $INSPECTOR_PID || true
@@ -337,16 +334,16 @@ jobs:
           $(find . -name "inspector-compatibility-*" -type d | wc -l) compatibility test combinations completed
 
           ### Visual Regression Testing
-          $(find . -name "visual-regression-tests" -type d | wc -l > 0 && echo "✅ Visual tests completed" || echo "⚠️ Visual tests skipped")
+          $(if [ "$(find . -name "visual-regression-tests" -type d | wc -l)" -gt 0 ]; then echo "✅ Visual tests completed"; else echo "⚠️ Visual tests skipped"; fi)
 
           ### Performance Benchmarking
-          $(find . -name "inspector-performance-results" -type d | wc -l > 0 && echo "✅ Performance tests completed" || echo "⚠️ Performance tests skipped")
+          $(if [ "$(find . -name "inspector-performance-results" -type d | wc -l)" -gt 0 ]; then echo "✅ Performance tests completed"; else echo "⚠️ Performance tests skipped"; fi)
 
           ## Quality Assessment
 
-          - Inspector Compatibility: $(ls inspector-compatibility-*/compatibility-report-*.md 2>/dev/null | wc -l) reports generated
-          - Visual Regression: $(ls visual-regression-tests/*.png 2>/dev/null | wc -l) screenshots captured
-          - Performance Metrics: $(ls inspector-performance-results/*.csv 2>/dev/null | wc -l) performance datasets collected
+          - Inspector Compatibility: $(find . -path './inspector-compatibility-*/compatibility-report-*.md' -type f | wc -l) reports generated
+          - Visual Regression: $(find visual-regression-tests -type f -name '*.png' 2>/dev/null | wc -l) screenshots captured
+          - Performance Metrics: $(find inspector-performance-results -type f -name '*.csv' 2>/dev/null | wc -l) performance datasets collected
 
           ## Recommendations
 

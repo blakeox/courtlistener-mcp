@@ -67,15 +67,19 @@ jobs:
               - 'src/server/**'
               - 'src/infrastructure/**'
               - 'src/security/**'
-              - 'src/worker.ts'
               - 'src/worker-edge.ts'
               - 'src/worker-mcp.ts'
               - 'src/worker-auth-limiter.ts'
               - 'src/worker/**'
               - 'wrangler.edge.jsonc'
               - 'wrangler.mcp.jsonc'
+              - 'wrangler.mcp.test.jsonc'
               - 'wrangler.auth-limiter.jsonc'
               - 'wrangler.jsonc'
+              - 'vitest.workers.config.ts'
+              - 'test/tsconfig.workers.json'
+              - 'test/worker-configuration.d.ts'
+              - 'test/workers/**'
               - 'scripts/dev/run-split-workers.mjs'
               - 'scripts/reports/analyze-worker-bundle.mjs'
               - 'docs/repo/WORKER_SPLIT.md'
@@ -108,9 +112,11 @@ jobs:
         if: github.event_name != 'pull_request'
         id: defaults
         run: |
-          echo "auth_related=true" >> "$GITHUB_OUTPUT"
-          echo "worker_related=true" >> "$GITHUB_OUTPUT"
-          echo "mcp_related=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "auth_related=true"
+            echo "worker_related=true"
+            echo "mcp_related=true"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Finalize filter outputs
         id: finalize
@@ -122,12 +128,14 @@ jobs:
           WORKER_DEFAULT: ${{ steps.defaults.outputs.worker_related }}
           MCP_DEFAULT: ${{ steps.defaults.outputs.mcp_related }}
         run: |
-          echo "auth_related=${AUTH_FILTER:-$AUTH_DEFAULT}" >> "$GITHUB_OUTPUT"
-          echo "worker_related=${WORKER_FILTER:-$WORKER_DEFAULT}" >> "$GITHUB_OUTPUT"
-          echo "mcp_related=${MCP_FILTER:-$MCP_DEFAULT}" >> "$GITHUB_OUTPUT"
+          {
+            echo "auth_related=${AUTH_FILTER:-$AUTH_DEFAULT}"
+            echo "worker_related=${WORKER_FILTER:-$WORKER_DEFAULT}"
+            echo "mcp_related=${MCP_FILTER:-$MCP_DEFAULT}"
+          } >> "$GITHUB_OUTPUT"
 
   test:
-    name: Smoke Matrix
+    name: Smoke Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -158,18 +166,7 @@ jobs:
         run: pnpm run typecheck
 
       - name: Build
-        if: matrix.node-version != 18
         run: pnpm run build
-
-      - name: Build (Node 18 — skip Vite; requires Node 20+)
-        if: matrix.node-version == 18
-        run: |
-          pnpm run clean
-          pnpm run generate:tool-schemas
-          pnpm run generate:hosted-auth-styles
-          pnpm exec tsc
-          pnpm run generate:manifest
-          pnpm run format:generated
 
       - name: Run unit tests
         run: pnpm run test:unit
@@ -202,6 +199,21 @@ jobs:
 
       - name: Run shared local gate
         run: pnpm run ci:local-gate
+
+      - name: Verify Cloudflare IaC ownership boundary
+        run: pnpm run cloudflare:check:iac
+
+      - name: Verify Cloudflare environment isolation
+        run: pnpm run cloudflare:check:environments
+
+      - name: Typecheck Workers runtime harness
+        run: pnpm exec tsc -p test/tsconfig.workers.json --noEmit
+
+      - name: Verify generated Workers bindings
+        run: pnpm exec wrangler types test/worker-configuration.d.ts --config wrangler.mcp.test.jsonc --env-interface MpcTestEnv --check
+
+      - name: Run Workers runtime tests
+        run: pnpm run test:workers
 
       - name: Run SPA unit tests
         run: pnpm run test:spa
@@ -249,13 +261,15 @@ jobs:
             LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json || echo 0)
             FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json || echo 0)
             STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json || echo 0)
-            echo "## Coverage Summary (Node 22)" >> $GITHUB_STEP_SUMMARY
-            echo "- Lines: ${LINES}%" >> $GITHUB_STEP_SUMMARY
-            echo "- Statements: ${STMTS}%" >> $GITHUB_STEP_SUMMARY
-            echo "- Functions: ${FUNCS}%" >> $GITHUB_STEP_SUMMARY
-            echo "- Branches: ${BRANCH}%" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## Coverage Summary (Node 22)"
+              echo "- Lines: ${LINES}%"
+              echo "- Statements: ${STMTS}%"
+              echo "- Functions: ${FUNCS}%"
+              echo "- Branches: ${BRANCH}%"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No coverage summary JSON found" >> $GITHUB_STEP_SUMMARY
+            echo "No coverage summary JSON found" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Run performance tests
@@ -268,9 +282,6 @@ jobs:
           PERF_COMMIT_SHA: ${{ github.sha }}
           PERF_RUNTIME_MODE: node-22
         run: pnpm run ci:perf-gate
-
-      - name: Install MCP Inspector
-        run: pnpm add -g @modelcontextprotocol/inspector
 
       - name: Run MCP protocol validation
         run: pnpm run test:mcp
@@ -514,9 +525,6 @@ jobs:
       - name: Build project
         run: pnpm run build
 
-      - name: Install MCP Inspector
-        run: pnpm add -g @modelcontextprotocol/inspector
-
       - name: Comprehensive MCP validation
         env:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
@@ -530,16 +538,18 @@ jobs:
 
       - name: Generate MCP compliance report
         run: |
-          echo "# MCP Protocol Compliance Report" > mcp-compliance-report.md
-          echo "" >> mcp-compliance-report.md
-          echo "Generated on: $(date)" >> mcp-compliance-report.md
-          echo "" >> mcp-compliance-report.md
-          echo "## Test Results" >> mcp-compliance-report.md
-          if [ -f test-output/mcp-validation.log ]; then
-            echo "\`\`\`" >> mcp-compliance-report.md
-            cat test-output/mcp-validation.log >> mcp-compliance-report.md
-            echo "\`\`\`" >> mcp-compliance-report.md
-          fi
+          {
+            echo "# MCP Protocol Compliance Report"
+            echo ""
+            echo "Generated on: $(date)"
+            echo ""
+            echo "## Test Results"
+            if [ -f test-output/mcp-validation.log ]; then
+              echo "\`\`\`"
+              cat test-output/mcp-validation.log
+              echo "\`\`\`"
+            fi
+          } > mcp-compliance-report.md
 
       - name: Upload compliance report
         uses: actions/upload-artifact@v7

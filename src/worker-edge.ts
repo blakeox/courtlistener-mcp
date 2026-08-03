@@ -76,7 +76,15 @@ import {
 } from './server/worker-platform-runtime.js';
 import type { WorkerEdgeDelegatedRouteDeps } from './server/worker-route-composition.js';
 import type { HandleWorkerCoreRoutesDeps } from './server/worker-core-routes.js';
-import { fetchMcpWorkerService } from './server/worker-mcp-service-fetch.js';
+import {
+  fetchMcpWorkerReadiness,
+  fetchMcpWorkerService,
+} from './server/worker-mcp-service-fetch.js';
+import {
+  buildRuntimeReadinessPayload,
+  runtimeReadinessStatusCode,
+  type RuntimeReadinessCheck,
+} from './infrastructure/runtime-readiness-contract.js';
 
 const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set(SUPPORTED_MCP_PROTOCOL_VERSION_LIST);
 const platform = createWorkerPlatformRuntime<WorkerEdgeEnv>();
@@ -158,6 +166,56 @@ const workerCoreRouteDeps = {
   getClientIdentifier: platform.workerObservabilityRuntime.getClientIdentifier,
   recordTurnstileVerdict: platform.cloudflareTelemetryRuntime.recordTurnstileVerdict,
   recordUiEvent: platform.cloudflareTelemetryRuntime.recordUiEvent,
+  workerRole: 'edge',
+  getReadinessResponse: async (request, env) => {
+    const checks: Record<string, RuntimeReadinessCheck> = {
+      runtime: { status: 'pass', message: 'Edge Worker request runtime is available.' },
+      mcp_service_binding: {
+        status: env.MCP_SERVICE || env.MCP_DEV_UPSTREAM_URL ? 'pass' : 'fail',
+        message: env.MCP_SERVICE
+          ? 'MCP service binding is configured.'
+          : env.MCP_DEV_UPSTREAM_URL
+            ? 'Local MCP upstream fallback is configured.'
+            : 'MCP service binding is missing.',
+      },
+    };
+
+    if (env.MCP_SERVICE || env.MCP_DEV_UPSTREAM_URL) {
+      const probeRequest = new Request(new URL('/ready', request.url), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      });
+      try {
+        const response = await fetchMcpWorkerReadiness(probeRequest, env);
+        const payload = (await response.json().catch(() => null)) as {
+          status?: string;
+          worker_role?: string;
+          version?: string;
+        } | null;
+        const ok = response.ok && payload?.status === 'ready';
+        checks.mcp_worker = {
+          status: ok ? 'pass' : 'fail',
+          message: ok ? 'MCP Worker readiness is confirmed.' : 'MCP Worker is not ready.',
+          details: {
+            http_status: response.status,
+            worker_role: payload?.worker_role ?? 'unknown',
+            version: payload?.version ?? 'unknown',
+          },
+        };
+      } catch (error) {
+        checks.mcp_worker = {
+          status: 'fail',
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    const payload = buildRuntimeReadinessPayload({ workerRole: 'edge', checks });
+    return new Response(JSON.stringify(payload), {
+      status: runtimeReadinessStatusCode(payload.status),
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  },
 } satisfies HandleWorkerCoreRoutesDeps<WorkerEdgeEnv>;
 
 const handleEdgeWorkerFetch = createWorkerEdgeFetchHandler<WorkerEdgeEnv>({
@@ -166,6 +224,7 @@ const handleEdgeWorkerFetch = createWorkerEdgeFetchHandler<WorkerEdgeEnv>({
   buildWorkerRouteMetricKey: platform.workerObservabilityRuntime.buildWorkerRouteMetricKey,
   recordRouteLatency: platform.workerObservabilityRuntime.recordRouteLatency,
   now: () => Date.now(),
+  forwardMcpRequest: (request, env) => fetchMcpWorkerService(request, env),
   workerCoreRouteDeps,
   workerEdgeDelegatedRouteDeps,
 });

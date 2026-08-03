@@ -18,6 +18,8 @@ export interface CreateWorkerEdgeFetchHandlerDeps<TEnv extends WorkerEdgeFetchRu
   buildWorkerRouteMetricKey: (method: string, pathname: string) => string;
   recordRouteLatency: (route: string, elapsedMs: number) => void;
   now: () => number;
+  /** Forward authenticated public MCP traffic to the private MCP Worker. */
+  forwardMcpRequest?: (request: Request, env: TEnv, ctx: ExecutionContext) => Promise<Response>;
   workerCoreRouteDeps: HandleWorkerCoreRoutesDeps<TEnv>;
   workerEdgeDelegatedRouteDeps: WorkerEdgeDelegatedRouteDeps<TEnv>;
 }
@@ -39,6 +41,10 @@ export function createWorkerEdgeFetchHandler<TEnv extends WorkerEdgeFetchRuntime
     const routeMetricKey = deps.buildWorkerRouteMetricKey(requestMethod, pathname);
 
     try {
+      if ((pathname === '/mcp' || pathname === '/sse') && deps.forwardMcpRequest) {
+        return await deps.forwardMcpRequest(request, env, ctx);
+      }
+
       const coreRouteResponse = await handleWorkerCoreRoutes(
         {
           request,

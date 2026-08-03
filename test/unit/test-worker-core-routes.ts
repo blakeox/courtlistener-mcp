@@ -166,7 +166,11 @@ describe('handleWorkerCoreRoutes', () => {
     assert.ok(response);
     assert.equal(response?.status, 200);
     assert.equal(payload.status, 'ok');
-    assert.deepEqual(payload.metrics, {
+    const diagnostics = payload.diagnostics as {
+      metrics: { latency_ms: unknown };
+      cloudflare: Record<string, unknown>;
+    };
+    assert.deepEqual(diagnostics.metrics, {
       latency_ms: {
         routes: {},
         durable_objects: {
@@ -189,12 +193,48 @@ describe('handleWorkerCoreRoutes', () => {
         },
       },
     });
-    assert.deepEqual(payload.cloudflare, {
+    assert.deepEqual(diagnostics.cloudflare, {
       analytics_enabled: false,
       async_queue_configured: false,
       async_jobs_kv_configured: false,
       turnstile_enforced_routes: [],
     });
+  });
+
+  it('separates liveness from readiness and reports a local ready contract', async () => {
+    const response = await handleWorkerCoreRoutes(
+      buildContext('/ready'),
+      buildDeps({ workerRole: 'mcp' }),
+    );
+    const payload = (await response?.json()) as Record<string, unknown>;
+
+    assert.ok(response);
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, 'ready');
+    assert.equal(payload.worker_role, 'mcp');
+    assert.equal(payload.schema_version, 'v1');
+  });
+
+  it('returns a failed readiness response when the delegated dependency is unavailable', async () => {
+    const response = await handleWorkerCoreRoutes(
+      buildContext('/ready'),
+      buildDeps({
+        workerRole: 'edge',
+        getReadinessResponse: async () =>
+          new Response(
+            JSON.stringify({
+              status: 'not_ready',
+              worker_role: 'edge',
+              checks: { mcp_worker: { status: 'fail' } },
+            }),
+            { status: 503, headers: { 'content-type': 'application/json' } },
+          ),
+      }),
+    );
+
+    assert.ok(response);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).status, 'not_ready');
   });
 
   it('returns session status through the core route layer', async () => {

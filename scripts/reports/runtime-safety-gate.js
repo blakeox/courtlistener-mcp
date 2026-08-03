@@ -10,12 +10,26 @@ const policyMode = (process.env.RUNTIME_SAFETY_GATE_POLICY_MODE || 'fail').trim(
 
 const checks = [
   {
+    id: 'runtime-health-contract',
+    command: ['npx', 'tsx', '--test', 'test/unit/test-runtime-health-contract.ts'],
+  },
+  {
+    id: 'manifest-contract',
+    command: ['npx', 'tsx', '--test', 'test/unit/test-manifest-contract.ts'],
+  },
+  {
     id: 'runtime-parity-certification',
     command: ['pnpm', 'run', 'test:runtime-parity:certify'],
   },
   {
     id: 'session-runtime-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-session-runtime-compatibility.ts'],
+    command: [
+      'npx',
+      'tsx',
+      '--test',
+      '--test-force-exit',
+      'test/unit/test-session-runtime-compatibility.ts',
+    ],
   },
   {
     id: 'security-auth-contract',

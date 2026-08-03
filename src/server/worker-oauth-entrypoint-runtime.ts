@@ -40,6 +40,8 @@ export function shouldBypassOAuthProvider(pathname: string): boolean {
   // Metadata discovery routes are served by handleWorkerOAuthRoutes so every
   // canonical and MCP-scoped alias follows the same response path.
   return (
+    pathname === '/health' ||
+    pathname === '/ready' ||
     pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorizationServerMetadata ||
     pathname === '/mcp/.well-known/oauth-authorization-server' ||
     pathname === '/.well-known/oauth-authorization-server/mcp' ||

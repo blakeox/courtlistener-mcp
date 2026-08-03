@@ -2,6 +2,7 @@ import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/
 
 import { generateId, sleep } from '../common/utils.js';
 import type { Logger } from '../infrastructure/logger.js';
+import type { McpProgressReporter } from './mcp-progress-reporter.js';
 
 export type AsyncJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'expired';
 
@@ -15,7 +16,6 @@ export const DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES = new Set([
   'analyze_case_authorities',
   'get_citation_network',
   'get_comprehensive_judge_profile',
-  'get_enhanced_recap_data',
   'validate_citations',
   'get_case_details',
   'get_opinion_text',
@@ -128,6 +128,7 @@ interface AsyncJobState {
   idempotencyKey?: string;
   coalescingScope?: string;
   execute: (request: CallToolRequest, requestId: string) => Promise<CallToolResult>;
+  progress?: McpProgressReporter;
   result?: CallToolResult;
   error?: {
     code: 'execution_failed' | 'max_attempts_exceeded' | 'cancelled' | 'expired';
@@ -212,6 +213,7 @@ export class AsyncToolWorkflowOrchestrator {
   private readonly config: ResolvedAsyncWorkflowConfig;
   private readonly logger: Logger;
   private readonly jobs = new Map<string, AsyncJobState>();
+  private jobLifecycleListener: ((snapshot: AsyncJobSnapshot) => void) | undefined;
   private readonly queue: string[] = [];
   private readonly idempotencyIndex = new Map<string, string>();
   private readonly requestCoalescingIndex = new Map<string, string>();
@@ -248,6 +250,33 @@ export class AsyncToolWorkflowOrchestrator {
 
   isEnabled(): boolean {
     return this.config.enabled;
+  }
+
+  setJobLifecycleListener(listener: ((snapshot: AsyncJobSnapshot) => void) | undefined): void {
+    this.jobLifecycleListener = listener;
+  }
+
+  getPublicJobSnapshot(jobId: string): AsyncJobSnapshot | null {
+    return this.getJobSnapshot(jobId);
+  }
+
+  getPublicJobResult(jobId: string): CallToolResult | null {
+    const job = this.jobs.get(jobId);
+    if (!job?.result) {
+      return null;
+    }
+    return job.result;
+  }
+
+  listPublicJobSnapshots(): AsyncJobSnapshot[] {
+    this.sweepExpiredJobs();
+    return [...this.jobs.values()]
+      .map((job) => this.snapshot(job))
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  }
+
+  cancelPublicJob(jobId: string): AsyncJobSnapshot | null {
+    return this.cancelJob(jobId);
   }
 
   async handleControlToolCall(request: CallToolRequest): Promise<CallToolResult> {
@@ -330,10 +359,11 @@ export class AsyncToolWorkflowOrchestrator {
     requestId: string;
     userId?: string;
     directive: AsyncExecutionDirective;
+    progress?: McpProgressReporter;
     execute: (request: CallToolRequest, requestId: string) => Promise<CallToolResult>;
   }): CallToolResult {
     this.sweepExpiredJobs();
-    const { request, requestId, userId, directive, execute } = params;
+    const { request, requestId, userId, directive, execute, progress } = params;
     const idempotencyScope = this.buildIdempotencyScope(
       request.params.name,
       userId,
@@ -392,6 +422,7 @@ export class AsyncToolWorkflowOrchestrator {
       ...(directive.idempotencyKey && { idempotencyKey: directive.idempotencyKey }),
       ...(coalescingScope && { coalescingScope }),
       execute,
+      ...(progress?.enabled ? { progress } : {}),
     };
 
     this.jobs.set(job.id, job);
@@ -405,6 +436,8 @@ export class AsyncToolWorkflowOrchestrator {
     this.evaluateQueueDepthGuardrail();
     this.pruneJobs();
     this.scheduleDrain();
+    void this.notifyJobProgress(job, 0, 3, 'Async job queued');
+    this.publishJobLifecycle(job);
     return this.buildQueuedEnvelope(job, false);
   }
 
@@ -519,6 +552,8 @@ export class AsyncToolWorkflowOrchestrator {
     job.updatedAtMs = startedAtMs;
     job.attempts.current += 1;
     this.recordQueueLatency(startedAtMs - job.queuedAtMs);
+    void this.notifyJobProgress(job, 1, 3, 'Async job running');
+    this.publishJobLifecycle(job);
 
     try {
       const result = await job.execute(
@@ -551,6 +586,8 @@ export class AsyncToolWorkflowOrchestrator {
         toolName: job.toolName,
         attempts: job.attempts.current,
       });
+      void this.notifyJobProgress(job, 3, 3, 'Async job completed');
+      this.publishJobLifecycle(job);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (this.expireIfNeeded(job)) {
@@ -630,6 +667,30 @@ export class AsyncToolWorkflowOrchestrator {
       maxAttempts: job.attempts.max,
       error: message,
     });
+    void this.notifyJobProgress(
+      job,
+      3,
+      3,
+      code === 'cancelled' ? 'Async job cancelled' : 'Async job failed',
+    );
+    this.publishJobLifecycle(job);
+  }
+
+  private publishJobLifecycle(job: AsyncJobState): void {
+    this.jobLifecycleListener?.(this.snapshot(job));
+  }
+
+  private async notifyJobProgress(
+    job: AsyncJobState,
+    progress: number,
+    total: number,
+    message: string,
+  ): Promise<void> {
+    if (!job.progress?.enabled) {
+      return;
+    }
+
+    await job.progress.report({ progress, total, message });
   }
 
   private sweepExpiredJobs(): void {

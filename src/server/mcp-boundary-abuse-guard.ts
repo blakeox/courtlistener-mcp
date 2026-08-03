@@ -122,6 +122,13 @@ export async function buildMcpReplayFingerprint(
   if (!contentType.includes('application/json')) {
     return null;
   }
+  // A sessionless JSON-RPC tuple is not a client identity. Reusing the same
+  // method and JSON-RPC ID behind one rate-limit bucket must not share replay
+  // state across unrelated clients; require a session or explicit request
+  // token before enabling tuple-based replay protection.
+  if (sessionId === '-') {
+    return null;
+  }
 
   try {
     const payload = (await request.clone().json()) as unknown;
@@ -131,6 +138,12 @@ export async function buildMcpReplayFingerprint(
     const method = typeof payload.method === 'string' ? payload.method : '';
     const id = payload.id;
     if (!method || (typeof id !== 'string' && typeof id !== 'number')) {
+      return null;
+    }
+    // initialize is commonly retried before the server can return a session id.
+    // The boundary rate limit still applies, while replay protection begins once
+    // the client has a session or supplies an explicit idempotency token.
+    if (method === 'initialize' && sessionId === '-') {
       return null;
     }
     return `${request.method}|${sessionId}|rpc:${method}|id:${String(id)}`;

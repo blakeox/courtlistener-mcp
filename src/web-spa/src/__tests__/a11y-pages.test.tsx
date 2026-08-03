@@ -14,6 +14,21 @@ import { ObservabilityPage } from '../pages/ObservabilityPage';
 import { OnboardingPage } from '../pages/OnboardingPage';
 import { renderWithSpaProviders, renderWorkspaceRoute } from './a11y-test-utils';
 import { createMatchMediaMock, stubBrowserStorage } from './test-utils';
+import { workspaceSidebarClassName } from '../lib/shell-classes';
+import {
+  emptyStateHintClass,
+  iconButtonClassName,
+  metaNoteDetailClass,
+  navCardLinkClassName,
+  sessionBadgeToolsClass,
+} from '../lib/ui-classes';
+import {
+  protocolEntryTimeClass,
+  toolCatalogDescriptionClass,
+  toolCatalogHintClass,
+  transcriptEntryTimeClass,
+} from '../lib/playground-classes';
+import { toastDismissClass } from '../lib/toast-classes';
 
 vi.mock('../lib/api', () => ({
   getSession: vi
@@ -39,19 +54,21 @@ vi.mock('../lib/api', () => ({
     status: 'ok',
     service: 'courtlistener-mcp',
     transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: [],
-    },
-    metrics: { latency_ms: { p50: 120 } },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: [],
+      },
+      metrics: { latency_ms: { p50: 120 } },
+      session_topology: {
+        version: 'v1',
+        shard_count: 4,
+        idle_ttl_ms: 1800000,
+        absolute_ttl_ms: 43200000,
+        eviction_sweep_limit: 100,
+      },
     },
   }),
   listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
@@ -200,5 +217,31 @@ describe('axe accessibility scans', () => {
     expect(utilityLink.className).toContain('sidebar-secondary-link');
     expect(mutedCopy.className).toContain('text-muted');
     expect(topbarDescription.className).toContain('text-[length:var(--text-md)]');
+  });
+
+  it('gradient-backed shell surfaces use background-image utilities', () => {
+    expect(workspaceSidebarClassName(false)).toContain('bg-[image:var(--shell-sidebar-bg)]');
+    expect(navCardLinkClassName(true)).toContain('bg-[image:var(--shell-sidebar-link-active-bg)]');
+  });
+
+  it('secondary text recipes use semantic colors instead of opacity-based contrast', () => {
+    expect(emptyStateHintClass).toContain('text-faint');
+    expect(emptyStateHintClass).not.toContain('opacity-');
+    expect(metaNoteDetailClass).toContain('text-faint');
+    expect(metaNoteDetailClass).not.toContain('opacity-');
+    expect(sessionBadgeToolsClass).toContain('text-faint');
+    expect(sessionBadgeToolsClass).not.toContain('opacity-');
+    expect(iconButtonClassName('inline')).toContain('text-faint');
+    expect(iconButtonClassName('inline')).not.toContain('opacity-');
+    expect(transcriptEntryTimeClass).toContain('text-faint');
+    expect(transcriptEntryTimeClass).not.toContain('opacity-');
+    expect(toolCatalogDescriptionClass).toContain('text-faint');
+    expect(toolCatalogDescriptionClass).not.toContain('opacity-');
+    expect(toolCatalogHintClass).toContain('text-muted');
+    expect(toolCatalogHintClass).not.toContain('opacity-');
+    expect(protocolEntryTimeClass).toContain('text-faint');
+    expect(protocolEntryTimeClass).not.toContain('opacity-');
+    expect(toastDismissClass).toContain('text-faint');
+    expect(toastDismissClass).not.toContain('opacity-');
   });
 });

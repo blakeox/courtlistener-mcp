@@ -1,4 +1,10 @@
 import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
+import {
+  buildRuntimeReadinessPayload,
+  runtimeReadinessStatusCode,
+  type RuntimeReadinessCheck,
+  type RuntimeWorkerRole,
+} from '../infrastructure/runtime-readiness-contract.js';
 import { buildWorkerHealthPayload } from './worker-health-runtime.js';
 import type { WorkerDurableRuntime, WorkerDurableRuntimeEnv } from './worker-durable-runtime.js';
 import { resolveWorkerUsage } from './worker-usage-runtime.js';
@@ -65,6 +71,12 @@ export interface HandleWorkerCoreRoutesDeps<
   now: () => number;
   getClientIdentifier?: (request: Request) => string;
   recordTurnstileVerdict?: (routeId: string, outcome: 'passed' | 'failed' | 'not_enforced') => void;
+  workerRole?: RuntimeWorkerRole;
+  getReadinessResponse?: (
+    request: Request,
+    env: TEnv,
+    ctx: ExecutionContext,
+  ) => Promise<Response | null>;
   recordUiEvent?: (
     eventName: string,
     userId: string | null,
@@ -123,6 +135,36 @@ export async function handleWorkerCoreRoutes<
         },
       },
     );
+  }
+
+  if (pathname === '/ready') {
+    if (requestMethod !== 'GET') {
+      return deps.jsonError('Method not allowed', 405, 'method_not_allowed');
+    }
+
+    try {
+      const delegatedResponse = await deps.getReadinessResponse?.(request, env, ctx);
+      if (delegatedResponse) {
+        return delegatedResponse;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const payload = buildRuntimeReadinessPayload({
+        workerRole: deps.workerRole ?? 'unknown',
+        checks: {
+          runtime: { status: 'fail', message: `Readiness probe failed: ${message}` },
+        },
+      });
+      return deps.jsonResponse(payload, runtimeReadinessStatusCode(payload.status));
+    }
+
+    const payload = buildRuntimeReadinessPayload({
+      workerRole: deps.workerRole ?? 'unknown',
+      checks: {
+        runtime: { status: 'pass', message: 'Worker request runtime is available.' },
+      } satisfies Record<string, RuntimeReadinessCheck>,
+    });
+    return deps.jsonResponse(payload, runtimeReadinessStatusCode(payload.status));
   }
 
   if (pathname === '/health') {
