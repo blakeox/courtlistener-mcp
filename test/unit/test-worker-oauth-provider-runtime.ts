@@ -15,6 +15,7 @@ import {
   getRegistrationAllowedOrigins,
   handleOAuthProviderApiRequest,
   handleOAuthProviderDefaultRequest,
+  isOAuthProtectedApiPath,
   resolveExternalOAuthToken,
   withRegistrationCors,
 } from '../../src/server/worker-oauth-provider-runtime-helpers.js';
@@ -111,6 +112,33 @@ describe('registration access tokens', () => {
 });
 
 describe('worker OAuth provider runtime', () => {
+  it('recognizes protected MCP API paths', () => {
+    assert.equal(isOAuthProtectedApiPath('/mcp'), true);
+    assert.equal(isOAuthProtectedApiPath('/sse'), true);
+    assert.equal(isOAuthProtectedApiPath('/api/usage'), true);
+    assert.equal(isOAuthProtectedApiPath('/health'), false);
+  });
+
+  it('rejects unauthenticated API fallthrough instead of forwarding to legacy MCP', async () => {
+    let legacyCalled = false;
+    const response = await handleOAuthProviderDefaultRequest(
+      new Request('https://worker.example/mcp'),
+      {},
+      {} as ExecutionContext,
+      {
+        handleAuthorizeRoute: async () => new Response('authorize'),
+        handleLegacyWorkerFetch: async () => {
+          legacyCalled = true;
+          return new Response('legacy');
+        },
+      },
+    );
+
+    assert.equal(response.status, 401);
+    assert.equal(legacyCalled, false);
+    assert.match(response.headers.get('www-authenticate') ?? '', /oauth-protected-resource/);
+  });
+
   it('derives registration allowed origins from configured origins', () => {
     const origins = getRegistrationAllowedOrigins(
       { MCP_ALLOWED_ORIGINS: 'https://auth.example, https://console.example' },

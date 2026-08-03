@@ -57,9 +57,16 @@ describe('worker-security protocol header validation', () => {
 });
 
 describe('worker-security auth', () => {
-  it('allows request when no auth is configured', async () => {
-    const res = await authorizeMcpRequest(req(), {});
+  it('allows request when development fallback is explicitly enabled', async () => {
+    const res = await authorizeMcpRequest(req(), { MCP_ALLOW_DEV_FALLBACK: 'true' });
     assert.equal(res, null);
+  });
+
+  it('fails closed when no auth is configured and development fallback is disabled', async () => {
+    const res = await authorizeMcpRequest(req(), { MCP_ALLOW_DEV_FALLBACK: 'false' });
+    assert.ok(res);
+    assert.equal(res.status, 401);
+    assert.match(await res.text(), /authentication_not_configured/);
   });
 
   it('does not accept MCP_AUTH_TOKEN as a public bearer token', async () => {

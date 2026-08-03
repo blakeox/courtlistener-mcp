@@ -15,6 +15,7 @@ import { buildEdgeAuthDecisionEngine } from './edge-auth-decision-engine.js';
 export interface WorkerSecurityEnv {
   MCP_AUTH_TOKEN?: string;
   MCP_SERVICE_TOKEN_HEADER?: string;
+  MCP_ALLOW_DEV_FALLBACK?: string;
   MCP_REQUIRE_PROTOCOL_VERSION?: string;
   MCP_ALLOWED_ORIGINS?: string;
   MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION?: string;
@@ -203,7 +204,17 @@ export async function authorizeMcpRequestWithPrincipal(
   const verifyFn = deps.verifyAccessTokenFn ?? verifyAccessToken;
 
   if (decisionEngine.attempts.length === 0) {
-    return { authError: null };
+    if (parseBoolean(env.MCP_ALLOW_DEV_FALLBACK)) {
+      return { authError: null };
+    }
+    return {
+      authError: jsonError(
+        401,
+        'No MCP authentication mechanism is configured.',
+        'authentication_not_configured',
+        request,
+      ),
+    };
   }
 
   const shouldTryServiceToken = decisionEngine.attempts.includes('serviceToken');

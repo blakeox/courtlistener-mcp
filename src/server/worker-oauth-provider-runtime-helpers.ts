@@ -103,7 +103,23 @@ export function handleOAuthProviderDefaultRequest<TEnv extends OAuthRuntimeEnv>(
   if (isHostedAuthorizePath(url.pathname) && env.OAUTH_PROVIDER) {
     return deps.handleAuthorizeRoute(request, env);
   }
+  if (isOAuthProtectedApiPath(url.pathname)) {
+    return Promise.resolve(
+      buildOAuthProviderErrorResponse({
+        code: 'unauthorized',
+        description: 'A valid OAuth access token is required for MCP API access.',
+        status: 401,
+        headers: {},
+        currentRequestOrigin: url.origin,
+        baseOrigin: url.origin,
+      }),
+    );
+  }
   return deps.handleLegacyWorkerFetch(request, env, ctx);
+}
+
+export function isOAuthProtectedApiPath(pathname: string): boolean {
+  return pathname === '/mcp' || pathname === '/sse' || pathname === '/api/usage';
 }
 
 export function buildOAuthProviderErrorResponse(params: {
