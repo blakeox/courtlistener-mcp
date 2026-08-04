@@ -13,7 +13,10 @@ type ReadinessPayload = {
 
 describe('Edge to MCP service binding', () => {
   it('probes the MCP Worker through MCP_SERVICE', async () => {
-    const response = await exports.default.fetch('https://edge.test/ready');
+    const runtimeExports = exports as unknown as {
+      default: { fetch(input: string): Promise<Response> };
+    };
+    const response = await runtimeExports.default.fetch('https://edge.test/ready');
     const payload = (await response.json()) as ReadinessPayload;
 
     expect(response.status).toBe(200);
