@@ -71,7 +71,6 @@ vi.mock('../lib/api', () => ({
       },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
   bootstrapSession: vi.fn().mockResolvedValue({
     ok: true,
@@ -79,8 +78,6 @@ vi.mock('../lib/api', () => ({
     expiresInSeconds: 43200,
   }),
   postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn(),
-  revokeKey: vi.fn(),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,

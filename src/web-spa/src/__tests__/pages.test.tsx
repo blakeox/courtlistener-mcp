@@ -49,7 +49,6 @@ vi.mock('../lib/api', () => ({
       },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
   bootstrapSession: vi.fn().mockResolvedValue({
     ok: true,
@@ -57,17 +56,6 @@ vi.mock('../lib/api', () => ({
     expiresInSeconds: 43200,
   }),
   postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn().mockResolvedValue({
-    message: 'ok',
-    api_key: {
-      id: 'k1',
-      label: 'test',
-      created_at: '2024-01-01',
-      expires_at: null,
-      token: 'tok',
-    },
-  }),
-  revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,
@@ -246,19 +234,6 @@ describe('OnboardingPage', () => {
   it('shows protocol explorer surfaces from live readiness metadata', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
-    vi.mocked(api.listKeys).mockResolvedValueOnce({
-      user_id: 'u1',
-      keys: [
-        {
-          id: 'k1',
-          label: 'Primary',
-          is_active: true,
-          revoked_at: null,
-          expires_at: null,
-          created_at: '2024-01-01',
-        },
-      ],
-    });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
         body: {
@@ -383,19 +358,6 @@ describe('OnboardingPage', () => {
   it('shows protocol mismatch recovery guidance', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
-    vi.mocked(api.listKeys).mockResolvedValueOnce({
-      user_id: 'u1',
-      keys: [
-        {
-          id: 'k1',
-          label: 'Primary',
-          is_active: true,
-          revoked_at: null,
-          expires_at: null,
-          created_at: '2024-01-01',
-        },
-      ],
-    });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
         body: {

@@ -53,13 +53,7 @@ vi.mock('../lib/api', () => ({
       },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn().mockResolvedValue({
-    message: 'ok',
-    api_key: { id: 'k1', label: 'test', created_at: '2024-01-01', expires_at: null, token: 'tok' },
-  }),
-  revokeKey: vi.fn().mockResolvedValue(undefined),
   mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,

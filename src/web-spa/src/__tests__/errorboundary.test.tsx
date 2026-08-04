@@ -46,15 +46,15 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
-  it('shows Go to Workspace Overview link', () => {
+  it('shows Go to Control Center link', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole('link', { name: /workspace overview/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /control center/i })).toHaveAttribute(
       'href',
-      '/app',
+      '/app/control-center',
     );
   });
 
