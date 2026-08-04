@@ -23,11 +23,26 @@ import {
 // Silent logger for tests — disabled output to avoid noise
 const logger = new Logger({ level: 'error', format: 'json', enabled: false }, 'test');
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const HTTP_TEST_SERVICE_TOKEN = 'http-test-service-token';
+const serviceAuthHeaders = { 'x-mcp-service-token': HTTP_TEST_SERVICE_TOKEN };
+
+function enableHttpTestServiceAuth(): () => void {
+  const previousToken = process.env.MCP_AUTH_TOKEN;
+  process.env.MCP_AUTH_TOKEN = HTTP_TEST_SERVICE_TOKEN;
+  return () => {
+    if (previousToken === undefined) {
+      delete process.env.MCP_AUTH_TOKEN;
+    } else {
+      process.env.MCP_AUTH_TOKEN = previousToken;
+    }
+  };
+}
 
 describe('HTTP Transport Server', () => {
   const port = 19000 + Math.floor(Math.random() * 1000);
   const baseUrl = `http://127.0.0.1:${port}`;
   let close: () => Promise<void>;
+  let restoreServiceAuth: (() => void) | undefined;
   let initializedSessionId: string | null = null;
 
   const initializeRequestBody = {
@@ -45,6 +60,7 @@ describe('HTTP Transport Server', () => {
     fetch(`${baseUrl}/mcp`, {
       method: 'POST',
       headers: {
+        ...serviceAuthHeaders,
         'Content-Type': 'application/json',
         Accept: 'application/json, text/event-stream',
       },
@@ -63,6 +79,7 @@ describe('HTTP Transport Server', () => {
   };
 
   before(async () => {
+    restoreServiceAuth = enableHttpTestServiceAuth();
     const createSessionServer = () =>
       new Server({ name: 'test-server', version: '1.0.0' }, { capabilities: {} });
     const result = await startHttpTransport(createSessionServer, logger, {
@@ -79,6 +96,7 @@ describe('HTTP Transport Server', () => {
 
   after(async () => {
     if (close) await close();
+    restoreServiceAuth?.();
   });
 
   it('GET /health returns 200 with unified runtime contract fields', async () => {
@@ -159,11 +177,11 @@ describe('HTTP Transport Server', () => {
     const [deleteA, deleteB] = await Promise.all([
       fetch(`${baseUrl}/mcp`, {
         method: 'DELETE',
-        headers: { 'mcp-session-id': sessionA! },
+        headers: { ...serviceAuthHeaders, 'mcp-session-id': sessionA! },
       }),
       fetch(`${baseUrl}/mcp`, {
         method: 'DELETE',
-        headers: { 'mcp-session-id': sessionB! },
+        headers: { ...serviceAuthHeaders, 'mcp-session-id': sessionB! },
       }),
     ]);
 
@@ -183,6 +201,7 @@ describe('HTTP Transport Server', () => {
     const deleteRes = await fetch(`${baseUrl}/mcp`, {
       method: 'DELETE',
       headers: {
+        ...serviceAuthHeaders,
         'mcp-session-id': sessionId,
       },
     });
@@ -197,6 +216,7 @@ describe('HTTP Transport Server', () => {
         fetch(`${baseUrl}/mcp`, {
           method: 'POST',
           headers: {
+            ...serviceAuthHeaders,
             'Content-Type': 'application/json',
             'mcp-session-id': fixture.sessionId,
           },
@@ -334,8 +354,10 @@ describe('HTTP Transport Server shutdown race handling', () => {
   const port = 21000 + Math.floor(Math.random() * 1000);
   const baseUrl = `http://127.0.0.1:${port}`;
   let close: () => Promise<void>;
+  let restoreServiceAuth: (() => void) | undefined;
 
   before(async () => {
+    restoreServiceAuth = enableHttpTestServiceAuth();
     const createSessionServer = () => {
       const sessionServer = new Server(
         { name: 'test-server-shutdown', version: '1.0.0' },
@@ -360,6 +382,7 @@ describe('HTTP Transport Server shutdown race handling', () => {
 
   after(async () => {
     if (close) await close();
+    restoreServiceAuth?.();
   });
 
   it('handles active sessions before shutdown begins', async () => {
@@ -367,6 +390,7 @@ describe('HTTP Transport Server shutdown race handling', () => {
       fetch(`${baseUrl}/mcp`, {
         method: 'POST',
         headers: {
+          ...serviceAuthHeaders,
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
         },
@@ -400,6 +424,7 @@ describe('HTTP Transport Server shutdown race handling', () => {
       fetch(`${baseUrl}/mcp`, {
         method: 'POST',
         headers: {
+          ...serviceAuthHeaders,
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
         },
@@ -438,11 +463,13 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
   const port = 22000 + Math.floor(Math.random() * 1000);
   const baseUrl = `http://127.0.0.1:${port}`;
   let close: () => Promise<void>;
+  let restoreServiceAuth: (() => void) | undefined;
 
   const initializeRequest = () =>
     fetch(`${baseUrl}/mcp`, {
       method: 'POST',
       headers: {
+        ...serviceAuthHeaders,
         'Content-Type': 'application/json',
         Accept: 'application/json, text/event-stream',
       },
@@ -459,6 +486,7 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
     });
 
   before(async () => {
+    restoreServiceAuth = enableHttpTestServiceAuth();
     const createSessionServer = async () => {
       await sleep(100);
       return new Server(
@@ -481,6 +509,7 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
 
   after(async () => {
     if (close) await close();
+    restoreServiceAuth?.();
   });
 
   it('returns 429 when session initialization concurrency limit is exceeded', async () => {
@@ -498,7 +527,7 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
     if (firstSessionId) {
       const cleanup = await fetch(`${baseUrl}/mcp`, {
         method: 'DELETE',
-        headers: { 'mcp-session-id': firstSessionId },
+        headers: { ...serviceAuthHeaders, 'mcp-session-id': firstSessionId },
       });
       assert.ok([200, 202, 204].includes(cleanup.status));
     }
@@ -516,7 +545,7 @@ describe('HTTP Transport Server backpressure and telemetry', () => {
     if (firstSessionId) {
       const cleanup = await fetch(`${baseUrl}/mcp`, {
         method: 'DELETE',
-        headers: { 'mcp-session-id': firstSessionId },
+        headers: { ...serviceAuthHeaders, 'mcp-session-id': firstSessionId },
       });
       assert.ok([200, 202, 204].includes(cleanup.status));
     }
@@ -578,11 +607,13 @@ describe('HTTP Transport Server active-request saturation', () => {
   const port = 23000 + Math.floor(Math.random() * 1000);
   const baseUrl = `http://127.0.0.1:${port}`;
   let close: () => Promise<void>;
+  let restoreServiceAuth: (() => void) | undefined;
 
   const initializeRequest = () =>
     fetch(`${baseUrl}/mcp`, {
       method: 'POST',
       headers: {
+        ...serviceAuthHeaders,
         'Content-Type': 'application/json',
         Accept: 'application/json, text/event-stream',
       },
@@ -599,6 +630,7 @@ describe('HTTP Transport Server active-request saturation', () => {
     });
 
   before(async () => {
+    restoreServiceAuth = enableHttpTestServiceAuth();
     const createSessionServer = async () => {
       await sleep(100);
       return new Server(
@@ -621,6 +653,7 @@ describe('HTTP Transport Server active-request saturation', () => {
 
   after(async () => {
     if (close) await close();
+    restoreServiceAuth?.();
   });
 
   it('returns 429 when active in-flight request limit is reached', async () => {
