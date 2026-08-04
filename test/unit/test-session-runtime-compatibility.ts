@@ -36,7 +36,10 @@ describe('session lifecycle runtime compatibility contract', () => {
             params: {},
           }),
         }),
-        env: {},
+        // This contract test isolates invalid-session handling. Keep the
+        // gateway auth boundary explicit so auth rejection cannot mask the
+        // lifecycle response under test.
+        env: { MCP_ALLOW_DEV_FALLBACK: 'true' },
         ctx: {} as ExecutionContext,
         pathname: '/mcp',
         requestMethod: 'POST',

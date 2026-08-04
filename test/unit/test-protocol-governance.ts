@@ -163,12 +163,15 @@ describe('HTTP session lifecycle governance contract', () => {
   const port = 22000 + Math.floor(Math.random() * 1000);
   const baseUrl = `http://127.0.0.1:${port}`;
   let closeServer: () => Promise<void>;
+  const previousAuthToken = process.env.MCP_AUTH_TOKEN;
+  const testAuthToken = 'protocol-governance-test-token';
 
   const buildPostHeaders = (sessionId?: string): Record<string, string> => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json, text/event-stream',
       'MCP-Protocol-Version': PREFERRED_MCP_PROTOCOL_VERSION,
+      'x-mcp-service-token': testAuthToken,
     };
     if (sessionId) {
       headers['mcp-session-id'] = sessionId;
@@ -177,6 +180,7 @@ describe('HTTP session lifecycle governance contract', () => {
   };
 
   before(async () => {
+    process.env.MCP_AUTH_TOKEN = testAuthToken;
     const createSessionServer = () => {
       const sessionServer = new Server(
         { name: 'protocol-governance-http-test', version: '1.0.0' },
@@ -200,6 +204,11 @@ describe('HTTP session lifecycle governance contract', () => {
   after(async () => {
     if (closeServer) {
       await closeServer();
+    }
+    if (previousAuthToken === undefined) {
+      delete process.env.MCP_AUTH_TOKEN;
+    } else {
+      process.env.MCP_AUTH_TOKEN = previousAuthToken;
     }
   });
 
@@ -248,6 +257,7 @@ describe('HTTP session lifecycle governance contract', () => {
         'mcp-session-id': sessionId,
         'MCP-Protocol-Version': PREFERRED_MCP_PROTOCOL_VERSION,
         'Last-Event-ID': 'stale-event-id',
+        'x-mcp-service-token': testAuthToken,
       },
     });
     assert.equal(replayResponse.status, 500);
@@ -257,6 +267,7 @@ describe('HTTP session lifecycle governance contract', () => {
       headers: {
         'mcp-session-id': sessionId,
         'MCP-Protocol-Version': PREFERRED_MCP_PROTOCOL_VERSION,
+        'x-mcp-service-token': testAuthToken,
       },
     });
     assert.equal(closeResponse.status, 200);
@@ -292,6 +303,7 @@ describe('HTTP session lifecycle governance contract', () => {
       headers: {
         'mcp-session-id': sessionId,
         'MCP-Protocol-Version': PREFERRED_MCP_PROTOCOL_VERSION,
+        'x-mcp-service-token': testAuthToken,
       },
     });
     assert.equal(staleCloseResponse.status, 400);
