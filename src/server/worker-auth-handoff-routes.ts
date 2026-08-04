@@ -8,6 +8,11 @@ import {
 import { verifyAccessToken, type OAuthVerificationMetadata } from '../security/oidc.js';
 import type { HostedOAuthCompletionSource } from '../auth/oauth-authorization-completion.js';
 import {
+  buildOAuthErrorRedirect,
+  resolveGrantedScopes,
+  UnsupportedOAuthScopeError,
+} from '../auth/oauth-scope-resolver.js';
+import {
   emitOAuthDiagnostic,
   summarizeHostedAuthReadiness,
   summarizeHostedAuthRequest,
@@ -59,6 +64,7 @@ type HostedAuthStatus =
   | 'invalid_return_state'
   | 'callback_failed'
   | 'approval_preparation_failed'
+  | 'invalid_scope'
   | 'logout_confirmation_required'
   | 'logged_out';
 
@@ -1111,6 +1117,7 @@ async function buildApprovalPageResponse<
 ): Promise<Response> {
   const oauthHelpers = deps.getOAuthHelpers(env);
   const authRequest = await oauthHelpers.parseAuthRequest(new Request(returnTo));
+  resolveGrantedScopes(authRequest);
   const secure = getSecureCookieSetting(request, env, deps);
 
   const approvalCookie = await encodeAuthApprovalCookie(
@@ -1174,6 +1181,7 @@ async function completeHostedAuthorization<
 ): Promise<Response> {
   const oauthHelpers = deps.getOAuthHelpers(env);
   const authRequest = await oauthHelpers.parseAuthRequest(new Request(returnTo));
+  const grantedScopes = resolveGrantedScopes(authRequest);
   const completionDetails = deps.buildHostedOAuthCompletionDetails(
     'browser_oauth_complete',
     userId,
@@ -1182,7 +1190,7 @@ async function completeHostedAuthorization<
     request: authRequest,
     userId,
     metadata: completionDetails.metadata,
-    scope: deps.resolveGrantedScopes(authRequest),
+    scope: grantedScopes,
     props: completionDetails.props,
   });
   return buildRedirectResponse(completion.redirectTo);
@@ -2310,6 +2318,45 @@ export async function handleWorkerAuthHandoffRoutes<
       );
       return attachHostedAuthHeaders(response, signal);
     } catch (error) {
+      if (error instanceof UnsupportedOAuthScopeError) {
+        const redirectTo = buildOAuthErrorRedirect(
+          error.authRequest,
+          error.code,
+          'One or more requested OAuth scopes are not supported.',
+        );
+        const response = redirectTo
+          ? buildRedirectResponse(redirectTo)
+          : deps.jsonError(
+              'One or more requested OAuth scopes are not supported.',
+              400,
+              error.code,
+            );
+        if (approveCorrelation.setCookieHeader) {
+          response.headers.append('Set-Cookie', approveCorrelation.setCookieHeader);
+        }
+        const signal = withHostedAuthRequestDuration(
+          {
+            ...signalBase,
+            ready: false,
+            status: 'invalid_scope' as const,
+            outcome: 'rejected' as const,
+            correlationId: approveCorrelation.correlationId,
+            authError: error.code,
+          },
+          requestStartedAtMs,
+        );
+        emitHostedAuthEvent(
+          env,
+          request,
+          'hosted_auth.approve.reject',
+          {
+            reason: error.code,
+            unsupported_scope_count: error.unsupportedScopes.length,
+          },
+          signal,
+        );
+        return attachHostedAuthHeaders(response, signal);
+      }
       const nonce = deps.generateCspNonce();
       const response = deps.htmlResponse(
         renderAuthPage(
@@ -2573,6 +2620,47 @@ export async function handleWorkerAuthHandoffRoutes<
       );
       return attachHostedAuthHeaders(response, signal);
     } catch (error) {
+      if (error instanceof UnsupportedOAuthScopeError) {
+        const redirectTo = buildOAuthErrorRedirect(
+          error.authRequest,
+          error.code,
+          'One or more requested OAuth scopes are not supported.',
+        );
+        const response = redirectTo
+          ? buildRedirectResponse(redirectTo)
+          : deps.jsonError(
+              'One or more requested OAuth scopes are not supported.',
+              400,
+              error.code,
+            );
+        response.headers.append('Set-Cookie', clearApprovalCookie);
+        if (approvalCorrelation.setCookieHeader) {
+          response.headers.append('Set-Cookie', approvalCorrelation.setCookieHeader);
+        }
+        const signal = withHostedAuthRequestDuration(
+          {
+            ...signalBase,
+            ready: false,
+            status: 'invalid_scope' as const,
+            outcome: 'rejected' as const,
+            correlationId: approvalCorrelation.correlationId,
+            authError: error.code,
+            approvalDurationMs: getElapsedDurationMs(requestStartedAtMs),
+          },
+          requestStartedAtMs,
+        );
+        emitHostedAuthEvent(
+          env,
+          request,
+          'hosted_auth.approve.reject',
+          {
+            reason: error.code,
+            unsupported_scope_count: error.unsupportedScopes.length,
+          },
+          signal,
+        );
+        return attachHostedAuthHeaders(response, signal);
+      }
       const response = deps.jsonError(
         'OAuth authorization could not be completed.',
         400,

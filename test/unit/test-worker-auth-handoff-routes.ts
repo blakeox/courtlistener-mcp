@@ -455,6 +455,56 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(response.headers.get('x-hosted-auth-outcome'), 'interactive');
   });
 
+  it('rejects unsupported scopes before rendering or completing hosted approval', async () => {
+    const authorizeUrl =
+      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fcallback&scope=unknown%3Ascope&state=state-1&code_challenge=challenge&code_challenge_method=S256';
+    const approvalUrl = `https://worker.example/oauth/approve?return_to=${encodeURIComponent(authorizeUrl)}`;
+
+    const response = await handleWorkerAuthHandoffRoutes({
+      request: new Request(approvalUrl, {
+        headers: { cookie: 'clmcp_ui=signed-session' },
+      }),
+      url: new URL(approvalUrl),
+      env: { MCP_UI_SESSION_SECRET: 'abcdefghijklmnopqrstuvwxyz123456' },
+      deps: {
+        jsonError,
+        generateCspNonce: () => 'nonce',
+        htmlResponse,
+        workerUiSessionRuntime: {
+          getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
+          resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-123' }),
+          createUiSessionState: async () => null,
+          getOrCreateCsrfCookieHeader: () => 'clmcp_csrf=csrf-token-123; Path=/; SameSite=Lax',
+          isSecureCookieRequest: () => true,
+        },
+        getOAuthHelpers: () => ({
+          parseAuthRequest: async () => ({
+            scope: ['unknown:scope'],
+            redirectUri: 'https://chatgpt.com/callback',
+            state: 'state-1',
+          }),
+          completeAuthorization: async () => {
+            throw new Error('completeAuthorization should not run for invalid_scope');
+          },
+        }),
+        buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+        resolveGrantedScopes: () => ['legal:read'],
+      },
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 302);
+    const location = new URL(String(response.headers.get('location')));
+    assert.equal(location.origin, 'https://chatgpt.com');
+    assert.equal(location.pathname, '/callback');
+    assert.equal(location.searchParams.get('error'), 'invalid_scope');
+    assert.equal(location.searchParams.get('state'), 'state-1');
+    assert.equal(response.headers.get('x-hosted-auth-error'), 'invalid_scope');
+    assert.equal(response.headers.get('x-hosted-auth-outcome'), 'rejected');
+    assert.equal(response.headers.get('x-hosted-auth-failure'), 'true');
+    assert.doesNotMatch(String(response.headers.get('set-cookie')), /clauth_approve=/);
+  });
+
   it('falls back to the default same-origin success path for hostile absolute return targets', async () => {
     const response = await handleWorkerAuthHandoffRoutes({
       request: new Request(

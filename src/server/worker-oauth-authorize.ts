@@ -1,7 +1,11 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 import { buildHostedOAuthCompletionDetails } from '../auth/oauth-authorization-completion.js';
-import { resolveGrantedScopes } from '../auth/oauth-scope-resolver.js';
+import {
+  buildOAuthErrorRedirect,
+  resolveGrantedScopes,
+  UnsupportedOAuthScopeError,
+} from '../auth/oauth-scope-resolver.js';
 import { HOSTED_MCP_BROWSER_AUTH_CONTRACT } from '../auth/oauth-contract.js';
 import {
   emitOAuthDiagnostic,
@@ -133,7 +137,29 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
     });
     return response;
   }
-  const grantedScopes = resolveGrantedScopes(authRequest);
+  let grantedScopes: string[];
+  try {
+    grantedScopes = resolveGrantedScopes(authRequest);
+  } catch (error) {
+    if (error instanceof UnsupportedOAuthScopeError) {
+      const redirectTo = buildOAuthErrorRedirect(
+        error.authRequest,
+        error.code,
+        'One or more requested OAuth scopes are not supported.',
+      );
+      const response = redirectTo
+        ? deps.redirectResponse(redirectTo, 302)
+        : deps.jsonError('One or more requested OAuth scopes are not supported.', 400, error.code);
+      emitOAuthDiagnostic(env, 'oauth.authorize.reject', {
+        ...requestSummary,
+        reason: error.code,
+        unsupported_scope_count: error.unsupportedScopes.length,
+        ...(await summarizeOAuthResponse(response)),
+      });
+      return response;
+    }
+    throw error;
+  }
 
   let completion;
   try {
