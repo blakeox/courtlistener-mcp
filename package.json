@@ -38,6 +38,8 @@
     "cloudflare:check:environments": "node scripts/cloudflare/check-environment-isolation.mjs",
     "cloudflare:check:live": "node scripts/cloudflare/check-live-inventory.mjs",
     "cloudflare:release:validate": "node scripts/cloudflare/validate-release-receipt.mjs",
+    "cloudflare:release": "node scripts/cloudflare/release-controller.mjs",
+    "cloudflare:release:probes": "node scripts/cloudflare/collect-release-probes.mjs",
     "cloudflare:secrets:sync-mcp": "node scripts/cloudflare/sync-mcp-secrets.mjs",
     "cloudflare:deploy": "pnpm run cloudflare:check && pnpm run deploy",
     "cloudflare:tail": "wrangler tail",

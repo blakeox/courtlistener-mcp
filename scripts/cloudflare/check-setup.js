@@ -269,12 +269,14 @@ async function checkMcpInitialize(baseUrl, path) {
     const hasResultSse = text.includes('"result"') && text.includes('"jsonrpc"');
     return {
       ok: res.ok && (Boolean(hasResultJson) || hasResultSse),
+      authProtected: [401, 403, 429].includes(res.status),
       status: res.status,
       body: text,
     };
   } catch (error) {
     return {
       ok: false,
+      authProtected: false,
       status: 0,
       body: error instanceof Error ? error.message : String(error),
     };
@@ -651,9 +653,17 @@ async function main() {
       'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is configured for dedicated DCR management-token signing.',
     );
   } else {
-    warn(
-      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens will fall back to MCP_UI_SESSION_SECRET or COURTLISTENER_API_KEY, coupling rotation across unrelated trust boundaries.',
-    );
+    const dedicatedRegistrationSecretRequired =
+      process.env.CLOUDFLARE_REQUIRE_DEDICATED_DCR_SECRET === 'true' ||
+      process.env.CLOUDFLARE_RELEASE_ENVIRONMENT === 'production';
+    const message =
+      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens will fall back to MCP_UI_SESSION_SECRET or COURTLISTENER_API_KEY, coupling rotation across unrelated trust boundaries.';
+    if (dedicatedRegistrationSecretRequired) {
+      fail(message);
+      hasCriticalError = true;
+    } else {
+      warn(message);
+    }
   }
 
   if (hasOidcAuth) {
@@ -772,11 +782,15 @@ async function main() {
       const mcp = await checkMcpInitialize(baseUrl, '/mcp');
       if (mcp.ok) {
         ok('/mcp initialize handshake passed.');
+      } else if (mcp.authProtected) {
+        ok(`/mcp ingress is reachable and auth-protected (HTTP ${mcp.status}).`);
       } else {
         warn(`/mcp initialize failed (HTTP ${mcp.status}).`);
         const sse = await checkMcpInitialize(baseUrl, '/sse');
         if (sse.ok) {
           warn('/sse initialize works; deployment may still be on an older endpoint shape.');
+        } else if (sse.authProtected) {
+          ok(`/sse ingress is reachable and auth-protected (HTTP ${sse.status}).`);
         } else {
           warn(`/sse initialize also failed (HTTP ${sse.status}).`);
         }

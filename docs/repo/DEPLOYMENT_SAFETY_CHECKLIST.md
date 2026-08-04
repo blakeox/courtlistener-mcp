@@ -48,6 +48,11 @@
    - if Turnstile is enforced, set `MCP_TURNSTILE_ENFORCED_ROUTES` explicitly
      (current route ids: `session_bootstrap`, `ai_chat`)
 
+The GitHub Actions release controller sets
+`CLOUDFLARE_REQUIRE_DEDICATED_DCR_SECRET=true`, so a missing
+`MCP_OAUTH_REGISTRATION_TOKEN_SECRET` blocks a release instead of silently
+falling back to UI-session or CourtListener API-key material.
+
 ## Post-deploy verification
 
 1. `GET /health` returns success.

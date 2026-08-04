@@ -16,6 +16,7 @@
     "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "false",
     "MCP_BOUNDARY_FAIL_OPEN": "false",
     "CODEMODE_ENABLED": "false",
+    "MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS": "3600",
     "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
   },
   "services": [

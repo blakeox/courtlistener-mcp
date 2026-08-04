@@ -44,6 +44,24 @@ describe('GitHub workflow hardening', () => {
     );
   });
 
+  it('keeps Cloudflare promotion behind the dedicated release controller', () => {
+    const workflow = read('../../.github/workflows/cloudflare-release.yml');
+
+    assert.match(workflow, /workflow_dispatch:/);
+    assert.match(workflow, /environment:/);
+    assert.match(workflow, /CLOUDFLARE_API_TOKEN/);
+    assert.match(workflow, /CLOUDFLARE_READONLY_API_TOKEN/);
+    assert.match(workflow, /pnpm run cloudflare:check:live/);
+    assert.match(workflow, /--phase upload/);
+    assert.match(workflow, /--phase canary/);
+    assert.match(workflow, /--phase promote/);
+    assert.match(workflow, /inputs\.promote == true/);
+    assert.match(workflow, /hashFiles\('release-state\.json'\) != ''/);
+    assert.match(workflow, /probe_directory=release-probes-promoted/);
+    assert.match(workflow, /decision=rollback/);
+    assert.match(workflow, /actions\/upload-artifact@v7/);
+  });
+
   it('makes the default test script include the SPA auth suites', () => {
     const packageJson = JSON.parse(read('../../package.json')) as {
       scripts?: Record<string, string>;

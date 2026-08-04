@@ -16,6 +16,24 @@ The release controller must be idempotent by release ID, source SHA, Worker, and
 environment. A retry discovers an existing upload instead of creating an
 untracked version.
 
+The implementation is `scripts/cloudflare/release-controller.mjs`, exposed as
+`pnpm run cloudflare:release` and invoked by
+`.github/workflows/cloudflare-release.yml`. The workflow is manual and binds to
+the selected GitHub environment. It runs the repository/IaC/live preflight,
+uploads all three Workers inactive, canaries them as a paired set, and promotes
+only when the explicit `promote` input is approved. A held canary remains an
+artifact-backed state rather than silently becoming production traffic.
+
+The controller also refuses to operate when the release ID, source SHA, prior
+100-percent version, or two-version traffic split is ambiguous. Rollback uses
+the recorded prior version IDs and does not reverse Durable Object migrations.
+
+The paired probe step uses Cloudflare's `Cloudflare-Workers-Version-Overrides`
+dictionary header to pin the public Edge request to the uploaded Edge version
+and the forwarded service-binding request to the uploaded MCP version. The probe
+artifacts record the requested IDs and status outcomes; Workers Logs/Tail
+remains the authoritative evidence that the selected versions actually executed.
+
 ## Read-only live preflight
 
 Release validation runs `pnpm run cloudflare:check:live` after environment
@@ -96,6 +114,10 @@ update, purge, deploy, rollback, or rotate Cloudflare resources.
    recorded.
 6. Canary traffic is promoted only with a fresh receipt and an operator
    decision.
+
+The controller workflow does not create secrets, bypass missing required
+secrets, or treat an unauthenticated protocol response as an OAuth success.
+Those are explicit preflight and authenticated-probe gates.
 
 Never treat Edge `/health` alone as release proof. Do not reverse Durable Object
 migrations during rollback; keep data changes forward-compatible and restore the

@@ -1,0 +1,179 @@
+name: Cloudflare Release Controller
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Cloudflare environment to release
+        required: true
+        type: choice
+        options: [staging, production]
+      release_id:
+        description: Idempotent release identifier
+        required: true
+        type: string
+      canary_percent:
+        description: Percentage used for the canary phase
+        required: true
+        default: '1'
+        type: string
+      promote:
+        description: Promote the validated canary to 100 percent
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: cloudflare-release-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Upload, canary, and optionally promote Cloudflare Workers
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      actions: write
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_READONLY_API_TOKEN: ${{ secrets.CLOUDFLARE_READONLY_API_TOKEN }}
+      CLOUDFLARE_REQUIRE_DEDICATED_DCR_SECRET: 'true'
+      CLOUDFLARE_RELEASE_ENVIRONMENT: ${{ inputs.environment }}
+      CLOUDFLARE_RELEASE_ID: ${{ inputs.release_id }}
+      CLOUDFLARE_CANARY_PERCENT: ${{ inputs.canary_percent }}
+      CLOUDFLARE_PROBE_DIRECTORY: release-probes
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+      GITHUB_ACTOR: ${{ github.actor }}
+      WRANGLER_VERSION: '4.118.0'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run repository release gates
+        run: |
+          pnpm run ci:local-gate
+          pnpm run cloudflare:check
+          pnpm run cloudflare:check:iac
+          pnpm run cloudflare:check:environments -- --require-provisioned
+
+      - name: Verify live Cloudflare inventory
+        run: pnpm run cloudflare:check:live > release-live-inventory.json
+
+      - name: Upload inactive Worker versions
+        run: |
+          CLOUDFLARE_RELEASE_PHASE=upload \
+            node scripts/cloudflare/release-controller.mjs \
+              --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+              --phase upload \
+              --release-id "$CLOUDFLARE_RELEASE_ID" \
+              --source-sha "$GITHUB_SHA" \
+              --state-file release-state.json
+
+      - name: Canary all three Workers
+        run: |
+          node scripts/cloudflare/release-controller.mjs \
+            --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+            --phase canary \
+            --release-id "$CLOUDFLARE_RELEASE_ID" \
+            --source-sha "$GITHUB_SHA" \
+            --state-file release-state.json
+
+      - name: Run version-override protocol probes
+        run: |
+          RELEASE_VERSION_OVERRIDE=true \
+            node scripts/cloudflare/collect-release-probes.mjs \
+              --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+              --state-file release-state.json \
+              --output-directory release-probes
+
+      - name: Require explicit promotion approval
+        if: ${{ inputs.promote != true }}
+        run: echo 'Canary is active; promotion was not requested. The release remains held.'
+
+      - name: Promote all three Workers
+        if: ${{ inputs.promote == true }}
+        run: |
+          node scripts/cloudflare/release-controller.mjs \
+            --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+            --phase promote \
+            --release-id "$CLOUDFLARE_RELEASE_ID" \
+            --source-sha "$GITHUB_SHA" \
+            --state-file release-state.json
+
+      - name: Verify promoted public behavior
+        if: ${{ inputs.promote == true }}
+        run: |
+          RELEASE_VERSION_OVERRIDE=false \
+            node scripts/cloudflare/collect-release-probes.mjs \
+              --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+              --state-file release-state.json \
+              --output-directory release-probes-promoted \
+              --no-override
+
+      - name: Roll back to recorded prior versions after a failed promotion
+        if: ${{ failure() && inputs.promote == true && hashFiles('release-state.json') != '' }}
+        run: |
+          node scripts/cloudflare/release-controller.mjs \
+            --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+            --phase rollback \
+            --release-id "$CLOUDFLARE_RELEASE_ID" \
+            --source-sha "$GITHUB_SHA" \
+            --state-file release-state.json
+
+      - name: Finalize and validate redacted release receipt
+        if: ${{ always() && hashFiles('release-state.json') != '' }}
+        run: |
+          if [ "${{ inputs.promote }}" = "true" ] && [ -d release-probes-promoted ]; then
+            probe_directory=release-probes-promoted
+          else
+            probe_directory=release-probes
+          fi
+          if [ "${{ inputs.promote }}" = "true" ] && [ "${{ job.status }}" != "success" ]; then
+            decision=rollback
+          elif [ "${{ inputs.promote }}" = "true" ]; then
+            decision=promote
+          else
+            decision=hold
+          fi
+          node scripts/cloudflare/release-controller.mjs \
+            --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
+            --phase finalize \
+            --release-id "$CLOUDFLARE_RELEASE_ID" \
+            --source-sha "$GITHUB_SHA" \
+            --state-file release-state.json \
+            --receipt-file release-receipt.json \
+            --probe-directory "$probe_directory" \
+            --decision "$decision" \
+            --approved-by "$GITHUB_ACTOR"
+          pnpm run cloudflare:release:validate -- --file release-receipt.json
+
+      - name: Upload release state and live inventory
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cloudflare-release-${{ inputs.release_id }}
+          if-no-files-found: warn
+          path: |
+            release-state.json
+            release-receipt.json
+            release-live-inventory.json
+            release-probes/
+            release-probes-promoted/

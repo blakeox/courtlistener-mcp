@@ -122,7 +122,7 @@ function createLimiterObject() {
 }
 
 describe('createWorkerDurableRuntime', () => {
-  it('returns a 429 response when auth failures are already blocked', async () => {
+  it('returns a 429 response when an extracted auth rate-limit handler sees a blocked client', async () => {
     const runtime = createRuntime();
     const env: TestEnv = {
       AUTH_FAILURE_LIMITER: createLimiterNamespace(async () =>
@@ -138,7 +138,8 @@ describe('createWorkerDurableRuntime', () => {
       ),
     };
 
-    const response = await runtime.getAuthRateLimitedResponse('client-1', env, 1_700_000_000_000);
+    const getAuthRateLimitedResponse = runtime.getAuthRateLimitedResponse;
+    const response = await getAuthRateLimitedResponse('client-1', env, 1_700_000_000_000);
     assert.ok(response);
     assert.equal(response?.status, 429);
     assert.equal(response?.headers.get('Retry-After'), '17');

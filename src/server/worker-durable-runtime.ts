@@ -469,6 +469,49 @@ async function callMcpSessionLifecycle<TEnv extends WorkerDurableRuntimeEnv>(
 export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>(
   deps: CreateWorkerDurableRuntimeDeps<TEnv>,
 ): WorkerDurableRuntime<TEnv> {
+  // Keep the probe as a closure instead of reaching through `this`. Runtime
+  // methods are passed into the transport boundary as standalone functions,
+  // so relying on an object receiver turns an otherwise valid 401 into a
+  // production-only TypeError.
+  const probeAuthRateLimit = async (
+    clientId: string,
+    env: TEnv,
+    nowMs: number,
+  ): Promise<AuthRateLimitProbeResult> => {
+    const cfg = getAuthFailureRateLimitConfig(env);
+    if (!cfg.enabled) {
+      return { kind: 'allowed', hasFailureState: false };
+    }
+    const limiterState = await callAuthLimiter(env, clientId, 'check', nowMs, deps);
+    if (limiterState.kind === 'unavailable') {
+      return {
+        kind: 'unavailable',
+        response: deps.jsonError(
+          'Unable to validate authentication rate limit.',
+          503,
+          'auth_rate_limiter_unavailable',
+        ),
+      };
+    }
+    if (limiterState.value.blocked) {
+      const retryAfterSeconds = limiterState.value.retryAfterSeconds;
+      return {
+        kind: 'blocked',
+        response: deps.jsonError(
+          'Too many failed authentication attempts',
+          429,
+          'auth_rate_limited',
+          { retry_after_seconds: retryAfterSeconds },
+          { 'Retry-After': String(retryAfterSeconds) },
+        ),
+      };
+    }
+    return {
+      kind: 'allowed',
+      hasFailureState: hasAuthFailureState(limiterState.value.state),
+    };
+  };
+
   return {
     async isUiSessionRevoked(env, sessionJti) {
       if (!isUiSessionRevocationEnabled(env)) return { kind: 'ok', value: false };
@@ -646,47 +689,14 @@ export function createWorkerDurableRuntime<TEnv extends WorkerDurableRuntimeEnv>
     },
 
     async getAuthRateLimitedResponse(clientId, env, nowMs) {
-      const probe = await this.probeAuthRateLimit(clientId, env, nowMs);
+      const probe = await probeAuthRateLimit(clientId, env, nowMs);
       if (probe.kind === 'allowed') {
         return null;
       }
       return probe.response;
     },
 
-    async probeAuthRateLimit(clientId, env, nowMs): Promise<AuthRateLimitProbeResult> {
-      const cfg = getAuthFailureRateLimitConfig(env);
-      if (!cfg.enabled) {
-        return { kind: 'allowed', hasFailureState: false };
-      }
-      const limiterState = await callAuthLimiter(env, clientId, 'check', nowMs, deps);
-      if (limiterState.kind === 'unavailable') {
-        return {
-          kind: 'unavailable',
-          response: deps.jsonError(
-            'Unable to validate authentication rate limit.',
-            503,
-            'auth_rate_limiter_unavailable',
-          ),
-        };
-      }
-      if (limiterState.value.blocked) {
-        const retryAfterSeconds = limiterState.value.retryAfterSeconds;
-        return {
-          kind: 'blocked',
-          response: deps.jsonError(
-            'Too many failed authentication attempts',
-            429,
-            'auth_rate_limited',
-            { retry_after_seconds: retryAfterSeconds },
-            { 'Retry-After': String(retryAfterSeconds) },
-          ),
-        };
-      }
-      return {
-        kind: 'allowed',
-        hasFailureState: hasAuthFailureState(limiterState.value.state),
-      };
-    },
+    probeAuthRateLimit,
 
     async getAuthRouteRateLimitedResponse(bucketId, env, nowMs) {
       const cfg = getAuthFailureRateLimitConfig(env);

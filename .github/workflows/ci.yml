@@ -75,7 +75,6 @@ jobs:
               - 'wrangler.mcp.jsonc'
               - 'wrangler.mcp.test.jsonc'
               - 'wrangler.auth-limiter.jsonc'
-              - 'wrangler.jsonc'
               - 'vitest.workers.config.ts'
               - 'test/tsconfig.workers.json'
               - 'test/worker-configuration.d.ts'
