@@ -19,7 +19,7 @@
     "hooks:install": "node scripts/dev/install-git-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "build": "npm run clean && node scripts/build/generate-package-version.mjs && npm run generate:web:spa && npm run generate:tool-schemas && npm run generate:hosted-auth-styles && tsc && npm run generate:manifest && npm run format:generated",
-    "format:generated": "prettier --write manifest.json src/server/generated/tool-input-schemas.ts src/web/spa-build-id.ts src/server/hosted-auth-page-styles.generated.ts",
+    "format:generated": "prettier --write manifest.json src/infrastructure/package-version.ts src/server/generated/tool-input-schemas.ts src/server/generated/tool-output-schemas.ts src/web/spa-build-id.ts src/server/hosted-auth-page-styles.generated.ts",
     "generate:web:spa": "node scripts/web/build-spa-assets.mjs",
     "generate:tool-schemas": "npx tsx scripts/build/generate-tool-schemas.mjs",
     "generate:hosted-auth-styles": "node scripts/build/embed-hosted-auth-styles.mjs",

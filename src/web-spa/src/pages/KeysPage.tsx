@@ -7,7 +7,26 @@ import { useToken } from '../lib/token-context';
 import { useToast } from '../components/Toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useStatus } from '../hooks/useStatus';
-import { Button, Card, FormField, Input, Modal, StatusBanner, formatDate } from '../components/ui';
+import { cn } from '../lib/cn';
+import {
+  badgeClassName,
+  dlGridClass,
+  emptyStateClass,
+  emptyStateIconClass,
+  hintClass,
+  inlineGroupRowClass,
+  monoClass,
+  LoadingState,
+  EmptyState,
+  Button,
+  Card,
+  FormField,
+  Input,
+  Modal,
+  StatusBanner,
+  formatDate,
+} from '../components/ui';
+import { stackClass, tableClass, tableScrollClass, twoColClass } from '../lib/workspace-classes';
 import type { ApiKeyRecord } from '../lib/types';
 
 function statusForKey(key: ApiKeyRecord): 'active' | 'revoked' | 'expired' {
@@ -118,13 +137,13 @@ export function KeysPage(): React.JSX.Element {
   const rows = keysQuery.data?.keys ?? [];
 
   return (
-    <div className="stack">
-      <div className="two-col">
+    <div className={stackClass}>
+      <div className={twoColClass}>
         <Card
           title="Local MCP credential"
           subtitle="This browser-scoped credential is optional and only used for direct operator probes."
         >
-          <dl className="dl-grid">
+          <dl className={dlGridClass}>
             <dt>Token status</dt>
             <dd>{token ? '✓ Set' : '✗ Not set'}</dd>
           </dl>
@@ -189,7 +208,7 @@ export function KeysPage(): React.JSX.Element {
           >
             {newToken || 'No key created yet.'}
           </div>
-          <div className="row">
+          <div className={inlineGroupRowClass}>
             <Button
               id="copyNewKeyBtn"
               variant="secondary"
@@ -209,7 +228,7 @@ export function KeysPage(): React.JSX.Element {
               Copy new key
             </Button>
           </div>
-          <div className="hint mono">
+          <div className={cn(hintClass, monoClass)}>
             export COURTLISTENER_MCP_API_KEY=&quot;{newToken ? '***' : 'paste_token'}&quot;
           </div>
         </Card>
@@ -219,13 +238,7 @@ export function KeysPage(): React.JSX.Element {
         title="Existing keys"
         subtitle="Statuses update immediately after creation or revocation."
       >
-        {keysQuery.isLoading ? (
-          <div className="loading" role="status" aria-busy="true" aria-label="Loading keys">
-            <div className="skeleton skeleton-line"></div>
-            <div className="skeleton skeleton-line short"></div>
-            <div className="skeleton skeleton-line"></div>
-          </div>
-        ) : null}
+        {keysQuery.isLoading ? <LoadingState label="Loading keys" /> : null}
         {keysQuery.isError ? (
           <div>
             <StatusBanner role="alert" message={toErrorMessage(keysQuery.error)} type="error" />
@@ -239,14 +252,15 @@ export function KeysPage(): React.JSX.Element {
           </div>
         ) : null}
         {!keysQuery.isLoading && !rows.length ? (
-          <div className="empty-state">
-            <div className="empty-icon">🔑</div>
-            <p>No keys found for this user.</p>
-          </div>
+          <EmptyState
+            icon={<span className={emptyStateIconClass}>🔑</span>}
+            message="No keys found for this user."
+            className={emptyStateClass}
+          />
         ) : null}
         {!!rows.length ? (
-          <div className="table-scroll">
-            <table className="table" aria-label="API keys">
+          <div className={tableScrollClass}>
+            <table className={tableClass} aria-label="API keys">
               <thead>
                 <tr>
                   <th scope="col">Label</th>
@@ -264,11 +278,18 @@ export function KeysPage(): React.JSX.Element {
                   return (
                     <tr key={key.id}>
                       <td>
-                        <div className="mono">{key.label || '(no label)'}</div>
-                        <div className="hint mono">{key.id}</div>
+                        <div className={monoClass}>{key.label || '(no label)'}</div>
+                        <div className={cn(hintClass, monoClass)}>{key.id}</div>
                       </td>
                       <td>
-                        <span className={`chip ${statusValue}`}>{statusValue}</span>
+                        <span
+                          className={badgeClassName(
+                            statusValue === 'active' ? 'ok' : 'warn',
+                            statusValue,
+                          )}
+                        >
+                          {statusValue}
+                        </span>
                       </td>
                       <td>{key.expires_at ? formatDate(key.expires_at) : 'none'}</td>
                       <td>{formatDate(key.created_at)}</td>
@@ -293,7 +314,7 @@ export function KeysPage(): React.JSX.Element {
 
       <Modal open={Boolean(revokeId)} title="Revoke key" onClose={() => setRevokeId('')}>
         <p>This action cannot be undone.</p>
-        <div className="row">
+        <div className={inlineGroupRowClass}>
           <Button
             variant="danger"
             onClick={async () => {
@@ -322,7 +343,7 @@ export function KeysPage(): React.JSX.Element {
           Your new key was created successfully. Promote it to become the active local MCP
           credential for this browser session.
         </p>
-        <div className="row">
+        <div className={inlineGroupRowClass}>
           <Button
             onClick={() => {
               const createdToken = pendingPromotionToken;
@@ -368,12 +389,12 @@ export function KeysPage(): React.JSX.Element {
         onClose={() => setRevokePreviousKey(null)}
       >
         <p>
-          Old key: <span className="mono">{revokePreviousKey?.label ?? ''}</span>
+          Old key: <span className={monoClass}>{revokePreviousKey?.label ?? ''}</span>
         </p>
         <p>
           Revoke it only after all clients have switched to the new key. Revocation is permanent.
         </p>
-        <div className="row">
+        <div className={inlineGroupRowClass}>
           <Button
             variant="danger"
             onClick={async () => {
