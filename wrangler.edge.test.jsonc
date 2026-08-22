@@ -20,6 +20,12 @@
     "html_handling": "none",
     "not_found_handling": "none",
   },
+  "services": [
+    {
+      "binding": "MCP_SERVICE",
+      "service": "courtlistener-mcp-mcp-test",
+    },
+  ],
   // Keep the test runtime aligned with the deployed CIMD behavior.
   "compatibility_flags": ["nodejs_als", "global_fetch_strictly_public"],
 }

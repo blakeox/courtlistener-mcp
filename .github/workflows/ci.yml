@@ -411,7 +411,7 @@ jobs:
               ;;
             stress-reliability)
               mkdir -p performance-data
-              pnpm run dev:workers > performance-data/local-gate-workers.log 2>&1 &
+              LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-gate-workers.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -441,7 +441,7 @@ jobs:
               ;;
             release-readiness)
               mkdir -p performance-data test-output
-              pnpm run dev:workers > performance-data/local-release-readiness-workers.log 2>&1 &
+              LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-release-readiness-workers.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
