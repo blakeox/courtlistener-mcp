@@ -17,7 +17,6 @@ interface TestEnv {
   MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
   MCP_BOUNDARY_GUARDS_ENABLED?: string;
   MCP_BOUNDARY_FAIL_OPEN?: string;
-  MCP_SESSION_LIFECYCLE_FAIL_OPEN?: string;
   MCP_UI_RATE_LIMIT_ENABLED?: string;
   MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
 }
@@ -45,13 +44,6 @@ function createRuntime() {
     now: () => 1_700_000_000_000,
     recordDurableObjectLatency: () => {},
     recordDurableObjectUnavailable: () => {},
-    getCachedSessionTopology: () => ({
-      version: 'v2',
-      shardCount: 16,
-      idleTtlMs: 1800,
-      absoluteTtlMs: 86400,
-      evictionSweepLimit: 64,
-    }),
     jsonError: (message, status, errorCode, extra, extraHeaders) =>
       new Response(
         JSON.stringify({
@@ -363,7 +355,7 @@ describe('createWorkerDurableRuntime', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'mcp-session-id': 'session-1',
+        'mcp-request-id': 'request-1',
       },
       body: JSON.stringify({ jsonrpc: '2.0', method: 'tools/call', id: 1 }),
     });
@@ -385,24 +377,6 @@ describe('createWorkerDurableRuntime', () => {
     });
   });
 
-  it('fails open when MCP session lifecycle checks are unavailable', async () => {
-    const runtime = createRuntime();
-    const env: TestEnv = {
-      AUTH_FAILURE_LIMITER: createLimiterNamespace(
-        async () => new Response('unavailable', { status: 503 }),
-      ),
-      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'true',
-    };
-    const request = new Request('https://worker.example/mcp', {
-      method: 'POST',
-      headers: { 'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000' },
-    });
-
-    const response = await runtime.validateSessionRequest(request, env, 1_700_000_000_000);
-
-    assert.equal(response, null);
-  });
-
   it('skips auth failure clear when the client has no failure state', async () => {
     const runtime = createRuntime();
     const capturedActions: string[] = [];
@@ -421,87 +395,6 @@ describe('createWorkerDurableRuntime', () => {
     await runtime.clearAuthFailures('client-1', env, 1_700_000_000_000, false);
 
     assert.deepEqual(capturedActions, []);
-  });
-
-  it('treats session lifecycle validation failures as unavailable', async () => {
-    const runtime = createRuntime();
-    const env: TestEnv = {
-      AUTH_FAILURE_LIMITER: createLimiterNamespace(
-        async () => new Response('unavailable', { status: 503 }),
-      ),
-      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'false',
-    };
-    const request = new Request('https://worker.example/mcp', {
-      method: 'POST',
-      headers: { 'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000' },
-    });
-
-    const response = await runtime.validateSessionRequest(request, env, 1_700_000_000_000);
-
-    assert.ok(response);
-    assert.equal(response?.status, 503);
-    assert.deepEqual(await response?.json(), {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    });
-  });
-
-  it('treats session lifecycle mutation failures as unavailable for register and close', async () => {
-    const runtime = createRuntime();
-    const env: TestEnv = {
-      AUTH_FAILURE_LIMITER: createLimiterNamespace(
-        async () => new Response('unavailable', { status: 503 }),
-      ),
-      MCP_SESSION_LIFECYCLE_FAIL_OPEN: 'false',
-    };
-
-    const registerOverride = await runtime.finalizeSessionResponse(
-      new Request('https://worker.example/mcp', { method: 'POST' }),
-      new Response(JSON.stringify({ jsonrpc: '2.0', result: {} }), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
-        },
-      }),
-      env,
-      1_700_000_000_000,
-    );
-
-    assert.ok(registerOverride);
-    assert.equal(registerOverride?.status, 503);
-    assert.deepEqual(await registerOverride?.json(), {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    });
-
-    const closeOverride = await runtime.finalizeSessionResponse(
-      new Request('https://worker.example/mcp', {
-        method: 'DELETE',
-        headers: {
-          'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
-        },
-      }),
-      new Response(null, { status: 204 }),
-      env,
-      1_700_000_000_000,
-    );
-
-    assert.ok(closeOverride);
-    assert.equal(closeOverride?.status, 503);
-    assert.deepEqual(await closeOverride?.json(), {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    });
   });
 
   it('degrades increment usage failures without throwing', async () => {
@@ -720,42 +613,6 @@ describe('AuthFailureLimiterDO cleanup', () => {
     assert.equal(storage.alarmAt, null);
   });
 
-  it('does not sweep expired MCP sessions on touch', async () => {
-    const { object, storage } = createLimiterObject();
-    await storage.put('mcp_session:expired', {
-      sessionId: 'expired',
-      createdAtMs: 0,
-      lastSeenAtMs: 0,
-      idleExpiresAtMs: 1_000,
-      absoluteExpiresAtMs: 1_000,
-    });
-    await storage.put('mcp_session:active', {
-      sessionId: 'active',
-      createdAtMs: 5_000,
-      lastSeenAtMs: 5_000,
-      idleExpiresAtMs: 60_000,
-      absoluteExpiresAtMs: 120_000,
-    });
-
-    await object.fetch(
-      new Request('https://auth-failure-limiter/internal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'mcp_session_touch',
-          nowMs: 10_000,
-          sessionId: 'active',
-          idleTtlMs: 30_000,
-          absoluteTtlMs: 120_000,
-          evictionSweepLimit: 64,
-        }),
-      }),
-    );
-
-    assert.ok(await storage.get('mcp_session:expired'), 'touch should not sweep stale sessions');
-    assert.ok(await storage.get('mcp_session:active'));
-  });
-
   it('evicts expired replay state keys on alarm', async () => {
     const { object, storage } = createLimiterObject();
     await storage.put('mcp_replay_state:deadbeef', {
@@ -764,7 +621,6 @@ describe('AuthFailureLimiterDO cleanup', () => {
       blockedUntilMs: 0,
     });
     await storage.put('mcp_replay_window_ms:deadbeef', 120_000);
-    await storage.put('mcp_session_alarm_at_ms', 5_000);
 
     const originalNow = Date.now;
     Date.now = () => 200_000;

@@ -614,7 +614,7 @@ export function Shell(
                               Open account
                             </ButtonLink>
                             <ButtonLink
-                              to="/app/credentials"
+                              to="/app/account"
                               variant="secondary"
                               size="compact"
                               className={accountMenuActionClass}
@@ -673,7 +673,7 @@ export function AuthRequired(props: React.PropsWithChildren): React.JSX.Element 
 
   React.useEffect(() => {
     if (!loading && !session?.authenticated) {
-      navigate('/app/control-center', { replace: true });
+      navigate('/app', { replace: true });
     }
   }, [loading, navigate, session?.authenticated]);
 

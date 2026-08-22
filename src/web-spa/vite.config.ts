@@ -3,8 +3,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-/** Local edge worker (`pnpm run dev:edge`, default port 8787). */
+/** Local edge worker (`pnpm run dev:workers`, default port 8787). */
 const workerDevTarget = process.env.VITE_WORKER_DEV_TARGET ?? 'http://localhost:8787';
+const spaRoot = import.meta.dirname;
 
 const workerDevProxy = {
   target: workerDevTarget,
@@ -15,7 +16,6 @@ const workerDevProxy = {
 const workerDevProxyPrefixes = [
   '/api',
   '/mcp',
-  '/sse',
   '/auth',
   '/oauth',
   '/token',
@@ -25,15 +25,15 @@ const workerDevProxyPrefixes = [
 ] as const;
 
 export default defineConfig({
-  root: path.resolve(__dirname),
+  root: path.resolve(spaRoot),
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: path.resolve(__dirname, '../../.spa-dist'),
+    outDir: path.resolve(spaRoot, '../../.spa-dist'),
     emptyOutDir: true,
     manifest: true,
     sourcemap: false,
     rollupOptions: {
-      input: path.resolve(__dirname, 'index.html'),
+      input: path.resolve(spaRoot, 'index.html'),
       output: {
         entryFileNames: 'app/spa.js',
         chunkFileNames: 'app/chunks/[name]-[hash].js',

@@ -76,7 +76,7 @@ test.describe('Accessibility smoke', () => {
     await expectNoSeriousViolations(page, 'landing');
   });
 
-  test('workspace control center passes axe WCAG AA rules', async ({ page }) => {
+  test('workspace overview passes axe WCAG AA rules', async ({ page }) => {
     await installSpaMocks(page, {
       session: {
         authenticated: false,
@@ -84,10 +84,10 @@ test.describe('Accessibility smoke', () => {
         turnstile_site_key: '',
       },
     });
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expectOpaqueForegroundText(page, '.ui-card .text-foreground');
-    await expectNoSeriousViolations(page, 'control-center');
+    await expectNoSeriousViolations(page, 'overview');
   });
 
   test('playground passes axe WCAG AA rules', async ({ page }) => {
@@ -137,7 +137,7 @@ test.describe('Accessibility smoke', () => {
         turnstile_site_key: '',
       },
     });
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await page.getByRole('button', { name: /switch to dark mode/i }).click();
 
@@ -149,7 +149,7 @@ test.describe('Accessibility smoke', () => {
       '--body-bg-dark-end',
     );
     await expect(page.locator('.sidebar-secondary-link').first()).toBeVisible();
-    await expectNoSeriousViolations(page, 'control-center-dark');
+    await expectNoSeriousViolations(page, 'overview-dark');
   });
 
   test('mobile navigation drawer owns the viewport and keeps keyboard focus visible', async ({
@@ -163,7 +163,7 @@ test.describe('Accessibility smoke', () => {
       },
     });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await page.getByRole('button', { name: /toggle navigation menu/i }).click();
 
     const sidebar = page.locator('.workspace-sidebar');

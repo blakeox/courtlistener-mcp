@@ -52,16 +52,9 @@ export interface WorkerHealthResponse {
   service: 'courtlistener-mcp';
   timestamp: string;
   version: string;
-  runtime: 'node' | 'cloudflare-worker';
+  runtime: 'cloudflare-worker';
   transport: string;
   diagnostics: {
-    session_topology: {
-      version: string;
-      shard_count: number;
-      idle_ttl_ms: number;
-      absolute_ttl_ms: number;
-      eviction_sweep_limit: number;
-    };
     cloudflare: {
       analytics_enabled: boolean;
       async_queue_configured: boolean;

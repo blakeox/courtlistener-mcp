@@ -1,7 +1,0 @@
-#!/bin/sh
-
-if command -v lefthook >/dev/null 2>&1; then
-  exec lefthook run pre-commit "$@"
-fi
-
-exec pnpm exec lefthook run pre-commit "$@"

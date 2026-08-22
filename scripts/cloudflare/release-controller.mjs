@@ -15,6 +15,8 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const WORKERS = ['auth_limiter', 'edge', 'mcp'];
+const VERSIONED_WORKERS = ['edge', 'mcp'];
+const UPLOAD_ORDER = [...VERSIONED_WORKERS, 'auth_limiter'];
 const CONFIGS = {
   staging: {
     auth_limiter: 'wrangler.auth-limiter.staging.jsonc',
@@ -100,8 +102,18 @@ function requireValidOptions(options, phase = options.phase) {
 }
 
 function runWrangler(args, { allowFailure = false } = {}) {
-  const command = ['exec', 'wrangler', ...args];
-  const result = spawnSync('pnpm', command, {
+  const wranglerBinary = join(
+    process.cwd(),
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler',
+  );
+  const command = [wranglerBinary, ...args];
+  if (!existsSync(wranglerBinary)) {
+    throw new Error('Repository-pinned Wrangler binary is missing. Run pnpm install first.');
+  }
+
+  const result = spawnSync(wranglerBinary, args, {
     encoding: 'utf8',
     env: { ...process.env, CI: 'true' },
   });
@@ -136,6 +148,29 @@ export function parseDeploymentVersions(output) {
         entry.percentage <= 100,
     )
     .map((entry) => ({ version_id: entry.version_id, percentage: entry.percentage }));
+}
+
+export function parseVersionList(output) {
+  const jsonStart = output.match(/\[\s*\{/u)?.index ?? -1;
+  if (jsonStart < 0) throw new Error('Wrangler version-list output did not contain JSON.');
+  const versions = JSON.parse(output.slice(jsonStart));
+  if (!Array.isArray(versions)) {
+    throw new Error('Wrangler version-list output was not an array.');
+  }
+  return versions.filter((version) => typeof version?.id === 'string');
+}
+
+export function findTaggedVersion(output, tag) {
+  if (!tag) throw new Error('A version tag is required.');
+  const matches = parseVersionList(output).filter(
+    (version) => version.annotations?.['workers/tag'] === tag,
+  );
+  if (matches.length > 1) {
+    throw new Error(
+      `Release tag ${tag} matches multiple deployable versions: ${matches.map((v) => v.id).join(', ')}`,
+    );
+  }
+  return matches[0]?.id ?? null;
 }
 
 function getActiveVersions(configFile) {
@@ -173,8 +208,61 @@ function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
+function parseJsonc(input) {
+  return JSON.parse(
+    input
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/,\s*([}\]])/g, '$1'),
+  );
+}
+
+function readRepositoryToolchain(environment) {
+  const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+  const packageManager = String(packageJson.packageManager ?? '');
+  const pnpmVersion = packageManager.match(/^pnpm@([^+\s]+)/u)?.[1];
+  const wranglerVersion = String(packageJson.devDependencies?.wrangler ?? '').replace(
+    /^[\^~]/u,
+    '',
+  );
+  const configDates = WORKERS.map((role) => {
+    const configFile = CONFIGS[environment][role];
+    const config = parseJsonc(readFileSync(join(process.cwd(), configFile), 'utf8'));
+    return config.compatibility_date;
+  });
+  const compatibilityDate = configDates[0];
+  if (!pnpmVersion || !wranglerVersion || !compatibilityDate) {
+    throw new Error('Repository toolchain metadata is incomplete.');
+  }
+  if (configDates.some((date) => date !== compatibilityDate)) {
+    throw new Error('Production Wrangler configs must share one compatibility date.');
+  }
+  return {
+    node: process.version,
+    pnpm: pnpmVersion,
+    wrangler: wranglerVersion,
+    compatibility_date: compatibilityDate,
+  };
+}
+
 function uploadWorker(role, configFile, options) {
+  if (role === 'auth_limiter') {
+    const result = runWrangler([
+      'deploy',
+      '-c',
+      configFile,
+      '--message',
+      `release ${options.releaseId} ${role} ${options.sourceSha}`,
+    ]);
+    return parseVersionId(result.output);
+  }
   const tag = `${options.releaseId}-${role}`;
+  const existing = findTaggedVersion(
+    runWrangler(['versions', 'list', '-c', configFile, '--json']).output,
+    tag,
+  );
+  if (existing) return existing;
+
   const result = runWrangler([
     'versions',
     'upload',
@@ -190,11 +278,22 @@ function uploadWorker(role, configFile, options) {
 }
 
 function upload(options) {
+  if (existsSync(options.stateFile)) {
+    const existing = readJson(options.stateFile);
+    if (!canReuseUploadState(existing, options)) {
+      throw new Error(
+        `Release state file exists but does not match release ${options.releaseId} in ${options.environment}.`,
+      );
+    }
+    return existing;
+  }
+
   const configs = CONFIGS[options.environment];
   const prior = Object.fromEntries(WORKERS.map((role) => [role, activeVersionId(configs[role])]));
-  const uploaded = Object.fromEntries(
-    WORKERS.map((role) => [role, uploadWorker(role, configs[role], options)]),
-  );
+  const uploaded = {};
+  for (const role of UPLOAD_ORDER) {
+    uploaded[role] = uploadWorker(role, configs[role], options);
+  }
   const state = {
     schema_version: 'v1',
     status: 'uploaded',
@@ -205,6 +304,8 @@ function upload(options) {
     configs,
     prior_version_ids: prior,
     uploaded_version_ids: uploaded,
+    upload_order: UPLOAD_ORDER,
+    direct_deploy_workers: ['auth_limiter'],
     canary_percent: options.canaryPercent,
     kill_switches: ['MCP_ASYNC_QUEUE_ENABLED=false', 'CODEMODE_ENABLED=false'],
     recorded_at: new Date().toISOString(),
@@ -213,9 +314,21 @@ function upload(options) {
   return state;
 }
 
+export function canReuseUploadState(state, options) {
+  return Boolean(
+    state &&
+    state.release_id === options.releaseId &&
+    state.environment === options.environment &&
+    state.source_sha === options.sourceSha &&
+    ['uploaded', 'canary', 'promoted', 'rolled-back'].includes(state.status) &&
+    state.uploaded_version_ids &&
+    WORKERS.every((role) => typeof state.uploaded_version_ids[role] === 'string'),
+  );
+}
+
 function deployState(state, phase) {
   const percentage = phase === 'canary' ? state.canary_percent : 100;
-  for (const role of WORKERS) {
+  for (const role of VERSIONED_WORKERS) {
     const configFile = state.configs[role];
     const uploaded = state.uploaded_version_ids[role];
     const prior = state.prior_version_ids[role];
@@ -239,18 +352,28 @@ function deployState(state, phase) {
   return state;
 }
 
+export function buildRollbackArgs(role, versionId, configFile, message) {
+  if (!versionId || !configFile || !message) {
+    throw new Error('Rollback role, version ID, config file, and message are required.');
+  }
+
+  if (role === 'auth_limiter') {
+    return ['rollback', versionId, '-c', configFile, '--message', message];
+  }
+
+  return ['versions', 'deploy', `${versionId}@100`, '-c', configFile, '--message', message, '-y'];
+}
+
 function rollback(state) {
   for (const role of WORKERS) {
-    runWrangler([
-      'versions',
-      'deploy',
-      `${state.prior_version_ids[role]}@100`,
-      '-c',
-      state.configs[role],
-      '--message',
-      `rollback ${state.release_id} ${state.source_sha}`,
-      '-y',
-    ]);
+    runWrangler(
+      buildRollbackArgs(
+        role,
+        state.prior_version_ids[role],
+        state.configs[role],
+        `rollback ${state.release_id} ${state.source_sha}`,
+      ),
+    );
   }
   state.status = 'rolled-back';
   state.last_deployed_at = new Date().toISOString();
@@ -272,12 +395,7 @@ function buildReceipt(state, options) {
       : state.status === 'canary'
         ? state.canary_percent
         : 0;
-  const toolchain = {
-    node: process.version,
-    pnpm: process.env.PNPM_VERSION || 'workflow-pinned',
-    wrangler: process.env.WRANGLER_VERSION || 'workflow-pinned',
-    compatibility_date: '2026-03-02',
-  };
+  const toolchain = readRepositoryToolchain(state.environment);
   return {
     schema_version: 'v1',
     release_id: state.release_id,
@@ -291,7 +409,7 @@ function buildReceipt(state, options) {
         role,
         {
           version_id: isRollback ? state.prior_version_ids[role] : state.uploaded_version_ids[role],
-          traffic_percent: activeTrafficPercent,
+          traffic_percent: role === 'auth_limiter' ? 100 : activeTrafficPercent,
         },
       ]),
     ),
@@ -302,14 +420,9 @@ function buildReceipt(state, options) {
         process.env.CLOUDFLARE_RESOURCE_MANIFEST || 'artifact/topology-manifest.json',
     },
     probes: Object.fromEntries(
-      [
-        'health',
-        'readiness',
-        'oauth',
-        'mcp_initialize',
-        'direct_mcp_denial',
-        'version_override',
-      ].map((name) => [name, probePath(options.probeDirectory, name)]),
+      ['health', 'readiness', 'oauth', 'mcp_discover', 'direct_mcp_denial', 'version_override'].map(
+        (name) => [name, probePath(options.probeDirectory, name)],
+      ),
     ),
     queue: {
       consumer_owner: process.env.CLOUDFLARE_QUEUE_CONSUMER_OWNER || 'artifact/queue-receipt.json',
@@ -369,4 +482,4 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   }
 }
 
-export { CONFIGS, WORKERS, buildReceipt, parseArgs, requireValidOptions };
+export { CONFIGS, WORKERS, UPLOAD_ORDER, buildReceipt, parseArgs, requireValidOptions };

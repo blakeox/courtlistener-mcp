@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 import {
   CloudflareAsyncQueueWorkflow,
@@ -179,6 +179,15 @@ describe('CloudflareAsyncQueueWorkflow.handleControlToolCall', () => {
     assert.equal(enabled.isEnabled(), true);
   });
 
+  it('fails closed when async execution is enabled without production bindings', () => {
+    const workflow = new CloudflareAsyncQueueWorkflow(
+      { MCP_ASYNC_QUEUE_ENABLED: 'true' },
+      { logger: new SilentLogger() as never },
+    );
+
+    assert.throws(() => workflow.isEnabled(), /ASYNC_JOBS_KV binding is missing/);
+  });
+
   it('records a terminal enqueue failure after queue.send fails', async () => {
     const kv = new MemoryKvNamespace();
     const workflow = new CloudflareAsyncQueueWorkflow(
@@ -247,6 +256,19 @@ describe('CloudflareAsyncQueueWorkflow.handleControlToolCall', () => {
 });
 
 describe('processAsyncQueueMessage', () => {
+  it('fails closed when the queue consumer has no job store binding', async () => {
+    await assert.rejects(
+      () =>
+        processAsyncQueueMessage({
+          env: {} as never,
+          logger: new SilentLogger() as never,
+          message: { jobId: 'missing-store' },
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        }),
+      /ASYNC_JOBS_KV binding is missing/,
+    );
+  });
+
   it('preserves cancellationRequested when cancellation is persisted during execution', async () => {
     const kv = new MemoryKvNamespace();
     const message: AsyncJobMessage = { jobId: 'job-running-cancelled' };

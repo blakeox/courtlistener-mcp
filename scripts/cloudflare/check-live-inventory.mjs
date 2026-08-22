@@ -3,7 +3,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cloudflareRequest, requireEnv } from './lib/cloudflare-api.mjs';
+import { cloudflareRequest } from './lib/cloudflare-api.mjs';
+import { runWrangler } from './lib/wrangler-secrets.mjs';
 
 const projectRoot = process.cwd();
 
@@ -38,6 +39,37 @@ function names(items) {
 
 function resourceName(item) {
   return item?.name ?? item?.queue_name ?? null;
+}
+
+function resolveAuthenticatedAccountId() {
+  const configured = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  if (configured) return configured;
+
+  const result = runWrangler(projectRoot, ['whoami', '--json']);
+  if ((result.status ?? 1) !== 0) {
+    throw new Error(
+      'CLOUDFLARE_ACCOUNT_ID is not set and Wrangler could not resolve an authenticated account. ' +
+        'Set CLOUDFLARE_ACCOUNT_ID or run `pnpm exec wrangler login`.',
+    );
+  }
+
+  let identity;
+  try {
+    const output = `${result.stdout || ''}`.trim();
+    identity = JSON.parse(output.slice(output.indexOf('{')));
+  } catch {
+    throw new Error('Wrangler whoami did not return machine-readable account information.');
+  }
+
+  const accounts = Array.isArray(identity?.accounts)
+    ? identity.accounts.filter((account) => typeof account?.id === 'string' && account.id.trim())
+    : [];
+  if (accounts.length !== 1) {
+    throw new Error(
+      `Wrangler authenticated ${accounts.length} Cloudflare accounts; set CLOUDFLARE_ACCOUNT_ID explicitly to disambiguate.`,
+    );
+  }
+  return accounts[0].id.trim();
 }
 
 export function evaluateLiveInventory({ account, workers, queues, expected }) {
@@ -100,7 +132,7 @@ function readExpectedTopology() {
     );
   }
   return {
-    accountId: requireEnv('CLOUDFLARE_ACCOUNT_ID'),
+    accountId: resolveAuthenticatedAccountId(),
     workerNames: {
       edge: edge.name,
       mcp: mcp.name,

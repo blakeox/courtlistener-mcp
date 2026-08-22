@@ -46,24 +46,19 @@ describe('worker-security protocol header validation', () => {
     );
   });
 
-  it('returns profile fallback diagnostics for unsupported capability profiles on legacy protocol', () => {
-    const result = validateProtocolHeaderNegotiation('2024-11-05', 'async', false, supported);
+  it('accepts async capability profiles on the v2 protocol', () => {
+    const result = validateProtocolHeaderNegotiation('2026-07-28', 'async', false, supported);
     assert.equal(result.error, null);
     assert.equal(result.diagnostics.accepted, true);
-    assert.equal(result.diagnostics.reason, 'profile_fallback');
-    assert.equal(result.diagnostics.acceptedCapabilityProfile, 'extended');
-    assert.equal(result.diagnostics.profileReason, 'fallback_unsupported_profile');
+    assert.equal(result.diagnostics.reason, 'accepted');
+    assert.equal(result.diagnostics.acceptedCapabilityProfile, 'async');
+    assert.equal(result.diagnostics.profileReason, 'accepted');
   });
 });
 
 describe('worker-security auth', () => {
-  it('allows request when development fallback is explicitly enabled', async () => {
-    const res = await authorizeMcpRequest(req(), { MCP_ALLOW_DEV_FALLBACK: 'true' });
-    assert.equal(res, null);
-  });
-
-  it('fails closed when no auth is configured and development fallback is disabled', async () => {
-    const res = await authorizeMcpRequest(req(), { MCP_ALLOW_DEV_FALLBACK: 'false' });
+  it('fails closed when no trusted auth mechanism is configured', async () => {
+    const res = await authorizeMcpRequest(req(), {});
     assert.ok(res);
     assert.equal(res.status, 401);
     assert.match(await res.text(), /authentication_not_configured/);

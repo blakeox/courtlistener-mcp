@@ -131,7 +131,7 @@ describe('web-spa api surface', () => {
         JSON.stringify({
           status: 'ok',
           service: 'courtlistener-mcp',
-          transport: 'cloudflare-agents-streamable-http',
+          transport: 'cloudflare-mcp-v2-streamable-http',
           runtime: 'cloudflare-worker',
           version: '1.0.5',
           timestamp: new Date().toISOString(),
@@ -147,13 +147,6 @@ describe('web-spa api surface', () => {
                 route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
               },
             },
-            session_topology: {
-              version: 'v1',
-              shard_count: 4,
-              idle_ttl_ms: 1800000,
-              absolute_ttl_ms: 43200000,
-              eviction_sweep_limit: 100,
-            },
           },
         }),
         { status: 200 },
@@ -168,7 +161,6 @@ describe('web-spa api surface', () => {
       'session_bootstrap',
       'ai_chat',
     ]);
-    assert.equal(health.diagnostics.session_topology.shard_count, 4);
   });
 
   it('bootstrapSession forwards authorization and turnstile token', async () => {
@@ -221,7 +213,6 @@ describe('web-spa api surface', () => {
           fallback_used: false,
           mode: 'cheap',
           tool: 'search_cases',
-          session_id: 'sid',
           ai_response: 'resp',
           mcp_result: {},
         }),

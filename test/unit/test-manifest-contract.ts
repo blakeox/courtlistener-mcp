@@ -70,7 +70,7 @@ describe('manifest contract', () => {
 
     if (!manifest.protocol) {
       assert.fail(
-        'manifest.json is missing protocol metadata; run npm run generate:manifest and commit the result',
+        'manifest.json is missing protocol metadata; run pnpm run generate:manifest and commit the result',
       );
     }
 
@@ -86,6 +86,18 @@ describe('manifest contract', () => {
       manifestToolsWithSchema,
       EXPECTED_OUTPUT_SCHEMA_TOOL_COUNT,
       'manifest tool outputSchema count must match governed tool contract',
+    );
+
+    const readme = fs.readFileSync(path.resolve(process.cwd(), 'README.md'), 'utf8');
+    assert.match(
+      readme,
+      new RegExp(`- ${manifestToolsWithSchema} governed tools,`),
+      'README governed-tool summary must match the committed manifest',
+    );
+    assert.match(
+      readme,
+      new RegExp(`## Tool Catalog \\(${manifestToolsWithSchema}\\)`),
+      'README tool catalog heading must match the committed manifest',
     );
   });
 });

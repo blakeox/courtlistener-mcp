@@ -1,21 +1,26 @@
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type {
-  ProgressToken,
-  ServerNotification,
-  ServerRequest,
-} from '@modelcontextprotocol/sdk/types.js';
+type ProgressToken = string | number;
+
+export interface ProgressNotificationContext {
+  _meta?: { progressToken?: ProgressToken };
+  sendNotification?: (notification: {
+    method: 'notifications/progress';
+    params: {
+      progressToken: ProgressToken;
+      progress: number;
+      total?: number;
+      message?: string;
+    };
+  }) => Promise<void>;
+}
 
 export interface McpProgressReporter {
   readonly enabled: boolean;
   report(params: { progress: number; total?: number; message?: string }): Promise<void>;
 }
 
-type ProgressExtra = Pick<
-  RequestHandlerExtra<ServerRequest, ServerNotification>,
-  'sendNotification' | '_meta'
->;
-
-export function createMcpProgressReporter(extra?: ProgressExtra): McpProgressReporter {
+export function createMcpProgressReporter(
+  extra?: ProgressNotificationContext,
+): McpProgressReporter {
   const progressToken = extra?._meta?.progressToken;
 
   return {
@@ -28,7 +33,7 @@ export function createMcpProgressReporter(extra?: ProgressExtra): McpProgressRep
       await extra.sendNotification({
         method: 'notifications/progress',
         params: {
-          progressToken: progressToken as ProgressToken,
+          progressToken,
           progress,
           ...(total !== undefined ? { total } : {}),
           ...(message ? { message } : {}),

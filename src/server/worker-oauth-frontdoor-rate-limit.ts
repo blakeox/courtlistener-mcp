@@ -8,6 +8,16 @@ export interface OAuthFrontdoorRateLimitDeps<TEnv> {
   now: () => number;
 }
 
+export function assertOAuthFrontdoorRateLimitDeps<TEnv>(
+  deps?: Partial<OAuthFrontdoorRateLimitDeps<TEnv>>,
+): asserts deps is OAuthFrontdoorRateLimitDeps<TEnv> {
+  if (!deps?.getClientIdentifier || !deps.getAuthRouteRateLimitedResponse || !deps.now) {
+    throw new Error(
+      'OAuth front-door rate limiting is unavailable: all limiter dependencies are required.',
+    );
+  }
+}
+
 export async function getOAuthFrontdoorRateLimitedResponse<TEnv>(
   request: Request,
   env: TEnv,

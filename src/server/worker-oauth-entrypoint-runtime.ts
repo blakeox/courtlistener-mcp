@@ -15,9 +15,9 @@ export interface HandleWorkerOAuthEntrypointDeps<TEnv extends OAuthEntrypointEnv
   summarizeOAuthRequest: (request: Request) => Promise<Record<string, unknown>>;
   summarizeOAuthResponse: (response: Response) => Promise<Record<string, unknown>>;
   emitOAuthDiagnostic: (env: TEnv, event: string, metadata: Record<string, unknown>) => void;
-  getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
-  getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
-  now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+  getClientIdentifier: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+  getAuthRouteRateLimitedResponse: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+  now: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
 }
 
 export function shouldInspectOAuthRoute(pathname: string): boolean {

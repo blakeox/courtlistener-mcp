@@ -5,9 +5,9 @@
  * Compares current performance results with baseline
  */
 
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 const DEFAULT_THRESHOLDS = {
   p95: { warnPct: 10, failPct: 20 },
@@ -35,12 +35,9 @@ const DEFAULT_ENDPOINT_CLASS_THRESHOLDS = {
 };
 
 const DEFAULT_SCENARIO_CLASS_MAP = {
-  mcp_initialize: 'mcp',
+  mcp_discover: 'mcp',
   mcp_tools_list: 'mcp',
   api_session_get: 'api',
-  api_keys_get: 'api',
-  auth_signup_limiter: 'auth',
-  auth_login_limiter: 'auth',
 };
 const DEFAULT_P95_MIN_DELTA_MS = 5;
 
@@ -696,7 +693,7 @@ function printUsage() {
     '  PERF_GATE_ENDPOINT_CLASS_THRESHOLDS_JSON={"mcp":{"p95":{"warnPct":12,"failPct":25},...}}',
   );
   console.log(
-    '  PERF_GATE_SCENARIO_CLASS_MAP_JSON={"mcp_initialize":"mcp","api_session_get":"api",...}',
+    '  PERF_GATE_SCENARIO_CLASS_MAP_JSON={"mcp_discover":"mcp","api_session_get":"api",...}',
   );
 }
 

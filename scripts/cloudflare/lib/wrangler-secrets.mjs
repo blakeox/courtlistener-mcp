@@ -7,8 +7,27 @@ import { spawnSync } from 'node:child_process';
 export const WRANGLER_EDGE_CONFIG = 'wrangler.edge.jsonc';
 export const WRANGLER_MCP_CONFIG = 'wrangler.mcp.jsonc';
 
+function resolveWranglerBinary(projectRoot) {
+  const wranglerBinary = join(
+    projectRoot,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler',
+  );
+  return existsSync(wranglerBinary) ? wranglerBinary : null;
+}
+
 export function runWrangler(projectRoot, args) {
-  const result = spawnSync('wrangler', args, {
+  const wranglerBinary = resolveWranglerBinary(projectRoot);
+  if (!wranglerBinary) {
+    return {
+      status: 1,
+      stdout: '',
+      stderr: 'Repository-pinned Wrangler binary is missing. Run pnpm install first.',
+    };
+  }
+
+  const result = spawnSync(wranglerBinary, args, {
     encoding: 'utf-8',
     cwd: projectRoot,
   });
@@ -57,21 +76,32 @@ export function listWranglerSecrets(projectRoot, configFile) {
 }
 
 export function formatSecretPutCommand(secret, configFile) {
-  return `wrangler secret put ${secret} -c ${configFile}`;
+  return `pnpm exec wrangler secret put ${secret} -c ${configFile}`;
 }
 
 export function putWranglerSecret(projectRoot, { secret, configFile, value }) {
-  const child = spawnSync('wrangler', ['secret', 'put', secret, '-c', configFile], {
+  // Secret input must be supplied directly to Wrangler, never through a shell.
+  const wranglerBinary = resolveWranglerBinary(projectRoot);
+  if (!wranglerBinary) {
+    return {
+      ok: false,
+      stdout: '',
+      stderr: 'Repository-pinned Wrangler binary is missing. Run pnpm install first.',
+      status: 1,
+    };
+  }
+
+  const secretChild = spawnSync(wranglerBinary, ['secret', 'put', secret, '-c', configFile], {
     cwd: projectRoot,
     input: value,
     encoding: 'utf-8',
   });
 
   return {
-    ok: (child.status ?? 1) === 0,
-    stdout: (child.stdout || '').trim(),
-    stderr: (child.stderr || '').trim(),
-    status: child.status ?? 1,
+    ok: (secretChild.status ?? 1) === 0,
+    stdout: (secretChild.stdout || '').trim(),
+    stderr: (secretChild.stderr || '').trim(),
+    status: secretChild.status ?? 1,
   };
 }
 

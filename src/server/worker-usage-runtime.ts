@@ -13,9 +13,7 @@ interface ResolveWorkerUsageParams<TEnv> {
 }
 
 export type WorkerUsageResolution =
-  | { kind: 'unauthenticated' }
-  | { kind: 'unavailable' }
-  | { kind: 'ok'; snapshot: unknown };
+  { kind: 'unauthenticated' } | { kind: 'unavailable' } | { kind: 'ok'; snapshot: unknown };
 
 export async function resolveWorkerUsage<TEnv>(
   params: ResolveWorkerUsageParams<TEnv>,

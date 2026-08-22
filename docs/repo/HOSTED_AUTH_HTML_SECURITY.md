@@ -21,7 +21,7 @@ browsers (Chrome, Cursor) can submit same-origin forms reliably.
 
 ```bash
 # Unit contract
-npx tsx --test test/unit/test-hosted-auth-html-security.ts
+pnpm exec tsx --test test/unit/test-hosted-auth-html-security.ts
 
 # Production (no session required)
 pnpm run test:e2e:oauth-approve-contract

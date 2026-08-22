@@ -35,13 +35,13 @@ describe('protocol capabilities', () => {
     assert.equal(enabled.prompts?.listChanged, true);
   });
 
-  it('advertises logging by default and omits sampling until enabled', () => {
+  it('omits deprecated capability surfaces by default', () => {
     const flags = resolveProtocolFeatureFlags({});
     const capabilities = buildServerCapabilities(flags);
 
-    assert.ok(capabilities.logging);
+    assert.equal(capabilities.logging, undefined);
     assert.equal(capabilities.sampling, undefined);
-    assert.ok(capabilities.resources?.subscribe);
+    assert.equal(capabilities.resources?.subscribe, undefined);
   });
 
   it('advertises sampling only when SAMPLING_ENABLED=true', () => {

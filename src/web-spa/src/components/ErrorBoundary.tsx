@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         <section className="ui-card">
           <h2>Something went wrong</h2>
           <p className="muted">
-            An unexpected error occurred. You can try again or return to the control center.
+            An unexpected error occurred. You can try again or return to the workspace overview.
           </p>
           <div className="status error" role="alert">
             {this.state.error?.message || 'An unknown error occurred.'}
@@ -46,8 +46,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             >
               Try again
             </button>
-            <a href="/app/control-center" className="btn secondary">
-              Go to Control Center
+            <a href="/app" className="btn secondary">
+              Go to Overview
             </a>
           </div>
         </section>

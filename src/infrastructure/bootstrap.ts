@@ -7,16 +7,12 @@ import type { ServerConfig } from '../types.js';
 import { CourtListenerAPI } from '../courtlistener.js';
 import { DefaultApiClientFactory } from '../infrastructure/api-client-factory.js';
 import { CacheManager } from '../infrastructure/cache.js';
-import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
-import { ConfigurationValidator } from '../infrastructure/config-validator.js';
 import { getConfig, type ConfigEnvironment } from '../infrastructure/config.js';
 import { container, DIContainer } from '../infrastructure/container.js';
 import type { Logger } from '../infrastructure/logger.js';
 import { createLogger } from '../infrastructure/logger.js';
 import type { MetricsCollector } from '../infrastructure/metrics.js';
 import { MetricsCollector as MetricsCollectorClass } from '../infrastructure/metrics.js';
-import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
-import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
 import { ResourceHandlerRegistry } from '../server/resource-handler.js';
 import { PromptHandlerRegistry } from '../server/prompt-handler.js';
@@ -111,7 +107,7 @@ import {
 } from '../domains/search/handlers.js';
 
 export function bootstrapServices(
-  environment: ConfigEnvironment = process.env,
+  environment: ConfigEnvironment,
   serviceContainer: DIContainer = container,
 ): void {
   // Worker and test runtimes may invoke bootstrap multiple times in the same
@@ -123,10 +119,7 @@ export function bootstrapServices(
   // Register configuration with validation
   serviceContainer.register('config', {
     factory: () => {
-      const config = getConfig(environment);
-      const validator = new ConfigurationValidator();
-      validator.validateAndThrow(config);
-      return config;
+      return getConfig(environment);
     },
     singleton: true,
   });
@@ -168,39 +161,9 @@ export function bootstrapServices(
       const cache = deps[0] as CacheManager;
       const logger = deps[1] as Logger;
       const metrics = deps[2] as MetricsCollector;
-      return new DefaultApiClientFactory(cache, logger, metrics);
+      return new DefaultApiClientFactory(cache, logger, metrics, environment);
     },
     dependencies: ['cache', 'logger', 'metrics'],
-    singleton: true,
-  });
-
-  // Register server factory
-  serviceContainer.register('serverFactory', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new MCPServerFactory(logger);
-    },
-    dependencies: ['logger'],
-    singleton: true,
-  });
-
-  // Register middleware factory
-  serviceContainer.register('middlewareFactory', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new MiddlewareFactory(logger);
-    },
-    dependencies: ['logger'],
-    singleton: true,
-  });
-
-  // Register circuit breaker manager
-  serviceContainer.register('circuitBreakerManager', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new CircuitBreakerManager(logger);
-    },
-    dependencies: ['logger'],
     singleton: true,
   });
 
@@ -237,13 +200,16 @@ export function bootstrapServices(
   registerToolHandlers(serviceContainer);
 
   // Register resource handlers
-  registerResourceHandlers(serviceContainer);
+  registerResourceHandlers(serviceContainer, environment);
 
   // Register prompt handlers
   registerPromptHandlers(serviceContainer);
 }
 
-function registerResourceHandlers(serviceContainer: DIContainer): void {
+function registerResourceHandlers(
+  serviceContainer: DIContainer,
+  environment: ConfigEnvironment,
+): void {
   const resourceRegistry = serviceContainer.get<ResourceHandlerRegistry>('resourceRegistry');
   const courtListenerApi = serviceContainer.get<CourtListenerAPI>('courtListenerApi');
 
@@ -257,7 +223,7 @@ function registerResourceHandlers(serviceContainer: DIContainer): void {
 
   const cache = serviceContainer.get<CacheManager>('cache');
   const metrics = serviceContainer.get<MetricsCollector>('metrics');
-  resourceRegistry.register(new ApiStatusResourceHandler(cache, metrics));
+  resourceRegistry.register(new ApiStatusResourceHandler(cache, metrics, environment));
 }
 
 function registerPromptHandlers(serviceContainer: DIContainer): void {

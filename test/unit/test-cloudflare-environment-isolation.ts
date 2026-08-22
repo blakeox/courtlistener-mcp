@@ -32,39 +32,6 @@ describe('Cloudflare environment isolation', () => {
     );
   });
 
-  it('does not treat shared compatibility settings as resource reuse', () => {
-    const overlaps = findResourceIdentifierOverlaps(
-      { compatibility_date: '2026-03-02', durable_objects: { class_name: 'CourtListenerMCP' } },
-      [
-        {
-          file: 'wrangler.mcp.staging.jsonc',
-          value: {
-            compatibility_date: '2026-03-02',
-            durable_objects: { class_name: 'CourtListenerMCP' },
-          },
-        },
-      ],
-    );
-    assert.deepEqual(overlaps, []);
-  });
-
-  it('does not treat Durable Object binding labels as shared resources', () => {
-    const overlaps = findResourceIdentifierOverlaps(
-      { durable_objects: { bindings: [{ name: 'MCP_OBJECT', class_name: 'CourtListenerMCP' }] } },
-      [
-        {
-          file: 'wrangler.mcp.staging.jsonc',
-          value: {
-            durable_objects: {
-              bindings: [{ name: 'MCP_OBJECT', class_name: 'CourtListenerMCP' }],
-            },
-          },
-        },
-      ],
-    );
-    assert.deepEqual(overlaps, []);
-  });
-
   it('reports the current provisioned staging topology', () => {
     const output = execFileSync(
       process.execPath,

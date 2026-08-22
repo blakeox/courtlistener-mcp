@@ -34,7 +34,7 @@ test.describe('Design system smoke', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
 
     const themeToggle = page.getByRole('button', {
@@ -66,7 +66,7 @@ test.describe('Design system smoke', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     const primaryLink = page.getByRole('link', { name: 'Open playground' }).first();
     await expect(primaryLink).toHaveClass(/primary/);
 
@@ -129,7 +129,7 @@ test.describe('Design system smoke', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await expect(page.locator('.workspace-shell')).toBeVisible();
     await expect(page.locator('.workspace-topbar')).toBeVisible();
   });
@@ -143,7 +143,7 @@ test.describe('Design system smoke', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
     await expect(page.locator('.stack').first()).toBeVisible();
     await expect(page.locator('.two-col').first()).toBeVisible();
   });

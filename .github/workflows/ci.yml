@@ -24,7 +24,7 @@ jobs:
       mcp_related: ${{ steps.finalize.outputs.mcp_related }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Filter changed paths
         if: github.event_name == 'pull_request'
@@ -79,8 +79,9 @@ jobs:
               - 'test/tsconfig.workers.json'
               - 'test/worker-configuration.d.ts'
               - 'test/workers/**'
-              - 'scripts/dev/run-split-workers.mjs'
+              - 'scripts/dev/run-local-workers.mjs'
               - 'scripts/reports/analyze-worker-bundle.mjs'
+              - 'scripts/cloudflare/check-worker-surface.mjs'
               - 'docs/repo/WORKER_SPLIT.md'
               - 'docs/repo/WORKER_BUNDLE_AUDIT.md'
               - 'src/index.ts'
@@ -91,7 +92,7 @@ jobs:
               - 'scripts/testing/probe-production-approve-contract.ts'
               - 'src/server/hosted-auth-html-security.ts'
               - 'test/unit/test-worker-*.ts'
-              - 'test/integration/test-http-transport.ts'
+              - 'test/integration/test-http-v2.ts'
               - 'test/integration/test-mcp-protocol.ts'
               - 'test/tools/runtime-parity-certification.ts'
               - '.github/workflows/ci.yml'
@@ -138,13 +139,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -176,7 +177,7 @@ jobs:
     needs: test
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
@@ -184,7 +185,7 @@ jobs:
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -201,6 +202,15 @@ jobs:
 
       - name: Verify Cloudflare IaC ownership boundary
         run: pnpm run cloudflare:check:iac
+
+      - name: Profile Cloudflare Worker startup
+        run: pnpm run cloudflare:check:startup
+
+      - name: Verify Worker platform surface
+        run: pnpm run cloudflare:check:surface
+
+      - name: Verify deployed Wrangler binding types
+        run: pnpm run cloudflare:check:types
 
       - name: Verify Cloudflare environment isolation
         run: pnpm run cloudflare:check:environments
@@ -243,10 +253,10 @@ jobs:
         run: pnpm run coverage
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: coverage-node-22
+          name: coverage-node-24
           path: |
             coverage/
             coverage/lcov.info
@@ -261,7 +271,7 @@ jobs:
             FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json || echo 0)
             STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json || echo 0)
             {
-              echo "## Coverage Summary (Node 22)"
+              echo "## Coverage Summary (Node 24)"
               echo "- Lines: ${LINES}%"
               echo "- Statements: ${STMTS}%"
               echo "- Functions: ${FUNCS}%"
@@ -270,9 +280,6 @@ jobs:
           else
             echo "No coverage summary JSON found" >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Run performance tests
-        run: pnpm run test:performance
 
       - name: Run performance regression gate
         env:
@@ -299,13 +306,13 @@ jobs:
       }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -345,13 +352,13 @@ jobs:
           - startup-diagnostics
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -390,22 +397,21 @@ jobs:
             protocol-contract)
               # Live MCP stdio tests run in full-validation and mcp-compliance; avoid
               # parallel CourtListener calls that flake when duplicated here.
-              npx tsx --test test/unit/test-protocol-governance.ts
+              pnpm exec tsx --test test/unit/test-protocol-governance.ts
               ;;
             auth-security-matrix)
-              npx tsx --test test/unit/test-mcp-gateway-auth.ts
-              npx tsx --test test/unit/test-worker-security.ts
+              pnpm exec tsx --test test/unit/test-mcp-gateway-auth.ts
+              pnpm exec tsx --test test/unit/test-worker-security.ts
               ;;
             auth-release-gate)
               pnpm run ci:auth-release-gate
               ;;
             startup-diagnostics)
-              npx tsx --test test/unit/test-http-server.ts
-              npx tsx --test test/integration/test-http-transport.ts
+              pnpm exec tsx --test test/integration/test-http-v2.ts
               ;;
             stress-reliability)
               mkdir -p performance-data
-              MCP_HTTP_PORT=3002 MCP_HTTP_HOST=127.0.0.1 pnpm run start:http > performance-data/local-gate-server.log 2>&1 &
+              pnpm run dev:workers > performance-data/local-gate-workers.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -413,21 +419,21 @@ jobs:
               trap cleanup EXIT
 
               for _ in $(seq 1 30); do
-                if curl -fsS http://127.0.0.1:3002/health >/dev/null 2>&1; then
+                if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
                   break
                 fi
                 sleep 1
               done
-              curl -fsS http://127.0.0.1:3002/health >/dev/null
+              LOCAL_HEALTH_URL=http://127.0.0.1:8787 node scripts/dev/check-local-health.mjs >/dev/null
 
-              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-baseline.json
-              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002 --output performance-data/load-profile-current.json
+              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:8787 --output performance-data/load-profile-baseline.json
+              pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:8787 --output performance-data/load-profile-current.json
               pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
 
               if [[ "${{ steps.gate_policy.outputs.strict_mode }}" == "true" ]]; then
-                pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3002 --output performance-data/hardening-soak-leak.json
+                pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:8787 --output performance-data/hardening-soak-leak.json
               else
-                pnpm run ci:hardening:soak-leak-checks -- --light --warn-only --base-url http://127.0.0.1:3002 --output performance-data/hardening-soak-leak.json
+                pnpm run ci:hardening:soak-leak-checks -- --light --warn-only --base-url http://127.0.0.1:8787 --output performance-data/hardening-soak-leak.json
                 fi
               ;;
             runtime-parity-security-async)
@@ -435,7 +441,7 @@ jobs:
               ;;
             release-readiness)
               mkdir -p performance-data test-output
-              MCP_HTTP_PORT=3002 MCP_HTTP_HOST=127.0.0.1 pnpm run start:http > performance-data/local-release-readiness-server.log 2>&1 &
+              pnpm run dev:workers > performance-data/local-release-readiness-workers.log 2>&1 &
               SERVER_PID=$!
               cleanup() {
                 kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -443,16 +449,16 @@ jobs:
               trap cleanup EXIT
 
               for _ in $(seq 1 30); do
-                if curl -fsS http://127.0.0.1:3002/health >/dev/null 2>&1; then
+                if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
                   break
                 fi
                 sleep 1
               done
-              curl -fsS http://127.0.0.1:3002/health >/dev/null
+              LOCAL_HEALTH_URL=http://127.0.0.1:8787 node scripts/dev/check-local-health.mjs >/dev/null
 
               RELEASE_READINESS_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
               RUNTIME_SAFETY_GATE_POLICY_MODE=${{ steps.gate_policy.outputs.policy_mode }} \
-              pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002
+              pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:8787
               ;;
             *)
               echo "Unknown gate: ${{ matrix.gate }}" >&2
@@ -462,7 +468,7 @@ jobs:
 
       - name: Upload hardening gate artifacts
         if: always() && matrix.gate == 'stress-reliability'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -474,7 +480,7 @@ jobs:
 
       - name: Upload runtime parity gate artifacts
         if: always() && matrix.gate == 'runtime-parity-security-async'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -484,7 +490,7 @@ jobs:
 
       - name: Upload release readiness gate artifacts
         if: always() && matrix.gate == 'release-readiness'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hardening-release-gates-${{ matrix.gate }}
           path: |
@@ -507,13 +513,13 @@ jobs:
       }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -531,7 +537,7 @@ jobs:
           echo "Running comprehensive MCP protocol validation..."
           pnpm run test:mcp
           if [ -n "$REMOTE_SERVER_URL" ]; then
-            eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+            REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
             SERVER_URL="$REMOTE_MCP_URL" pnpm run test:mcp
           fi
 
@@ -551,7 +557,7 @@ jobs:
           } > mcp-compliance-report.md
 
       - name: Upload compliance report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mcp-compliance-report
           path: mcp-compliance-report.md
@@ -568,13 +574,13 @@ jobs:
     needs: [full-validation, mcp-compliance]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -587,7 +593,8 @@ jobs:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "Testing remote server deployment..."
-          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+          REMOTE_HEALTH_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field healthUrl)"
+          REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
           curl -f "$REMOTE_HEALTH_URL" || echo "Remote server not accessible"
           SERVER_URL="$REMOTE_MCP_URL" pnpm run test:mcp
 
@@ -596,21 +603,22 @@ jobs:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "Running performance benchmarks..."
-          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
-          SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance
+          mkdir -p performance-data
+          REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
+          pnpm run ci:load-profile-suite -- --light --base-url "$REMOTE_MCP_URL" --output performance-data/remote-ci.json
 
   security-check:
     name: Security & Code Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -618,17 +626,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Gitleaks
-        run: |
-          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz -o /tmp/gitleaks.tar.gz
-          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          chmod +x /tmp/gitleaks
-
       - name: Run Gitleaks
-        run: /tmp/gitleaks dir . --no-banner --redact --exit-code 1
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run security audit
-        run: pnpm audit --audit-level=moderate || echo "pnpm audit returned issues"
+        run: pnpm audit --audit-level=moderate
 
       - name: Check for sensitive data in logs
         run: |

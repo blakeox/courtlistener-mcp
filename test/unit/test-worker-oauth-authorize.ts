@@ -50,7 +50,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -82,7 +82,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -113,7 +113,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -144,7 +144,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -172,7 +172,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -196,7 +196,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread+unknown%3Ascope&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread+unknown%3Ascope&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -226,7 +226,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -246,7 +246,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
     );
   });
 
-  it('requires explicit approval before completing OAuth from ambient dev fallback identity', async () => {
+  it('requires explicit approval before completing OAuth from a browser identity', async () => {
     const env: TestEnv = {
       OAUTH_PROVIDER: {
         parseAuthRequest: async () => ({ scope: ['legal:read'] }),
@@ -256,7 +256,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -265,7 +265,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       resolveCloudflareOAuthIdentity: async () => ({
         kind: 'authenticated',
         userId: 'dev-user',
-        authSource: 'dev_fallback',
+        authSource: 'cloudflare_access',
       }),
     });
 
@@ -288,7 +288,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=bad-client&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=bad-client&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -317,7 +317,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -361,7 +361,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -407,7 +407,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread+unknown%3Ascope&state=state-1&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread+unknown%3Ascope&state=state-1&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {
@@ -441,7 +441,7 @@ describe('handleWorkerOAuthAuthorizeRoute', () => {
       },
     };
     const request = new Request(
-      'https://worker.example/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&scope=legal%3Aread&state=test&code_challenge=abc&code_challenge_method=S256',
     );
 
     const response = await handleWorkerOAuthAuthorizeRoute(request, env, {

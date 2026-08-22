@@ -10,7 +10,6 @@ const inputOutputFile = resolve(outputDir, 'tool-input-schemas.ts');
 const outputSchemaFile = resolve(outputDir, 'tool-output-schemas.ts');
 
 process.env.COURTLISTENER_API_KEY ??= 'build-time-schema-generation';
-process.env.MCP_ALLOW_DEV_FALLBACK ??= 'true';
 
 const { bootstrapServices } = await import('../../src/infrastructure/bootstrap.ts');
 const { container } = await import('../../src/infrastructure/container.ts');

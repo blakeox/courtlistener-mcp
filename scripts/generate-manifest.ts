@@ -5,8 +5,8 @@ import {
 } from '../src/infrastructure/protocol-constants.js';
 import { MCP_SERVER_INSTRUCTIONS } from '../src/infrastructure/mcp-server-instructions.js';
 import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
 
 const __filename = fileURLToPath(import.meta.url);

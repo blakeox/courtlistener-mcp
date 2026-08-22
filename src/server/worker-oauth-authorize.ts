@@ -32,7 +32,7 @@ interface OAuthAuthorizeDeps<TEnv extends OAuthAuthorizeEnv> {
     | {
         kind: 'authenticated';
         userId: string;
-        authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access' | 'dev_fallback';
+        authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access';
       }
     | { kind: 'missing' }
     | { kind: 'session_revocation_unavailable' }
@@ -90,7 +90,7 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
     }
 
     const response = deps.jsonError(
-      'User identity is required for OAuth authorization. Sign in via the worker-hosted auth flow or provide a valid OIDC token, or configure MCP_OAUTH_DEV_USER_ID + MCP_ALLOW_DEV_FALLBACK=true only for controlled development. This fallback is unsafe for production use.',
+      'User identity is required for OAuth authorization. Sign in via the worker-hosted auth flow or provide a valid OIDC token.',
       401,
       'identity_required',
     );
@@ -112,7 +112,6 @@ export async function handleWorkerOAuthAuthorizeRoute<TEnv extends OAuthAuthoriz
       auth_ui_handoff: true,
       approval_required: true,
       auth_source: identity.authSource,
-      dev_fallback_unsafe: identity.authSource === 'dev_fallback',
       ...(await summarizeOAuthResponse(response)),
     });
     return response;

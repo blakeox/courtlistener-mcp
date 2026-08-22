@@ -15,7 +15,7 @@ describe('handleWorkerOAuthEntrypoint', () => {
     let limiterCalls = 0;
 
     const response = await handleWorkerOAuthEntrypoint(
-      new Request('https://worker.example/authorize?client_id=client-1', { method: 'GET' }),
+      new Request('https://worker.example/oauth/authorize?client_id=client-1', { method: 'GET' }),
       {},
       {} as ExecutionContext,
       {

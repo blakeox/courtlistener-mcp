@@ -1,16 +1,17 @@
 # CourtListener MCP Server
 
 Production-ready Model Context Protocol (MCP) server for CourtListener legal
-data. It exposes legal research tools over MCP (`stdio` and HTTP), with
-deployment-ready support for local use, self-hosted remote deployments, hosted
-Cloudflare Workers OAuth, structured logging, caching, and CI testing.
+data. It exposes legal research tools over MCP (`stdio` and Cloudflare Worker
+Streamable HTTP), with deployment-ready hosted OAuth, structured logging,
+caching, and CI testing.
 
 ## What This Repository Provides
 
-- MCP server built on `@modelcontextprotocol/sdk`
-- 49 legal research tools backed by CourtListener API v4
-- Three deployment contracts: local `stdio`, self-hosted remote HTTP, and hosted
-  remote OAuth
+- MCP v2 server built on `@modelcontextprotocol/server`
+- 52 governed tools, including three asynchronous job-control tools backed by
+  CourtListener API v4
+- Two deployment contracts: local `stdio` and hosted Cloudflare Worker remote
+  OAuth
 - Hosted MCP OAuth transport via Cloudflare Workers OAuth Provider
 - Worker-owned browser auth handoff for hosted sign-in and approval
 - Optional queue-backed async MCP jobs for durable hosted execution
@@ -29,7 +30,7 @@ Cloudflare Workers OAuth, structured logging, caching, and CI testing.
   clients
 - `docs/` deployment, testing, and operational documentation
 - `test/` unit/integration/e2e test suites
-- `scripts/` deployment helpers, diagnostics, inspector tooling, key management
+- `scripts/` deployment helpers, diagnostics, key management
 
 ## Quick Start
 
@@ -81,22 +82,20 @@ npm link
 courtlistener-mcp --setup
 ```
 
-### 3. Self-host the HTTP runtime from source
+### 3. Develop or self-host the Cloudflare Workers topology
 
 ```bash
 git clone https://github.com/blakeox/courtlistener-mcp.git
 cd courtlistener-mcp
 pnpm install
 pnpm build
-node dist/http.js
+pnpm run dev:workers
 ```
 
-### 4. Self-host with Docker
-
-```bash
-cp .env.production .env
-docker compose -f docker-compose.prod.yml up -d
-```
+`dev:workers` starts the local Edge and MCP Workers with their service binding.
+For a deployed self-hosted topology, authenticate Wrangler and use the
+Cloudflare release workflow after configuring the required Worker secrets; the
+production source of truth is the `wrangler.*.jsonc` configuration.
 
 ## Publishing to npm
 
@@ -126,23 +125,13 @@ git push origin v1.0.5
 - Best for privacy-sensitive workflows, local development, and
   bring-your-own-hosting
 
-### 2. Self-hosted remote mode
-
-- Deploy the HTTP/streamable HTTP runtime on your own infrastructure
-- Bring your own auth if you need it (`OIDC_*`, service token, proxy auth, etc.)
-- Best for teams that want remote access without using the hosted CourtListener
-  endpoint
-
-### 3. Hosted remote mode
+### 2. Hosted remote mode
 
 - Use the CourtListener Cloudflare Worker as the remote MCP endpoint
 - The Worker is the MCP OAuth server and exposes `/mcp`, `/oauth/authorize`,
   `/token`, `/register`, and discovery metadata
 - The Worker also owns the browser auth handoff routes on the same origin
   (`/auth/start`, `/auth/callback`, `/oauth/approve`, `/oauth/logout`)
-- Legacy `/authorize`, `/auth/approve`, and `/auth/logout` aliases remain in the
-  runtime for compatibility, but production now publishes the `/oauth/*`
-  endpoints as canonical
 - Keep Logto as the current upstream hosted identity provider if you want a
   managed OIDC tenant; the Worker-facing contract stays generic OIDC
 - Best for ChatGPT, Claude, Codex, and browser-native remote clients
@@ -152,7 +141,7 @@ git push origin v1.0.5
 Prebuilt configs are provided in [`configs/`](./configs):
 
 - `local-stdio.json`
-- `self-hosted-remote-http.json`
+- `self-hosted-remote.json` for a self-hosted remote Worker
 - `hosted-remote-claude.json`
 - `hosted-oauth-chatgpt.json`
 - `hosted-oauth-codex.json`
@@ -169,8 +158,8 @@ Prebuilt configs are provided in [`configs/`](./configs):
 Explicit contract examples:
 
 - [`configs/local-stdio.json`](./configs/local-stdio.json) for local `stdio`
-- [`configs/self-hosted-remote-http.json`](./configs/self-hosted-remote-http.json)
-  for self-hosted remote HTTP
+- [`configs/self-hosted-remote.json`](./configs/self-hosted-remote.json) for a
+  self-hosted Cloudflare Worker remote
 - [`configs/hosted-remote-claude.json`](./configs/hosted-remote-claude.json) for
   hosted remote use with Claude-style clients
 - [`configs/hosted-oauth-chatgpt.json`](./configs/hosted-oauth-chatgpt.json) for
@@ -180,18 +169,18 @@ Explicit contract examples:
 - [`configs/hosted-oauth-codex.json`](./configs/hosted-oauth-codex.json) for
   older JSON-based Codex-style clients
 
-Legacy filenames are still shipped for compatibility:
+Additional client-specific examples remain available for clients with
+provider-specific configuration formats:
 
-- [`configs/codex.json`](./configs/codex.json) for the legacy direct HTTP JSON
-  example
+- [`configs/codex.json`](./configs/codex.json) for the direct HTTP JSON example
 - [`configs/openai-chatgpt.json`](./configs/openai-chatgpt.json) for hosted
   OAuth
 - [`configs/claude-desktop-remote.json`](./configs/claude-desktop-remote.json)
   for hosted remote use
-- [`mcp-config.json`](./mcp-config.json) for local/bridge variants used in
-  development
+- [`mcp-config.json`](./mcp-config.json) for local and direct remote variants
+  used in development
 
-## Tool Catalog (33)
+## Tool Catalog (52)
 
 ### Search and discovery
 
@@ -253,7 +242,7 @@ For authoritative tool schema/arguments, use MCP `tools/list` from your client.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 24.18.0 (see `.nvmrc`)
 - `pnpm`
 - CourtListener API token (recommended for higher limits)
 
@@ -289,38 +278,38 @@ pnpm run generate:web:spa
 pnpm run generate:tool-schemas
 pnpm run generate:hosted-auth-styles
 # Secrets (apply to edge + MCP workers as needed)
-wrangler secret put COURTLISTENER_API_KEY -c wrangler.mcp.jsonc
-wrangler secret put MCP_UI_SESSION_SECRET -c wrangler.edge.jsonc
-wrangler secret put OIDC_ISSUER -c wrangler.edge.jsonc
-wrangler secret put OIDC_AUDIENCE -c wrangler.edge.jsonc
-wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET -c wrangler.edge.jsonc
+pnpm exec wrangler secret put COURTLISTENER_API_KEY -c wrangler.mcp.jsonc
+pnpm exec wrangler secret put MCP_UI_SESSION_SECRET -c wrangler.edge.jsonc
+pnpm exec wrangler secret put OIDC_ISSUER -c wrangler.edge.jsonc
+pnpm exec wrangler secret put OIDC_AUDIENCE -c wrangler.edge.jsonc
+pnpm exec wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET -c wrangler.edge.jsonc
 # Optional shared token auth
-wrangler secret put MCP_AUTH_TOKEN -c wrangler.mcp.jsonc
+pnpm exec wrangler secret put MCP_AUTH_TOKEN -c wrangler.mcp.jsonc
 pnpm run cloudflare:check
-pnpm run deploy   # auth-limiter → edge → mcp
+# Production changes go through the GitHub Actions Cloudflare Release Controller.
+# It performs upload, canary, promotion, rollback, and receipt validation.
 ```
 
 Endpoints after deploy:
 
 - `GET /health`
 - `POST /mcp` (primary MCP endpoint)
-- `GET /sse` (legacy SSE compatibility path)
-- `GET/POST /authorize`
+- `GET /oauth/authorize`
+- `GET/POST /oauth/approve`
+- `POST /oauth/logout`
 - `POST /token`
 - `POST /register`
 - `GET /.well-known/oauth-authorization-server`
 - `GET /.well-known/oauth-protected-resource`
 
-`GET /health` returns a unified runtime contract on Worker, streamable HTTP, and
-diagnostics HTTP:
+`GET /health` returns a unified runtime contract on the Edge and MCP Workers:
 
 - Core fields: `status`, `service`, `timestamp`, `version`, `runtime`,
   `transport`
-- Shared diagnostics: `diagnostics.session_topology`, `diagnostics.cloudflare`,
-  `diagnostics.metrics.latency_ms`
-- Runtime-specific diagnostics (for example `diagnostics.backpressure` on
-  streamable HTTP or `diagnostics.metrics_health` on diagnostics HTTP) live
-  alongside those shared sections
+- Shared diagnostics: `diagnostics.cloudflare`,
+  `diagnostics.metrics.latency_ms`; MCP transport is stateless and has no
+  protocol-session topology.
+- Runtime-specific diagnostics live alongside those shared sections.
 
 ## Web UX Wave (SPA)
 
@@ -332,15 +321,15 @@ diagnostics HTTP:
 - ✅ **Focused SPA rule**: use `pnpm run test:spa:focus -- <file...>` for
   targeted browser-auth/UI checks so the real SPA Vitest config and setup are
   always applied.
-- **Control Center** (`/app/control-center`): live session/auth/key/runtime
-  posture with a guided MCP checklist.
-- **Protocol explorer**: initialize/tool/resource/prompt discovery surfaced
-  directly in Control Center metadata panels.
+- **Overview** (`/app`): live session/auth/key/runtime posture with a guided MCP
+  checklist.
+- **Protocol explorer**: v2 discovery/tool/resource/prompt surfaces surfaced
+  directly in the overview metadata panels.
 - **Async operator workspace** (`/app/playground`): queue async tool calls
   (`__mcp_async`), monitor lifecycle state, deep-link job details, cancel/retry,
   and fetch results.
 - **Recovery UX**: cross-page recovery status banners plus safe fallback routes
-  back to login, keys, and Control Center.
+  back to login, account, and the workspace overview.
 
 ## Auth Model by Deployment Mode
 
@@ -353,21 +342,21 @@ Cloudflare OAuth is the primary hosted auth path for remote MCP routes.
 - Remote MCP clients connect directly to the Worker
 
 - OAuth endpoints:
-  - `GET/POST /authorize`
+  - `GET /oauth/authorize`
   - `POST /token`
   - `POST /register`
 - Discovery endpoints:
   - `GET /.well-known/oauth-authorization-server`
   - `GET /.well-known/oauth-protected-resource`
-- `/authorize` resolves identity from:
+- `/oauth/authorize` resolves identity from:
   - Signed UI session (`clmcp_ui`) when present
   - Cloudflare Access identity headers (`cf-access-authenticated-user-id` or
     `cf-access-authenticated-user-email`) only when
     `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true`
-  - `MCP_OAUTH_DEV_USER_ID` only when `MCP_ALLOW_DEV_FALLBACK=true` (development
-    fallback only; unsafe outside controlled dev and blocked by startup
-    invariants when `NODE_ENV=production`)
-- If unresolved, `/authorize` redirects to same-origin
+  - If no trusted identity is present, the Worker redirects to the hosted auth
+    handoff or returns `identity_required`; there is no development identity
+    bypass.
+- If unresolved, `/oauth/authorize` redirects to same-origin
   `/auth/start?return_to=<authorize_url>` when Worker-native hosted auth config
   is present
 - `POST /api/session/bootstrap` remains the Worker-native bearer-to-session
@@ -375,35 +364,35 @@ Cloudflare OAuth is the primary hosted auth path for remote MCP routes.
 - Same-origin Worker auth handoff:
   - `GET /auth/start`
   - `GET /auth/callback`
-  - `GET/POST /auth/approve`
-  - `GET/POST /auth/logout` (`GET` renders a confirmation form; `POST` performs
+  - `GET/POST /oauth/approve`
+  - `GET/POST /oauth/logout` (`GET` renders a confirmation form; `POST` performs
     the logout)
   - Worker-native hosted auth expects `OIDC_ISSUER`, `MCP_UI_SESSION_SECRET`,
     and a complete upstream OIDC client pair
   - Required upstream pair: `MCP_AUTH_OIDC_CLIENT_ID` +
     `MCP_AUTH_OIDC_CLIENT_SECRET`
-  - As an alternative browser-auth boundary, protect `/authorize` and
-    `/auth/approve` with Cloudflare Access and enable
+  - As an alternative browser-auth boundary, protect `/oauth/authorize` and
+    `/oauth/approve` with Cloudflare Access and enable
     `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` plus
     `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`; the Worker will bootstrap
     its own same-origin UI session from trusted Access identity headers before
     rendering the approval step
   - Partial `MCP_AUTH_OIDC_CLIENT_*` config fails closed
-  - Dynamic client-registration management tokens should use a dedicated
-    `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`; otherwise they fall back to
-    `MCP_UI_SESSION_SECRET` or `COURTLISTENER_API_KEY`
+  - Dynamic client-registration management tokens require the dedicated
+    `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`; without it, registration management
+    tokens are disabled
   - `MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS` defaults to 86400 and should be
     set explicitly for hosted deployments
   - Browser-session authorization now stops at an explicit same-site approval
-    screen before the Worker completes `/authorize`
+    screen before the Worker completes `/oauth/authorize`
   - Hosted-auth probe responses emit `X-Hosted-Auth-*` readiness headers with a
     concrete reason, coarse failure category, stable low-cardinality
     signal/failure flags, stable flow correlation ID, flow outcome, credential
     source, and config-error count
   - Route-level rate limit controls:
-    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
-    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
-    - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS`
+    - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
+    - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
+    - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS`
 - Usage dashboard endpoint:
   - `GET /api/usage` returns per-user counters (`totalRequests`,
     `dailyRequests`, `byRoute`, `lastSeenAt`)
@@ -419,14 +408,13 @@ Cloudflare OAuth is the primary hosted auth path for remote MCP routes.
   - `MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION=true` only when the Worker is
     deployed behind Cloudflare Access or another edge that strips/spoof-proofs
     `CF-Access-Jwt-Assertion`
-  - `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` only when `/authorize`
-    is deployed behind Cloudflare Access or another edge that
+  - `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` only when
+    `/oauth/authorize` is deployed behind Cloudflare Access or another edge that
     strips/spoof-proofs `cf-access-authenticated-user-*`
   - `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true` is required by deploy checks
     before either scoped trust flag is allowed
   - Without those explicit per-surface flags, the Worker ignores
     `CF-Access-Jwt-Assertion` and `cf-access-authenticated-user-*`
-  - `MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS` is deprecated and ignored
 - Optional service-token path:
   - `MCP_AUTH_TOKEN`
   - `MCP_SERVICE_TOKEN_HEADER`
@@ -440,30 +428,20 @@ identity, secrets, and deployment policy inside your own infrastructure.
 - Users typically provide their own `COURTLISTENER_API_KEY`
 - This is the simplest path for desktop-local MCP clients and development
 
-### Removed Legacy UI/Auth Endpoints
-
-The following legacy UI endpoints are disabled in the hard cutover and return
-`410`:
-
-- `/api/login*`
-- `/api/logout*`
-- `/api/signup*`
-- `/api/password*`
-- `/api/keys*`
-- `/oauth/consent`
-
-Canonical hosted OAuth contract values (paths, grants, response types, scopes,
-PKCE methods, priority clients) live in `src/auth/oauth-contract.ts`.
+Unknown or retired UI/auth paths are not routed by the Worker and return the
+normal `404` response. Canonical hosted OAuth contract values (paths, grants,
+response types, scopes, PKCE methods, priority clients) live in
+`src/auth/oauth-contract.ts`.
 
 ### Hosted auth rollout checks
 
 Before promoting a hosted Worker deploy, verify:
 
-- `pnpm run cloudflare:check` is clean except for intentional deprecation
-  warnings
+- `pnpm run cloudflare:check` is clean; optional DCR signing-secret and WAF
+  API-token warnings are understood and tracked separately
 - `https://<worker>/auth/start?continue=1` returns `302`
-- a real `/authorize` browser journey reaches `/auth/approve` before OAuth
-  completion
+  - a real `/oauth/authorize` browser journey reaches `/oauth/approve` before
+    OAuth completion
 - DCR management token rotation is independent of UI session rotation by setting
   `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`
 - any Cloudflare Access trust flags are paired with
@@ -471,15 +449,15 @@ Before promoting a hosted Worker deploy, verify:
 
 ## Runtime and Observability
 
-When metrics are enabled, local split-worker endpoints include:
+The local public health endpoint is the Edge Worker:
 
 - Edge (portal, OAuth, SPA shell): `GET http://localhost:8787/health`
   (`pnpm run health`)
-- MCP (`/mcp`, `/sse`, queue): `GET http://localhost:3001/health`
-  (`pnpm run health:mcp`)
 
-Start both with `pnpm run dev:workers`; point the Vite SPA dev server at the
-edge worker (default `http://localhost:8787`).
+Start the topology with `pnpm run dev:workers`; point the Vite SPA dev server at
+the edge worker (default `http://localhost:8787`). The MCP Worker is an internal
+service in this mode and is verified through the Edge `/ready` service-binding
+probe.
 
 Useful runtime variables:
 
@@ -487,8 +465,6 @@ Useful runtime variables:
 - `CACHE_TTL`
 - `LOG_LEVEL`
 - `LOG_FORMAT`
-- `METRICS_ENABLED`
-- `METRICS_PORT`
 - `NODE_ENV`
 
 ## Testing
@@ -508,22 +484,21 @@ pnpm run coverage
 pnpm run coverage:check
 ```
 
-### MCP protocol and inspector
+### MCP v2 protocol contract
 
 ```bash
 pnpm run test:mcp
-pnpm run ci:test-inspector:enhanced
-pnpm run ci:test-inspector:enhanced:extended
-pnpm run ci:test-inspector:performance
+pnpm run ci:test:mcp-v2
+pnpm run ci:test:mcp-v2:extended
 ```
 
 ### Release hardening performance gates
 
 ```bash
-pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3002
+pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:8787
 pnpm run ci:perf-gate -- baseline.json current.json
-pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3002
-pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002
+pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:8787
+pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:8787
 ```
 
 CI runs these gates in warn mode for pull requests/non-protected branches, and

@@ -1,4 +1,4 @@
-import { GetPromptResult } from '@modelcontextprotocol/sdk/types.js';
+import { GetPromptResult } from '@modelcontextprotocol/server';
 import { PromptHandler } from '../server/prompt-handler.js';
 
 export class SummarizeStatutePromptHandler implements PromptHandler {

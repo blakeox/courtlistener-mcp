@@ -39,30 +39,4 @@ describe('worker edge fetch runtime', () => {
       { pathname: '/mcp', authorization: 'Bearer provider-validated-token' },
     ]);
   });
-
-  it('forwards the legacy SSE path through the same private binding', async () => {
-    let forwardedPath: string | null = null;
-    const handler = createWorkerEdgeFetchHandler({
-      getRequestOrigin: () => null,
-      getCachedAllowedOrigins: () => [],
-      buildWorkerRouteMetricKey: (method, pathname) => `${method} ${pathname}`,
-      recordRouteLatency: () => undefined,
-      now: () => 0,
-      forwardMcpRequest: async (request) => {
-        forwardedPath = new URL(request.url).pathname;
-        return new Response('forwarded', { status: 200 });
-      },
-      workerCoreRouteDeps: {} as never,
-      workerEdgeDelegatedRouteDeps: {} as never,
-    });
-
-    const response = await handler(
-      new Request('https://edge.example/sse'),
-      {} as never,
-      {} as ExecutionContext,
-    );
-
-    assert.equal(response.status, 200);
-    assert.equal(forwardedPath, '/sse');
-  });
 });

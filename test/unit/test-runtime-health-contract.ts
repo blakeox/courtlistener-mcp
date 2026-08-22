@@ -5,20 +5,18 @@ import { describe, it } from 'node:test';
 
 import { PACKAGE_VERSION } from '../../src/infrastructure/package-version.js';
 import {
-  buildNodeDiagnosticsHealthPayload,
-  buildNodeStreamableHttpHealthPayload,
+  buildLocalStdioHealthPayload,
   buildRuntimeHealthCore,
   buildSharedRuntimeDiagnostics,
   extractRuntimeHealthCore,
-  mapDiagnosticsMetricsHealthStatus,
   RUNTIME_HEALTH_SERVICE,
   validateRuntimeHealthExtendedPayload,
 } from '../../src/infrastructure/runtime-health-contract.js';
 import { buildWorkerHealthPayload } from '../../src/server/worker-health-runtime.js';
 
-function buildTestStreamableDiagnostics(
+function buildTestLocalDiagnostics(
   overrides: Record<string, unknown> = {},
-): Parameters<typeof buildNodeStreamableHttpHealthPayload>[0] {
+): Parameters<typeof buildLocalStdioHealthPayload>[0] {
   return {
     ...buildSharedRuntimeDiagnostics({}),
     ...overrides,
@@ -26,18 +24,11 @@ function buildTestStreamableDiagnostics(
 }
 
 describe('runtime health contract', () => {
-  it('builds shared core fields for node and worker payloads', () => {
-    const nodeHealth = buildNodeStreamableHttpHealthPayload(
-      buildTestStreamableDiagnostics({ backpressure: { activeRequests: 0 } }),
+  it('builds shared core fields for local stdio and worker payloads', () => {
+    const localHealth = buildLocalStdioHealthPayload(
+      buildTestLocalDiagnostics({ backpressure: { activeRequests: 0 } }),
     );
     const workerHealth = buildWorkerHealthPayload(
-      {
-        version: 'v2',
-        shardCount: 4,
-        idleTtlMs: 1_800_000,
-        absoluteTtlMs: 43_200_000,
-        evictionSweepLimit: 100,
-      },
       { route_latency_ms: {} },
       {
         analyticsEnabled: true,
@@ -47,80 +38,60 @@ describe('runtime health contract', () => {
       },
     );
 
-    assert.equal(nodeHealth.service, RUNTIME_HEALTH_SERVICE);
-    assert.equal(nodeHealth.runtime, 'node');
-    assert.equal(nodeHealth.transport, 'streamable-http');
-    assert.equal(nodeHealth.version, PACKAGE_VERSION);
-    assert.ok(Date.parse(nodeHealth.timestamp));
-    assert.ok(nodeHealth.diagnostics.session_topology);
-    assert.ok(nodeHealth.diagnostics.cloudflare);
-    assert.ok(nodeHealth.diagnostics.metrics);
+    assert.equal(localHealth.service, RUNTIME_HEALTH_SERVICE);
+    assert.equal(localHealth.runtime, 'local-stdio');
+    assert.equal(localHealth.transport, 'local-stdio');
+    assert.equal(localHealth.version, PACKAGE_VERSION);
+    assert.ok(Date.parse(localHealth.timestamp));
+    assert.ok(localHealth.diagnostics.cloudflare);
+    assert.ok(localHealth.diagnostics.metrics);
 
     assert.equal(workerHealth.service, RUNTIME_HEALTH_SERVICE);
     assert.equal(workerHealth.runtime, 'cloudflare-worker');
-    assert.equal(workerHealth.transport, 'cloudflare-agents-streamable-http');
+    assert.equal(workerHealth.transport, 'cloudflare-mcp-v2-streamable-http');
     assert.equal(workerHealth.version, PACKAGE_VERSION);
     assert.ok(Date.parse(workerHealth.timestamp));
-    assert.ok(workerHealth.diagnostics.session_topology);
     assert.ok(workerHealth.diagnostics.cloudflare);
     assert.ok(workerHealth.diagnostics.metrics);
   });
 
   it('extracts runtime health core from compatible payloads', () => {
-    const core = buildRuntimeHealthCore('node', 'degraded');
+    const core = buildRuntimeHealthCore('local-stdio', 'degraded');
     const extracted = extractRuntimeHealthCore(core as unknown as Record<string, unknown>);
 
     assert.deepEqual(extracted, core);
     assert.equal(extractRuntimeHealthCore({ status: 'ok' }), null);
   });
 
-  it('maps diagnostics metrics health into the shared runtime contract', () => {
-    assert.equal(mapDiagnosticsMetricsHealthStatus('healthy'), 'ok');
-    assert.equal(mapDiagnosticsMetricsHealthStatus('warning'), 'degraded');
-    assert.equal(mapDiagnosticsMetricsHealthStatus('critical'), 'unhealthy');
-
-    const payload = buildNodeDiagnosticsHealthPayload(
+  it('preserves optional diagnostics on the local stdio contract', () => {
+    const payload = buildLocalStdioHealthPayload(
       {
-        status: 'warning',
-        checks: {
-          uptime: { status: 'pass', message: 'running' },
+        ...buildSharedRuntimeDiagnostics({}),
+        metrics_health: {
+          status: 'warning',
+          checks: { uptime: { status: 'pass', message: 'running' } },
+          metrics: { uptime_seconds: 10 },
         },
-        metrics: { uptime_seconds: 10 },
+        cache_stats: { enabled: true, totalEntries: 0 },
       },
-      { enabled: true, totalEntries: 0 },
+      'degraded',
     );
 
     assert.equal(payload.status, 'degraded');
-    assert.equal(payload.runtime, 'node');
-    assert.equal(payload.transport, 'diagnostics-http');
+    assert.equal(payload.runtime, 'local-stdio');
+    assert.equal(payload.transport, 'local-stdio');
     assert.equal(payload.service, RUNTIME_HEALTH_SERVICE);
-    assert.equal(payload.diagnostics.metrics_health?.status, 'warning');
+    assert.equal((payload.diagnostics.metrics_health as { status: string }).status, 'warning');
     assert.deepEqual(payload.diagnostics.cache_stats, { enabled: true, totalEntries: 0 });
-    assert.ok(payload.diagnostics.session_topology);
     assert.ok(payload.diagnostics.cloudflare);
     assert.ok(payload.diagnostics.metrics);
   });
 
-  it('uses the same diagnostics sections across streamable, diagnostics, and worker payloads', () => {
-    const streamable = buildNodeStreamableHttpHealthPayload(
-      buildTestStreamableDiagnostics({ backpressure: { activeRequests: 0 } }),
-    );
-    const diagnostics = buildNodeDiagnosticsHealthPayload(
-      {
-        status: 'healthy',
-        checks: { uptime: { status: 'pass', message: 'running' } },
-        metrics: { uptime_seconds: 10 },
-      },
-      { enabled: true, totalEntries: 0 },
+  it('uses the same diagnostics sections across local and worker payloads', () => {
+    const local = buildLocalStdioHealthPayload(
+      buildTestLocalDiagnostics({ backpressure: { activeRequests: 0 } }),
     );
     const worker = buildWorkerHealthPayload(
-      {
-        version: 'v2',
-        shardCount: 4,
-        idleTtlMs: 1_800_000,
-        absoluteTtlMs: 43_200_000,
-        evictionSweepLimit: 100,
-      },
       { route_latency_ms: {} },
       {
         analyticsEnabled: false,
@@ -130,15 +101,13 @@ describe('runtime health contract', () => {
       },
     );
 
-    for (const payload of [streamable, diagnostics, worker]) {
+    for (const payload of [local, worker]) {
       assert.equal(validateRuntimeHealthExtendedPayload(payload).ok, true);
-      assert.ok(payload.diagnostics.session_topology);
       assert.ok(payload.diagnostics.cloudflare);
       assert.ok(payload.diagnostics.metrics);
     }
 
-    assert.equal(streamable.transport, 'streamable-http');
-    assert.equal(diagnostics.transport, 'diagnostics-http');
-    assert.equal(worker.transport, 'cloudflare-agents-streamable-http');
+    assert.equal(local.transport, 'local-stdio');
+    assert.equal(worker.transport, 'cloudflare-mcp-v2-streamable-http');
   });
 });

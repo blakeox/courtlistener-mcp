@@ -52,7 +52,7 @@ for (const [filename, hookName] of Object.entries(hooks)) {
   chmodSync(target, 0o755);
 }
 
-execFileSync('git', ['config', '--local', 'core.hooksPath', '.githooks'], {
+execFileSync('git', ['config', '--local', '--replace-all', 'core.hooksPath', '.githooks'], {
   cwd: repoRoot,
   stdio: 'inherit',
 });

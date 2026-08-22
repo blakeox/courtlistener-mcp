@@ -8,7 +8,7 @@ const REQUIRED_PROBES = [
   'health',
   'readiness',
   'oauth',
-  'mcp_initialize',
+  'mcp_discover',
   'direct_mcp_denial',
   'version_override',
 ];

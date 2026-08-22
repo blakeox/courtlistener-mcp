@@ -8,204 +8,80 @@ import { ServerConfig } from '../types.js';
 import { validateConfigWithZod } from './config-schema.js';
 import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from './protocol-constants.js';
 import { type AuthPolicyDiagnostics, evaluateAuthPolicyMatrix } from './auth-policy-matrix.js';
-import { validateSessionTopologyEnvironment } from './session-topology-config.js';
 import { redactSecretsInText } from './secret-redaction.js';
 import { evaluateWorkerHostedAuthConfig } from '../server/worker-upstream-oidc-config.js';
 
 export type ConfigEnvironment = Readonly<Record<string, string | undefined>>;
 
-function parseBooleanEnv(value: string | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-}
-
-function createConfig(environment: ConfigEnvironment = process.env): ServerConfig {
-  const process = { env: environment };
-
+function createConfig(environment: ConfigEnvironment = {}): ServerConfig {
   return {
     courtListener: {
-      baseUrl: process.env.COURTLISTENER_BASE_URL || 'https://www.courtlistener.com/api/rest/v4',
+      baseUrl: environment.COURTLISTENER_BASE_URL || 'https://www.courtlistener.com/api/rest/v4',
       version: 'v4',
-      timeout: parsePositiveInt(process.env.COURTLISTENER_TIMEOUT, 30000, 1000),
-      retryAttempts: parsePositiveInt(process.env.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
-      rateLimitPerMinute: parsePositiveInt(process.env.COURTLISTENER_RATE_LIMIT, 100, 1),
-      ...(process.env.COURTLISTENER_API_KEY?.trim()
-        ? { apiKey: process.env.COURTLISTENER_API_KEY.trim() }
+      timeout: parsePositiveInt(environment.COURTLISTENER_TIMEOUT, 30000, 1000),
+      retryAttempts: parsePositiveInt(environment.COURTLISTENER_RETRY_ATTEMPTS, 3, 0),
+      rateLimitPerMinute: parsePositiveInt(environment.COURTLISTENER_RATE_LIMIT, 100, 1),
+      ...(environment.COURTLISTENER_API_KEY?.trim()
+        ? { apiKey: environment.COURTLISTENER_API_KEY.trim() }
         : {}),
     },
     cache: {
-      enabled: process.env.CACHE_ENABLED !== 'false',
-      ttl: parsePositiveInt(process.env.CACHE_TTL, 300, 0), // 5 minutes default
-      maxSize: parsePositiveInt(process.env.CACHE_MAX_SIZE, 1000, 1),
+      enabled: environment.CACHE_ENABLED !== 'false',
+      ttl: parsePositiveInt(environment.CACHE_TTL, 300, 0), // 5 minutes default
+      maxSize: parsePositiveInt(environment.CACHE_MAX_SIZE, 1000, 1),
     },
     logging: {
-      level: parseLogLevel(process.env.LOG_LEVEL),
-      format: parseLogFormat(process.env.LOG_FORMAT),
-      enabled: process.env.LOGGING_ENABLED !== 'false',
+      level: parseLogLevel(environment.LOG_LEVEL),
+      format: parseLogFormat(environment.LOG_FORMAT),
+      enabled: environment.LOGGING_ENABLED !== 'false',
     },
-    metrics: {
-      enabled: process.env.METRICS_ENABLED === 'true',
-      ...(process.env.METRICS_PORT !== undefined && {
-        port: parsePositiveInt(process.env.METRICS_PORT, 3001, 1024, 65535),
-      }),
-    },
-    // Enhanced security and middleware configuration
     security: {
-      authEnabled: process.env.AUTH_ENABLED === 'true',
-      apiKeys: process.env.AUTH_API_KEYS
-        ? process.env.AUTH_API_KEYS.split(',')
+      authEnabled: environment.AUTH_ENABLED === 'true',
+      apiKeys: environment.AUTH_API_KEYS
+        ? environment.AUTH_API_KEYS.split(',')
             .map((key) => key.trim())
             .filter((key) => key.length > 0)
         : [],
-      allowAnonymous: process.env.AUTH_ALLOW_ANONYMOUS !== 'false',
-      headerName: process.env.AUTH_HEADER_NAME || 'x-api-key',
-      corsEnabled: process.env.CORS_ENABLED !== 'false',
-      corsOrigins: process.env.CORS_ORIGINS
-        ? process.env.CORS_ORIGINS.split(',')
-            .map((origin) => origin.trim())
-            .filter((origin) => origin.length > 0)
-        : ['*'],
-      rateLimitEnabled: process.env.RATE_LIMIT_ENABLED === 'true',
-      maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
-      sanitizationEnabled: process.env.SANITIZATION_ENABLED !== 'false',
-    },
-    audit: {
-      enabled: process.env.AUDIT_ENABLED === 'true',
-      logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
-      includeRequestBody: process.env.AUDIT_INCLUDE_REQUEST_BODY === 'true',
-      includeResponseBody: process.env.AUDIT_INCLUDE_RESPONSE_BODY === 'true',
-      maxBodyLength: parsePositiveInt(process.env.AUDIT_MAX_BODY_LENGTH, 2000, 0),
-      sensitiveFields: process.env.AUDIT_SENSITIVE_FIELDS
-        ? process.env.AUDIT_SENSITIVE_FIELDS.split(',')
-            .map((f) => f.trim())
-            .filter((f) => f.length > 0)
-        : ['password', 'token', 'secret', 'key', 'auth'],
-    },
-    circuitBreaker: {
-      enabled: process.env.CIRCUIT_BREAKER_ENABLED === 'true',
-      failureThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5, 1),
-      successThreshold: parsePositiveInt(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD, 3, 1),
-      timeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10000, 1),
-      resetTimeout: parsePositiveInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 60000, 1),
-    },
-    compression: {
-      enabled: process.env.COMPRESSION_ENABLED !== 'false',
-      threshold: parsePositiveInt(process.env.COMPRESSION_THRESHOLD, 1024, 0),
-      level: parsePositiveInt(process.env.COMPRESSION_LEVEL, 6, 0, 9),
-      types: process.env.COMPRESSION_TYPES
-        ? process.env.COMPRESSION_TYPES.split(',')
-            .map((t) => t.trim())
-            .filter((t) => t.length > 0)
-        : ['application/json', 'text/plain', 'text/html', 'application/javascript'],
     },
     sampling: {
-      enabled: process.env.SAMPLING_ENABLED === 'true',
-      maxTokens: parsePositiveInt(process.env.SAMPLING_MAX_TOKENS, 1000, 1),
-      ...(process.env.SAMPLING_DEFAULT_MODEL !== undefined && {
-        defaultModel: process.env.SAMPLING_DEFAULT_MODEL,
-      }),
-    },
-    correlation: {
-      enabled: process.env.CORRELATION_ENABLED !== 'false',
-      headerName: process.env.CORRELATION_HEADER_NAME || 'x-correlation-id',
-      generateId: process.env.CORRELATION_GENERATE_ID !== 'false',
-    },
-    sanitization: {
-      enabled: process.env.SANITIZATION_ENABLED !== 'false',
-      maxStringLength: parsePositiveInt(process.env.SANITIZATION_MAX_STRING_LENGTH, 10000, 1),
-      maxArrayLength: parsePositiveInt(process.env.SANITIZATION_MAX_ARRAY_LENGTH, 1000, 1),
-      maxObjectDepth: parsePositiveInt(process.env.SANITIZATION_MAX_OBJECT_DEPTH, 10, 1),
-    },
-    rateLimit: {
-      enabled: process.env.RATE_LIMIT_ENABLED === 'true',
-      maxRequestsPerMinute: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 1),
-      maxRequestsPerHour: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_HOUR, 1000, 1),
-      maxRequestsPerDay: parsePositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS_DAY, 10000, 1),
-      windowSizeMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60000, 1),
-      clientIdentification: process.env.RATE_LIMIT_CLIENT_ID || 'ip',
-      identificationHeader: process.env.RATE_LIMIT_ID_HEADER || 'x-client-id',
-      whitelistedClients: process.env.RATE_LIMIT_WHITELIST
-        ? process.env.RATE_LIMIT_WHITELIST.split(',')
-            .map((c) => c.trim())
-            .filter((c) => c.length > 0)
-        : [],
-      penaltyMultiplier: parseFloat(process.env.RATE_LIMIT_PENALTY_MULTIPLIER || '0.1'),
-      persistStorage: process.env.RATE_LIMIT_PERSIST === 'true',
-    },
-    gracefulShutdown: {
-      enabled: process.env.GRACEFUL_SHUTDOWN_ENABLED !== 'false',
-      timeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT, 30000, 1),
-      forceTimeout: parsePositiveInt(process.env.GRACEFUL_SHUTDOWN_FORCE_TIMEOUT, 5000, 1),
-      signals: process.env.GRACEFUL_SHUTDOWN_SIGNALS
-        ? process.env.GRACEFUL_SHUTDOWN_SIGNALS.split(',').map((s) => s.trim())
-        : ['SIGTERM', 'SIGINT', 'SIGUSR2'],
-    },
-    httpTransport: {
-      port: parsePositiveInt(process.env.MCP_HTTP_PORT, 3002, 1024, 65535),
-      host: process.env.MCP_HTTP_HOST || '0.0.0.0',
-      enableJsonResponse: process.env.MCP_JSON_RESPONSE === 'true',
-      enableSessions: process.env.MCP_SESSIONS !== 'false',
-      enableResumability: process.env.MCP_RESUMABILITY === 'true',
-      enableDnsRebindingProtection: process.env.MCP_DNS_PROTECTION === 'true',
-      ...(process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS !== undefined && {
-        maxConcurrentRequests: parsePositiveInt(
-          process.env.MCP_HTTP_MAX_CONCURRENT_REQUESTS,
-          256,
-          1,
-        ),
-      }),
-      ...(process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS !== undefined && {
-        maxConcurrentSessionInitializations: parsePositiveInt(
-          process.env.MCP_HTTP_MAX_SESSION_INITIALIZATIONS,
-          32,
-          1,
-        ),
-      }),
-      ...(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS !== undefined && {
-        maxActiveSessions: parsePositiveInt(process.env.MCP_HTTP_MAX_ACTIVE_SESSIONS, 1024, 1),
-      }),
-      ...(process.env.MCP_ALLOWED_ORIGINS !== undefined && {
-        allowedOrigins: process.env.MCP_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
-      }),
-      ...(process.env.MCP_ALLOWED_HOSTS !== undefined && {
-        allowedHosts: process.env.MCP_ALLOWED_HOSTS.split(',').map((h) => h.trim()),
+      enabled: environment.SAMPLING_ENABLED === 'true',
+      maxTokens: parsePositiveInt(environment.SAMPLING_MAX_TOKENS, 1000, 1),
+      ...(environment.SAMPLING_DEFAULT_MODEL !== undefined && {
+        defaultModel: environment.SAMPLING_DEFAULT_MODEL,
       }),
     },
     oauth: {
-      enabled: process.env.OAUTH_ENABLED === 'true',
-      ...(process.env.OAUTH_ISSUER_URL !== undefined && {
-        issuerUrl: process.env.OAUTH_ISSUER_URL,
+      enabled: environment.OAUTH_ENABLED === 'true',
+      ...(environment.OAUTH_ISSUER_URL !== undefined && {
+        issuerUrl: environment.OAUTH_ISSUER_URL,
       }),
-      ...(process.env.OAUTH_CLIENT_ID !== undefined && { clientId: process.env.OAUTH_CLIENT_ID }),
-      ...(process.env.OAUTH_CLIENT_SECRET !== undefined && {
-        clientSecret: process.env.OAUTH_CLIENT_SECRET,
+      ...(environment.OAUTH_CLIENT_ID !== undefined && { clientId: environment.OAUTH_CLIENT_ID }),
+      ...(environment.OAUTH_CLIENT_SECRET !== undefined && {
+        clientSecret: environment.OAUTH_CLIENT_SECRET,
       }),
     },
     asyncExecution: {
-      enabled: process.env.MCP_ASYNC_EXECUTION_ENABLED !== 'false',
-      queueConcurrency: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_CONCURRENCY, 1, 1),
-      queueBatchSize: parsePositiveInt(process.env.MCP_ASYNC_QUEUE_BATCH_SIZE, 1, 1),
-      defaultMaxAttempts: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_MAX_ATTEMPTS, 3, 1),
-      defaultRetryDelayMs: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_RETRY_DELAY_MS, 500, 0),
-      defaultTtlSeconds: parsePositiveInt(process.env.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
-      maxStoredJobs: parsePositiveInt(process.env.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
-      maxQueueDepth: parsePositiveInt(process.env.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
+      enabled: environment.MCP_ASYNC_EXECUTION_ENABLED !== 'false',
+      queueConcurrency: parsePositiveInt(environment.MCP_ASYNC_QUEUE_CONCURRENCY, 1, 1),
+      queueBatchSize: parsePositiveInt(environment.MCP_ASYNC_QUEUE_BATCH_SIZE, 1, 1),
+      defaultMaxAttempts: parsePositiveInt(environment.MCP_ASYNC_DEFAULT_MAX_ATTEMPTS, 3, 1),
+      defaultRetryDelayMs: parsePositiveInt(environment.MCP_ASYNC_DEFAULT_RETRY_DELAY_MS, 500, 0),
+      defaultTtlSeconds: parsePositiveInt(environment.MCP_ASYNC_DEFAULT_TTL_SECONDS, 900, 1),
+      maxStoredJobs: parsePositiveInt(environment.MCP_ASYNC_MAX_STORED_JOBS, 2000, 100),
+      maxQueueDepth: parsePositiveInt(environment.MCP_ASYNC_MAX_QUEUE_DEPTH, 512, 1),
       queueLatencyGuardrailMs: parsePositiveInt(
-        process.env.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS,
+        environment.MCP_ASYNC_QUEUE_LATENCY_GUARDRAIL_MS,
         2_000,
         1,
       ),
       completionLatencyGuardrailMs: parsePositiveInt(
-        process.env.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
+        environment.MCP_ASYNC_COMPLETION_LATENCY_GUARDRAIL_MS,
         15_000,
         1,
       ),
     },
   };
 }
-
-const defaultConfig: ServerConfig = createConfig();
 
 /**
  * Get the server configuration
@@ -228,19 +104,17 @@ const defaultConfig: ServerConfig = createConfig();
  *
  * @example
  * ```typescript
- * const config = getConfig();
+ * const config = getConfig(process.env);
  * console.log(config.courtListener.baseUrl);
  * console.log(config.cache.enabled);
  * ```
  *
  * @see {@link ServerConfig} for complete configuration structure
  */
-export function getConfig(environment: ConfigEnvironment = process.env): ServerConfig {
-  const config = validateConfig(
-    environment === process.env ? defaultConfig : createConfig(environment),
-    environment,
-  );
-  return validateConfigWithZod(config);
+export function getConfig(environment: ConfigEnvironment = {}): ServerConfig {
+  const config = validateConfigWithZod(createConfig(environment));
+  assertStartupInvariants(config, environment);
+  return config;
 }
 
 interface StartupInvariantReport {
@@ -251,22 +125,24 @@ interface StartupInvariantReport {
 
 function evaluateStartupInvariants(
   config: ServerConfig,
-  environment: ConfigEnvironment = process.env,
+  environment: ConfigEnvironment = {},
 ): StartupInvariantReport {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const sessionsEnabled = config.httpTransport?.enableSessions ?? true;
-  const resumabilityEnabled = config.httpTransport?.enableResumability ?? false;
-  const authPolicy = evaluateAuthPolicyMatrix(config);
+  const authPolicy = evaluateAuthPolicyMatrix(config, environment);
   errors.push(...authPolicy.errors);
   warnings.push(...authPolicy.warnings);
 
-  if (config.oauth?.enabled && !sessionsEnabled) {
-    errors.push('OAuth requires MCP HTTP sessions to be enabled');
+  if (config.security.authEnabled && config.security.apiKeys.length === 0) {
+    errors.push('Authentication enabled but no API keys provided');
   }
 
-  if (resumabilityEnabled && !sessionsEnabled) {
-    errors.push('MCP resumability requires sessions to be enabled');
+  if (environment.NODE_ENV === 'production' && config.logging.level === 'debug') {
+    warnings.push('Debug logging should not be used in production');
+  }
+
+  if (!config.cache.enabled && config.courtListener.rateLimitPerMinute > 100) {
+    warnings.push('High rate limits without caching may impact performance');
   }
 
   const requireProtocolVersion = environment.MCP_REQUIRE_PROTOCOL_VERSION;
@@ -278,16 +154,6 @@ function evaluateStartupInvariants(
     warnings.push('MCP_REQUIRE_PROTOCOL_VERSION should be either "true" or "false"');
   }
 
-  if (requireProtocolVersion === 'true' && !sessionsEnabled) {
-    warnings.push(
-      'MCP protocol-version enforcement is enabled while sessions are disabled; verify client compatibility for stateless calls',
-    );
-  }
-
-  const sessionTopology = validateSessionTopologyEnvironment(environment, 'MCP session topology');
-  errors.push(...sessionTopology.errors);
-  warnings.push(...sessionTopology.warnings);
-
   return {
     errors: errors.map((message) => redactSecretsInText(message)),
     warnings: warnings.map((message) => redactSecretsInText(message)),
@@ -295,167 +161,17 @@ function evaluateStartupInvariants(
   };
 }
 
-function validateConfigShape(config: ServerConfig): ServerConfig {
-  // Validate CourtListener config
-  if (!config.courtListener.baseUrl) {
-    throw new Error('CourtListener base URL is required');
-  }
-
-  if (config.courtListener.timeout < 1000) {
-    throw new Error('Timeout must be at least 1000ms');
-  }
-
-  if (config.courtListener.retryAttempts < 0 || config.courtListener.retryAttempts > 10) {
-    throw new Error('Retry attempts must be between 0 and 10');
-  }
-
-  if (config.courtListener.rateLimitPerMinute <= 0) {
-    throw new Error('Rate limit must be positive');
-  }
-
-  // Validate cache config
-  if (config.cache.ttl < 0) {
-    throw new Error('Cache TTL must be non-negative');
-  }
-
-  if (config.cache.maxSize <= 0) {
-    throw new Error('Cache max size must be positive');
-  }
-
-  // Validate logging config
-  const validLogLevels = ['debug', 'info', 'warn', 'error'];
-  if (!validLogLevels.includes(config.logging.level)) {
-    throw new Error(`Invalid log level: ${config.logging.level}`);
-  }
-
-  const validLogFormats = ['json', 'text'];
-  if (!validLogFormats.includes(config.logging.format)) {
-    throw new Error(`Invalid log format: ${config.logging.format}`);
-  }
-
-  // Validate security config
-  if (config.security.authEnabled && config.security.apiKeys.length === 0) {
-    throw new Error('Authentication enabled but no API keys provided');
-  }
-
-  if (config.security.maxRequestsPerMinute <= 0) {
-    throw new Error('Rate limit must be positive');
-  }
-
-  // Validate circuit breaker config
-  if (config.circuitBreaker.failureThreshold <= 0) {
-    throw new Error('Circuit breaker failure threshold must be positive');
-  }
-
-  if (config.circuitBreaker.successThreshold <= 0) {
-    throw new Error('Circuit breaker success threshold must be positive');
-  }
-
-  if (config.circuitBreaker.timeout <= 0) {
-    throw new Error('Circuit breaker timeout must be positive');
-  }
-
-  // Validate compression config
-  if (config.compression.level < 1 || config.compression.level > 9) {
-    throw new Error('Compression level must be between 1 and 9');
-  }
-
-  if (config.compression.threshold < 0) {
-    throw new Error('Compression threshold must be non-negative');
-  }
-
-  return config;
-}
-
-function assertStartupInvariants(
-  config: ServerConfig,
-  environment: ConfigEnvironment = process.env,
-): void {
+function assertStartupInvariants(config: ServerConfig, environment: ConfigEnvironment = {}): void {
   const startupInvariants = evaluateStartupInvariants(config, environment);
   if (startupInvariants.errors.length > 0) {
     throw new Error(`Startup invariants failed:\n${startupInvariants.errors.join('\n')}`);
   }
 }
 
-function validateConfig(
-  config: ServerConfig,
-  environment: ConfigEnvironment = process.env,
-): ServerConfig {
-  const shaped = validateConfigShape(config);
-  assertStartupInvariants(shaped, environment);
-  return shaped;
-}
-
-function resolveConfigForDiagnostics(): ServerConfig {
-  return validateConfigWithZod(validateConfigShape(defaultConfig));
-}
-
-export function getEnvironmentInfo() {
-  return {
-    nodeVersion: process.version,
-    platform: process.platform,
-    arch: process.arch,
-    uptime: process.uptime(),
-    memoryUsage: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development',
-  };
-}
-
-/**
- * Get enhanced configuration summary for diagnostics
- */
-export function getConfigSummary() {
-  const config = getConfig();
-  const startupInvariants = evaluateStartupInvariants(config);
-
-  return {
-    features: {
-      authentication: config.security.authEnabled,
-      audit: config.audit.enabled,
-      circuitBreaker: config.circuitBreaker.enabled,
-      compression: config.compression.enabled,
-      caching: config.cache.enabled,
-      metrics: config.metrics.enabled,
-      sanitization: config.security.sanitizationEnabled,
-      cors: config.security.corsEnabled,
-    },
-    limits: {
-      cacheSize: config.cache.maxSize,
-      cacheTtl: config.cache.ttl,
-      rateLimitPerMinute: config.courtListener.rateLimitPerMinute,
-      requestTimeout: config.courtListener.timeout,
-      circuitBreakerThreshold: config.circuitBreaker.failureThreshold,
-      httpMaxConcurrentRequests: config.httpTransport?.maxConcurrentRequests ?? null,
-      httpMaxConcurrentSessionInitializations:
-        config.httpTransport?.maxConcurrentSessionInitializations ?? null,
-      httpMaxActiveSessions: config.httpTransport?.maxActiveSessions ?? null,
-      asyncQueueConcurrency: config.asyncExecution?.queueConcurrency ?? null,
-      asyncQueueBatchSize: config.asyncExecution?.queueBatchSize ?? null,
-      asyncMaxQueueDepth: config.asyncExecution?.maxQueueDepth ?? null,
-    },
-    security: {
-      authEnabled: config.security.authEnabled,
-      allowAnonymous: config.security.allowAnonymous,
-      apiKeysConfigured: config.security.apiKeys.length,
-      corsOrigins: config.security.corsOrigins.length,
-    },
-    startupDiagnostics: {
-      status: startupInvariants.errors.length === 0 ? 'ok' : 'error',
-      invariants: startupInvariants,
-      authPolicy: startupInvariants.authPolicy,
-      hostedAuth: startupInvariants.authPolicy.hostedAuth,
-      protocol: {
-        requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
-        supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
-      },
-    },
-  };
-}
-
 export function getStartupDiagnostics() {
   try {
-    const config = resolveConfigForDiagnostics();
-    const invariants = evaluateStartupInvariants(config);
+    const config = getConfig(process.env);
+    const invariants = evaluateStartupInvariants(config, process.env);
 
     return {
       status: invariants.errors.length === 0 ? 'ok' : 'error',
@@ -467,14 +183,6 @@ export function getStartupDiagnostics() {
       },
       authPolicy: invariants.authPolicy,
       hostedAuth: invariants.authPolicy.hostedAuth,
-      session: {
-        sessionsEnabled: config.httpTransport?.enableSessions ?? true,
-        resumabilityEnabled: config.httpTransport?.enableResumability ?? false,
-        maxConcurrentRequests: config.httpTransport?.maxConcurrentRequests ?? null,
-        maxConcurrentSessionInitializations:
-          config.httpTransport?.maxConcurrentSessionInitializations ?? null,
-        maxActiveSessions: config.httpTransport?.maxActiveSessions ?? null,
-      },
       protocol: {
         requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
         supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
@@ -498,22 +206,6 @@ export function getStartupDiagnostics() {
             serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
             oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
           },
-          devFallback: {
-            userIdConfigured: Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()),
-            allowFlagEnabled: parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
-            enabled:
-              Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
-              parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
-            productionLike: process.env.NODE_ENV === 'production',
-            riskLevel:
-              Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
-              parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
-                ? 'enabled'
-                : Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) ||
-                    parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
-                  ? 'misconfigured'
-                  : 'disabled',
-          },
           hostedAuth,
           effectivePrimary: null,
           incompatibleRulesTriggered: [],
@@ -532,31 +224,11 @@ export function getStartupDiagnostics() {
           serviceToken: Boolean(process.env.MCP_AUTH_TOKEN?.trim()),
           oidc: Boolean(process.env.OIDC_ISSUER?.trim()),
         },
-        devFallback: {
-          userIdConfigured: Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()),
-          allowFlagEnabled: parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
-          enabled:
-            Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
-            parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK),
-          productionLike: process.env.NODE_ENV === 'production',
-          riskLevel:
-            Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) &&
-            parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
-              ? 'enabled'
-              : Boolean(process.env.MCP_OAUTH_DEV_USER_ID?.trim()) ||
-                  parseBooleanEnv(process.env.MCP_ALLOW_DEV_FALLBACK)
-                ? 'misconfigured'
-                : 'disabled',
-        },
         hostedAuth,
         effectivePrimary: null,
         incompatibleRulesTriggered: [],
       },
       hostedAuth,
-      session: {
-        sessionsEnabled: process.env.MCP_SESSIONS !== 'false',
-        resumabilityEnabled: process.env.MCP_RESUMABILITY === 'true',
-      },
       protocol: {
         requireVersionHeader: process.env.MCP_REQUIRE_PROTOCOL_VERSION === 'true',
         supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],

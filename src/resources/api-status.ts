@@ -1,16 +1,16 @@
-import { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
+import { ReadResourceResult, Resource } from '@modelcontextprotocol/server';
 import { CacheManager } from '../infrastructure/cache.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ResourceHandler, ResourceContext } from '../server/resource-handler.js';
+import type { ConfigEnvironment } from '../infrastructure/config.js';
 
 const DEFAULT_SUBSCRIPTION_REFRESH_TTL_MS = 60_000;
 
-function resolveSubscriptionRefreshTtlMs(defaultTtlMs: number): number {
-  if (typeof process === 'undefined') {
-    return defaultTtlMs;
-  }
-
-  const override = process.env.MCP_TEST_SUBSCRIPTION_REFRESH_MS;
+function resolveSubscriptionRefreshTtlMs(
+  defaultTtlMs: number,
+  environment: ConfigEnvironment,
+): number {
+  const override = environment.MCP_TEST_SUBSCRIPTION_REFRESH_MS;
   if (!override) {
     return defaultTtlMs;
   }
@@ -26,12 +26,13 @@ export class ApiStatusResourceHandler implements ResourceHandler {
   readonly mimeType = 'application/json';
 
   get subscriptionRefreshTtlMs(): number {
-    return resolveSubscriptionRefreshTtlMs(DEFAULT_SUBSCRIPTION_REFRESH_TTL_MS);
+    return resolveSubscriptionRefreshTtlMs(DEFAULT_SUBSCRIPTION_REFRESH_TTL_MS, this.environment);
   }
 
   constructor(
     private cache: CacheManager,
     private metrics: MetricsCollector,
+    private environment: ConfigEnvironment = {},
   ) {}
 
   matches(uri: string): boolean {

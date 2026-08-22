@@ -16,10 +16,10 @@ export interface CreateWorkerEdgeFetchHandlerDeps<TEnv extends WorkerEdgeFetchRu
   getRequestOrigin: (request: Request) => string | null;
   getCachedAllowedOrigins: (rawAllowedOrigins: string | undefined) => string[];
   buildWorkerRouteMetricKey: (method: string, pathname: string) => string;
-  recordRouteLatency: (route: string, elapsedMs: number) => void;
+  recordRouteLatency: (env: TEnv, route: string, elapsedMs: number) => void;
   now: () => number;
-  /** Forward authenticated public MCP traffic to the private MCP Worker. */
-  forwardMcpRequest?: (request: Request, env: TEnv, ctx: ExecutionContext) => Promise<Response>;
+  /** Forward authenticated public MCP traffic to the required private MCP Worker. */
+  forwardMcpRequest: (request: Request, env: TEnv, ctx: ExecutionContext) => Promise<Response>;
   workerCoreRouteDeps: HandleWorkerCoreRoutesDeps<TEnv>;
   workerEdgeDelegatedRouteDeps: WorkerEdgeDelegatedRouteDeps<TEnv>;
 }
@@ -41,7 +41,7 @@ export function createWorkerEdgeFetchHandler<TEnv extends WorkerEdgeFetchRuntime
     const routeMetricKey = deps.buildWorkerRouteMetricKey(requestMethod, pathname);
 
     try {
-      if ((pathname === '/mcp' || pathname === '/sse') && deps.forwardMcpRequest) {
+      if (pathname === '/mcp') {
         return await deps.forwardMcpRequest(request, env, ctx);
       }
 
@@ -83,7 +83,7 @@ export function createWorkerEdgeFetchHandler<TEnv extends WorkerEdgeFetchRuntime
 
       return new Response('Not found', { status: 404 });
     } finally {
-      deps.recordRouteLatency(routeMetricKey, deps.now() - requestStartedAt);
+      deps.recordRouteLatency(env, routeMetricKey, deps.now() - requestStartedAt);
     }
   };
 }

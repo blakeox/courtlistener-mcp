@@ -1,4 +1,4 @@
-import { Tool, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import { Tool, ToolAnnotations } from '@modelcontextprotocol/server';
 import { getEnhancedToolDefinitions } from '../tool-definitions.js';
 import {
   DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES,

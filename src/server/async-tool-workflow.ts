@@ -1,4 +1,4 @@
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 import { generateId, sleep } from '../common/utils.js';
 import type { Logger } from '../infrastructure/logger.js';

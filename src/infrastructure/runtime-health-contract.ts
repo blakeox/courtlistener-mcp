@@ -1,14 +1,10 @@
 import { PACKAGE_VERSION } from './package-version.js';
-import { resolveWorkerMcpSessionTopologyV2 } from '../server/worker-mcp-session-topology.js';
 
 export const RUNTIME_HEALTH_SERVICE = 'courtlistener-mcp' as const;
 
 export type RuntimeHealthStatus = 'ok' | 'degraded' | 'unhealthy';
-export type RuntimeHealthRuntime = 'node' | 'cloudflare-worker';
-export type RuntimeHealthTransport =
-  | 'streamable-http'
-  | 'diagnostics-http'
-  | 'cloudflare-agents-streamable-http';
+export type RuntimeHealthRuntime = 'local-stdio' | 'cloudflare-worker';
+export type RuntimeHealthTransport = 'local-stdio' | 'cloudflare-mcp-v2-streamable-http';
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -20,14 +16,6 @@ export interface RuntimeHealthCore {
   runtime: RuntimeHealthRuntime;
 }
 
-export interface RuntimeHealthSessionTopologySnapshot {
-  version: string;
-  shard_count: number;
-  idle_ttl_ms: number;
-  absolute_ttl_ms: number;
-  eviction_sweep_limit: number;
-}
-
 export interface RuntimeHealthCloudflareSnapshot {
   analytics_enabled: boolean;
   async_queue_configured: boolean;
@@ -35,21 +23,16 @@ export interface RuntimeHealthCloudflareSnapshot {
   turnstile_enforced_routes: string[];
 }
 
-export type DiagnosticsMetricsHealthStatus = 'healthy' | 'warning' | 'critical';
-
-export interface DiagnosticsMetricsHealth {
-  status: DiagnosticsMetricsHealthStatus;
-  checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }>;
-  metrics: unknown;
-}
-
 export interface RuntimeHealthDiagnostics {
-  session_topology: RuntimeHealthSessionTopologySnapshot;
   cloudflare: RuntimeHealthCloudflareSnapshot;
   metrics: {
     latency_ms: unknown;
   };
-  metrics_health?: DiagnosticsMetricsHealth;
+  metrics_health?: {
+    status: 'healthy' | 'warning' | 'critical';
+    checks: Record<string, { status: 'pass' | 'fail'; message: string; value?: unknown }>;
+    metrics: unknown;
+  };
   cache_stats?: unknown;
   shutting_down?: boolean;
   limits?: Record<string, unknown>;
@@ -101,30 +84,8 @@ export function buildRuntimeHealthCore(
   };
 }
 
-export function toSessionTopologySnapshot(topology: {
-  version: string;
-  shardCount: number;
-  idleTtlMs: number;
-  absoluteTtlMs: number;
-  evictionSweepLimit: number;
-}): RuntimeHealthSessionTopologySnapshot {
-  return {
-    version: topology.version,
-    shard_count: topology.shardCount,
-    idle_ttl_ms: topology.idleTtlMs,
-    absolute_ttl_ms: topology.absoluteTtlMs,
-    eviction_sweep_limit: topology.evictionSweepLimit,
-  };
-}
-
-export function resolveSessionTopologyFromEnv(
-  env: EnvLike = typeof process !== 'undefined' ? process.env : {},
-): RuntimeHealthSessionTopologySnapshot {
-  return toSessionTopologySnapshot(resolveWorkerMcpSessionTopologyV2(env));
-}
-
 export function resolveCloudflareBindingsSnapshot(
-  env: EnvLike = typeof process !== 'undefined' ? process.env : {},
+  env: EnvLike = {},
   overrides: Partial<RuntimeHealthCloudflareSnapshot> = {},
 ): RuntimeHealthCloudflareSnapshot {
   return {
@@ -137,14 +98,13 @@ export function resolveCloudflareBindingsSnapshot(
 }
 
 export function buildSharedRuntimeDiagnostics(
-  env: EnvLike = typeof process !== 'undefined' ? process.env : {},
+  env: EnvLike = {},
   options: {
     cloudflare?: Partial<RuntimeHealthCloudflareSnapshot>;
     latencyMs?: unknown;
   } = {},
-): Pick<RuntimeHealthDiagnostics, 'session_topology' | 'cloudflare' | 'metrics'> {
+): Pick<RuntimeHealthDiagnostics, 'cloudflare' | 'metrics'> {
   return {
-    session_topology: resolveSessionTopologyFromEnv(env),
     cloudflare: resolveCloudflareBindingsSnapshot(env, options.cloudflare),
     metrics: {
       latency_ms: options.latencyMs ?? { routes: {} },
@@ -171,76 +131,16 @@ export function buildRuntimeHealthPayload(options: {
   };
 }
 
-export function buildNodeStreamableHttpHealthPayload(
+export function buildLocalStdioHealthPayload(
   diagnostics: RuntimeHealthDiagnostics,
   status: RuntimeHealthStatus = 'ok',
 ): RuntimeHealthExtendedPayload {
   return buildRuntimeHealthPayload({
-    runtime: 'node',
-    transport: 'streamable-http',
+    runtime: 'local-stdio',
+    transport: 'local-stdio',
     status,
     diagnostics,
   });
-}
-
-export function buildNodeDiagnosticsHealthPayload(
-  metricsHealth: DiagnosticsMetricsHealth,
-  cacheStats: unknown,
-  env: EnvLike = typeof process !== 'undefined' ? process.env : {},
-): RuntimeHealthExtendedPayload {
-  const shared = buildSharedRuntimeDiagnostics(env, {
-    latencyMs: {
-      route_latency_ms:
-        metricsHealth.metrics &&
-        typeof metricsHealth.metrics === 'object' &&
-        metricsHealth.metrics !== null &&
-        'runtime_latency_ms' in metricsHealth.metrics
-          ? ((metricsHealth.metrics as { runtime_latency_ms?: unknown }).runtime_latency_ms ?? {})
-          : {},
-    },
-  });
-
-  return buildRuntimeHealthPayload({
-    runtime: 'node',
-    transport: 'diagnostics-http',
-    status: mapDiagnosticsMetricsHealthStatus(metricsHealth.status),
-    diagnostics: {
-      ...shared,
-      metrics_health: metricsHealth,
-      cache_stats: cacheStats,
-    },
-  });
-}
-
-export function mapDiagnosticsMetricsHealthStatus(
-  status: DiagnosticsMetricsHealthStatus,
-): RuntimeHealthStatus {
-  switch (status) {
-    case 'healthy':
-      return 'ok';
-    case 'warning':
-      return 'degraded';
-    case 'critical':
-      return 'unhealthy';
-    default: {
-      const _exhaustive: never = status;
-      return _exhaustive;
-    }
-  }
-}
-
-export function diagnosticsHealthStatusCode(status: RuntimeHealthStatus): number {
-  switch (status) {
-    case 'ok':
-    case 'degraded':
-      return 200;
-    case 'unhealthy':
-      return 503;
-    default: {
-      const _exhaustive: never = status;
-      return _exhaustive;
-    }
-  }
 }
 
 export function extractRuntimeHealthCore(
@@ -252,7 +152,7 @@ export function extractRuntimeHealthCore(
     service !== RUNTIME_HEALTH_SERVICE ||
     typeof timestamp !== 'string' ||
     typeof version !== 'string' ||
-    (runtime !== 'node' && runtime !== 'cloudflare-worker')
+    (runtime !== 'local-stdio' && runtime !== 'cloudflare-worker')
   ) {
     return null;
   }
@@ -290,31 +190,14 @@ export function validateRuntimeHealthExtendedPayload(payload: unknown): {
   }
 
   const diagnosticsRecord = diagnostics as Record<string, unknown>;
-  const sessionTopology = diagnosticsRecord.session_topology;
   const cloudflare = diagnosticsRecord.cloudflare;
   const metrics = diagnosticsRecord.metrics;
 
-  if (!sessionTopology || typeof sessionTopology !== 'object') {
-    return { ok: false, reason: 'diagnostics.session_topology is missing' };
-  }
   if (!cloudflare || typeof cloudflare !== 'object') {
     return { ok: false, reason: 'diagnostics.cloudflare is missing' };
   }
   if (!metrics || typeof metrics !== 'object') {
     return { ok: false, reason: 'diagnostics.metrics is missing' };
-  }
-
-  const topology = sessionTopology as Record<string, unknown>;
-  for (const key of [
-    'version',
-    'shard_count',
-    'idle_ttl_ms',
-    'absolute_ttl_ms',
-    'eviction_sweep_limit',
-  ] as const) {
-    if (!(key in topology)) {
-      return { ok: false, reason: `diagnostics.session_topology.${key} is missing` };
-    }
   }
 
   return { ok: true };
@@ -332,12 +215,3 @@ export function extractRuntimeHealthDiagnostics(payload: unknown): RuntimeHealth
 
   return diagnostics as RuntimeHealthDiagnostics;
 }
-
-/** @deprecated Use RuntimeHealthExtendedPayload */
-export type NodeStreamableHttpHealthPayload = RuntimeHealthExtendedPayload;
-
-/** @deprecated Use RuntimeHealthExtendedPayload */
-export type NodeDiagnosticsHealthPayload = RuntimeHealthExtendedPayload;
-
-/** @deprecated Use RuntimeHealthExtendedPayload */
-export type WorkerHealthPayload = RuntimeHealthExtendedPayload;

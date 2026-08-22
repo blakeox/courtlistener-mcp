@@ -13,7 +13,6 @@ describe('PlaygroundProvider', () => {
     expect(result.current.token).toBe('test-token');
     expect(result.current.tokenMissing).toBe(false);
     expect(result.current.transcript).toEqual([]);
-    expect(result.current.mcpSessionId).toBe('');
     expect(result.current.lastRawMcp).toBe('');
   });
 
@@ -49,16 +48,6 @@ describe('PlaygroundProvider', () => {
     expect(result.current.transcript).toEqual([]);
   });
 
-  it('setMcpSessionId updates session', async () => {
-    const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
-    );
-    const { result } = renderHook(() => usePlayground(), { wrapper });
-    act(() => result.current.setMcpSessionId('session-123'));
-    expect(result.current.mcpSessionId).toBe('session-123');
-  });
-
   it('setLastRawMcp updates raw MCP data', async () => {
     const { PlaygroundProvider, usePlayground } = await import('../lib/playground-context');
     const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -75,10 +64,10 @@ describe('PlaygroundProvider', () => {
       <PlaygroundProvider token="tok">{children}</PlaygroundProvider>
     );
     const { result } = renderHook(() => usePlayground(), { wrapper });
-    act(() => result.current.addProtocolEntry('request', { method: 'initialize' }));
+    act(() => result.current.addProtocolEntry('request', { method: 'server/discover' }));
     expect(result.current.protocolLog).toHaveLength(1);
     expect(result.current.protocolLog[0].direction).toBe('request');
-    expect(result.current.protocolLog[0].payload).toEqual({ method: 'initialize' });
+    expect(result.current.protocolLog[0].payload).toEqual({ method: 'server/discover' });
     expect(result.current.protocolLog[0].at).toBeTruthy();
   });
 

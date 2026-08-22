@@ -5,37 +5,39 @@ import type {
   LatencyStats,
   SlowOperationSnapshot,
 } from './worker-runtime-contract.js';
-import type { WorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.js';
 import type { WorkerPlatformEnv } from './worker-runtime-contract.js';
 import { parseAllowedOrigins } from './worker-security.js';
 
-export interface CreateWorkerObservabilityRuntimeDeps {
+export interface CreateWorkerObservabilityRuntimeDeps<TEnv extends WorkerPlatformEnv> {
   routeLatencyMaxRoutes: number;
   routeLatencyOverflowRoute: string;
   exportTopSlowOperationLimit: number;
   doOutlierScoreThreshold: number;
   doOutlierMinSamples: number;
-  resolveWorkerMcpSessionTopologyV2: (env: WorkerPlatformEnv) => WorkerMcpSessionTopologyV2;
-  onRouteLatencyRecorded?: (route: string, elapsedMs: number) => void;
+  onRouteLatencyRecorded?: (env: TEnv, route: string, elapsedMs: number) => void;
   onDurableObjectLatencyRecorded?: (
+    env: TEnv,
     dimension: DurableObjectLatencyDimension,
     elapsedMs: number,
   ) => void;
-  onDurableObjectUnavailable?: (dimension: DurableObjectLatencyDimension) => void;
+  onDurableObjectUnavailable?: (env: TEnv, dimension: DurableObjectLatencyDimension) => void;
 }
 
 export interface WorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv> {
   getRequestOrigin(request: Request): string | null;
   getClientIdentifier(request: Request): string;
   buildWorkerRouteMetricKey(method: string, pathname: string): string;
-  recordRouteLatency(route: string, elapsedMs: number): void;
-  recordDurableObjectLatency(dimension: DurableObjectLatencyDimension, elapsedMs: number): void;
-  recordDurableObjectUnavailable(dimension: DurableObjectLatencyDimension): void;
+  recordRouteLatency(env: TEnv, route: string, elapsedMs: number): void;
+  recordDurableObjectLatency(
+    env: TEnv,
+    dimension: DurableObjectLatencyDimension,
+    elapsedMs: number,
+  ): void;
+  recordDurableObjectUnavailable(env: TEnv, dimension: DurableObjectLatencyDimension): void;
   getCachedAllowedOrigins(
     rawAllowedOrigins: string | undefined,
     authUiOriginRaw?: string,
   ): string[];
-  getCachedSessionTopology(env: TEnv): WorkerMcpSessionTopologyV2;
   getWorkerLatencySnapshot(): {
     routes: Record<string, LatencySnapshot>;
     durable_objects: Record<DurableObjectLatencyDimension, LatencySnapshot>;
@@ -78,15 +80,13 @@ function getLatencySnapshot(stats: LatencyStats): LatencySnapshot {
 }
 
 export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>(
-  deps: CreateWorkerObservabilityRuntimeDeps,
+  deps: CreateWorkerObservabilityRuntimeDeps<TEnv>,
 ): WorkerObservabilityRuntime<TEnv> {
   const workerRouteLatency = new Map<string, LatencyStats>();
   const allowedOriginsCache = new Map<string, string[]>();
-  const sessionTopologyCache = new Map<string, WorkerMcpSessionTopologyV2>();
   const durableObjectLatency: Record<DurableObjectLatencyDimension, LatencyStats> = {
     auth_limiter: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
     session_revocation: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
-    mcp_session_lifecycle: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
     ai_chat_quota: { count: 0, totalMs: 0, maxMs: 0, lastMs: 0, unavailableCount: 0 },
   };
 
@@ -114,7 +114,7 @@ export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>
       return `${method.toUpperCase()} ${normalizedPath || '/'}`;
     },
 
-    recordRouteLatency(route: string, elapsedMs: number): void {
+    recordRouteLatency(env: TEnv, route: string, elapsedMs: number): void {
       const overflowExists = workerRouteLatency.has(deps.routeLatencyOverflowRoute);
       const routeCap = overflowExists ? deps.routeLatencyMaxRoutes : deps.routeLatencyMaxRoutes - 1;
       const routeKey =
@@ -124,7 +124,7 @@ export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>
       const stats = workerRouteLatency.get(routeKey);
       if (stats) {
         recordLatency(stats, elapsedMs);
-        deps.onRouteLatencyRecorded?.(routeKey, elapsedMs);
+        deps.onRouteLatencyRecorded?.(env, routeKey, elapsedMs);
         return;
       }
 
@@ -136,18 +136,22 @@ export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>
         lastMs: durationMs,
         unavailableCount: 0,
       });
-      deps.onRouteLatencyRecorded?.(routeKey, durationMs);
+      deps.onRouteLatencyRecorded?.(env, routeKey, durationMs);
       return;
     },
 
-    recordDurableObjectLatency(dimension: DurableObjectLatencyDimension, elapsedMs: number): void {
+    recordDurableObjectLatency(
+      env: TEnv,
+      dimension: DurableObjectLatencyDimension,
+      elapsedMs: number,
+    ): void {
       recordLatency(durableObjectLatency[dimension], elapsedMs);
-      deps.onDurableObjectLatencyRecorded?.(dimension, elapsedMs);
+      deps.onDurableObjectLatencyRecorded?.(env, dimension, elapsedMs);
     },
 
-    recordDurableObjectUnavailable(dimension: DurableObjectLatencyDimension): void {
+    recordDurableObjectUnavailable(env: TEnv, dimension: DurableObjectLatencyDimension): void {
       durableObjectLatency[dimension].unavailableCount += 1;
-      deps.onDurableObjectUnavailable?.(dimension);
+      deps.onDurableObjectUnavailable?.(env, dimension);
     },
 
     getCachedAllowedOrigins(
@@ -160,20 +164,6 @@ export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>
       const parsed = parseAllowedOrigins(rawAllowedOrigins);
       allowedOriginsCache.set(cacheKey, parsed);
       return parsed;
-    },
-
-    getCachedSessionTopology(env: TEnv): WorkerMcpSessionTopologyV2 {
-      const cacheKey = [
-        env.MCP_SESSION_SHARD_COUNT ?? '',
-        env.MCP_SESSION_IDLE_TTL_SECONDS ?? '',
-        env.MCP_SESSION_ABSOLUTE_TTL_SECONDS ?? '',
-        env.MCP_SESSION_EVICTION_SWEEP_LIMIT ?? '',
-      ].join('|');
-      const cached = sessionTopologyCache.get(cacheKey);
-      if (cached) return cached;
-      const topology = deps.resolveWorkerMcpSessionTopologyV2(env);
-      sessionTopologyCache.set(cacheKey, topology);
-      return topology;
     },
 
     getWorkerLatencySnapshot(): {
@@ -193,7 +183,6 @@ export function createWorkerObservabilityRuntime<TEnv extends WorkerPlatformEnv>
       const durableObjects = {
         auth_limiter: getLatencySnapshot(durableObjectLatency.auth_limiter),
         session_revocation: getLatencySnapshot(durableObjectLatency.session_revocation),
-        mcp_session_lifecycle: getLatencySnapshot(durableObjectLatency.mcp_session_lifecycle),
         ai_chat_quota: getLatencySnapshot(durableObjectLatency.ai_chat_quota),
       };
       const topSlowOperations = Object.entries(routes)

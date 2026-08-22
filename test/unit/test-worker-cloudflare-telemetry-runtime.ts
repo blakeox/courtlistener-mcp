@@ -36,12 +36,12 @@ describe('Worker Cloudflare operational telemetry', () => {
     console.log = (value?: unknown) => lines.push(String(value));
     try {
       const runtime = createCloudflareTelemetryRuntime();
-      runtime.setCurrentEnv({ MCP_CF_STRUCTURED_LOGS_ENABLED: 'false' });
-      runtime.recordRouteLatency('GET /health', 3);
+      const disabledEnv = { MCP_CF_STRUCTURED_LOGS_ENABLED: 'false' };
+      runtime.recordRouteLatency(disabledEnv, 'GET /health', 3);
       assert.equal(lines.length, 0);
 
-      runtime.setCurrentEnv({ MCP_CF_STRUCTURED_LOGS_ENABLED: 'true' });
-      runtime.recordRouteLatency('GET /health', 4);
+      const enabledEnv = { MCP_CF_STRUCTURED_LOGS_ENABLED: 'true' };
+      runtime.recordRouteLatency(enabledEnv, 'GET /health', 4);
       assert.equal(lines.length, 1);
       assert.equal(JSON.parse(lines[0]).event, 'route_latency');
     } finally {

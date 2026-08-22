@@ -1,31 +1,35 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "courtlistener-mcp-staging-mcp",
-  "compatibility_date": "2026-03-02",
+  "account_id": "cc3bb24ae3c87cff38c2be85df3dab29",
+  "compatibility_date": "2026-08-18",
   "main": "src/worker-mcp.ts",
   "workers_dev": false,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true,
+    },
   },
   "vars": {
-    "MCP_OAUTH_BACKEND": "cloudflare",
-    "MCP_ALLOW_DEV_FALLBACK": "false",
-    "MCP_SESSION_IDLE_TTL_SECONDS": "900",
-    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "false",
     "MCP_BOUNDARY_FAIL_OPEN": "false",
     "CODEMODE_ENABLED": "false",
     "MCP_ASYNC_QUEUE_ENABLED": "false",
+    "MCP_CF_ANALYTICS_ENABLED": "true",
     "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
   },
   "ai": {
     "binding": "AI",
   },
   "kv_namespaces": [
-    {
-      "binding": "OAUTH_KV",
-      "id": "5d6b587f16d74ac6ae5ad78d5765d5f4",
-    },
     {
       "binding": "ASYNC_JOBS_KV",
       "id": "b41d2686110546e88989c375e4bc10fb",
@@ -54,13 +58,9 @@
       },
     ],
   },
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": ["nodejs_als"],
   "durable_objects": {
     "bindings": [
-      {
-        "name": "MCP_OBJECT",
-        "class_name": "CourtListenerMCP",
-      },
       {
         "name": "AUTH_FAILURE_LIMITER",
         "class_name": "AuthFailureLimiterDO",
@@ -68,10 +68,4 @@
       },
     ],
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["CourtListenerMCP"],
-    },
-  ],
 }

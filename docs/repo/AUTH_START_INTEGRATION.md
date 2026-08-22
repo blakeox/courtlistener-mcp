@@ -16,9 +16,8 @@ on the same origin.
    callback code, sets `clmcp_ui`, and for `/oauth/authorize` return targets
    stops on a same-site approval screen before completing OAuth.
 
-Legacy `/authorize`, `/auth/approve`, and `/auth/logout` aliases are still
-recognized by the Worker, but the published browser-auth contract is now the
-`/oauth/*` path set.
+The browser-auth contract is canonical and uses only the `/oauth/*` path set.
+Former aliases are not routed and return the normal `404` response.
 
 ## Worker env required
 
@@ -32,9 +31,8 @@ recognized by the Worker, but the published browser-auth contract is now the
 - `MCP_AUTH_OIDC_SCOPES=<optional scopes; defaults to openid profile email>`
 - `MCP_UI_SESSION_SECRET=<strong random secret>` (required; hosted auth is not
   considered healthy without it)
-- `MCP_ALLOW_DEV_FALLBACK=false` (recommended in production; enabling it with
-  `MCP_OAUTH_DEV_USER_ID` now emits explicit startup risk warnings and is
-  rejected when `NODE_ENV=production`)
+- Development identity fallback is removed; use the hosted auth handoff or a
+  real OIDC bearer identity in every environment.
 - `MCP_OAUTH_REGISTRATION_TOKEN_SECRET=<dedicated DCR management-token signing secret>`
   (recommended so registration token rotation is decoupled from UI
   session/API-key rotation)
@@ -43,33 +41,37 @@ recognized by the Worker, but the published browser-auth contract is now the
 - `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true` only when intentionally
   enabling one of the scoped Cloudflare Access trust flags for a trusted edge
   deployment
-- `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` only when `/authorize` and
-  `/auth/approve` are actually protected by Cloudflare Access or another edge
-  that strips spoofed `cf-access-authenticated-user-*` headers
+- `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS=true` only when
+  `/oauth/authorize` and `/oauth/approve` are actually protected by Cloudflare
+  Access or another edge that strips spoofed `cf-access-authenticated-user-*`
+  headers
 - Optional bootstrap throttles:
-  - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
-  - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
-  - `MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS`
+  - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX`
+  - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS`
+  - `MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS`
 
 ## Current route behavior
 
 - Worker-native hosted auth routes:
   - `/auth/start`
   - `/auth/callback`
-  - `/auth/approve`
-  - `/auth/logout`
+  - `/oauth/approve`
+  - `/oauth/logout`
 - Readiness now requires all of: `OIDC_ISSUER`, the complete upstream client
   pair (`MCP_AUTH_OIDC_CLIENT_*`), and `MCP_UI_SESSION_SECRET`.
-- In Cloudflare Access browser-auth mode, `/auth/approve` can bootstrap the
+- In Cloudflare Access browser-auth mode, `/oauth/approve` can bootstrap the
   Worker UI session directly from trusted Access identity headers, but
   `/auth/start` is still only the Worker-native upstream-OIDC handoff surface.
 - Partial Worker-native credentials fail closed until the pair is completed or
   removed.
-- `MCP_AUTH_UI_ORIGIN` is deprecated and ignored; hosted auth always starts on
-  the Worker origin.
-- DCR management tokens should use `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`;
-  without it they fall back to `MCP_UI_SESSION_SECRET` or
-  `COURTLISTENER_API_KEY`.
+- Hosted auth always starts on the Worker origin; external auth-origin overrides
+  are not supported.
+- DCR management tokens require `MCP_OAUTH_REGISTRATION_TOKEN_SECRET`; without
+  it registration management tokens are disabled.
+- Authorization-server metadata advertises the modern Client ID Metadata
+  Document (CIMD) path. The `/register` endpoint remains available for RFC 7591
+  clients during the compatibility window; both paths resolve through the same
+  OAuth client policy.
 - Hosted-auth responses now emit stable `X-Hosted-Auth-*` metadata for
   dashboards and alerts:
   - `X-Hosted-Auth-Ready`
@@ -86,7 +88,7 @@ recognized by the Worker, but the published browser-auth contract is now the
   - `X-Hosted-Auth-Terminal` (`true` when the current route ended the flow
     rather than continuing it)
   - `X-Hosted-Auth-Correlation-Id` (stable across the normal `/auth/start` →
-    `/auth/callback` → `/auth/approve` → `/auth/logout` browser journey)
+    `/auth/callback` → `/oauth/approve` → `/oauth/logout` browser journey)
   - `X-Hosted-Auth-Credential-Source`
   - `X-Hosted-Auth-Config-Error-Count`
   - `X-Hosted-Auth-Duration-Ms` (overall route handling time)
@@ -110,9 +112,9 @@ recognized by the Worker, but the published browser-auth contract is now the
 Cloudflare bills Durable Object **duration** (CPU + storage I/O time while a DO
 is active). This repo uses two DO classes:
 
-- **`AuthFailureLimiterDO`** — auth rate limits, MCP session registry, usage
-  counters (called many times per MCP request)
-- **`CourtListenerMCP`** — one DO per connected MCP client session
+- **`AuthFailureLimiterDO`** — auth rate limits and bounded usage counters. MCP
+  v2 request handling is stateless and does not use a per-client MCP session
+  Durable Object.
 
 If you receive a “90% of daily Durable Objects free tier limit” email, check
 `/health` → `diagnostics.metrics.latency_ms.durable_objects.*` on the edge and
@@ -130,8 +132,6 @@ MCP workers.
 
 **Code-side optimizations (deploy auth-limiter + MCP workers):**
 
-- MCP session **touch** no longer runs eviction sweeps on every request (alarms
-  handle cleanup).
 - MCP boundary + replay checks are bundled into **one** DO call per request.
 - Successful MCP auth skips a redundant **clear** DO call when the client has no
   failure state.
@@ -176,11 +176,11 @@ not the MCP worker — see `docs/repo/WORKER_SPLIT.md`.
 1. Open MCP OAuth flow from ChatGPT/Codex.
 2. In Worker-native mode, confirm redirect to
    `https://<worker>/auth/start?return_to=...`.
-3. In Cloudflare Access mode, confirm `/authorize` first redirects to the Access
-   login boundary for the protected route.
+3. In Cloudflare Access mode, confirm `/oauth/authorize` first redirects to the
+   Access login boundary for the protected route.
 4. Sign in via the configured provider or Access login boundary.
 5. Confirm the Worker shows an approval screen before completing browser-session
-   `/authorize` requests.
+   `/oauth/authorize` requests.
 6. Confirm a direct probe of `https://<worker>/auth/start?continue=1` returns
    `302` only when hosted auth is fully ready and a non-redirect with setup
    guidance when it is not.

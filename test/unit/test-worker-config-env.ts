@@ -46,14 +46,12 @@ describe('Worker configuration environment', () => {
       CACHE_ENABLED: 'false',
       CACHE_TTL: '42',
       LOG_LEVEL: 'debug',
-      MCP_HTTP_MAX_CONCURRENT_REQUESTS: '7',
       MCP_REQUIRE_PROTOCOL_VERSION: 'true',
     });
 
     assert.equal(config.cache.enabled, false);
     assert.equal(config.cache.ttl, 42);
     assert.equal(config.logging.level, 'debug');
-    assert.equal(config.httpTransport?.maxConcurrentRequests, 7);
   });
 
   it('does not inherit a host API key when the Worker binding is absent', () => {

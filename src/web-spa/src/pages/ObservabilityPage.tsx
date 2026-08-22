@@ -178,41 +178,6 @@ export function ObservabilityPage(): React.JSX.Element {
         </div>
 
         <div className={stackClass}>
-          <Card title="Session topology" subtitle="Current Durable Object session model shape.">
-            <DefinitionList
-              entries={[
-                {
-                  term: 'Topology version',
-                  description: diagnostics?.session_topology.version ?? 'Loading',
-                },
-                {
-                  term: 'Shard count',
-                  description: diagnostics
-                    ? String(diagnostics.session_topology.shard_count)
-                    : 'Loading',
-                },
-                {
-                  term: 'Idle TTL',
-                  description: diagnostics
-                    ? `${diagnostics.session_topology.idle_ttl_ms} ms`
-                    : 'Loading',
-                },
-                {
-                  term: 'Absolute TTL',
-                  description: diagnostics
-                    ? `${diagnostics.session_topology.absolute_ttl_ms} ms`
-                    : 'Loading',
-                },
-                {
-                  term: 'Eviction sweep limit',
-                  description: diagnostics
-                    ? String(diagnostics.session_topology.eviction_sweep_limit)
-                    : 'Loading',
-                },
-              ]}
-            />
-          </Card>
-
           <Card
             title="Operator posture"
             subtitle="Whether the browser-facing control path is measurable end to end."

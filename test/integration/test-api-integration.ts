@@ -5,7 +5,7 @@
  * Tests real API interactions and end-to-end functionality
  */
 
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 // Import live server source so test:integration does not depend on stale build output.
 const { LegalMCPServer } = await import('../../src/index.ts');

@@ -3,14 +3,12 @@
  * Modular tool handlers that can be dynamically registered and executed
  */
 
-import {
+import type {
   CallToolRequest,
   CallToolResult,
-  ErrorCode,
-  McpError,
   ToolAnnotations,
   EmbeddedResource,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 import { z, type ZodIssue } from '../common/zod.js';
 import { Result, success, failure } from '../common/types.js';
 import { TOOL_INPUT_SCHEMAS } from './generated/tool-input-schemas.js';
@@ -35,6 +33,16 @@ export const DESTRUCTIVE_TOOL_ANNOTATIONS: ToolAnnotations = {
   destructiveHint: true,
   openWorldHint: true,
 };
+
+export class ToolProtocolError extends Error {
+  constructor(
+    readonly code: 'MethodNotFound' | 'InvalidParams',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ToolProtocolError';
+  }
+}
 
 export interface ToolHandler<TInput = unknown> {
   readonly name: string;
@@ -190,14 +198,14 @@ export class ToolHandlerRegistry {
     const handler = this.handlers.get(request.params.name);
 
     if (!handler) {
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+      throw new ToolProtocolError('MethodNotFound', `Unknown tool: ${request.params.name}`);
     }
 
     // Validate input
     const validationResult = handler.validate(request.params.arguments);
     if (!validationResult.success) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      throw new ToolProtocolError(
+        'InvalidParams',
         validationResult.error?.message ?? 'Invalid parameters',
       );
     }

@@ -1,24 +1,34 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "courtlistener-mcp-staging-auth-limiter",
-  "compatibility_date": "2026-03-02",
+  "account_id": "cc3bb24ae3c87cff38c2be85df3dab29",
+  "compatibility_date": "2026-08-18",
   "main": "src/worker-auth-limiter.ts",
   "workers_dev": false,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true,
+    },
   },
   "vars": {
     "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
   },
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [],
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["AuthFailureLimiterDO"],
+  "exports": {
+    "AuthFailureLimiterDO": {
+      "type": "durable-object",
+      "storage": "sqlite",
     },
-  ],
+  },
 }

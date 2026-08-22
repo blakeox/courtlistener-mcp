@@ -15,7 +15,11 @@
 # (avoids oauth_route_rate_limit_unavailable during partial local setups).
 MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false
 
-# Split workers: `pnpm run dev:workers` (edge :8787, MCP :3001). Vite proxies to :8787.
+# `pnpm run dev:workers` starts Edge and MCP together with a local MCP_SERVICE binding.
+
+# Keep async queue execution disabled until its production bindings and release
+# receipt are explicitly enabled.
+MCP_ASYNC_QUEUE_ENABLED=false
 
 # MCP protocol surface (optional; defaults shown in MCP_CURRENT_STATE.md)
 # LOGGING_ENABLED=true
@@ -25,8 +29,4 @@ MCP_AUTH_FAILURE_RATE_LIMIT_ENABLED=false
 # MCP_LIST_CHANGED_ENABLED=false
 # MCP_TEST_SUBSCRIPTION_REFRESH_MS=
 
-# Session topology (Worker / streamable HTTP; validated at startup and in check-setup)
-# MCP_SESSION_IDLE_TTL_SECONDS=1800
-# MCP_SESSION_ABSOLUTE_TTL_SECONDS=43200
-# MCP_SESSION_SHARD_COUNT=4
-# MCP_SESSION_EVICTION_SWEEP_LIMIT=100
+# MCP v2 is stateless; no session-topology settings are required.

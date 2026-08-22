@@ -11,41 +11,27 @@ const policyMode = (process.env.RUNTIME_SAFETY_GATE_POLICY_MODE || 'fail').trim(
 const checks = [
   {
     id: 'runtime-health-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-runtime-health-contract.ts'],
+    command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-runtime-health-contract.ts'],
   },
   {
     id: 'manifest-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-manifest-contract.ts'],
+    command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-manifest-contract.ts'],
   },
   {
     id: 'runtime-parity-certification',
     command: ['pnpm', 'run', 'test:runtime-parity:certify'],
   },
   {
-    id: 'session-runtime-contract',
-    command: [
-      'npx',
-      'tsx',
-      '--test',
-      '--test-force-exit',
-      'test/unit/test-session-runtime-compatibility.ts',
-    ],
-  },
-  {
     id: 'security-auth-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-worker-security.ts'],
+    command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-worker-security.ts'],
   },
   {
     id: 'gateway-auth-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-mcp-gateway-auth.ts'],
+    command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-mcp-gateway-auth.ts'],
   },
   {
     id: 'async-workflow-contract',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-async-tool-execution-service.ts'],
-  },
-  {
-    id: 'breaking-change-gates',
-    command: ['npx', 'tsx', '--test', 'test/unit/test-breaking-change-governance.ts'],
+    command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-async-tool-execution-service.ts'],
   },
 ];
 

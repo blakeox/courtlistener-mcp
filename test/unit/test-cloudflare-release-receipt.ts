@@ -13,8 +13,8 @@ function validReceipt() {
     toolchain: {
       node: '24.18.0',
       pnpm: '10.14.0',
-      wrangler: '4.118.0',
-      compatibility_date: '2026-03-02',
+      wrangler: '4.124.0',
+      compatibility_date: '2026-08-18',
     },
     workers: {
       auth_limiter: { version_id: 'auth-v1', traffic_percent: 0 },
@@ -30,7 +30,7 @@ function validReceipt() {
       health: 'artifact/health.json',
       readiness: 'artifact/readiness.json',
       oauth: 'artifact/oauth.json',
-      mcp_initialize: 'artifact/mcp-initialize.json',
+      mcp_discover: 'artifact/mcp-discover.json',
       direct_mcp_denial: 'artifact/direct-mcp-denial.json',
       version_override: 'artifact/version-override.json',
     },

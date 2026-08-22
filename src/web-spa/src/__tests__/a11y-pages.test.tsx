@@ -53,7 +53,7 @@ vi.mock('../lib/api', () => ({
   getWorkerHealth: vi.fn().mockResolvedValue({
     status: 'ok',
     service: 'courtlistener-mcp',
-    transport: 'cloudflare-agents-streamable-http',
+    transport: 'cloudflare-mcp-v2-streamable-http',
     diagnostics: {
       cloudflare: {
         analytics_enabled: true,
@@ -62,13 +62,6 @@ vi.mock('../lib/api', () => ({
         turnstile_enforced_routes: [],
       },
       metrics: { latency_ms: { p50: 120 } },
-      session_topology: {
-        version: 'v1',
-        shard_count: 4,
-        idle_ttl_ms: 1800000,
-        absolute_ttl_ms: 43200000,
-        eviction_sweep_limit: 100,
-      },
     },
   }),
   logout: vi.fn().mockResolvedValue(undefined),
@@ -78,14 +71,13 @@ vi.mock('../lib/api', () => ({
     expiresInSeconds: 43200,
   }),
   postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
-  mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
+  mcpCall: vi.fn().mockResolvedValue({ body: {} }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,
     fallback_used: false,
     mode: 'cheap',
     tool: 'search_cases',
     tool_reason: 'Default search',
-    session_id: 'sid',
     ai_response: 'resp',
     mcp_result: {},
   }),
@@ -155,7 +147,7 @@ describe('axe accessibility scans', () => {
   });
 
   it('workspace dashboard has no detectable WCAG violations', async () => {
-    const { container } = renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app/control-center');
+    const { container } = renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app');
     await screen.findByRole('heading', { name: 'Overview', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
   });
@@ -187,19 +179,19 @@ describe('axe accessibility scans', () => {
   });
 
   it('onboarding diagnostics page has no detectable WCAG violations', async () => {
-    const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/onboarding');
+    const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/diagnostics');
     await screen.findByRole('heading', { name: 'Runtime Diagnostics', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
   });
 
   it('workspace chrome keeps muted and utility text above the unreadable floor', async () => {
-    renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app/control-center');
+    renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app');
     await screen.findByRole('heading', { name: 'Overview', level: 1 });
 
     const utilityLabel = screen.getByText('Workspace utilities');
     const utilityLink = screen.getByRole('link', { name: 'Diagnostics' });
     const mutedCopy = screen.getByText('Your environment is fully agent-ready.');
-    const topbarDescription = screen.getByText('Legacy overview route.');
+    const topbarDescription = screen.getByText('Review workspace activity and next steps.');
     const tokensCss = readFileSync(tokensCssPath, 'utf8');
     const readRemToken = (name: string) => {
       const match = tokensCss.match(new RegExp(`${name}:\\s*([0-9.]+)rem;`));

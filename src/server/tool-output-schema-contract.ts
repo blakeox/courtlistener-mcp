@@ -239,12 +239,7 @@ const MUTATION_TOOLS = new Set(['manage_alerts', 'create_docket_alert']);
 const VALIDATION_TOOLS = new Set(['validate_citations']);
 
 export type ToolOutputSchemaKind =
-  | 'search'
-  | 'paginated'
-  | 'analysis'
-  | 'mutation'
-  | 'validation'
-  | 'detail';
+  'search' | 'paginated' | 'analysis' | 'mutation' | 'validation' | 'detail';
 
 export function classifyToolOutputSchemaKind(toolName: string): ToolOutputSchemaKind {
   if (SEARCH_TOOLS.has(toolName)) {

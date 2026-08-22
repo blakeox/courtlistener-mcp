@@ -32,9 +32,8 @@ describe('GitHub workflow hardening', () => {
       `unexpected publish workflow files: ${strayPublishWorkflows.join(', ')}`,
     );
     assert.match(releaseWorkflow, /publish-npm:/);
-    assert.match(releaseWorkflow, /publish-docker:/);
     assert.match(releaseWorkflow, /github-release:/);
-    assert.match(releaseWorkflow, /needs: \[validate-release, docker-test\]/);
+    assert.match(releaseWorkflow, /needs: validate-release/);
     assert.match(releaseWorkflow, /workflow_dispatch:/);
     assert.match(releaseWorkflow, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
     assert.match(releaseWorkflow, /Configure npm publish auth/);
@@ -51,6 +50,7 @@ describe('GitHub workflow hardening', () => {
     assert.match(workflow, /environment:/);
     assert.match(workflow, /CLOUDFLARE_API_TOKEN/);
     assert.match(workflow, /CLOUDFLARE_READONLY_API_TOKEN/);
+    assert.match(workflow, /pnpm run cloudflare:check:types/);
     assert.match(workflow, /pnpm run cloudflare:check:live/);
     assert.match(workflow, /--phase upload/);
     assert.match(workflow, /--phase canary/);
@@ -59,7 +59,73 @@ describe('GitHub workflow hardening', () => {
     assert.match(workflow, /hashFiles\('release-state\.json'\) != ''/);
     assert.match(workflow, /probe_directory=release-probes-promoted/);
     assert.match(workflow, /decision=rollback/);
-    assert.match(workflow, /actions\/upload-artifact@v7/);
+    assert.match(
+      workflow,
+      /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/,
+    );
+  });
+
+  it('does not eval secret-derived remote endpoint output in CI', () => {
+    const workflows = [
+      read('../../.github/workflows/ci.yml'),
+      read('../../.github/workflows/performance.yml'),
+    ];
+    for (const workflow of workflows) {
+      assert.doesNotMatch(workflow, /eval\s+"\$\(node scripts\/resolve-remote-endpoints\.js/);
+      assert.match(workflow, /resolve-remote-endpoints\.js .*--field (?:mcpUrl|healthUrl)/);
+    }
+  });
+
+  it('uses the repository health probe for local Worker readiness', () => {
+    const workflows = [
+      read('../../.github/workflows/ci.yml'),
+      read('../../.github/workflows/release.yml'),
+    ];
+    for (const workflow of workflows) {
+      assert.doesNotMatch(workflow, /curl -fsS http:\/\/127\.0\.0\.1:8787\/health/);
+      assert.match(
+        workflow,
+        /LOCAL_HEALTH_URL=http:\/\/127\.0\.0\.1:8787 .*check-local-health\.mjs/,
+      );
+    }
+  });
+
+  it('uses the immutable Node 24 Gitleaks action instead of an ad-hoc download', () => {
+    const workflow = read('../../.github/workflows/ci.yml');
+
+    assert.match(
+      workflow,
+      /gitleaks\/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3\.0\.0/,
+    );
+    assert.doesNotMatch(workflow, /Install Gitleaks/);
+    assert.doesNotMatch(workflow, /gitleaks_8\.24\.3_linux_x64\.tar\.gz/);
+  });
+
+  it('keeps all workflow actions pinned to immutable commits', () => {
+    const mutableActionRef = /uses:\s*[\w.-]+\/[\w.-]+@(?:v\d+|main|master|latest)(?:\s|$)/iu;
+
+    for (const workflowFile of listWorkflowFiles()) {
+      const workflow = read(`../../.github/workflows/${workflowFile}`);
+      assert.doesNotMatch(workflow, mutableActionRef, `${workflowFile} has a mutable action ref`);
+    }
+  });
+
+  it('removes direct production deployment shortcuts', () => {
+    const packageJson = JSON.parse(read('../../package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    assert.equal(packageJson.scripts?.deploy, undefined);
+    assert.equal(packageJson.scripts?.['deploy:workers'], undefined);
+    assert.equal(packageJson.scripts?.['deploy:edge'], undefined);
+    assert.equal(packageJson.scripts?.['deploy:mcp'], undefined);
+    assert.equal(packageJson.scripts?.['deploy:auth-limiter'], undefined);
+    assert.equal(packageJson.scripts?.['cloudflare:deploy'], undefined);
+  });
+
+  it('keeps numbered duplicate files visible to repository hygiene checks', () => {
+    const gitignore = read('../../.gitignore');
+
+    assert.doesNotMatch(gitignore, /^\* 2\.[^\n]*$/m);
   });
 
   it('makes the default test script include the SPA auth suites', () => {
@@ -70,11 +136,11 @@ describe('GitHub workflow hardening', () => {
 
     assert.equal(
       packageJson.scripts?.test,
-      'npm run test:unit && npm run test:integration && npm run test:spa:auth && npm run test:spa:e2e:auth',
+      'pnpm run test:unit && pnpm run test:integration && pnpm run test:spa:auth && pnpm run test:spa:e2e:auth',
     );
     assert.equal(
       packageJson.scripts?.['test:all'],
-      'npm run test:unit && npm run test:integration && npm run test:spa:auth && npm run test:spa:e2e:auth',
+      'pnpm run test:unit && pnpm run test:integration && pnpm run test:spa:auth && pnpm run test:spa:e2e:auth',
     );
     assert.deepEqual(packageJson['lint-staged']?.['**/*.{ts,tsx,js,mjs,cjs}'], [
       'pnpm exec eslint --fix --max-warnings=0 --no-warn-ignored',
@@ -86,18 +152,33 @@ describe('GitHub workflow hardening', () => {
     assert.equal(fs.existsSync(new URL('../../.lintstagedrc.json', import.meta.url)), false);
   });
 
-  it('uses the TypeScript inspector runners from CI and release workflows', () => {
-    const releaseWorkflow = read('../../.github/workflows/release.yml');
-    const inspectorWorkflow = read('../../.github/workflows/inspector-integration.yml');
+  it('runs real Worker load profiles instead of a placeholder performance command', () => {
+    const packageJson = JSON.parse(read('../../package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    const performanceWorkflow = read('../../.github/workflows/performance.yml');
+    const ciWorkflow = read('../../.github/workflows/ci.yml');
 
-    assert.match(releaseWorkflow, /pnpm run ci:test-inspector:extended/);
-    assert.doesNotMatch(releaseWorkflow, /ci-test-mcp-inspector\.js/);
-    assert.match(inspectorWorkflow, /pnpm run ci:test-inspector/);
-    assert.doesNotMatch(inspectorWorkflow, /ci-test-mcp-inspector\.js/);
+    assert.equal(
+      packageJson.scripts?.['test:performance'],
+      'node scripts/performance/load-profile-suite.js --light',
+    );
+    assert.match(performanceWorkflow, /pnpm run ci:load-profile-suite/);
+    assert.match(performanceWorkflow, /check-local-health\.mjs/);
+    assert.doesNotMatch(performanceWorkflow, /echo ['"]Performance tests available/);
+    assert.doesNotMatch(ciWorkflow, /pnpm run test:performance/);
+  });
+
+  it('uses the direct MCP v2 contract runner from the release workflow', () => {
+    const releaseWorkflow = read('../../.github/workflows/release.yml');
+
+    assert.match(releaseWorkflow, /pnpm run ci:test:mcp-v2:extended/);
+    assert.doesNotMatch(releaseWorkflow, /Inspector|mcp-inspector|ci-test-inspector/);
     assert.doesNotMatch(releaseWorkflow, /pnpm add -g @modelcontextprotocol\/inspector/);
-    assert.doesNotMatch(inspectorWorkflow, /pnpm add -g @modelcontextprotocol\/inspector/);
-    assert.match(inspectorWorkflow, /node -e .*inspector\/package\.json/);
-    assert.match(inspectorWorkflow, /inspector-version: \['locked'\]/);
+    assert.equal(
+      fs.existsSync(new URL('../../.github/workflows/inspector-integration.yml', import.meta.url)),
+      false,
+    );
   });
 
   it('does not advertise an unpublished npm install path in the README', () => {
@@ -106,7 +187,8 @@ describe('GitHub workflow hardening', () => {
     assert.doesNotMatch(readme, /npx courtlistener-mcp/);
     assert.match(readme, /Run locally from a checkout/);
     assert.match(readme, /node dist\/index\.js --setup/);
-    assert.match(readme, /node dist\/http\.js/);
+    assert.match(readme, /pnpm run dev:workers/);
+    assert.doesNotMatch(readme, /node dist\/http\.js/);
   });
 
   it('runs browser auth coverage in CI on the dedicated browser-auth job', () => {
@@ -140,6 +222,8 @@ describe('GitHub workflow hardening', () => {
     assert.doesNotMatch(ciWorkflow, /pnpm install --frozen-lockfile --dry-run/);
     assert.match(ciWorkflow, /pnpm run test:unit/);
     assert.match(ciWorkflow, /pnpm run ci:local-gate/);
+    assert.match(ciWorkflow, /run: pnpm audit --audit-level=moderate/);
+    assert.doesNotMatch(ciWorkflow, /pnpm audit --audit-level=moderate \|\|/);
     assert.match(releaseWorkflow, /concurrency:/);
     assert.match(releaseWorkflow, /pnpm run format:check/);
     assert.doesNotMatch(releaseWorkflow, /pnpm install --frozen-lockfile --dry-run/);
@@ -149,12 +233,16 @@ describe('GitHub workflow hardening', () => {
       releaseWorkflow,
       /pnpm run cloudflare:check:environments -- --require-provisioned/,
     );
+    assert.match(releaseWorkflow, /pnpm run cloudflare:check:types/);
     assert.match(releaseWorkflow, /pnpm run cloudflare:check:live/);
     assert.match(releaseWorkflow, /CLOUDFLARE_READONLY_API_TOKEN/);
     assert.doesNotMatch(ciWorkflow, /pnpm run cloudflare:check:live/);
     assert.match(releaseWorkflow, /pnpm run test:spa:e2e:auth/);
     assert.doesNotMatch(releaseWorkflow, /All 25 tools tested successfully/);
-    assert.match(releaseWorkflow, /Array\.isArray\(manifest\.tools\)/);
+    assert.match(releaseWorkflow, /manifest\.capabilities\?\.tools\?\.tools/);
+    assert.doesNotMatch(releaseWorkflow, /Array\.isArray\(manifest\.tools\)/);
+    assert.match(releaseWorkflow, /resolve-remote-endpoints\.js .*--field mcpUrl/);
+    assert.doesNotMatch(releaseWorkflow, /SERVER_URL="\$REMOTE_SERVER_URL"/);
   });
 
   it('runs the Workers-runtime harness in CI and release validation', () => {

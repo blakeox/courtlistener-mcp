@@ -1,10 +1,6 @@
 import { bootstrapServices } from '../infrastructure/bootstrap.js';
 import { DIContainer } from '../infrastructure/container.js';
 import type { ConfigEnvironment } from '../infrastructure/config.js';
-import {
-  type ProtocolFeatureFlags,
-  resolveProtocolFeatureFlags,
-} from '../infrastructure/protocol-constants.js';
 import type { Logger } from '../infrastructure/logger.js';
 import type { MetricsCollector } from '../infrastructure/metrics.js';
 import type { ServerConfig } from '../types.js';
@@ -19,7 +15,6 @@ export interface WorkerRuntime {
   logger: Logger;
   metrics: MetricsCollector;
   promptRegistry: PromptHandlerRegistry;
-  protocolFlags: ProtocolFeatureFlags;
   resourceRegistry: ResourceHandlerRegistry;
   toolRegistry: ToolHandlerRegistry;
 }
@@ -38,7 +33,6 @@ export function createWorkerRuntime(env: WorkerMcpEnv): WorkerRuntime {
     logger: serviceContainer.get<Logger>('logger'),
     metrics: serviceContainer.get<MetricsCollector>('metrics'),
     promptRegistry: serviceContainer.get<PromptHandlerRegistry>('promptRegistry'),
-    protocolFlags: resolveProtocolFeatureFlags(env),
     resourceRegistry: serviceContainer.get<ResourceHandlerRegistry>('resourceRegistry'),
     toolRegistry: serviceContainer.get<ToolHandlerRegistry>('toolRegistry'),
   };

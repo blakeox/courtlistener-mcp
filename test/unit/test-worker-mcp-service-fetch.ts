@@ -53,29 +53,11 @@ describe('fetchMcpWorkerService', () => {
     assert.equal(capturedToken, 'internal-service-token');
   });
 
-  it('falls back to MCP_DEV_UPSTREAM_URL when MCP_SERVICE is missing', async () => {
-    const env = {
-      MCP_DEV_UPSTREAM_URL: 'http://127.0.0.1:3999',
-    } as WorkerEdgeEnv;
-
-    const originalFetch = globalThis.fetch;
-    let capturedUrl = '';
-    try {
-      globalThis.fetch = async (request: Request) => {
-        capturedUrl = request.url;
-        return new Response('ok', { status: 200 });
-      };
-
-      const response = await fetchMcpWorkerService(
-        new Request('https://portal.example/mcp', { method: 'GET' }),
-        env,
-      );
-
-      assert.equal(response.status, 200);
-      assert.equal(capturedUrl, 'http://127.0.0.1:3999/mcp');
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+  it('fails closed when the service binding is missing', async () => {
+    await assert.rejects(
+      () => fetchMcpWorkerService(new Request('https://portal.example/mcp'), {} as WorkerEdgeEnv),
+      /MCP_SERVICE binding is missing/,
+    );
   });
 
   it('bounds a stalled MCP readiness binding probe', async () => {

@@ -2,13 +2,11 @@ import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 
 describe('MCP Worker runtime smoke', () => {
-  it('runs inside workerd with the configured Durable Object and KV bindings', async () => {
+  it('runs inside workerd with the configured KV bindings', async () => {
     const runtimeEnv = env as unknown as {
-      MCP_OBJECT: DurableObjectNamespace;
       ASYNC_JOBS_KV: KVNamespace;
     };
 
-    expect(runtimeEnv.MCP_OBJECT).toBeDefined();
     expect(runtimeEnv.ASYNC_JOBS_KV).toBeDefined();
 
     const key = `workers-runtime-${crypto.randomUUID()}`;
@@ -28,7 +26,8 @@ describe('MCP Worker runtime smoke', () => {
       worker_role: 'mcp',
       checks: {
         runtime: { status: 'pass' },
-        mcp_object: { status: 'pass' },
+        mcp_v2: { status: 'pass' },
+        async_queue: { status: 'pass' },
       },
     });
   });

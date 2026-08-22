@@ -7,7 +7,7 @@
 
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 import { getStructuredPayload } from '../utils/mcp-result.js';
 

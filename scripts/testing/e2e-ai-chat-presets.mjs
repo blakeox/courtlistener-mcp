@@ -76,10 +76,6 @@ async function main() {
       assert(body.test_mode === true, `Expected test_mode=true, got ${String(body.test_mode)}`);
       assert(typeof body.fallback_used === 'boolean', 'Expected fallback_used boolean');
       assert(
-        typeof body.session_id === 'string' && body.session_id.length > 0,
-        'Expected non-empty session_id',
-      );
-      assert(
         typeof body.ai_response === 'string' && body.ai_response.trim().length > 0,
         'Expected non-empty ai_response',
       );

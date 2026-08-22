@@ -31,6 +31,7 @@ import {
 } from './worker-upstream-oidc-config.js';
 import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-limit.js';
 import { getOAuthFrontdoorRateLimitedResponse } from './worker-oauth-frontdoor-rate-limit.js';
+import { decodeBase64Url, encodeBase64Url } from '../common/base64url.js';
 import {
   cloneHeadersPreservingSetCookie,
   type HtmlResponseSecurityOptions,
@@ -127,9 +128,9 @@ interface HandleWorkerAuthHandoffRoutesDeps<TEnv extends WorkerUiSessionRuntimeE
     userId: string,
   ) => { metadata: Record<string, unknown>; props: Record<string, unknown> };
   resolveGrantedScopes: (authRequest: { scope: string[] }) => string[];
-  getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
-  getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
-  now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+  getClientIdentifier: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+  getAuthRouteRateLimitedResponse: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+  now: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
 }
 
 interface HandleWorkerAuthHandoffRoutesParams<TEnv extends WorkerUiSessionRuntimeEnv> {
@@ -178,21 +179,6 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-}
-
-function encodeBase64Url(value: string | Uint8Array): string {
-  const buffer = typeof value === 'string' ? Buffer.from(value, 'utf-8') : Buffer.from(value);
-  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
-}
-
-function decodeBase64Url(value: string): string | null {
-  try {
-    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    return Buffer.from(padded, 'base64').toString('utf-8');
-  } catch {
-    return null;
-  }
 }
 
 async function signValue(value: string, secret: string): Promise<string> {

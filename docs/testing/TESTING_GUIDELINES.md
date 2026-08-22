@@ -30,9 +30,9 @@ Legal MCP Server codebase.
    - Error handling
 
 2. **Security Components**
-   - Authentication middleware
-   - Input sanitization
-   - Rate limiting
+   - Worker authentication and OAuth routes
+   - MCP protocol boundary and input validation
+   - Durable Object-backed rate limiting
 
 3. **Performance Critical**
    - Cache TTL/LRU logic
@@ -42,14 +42,14 @@ Legal MCP Server codebase.
 ### ⚡ HIGH (Should Test)
 
 1. **Server Infrastructure**
-   - HTTP server endpoints
-   - Enterprise server middleware
-   - Configuration management
+   - Cloudflare Worker entrypoints and route composition
+   - Stateless MCP v2 Streamable HTTP transport
+   - Configuration and binding contracts
 
 2. **Integration Points**
-   - Middleware pipeline
+   - Worker service bindings and Cloudflare resources
    - Tool handlers
-   - Error propagation
+   - Error and result-schema propagation
 
 ### 🟡 MEDIUM (Nice to Test)
 
@@ -76,9 +76,7 @@ describe('Component Name', () => {
   describe('Feature Group', () => {
     it('should handle normal case', () => {
       // Arrange
-      const input = {
-        /* test data */
-      };
+      const input = {/* test data */};
 
       // Act
       const result = component.method(input);
@@ -123,14 +121,15 @@ class MockLogger {
 
 ### Test Coverage Goals
 
-| Component         | Target Coverage | Priority |
-| ----------------- | --------------- | -------- |
-| CourtListener API | 90%+            | CRITICAL |
-| Metrics Collector | 95%+            | CRITICAL |
-| Cache Manager     | 90%+            | CRITICAL |
-| Enterprise Server | 80%+            | HIGH     |
-| HTTP Server       | 85%+            | HIGH     |
-| Configuration     | 70%+            | MEDIUM   |
+| Component           | Target Coverage | Priority |
+| ------------------- | --------------- | -------- |
+| CourtListener API   | 90%+            | CRITICAL |
+| Metrics Collector   | 95%+            | CRITICAL |
+| Cache Manager       | 90%+            | CRITICAL |
+| Workers runtime     | 85%+            | HIGH     |
+| MCP v2 transport    | 90%+            | HIGH     |
+| Local Worker parity | 85%+            | HIGH     |
+| Configuration       | 70%+            | MEDIUM   |
 
 ## Running Tests
 
@@ -138,43 +137,55 @@ class MockLogger {
 
 ```bash
 # Run all unit tests
-npm run test:unit
+pnpm run test:unit
 
 # Install the Chromium browser used by the SPA Playwright harness
 pnpm exec playwright install chromium
 
 # Run heuristic source-to-test coverage analysis
-npm run test:coverage
+pnpm run test:coverage
 
 # Run the targeted SPA auth/browser-facing Vitest suite
-npm run test:spa:auth
+pnpm run test:spa:auth
 
 # Run a focused SPA Vitest slice under the real SPA config
 pnpm run test:spa:focus -- src/web-spa/src/__tests__/shell.test.tsx
 
 # Run the browser-based SPA harness against the local Vite app
-npm run test:spa:e2e
+pnpm run test:spa:e2e
 
 # Run design-token smoke checks (landing, theme toggle, buttons, eyebrows)
-npm run test:spa:design
+pnpm run test:spa:design
 
 # Lint SPA styles for token-only CSS and no Tailwind utilities
 pnpm run ci:check:design-system
 
 # Run the auth-focused Playwright browser suite
-npm run test:spa:e2e:auth
+pnpm run test:spa:e2e:auth
 
 # Run the hosted auth release gate used by CI/release
 pnpm run ci:auth-release-gate
 
+# Run Cloudflare Workers runtime tests and a Wrangler dry-run bundle
+pnpm run test:workers
+
+# Run focused MCP v2 protocol and Worker transport contracts
+pnpm run test:mcp:surface
+pnpm run test:transport:http
+
+# Verify generated bindings and Cloudflare IaC ownership
+pnpm run cloudflare:check:types
+pnpm run cloudflare:check:iac
+pnpm run cloudflare:check:startup
+
 # Run the default repository test suite (unit + integration + targeted SPA auth/browser)
-npm run test:all
+pnpm run test:all
 
 # Analyze untested code candidates
-npm run test:analysis
+pnpm run test:analysis
 
 # Enforce c8 thresholds used by CI
-npm run coverage:check
+pnpm run coverage:check
 ```
 
 ### CI/CD Integration
@@ -182,17 +193,17 @@ npm run coverage:check
 - All tests must pass before merging
 - Coverage reports should be generated
 - Hosted auth changes should stay green under `pnpm run ci:auth-release-gate`
-- CI now enforces `npm run test:spa:auth`, the default `npm run test` /
-  `npm run test:all` include the targeted SPA auth/browser suites, and the auth
-  release gate also runs `npm run test:spa:e2e:auth`
+- CI now enforces `pnpm run test:spa:auth`, the default `pnpm run test` /
+  `pnpm run test:all` include the targeted SPA auth/browser suites, and the auth
+  release gate also runs `pnpm run test:spa:e2e:auth`
 - For focused SPA work, prefer `pnpm run test:spa:focus -- <file...>` over
   root-level `vitest` commands so `src/web-spa/vitest.config.ts` and
   `vitest.setup.ts` always apply
-- `npm run test:spa:e2e` runs Playwright against the real local Vite SPA; the
+- `pnpm run test:spa:e2e` runs Playwright against the real local Vite SPA; the
   auth suite mostly mocks `/api/*` and `/mcp` for deterministic browser
   coverage, but now also includes a real local worker-route auth/session/logout
-  flow plus a real `/authorize -> /auth/approve` browser approval journey
-- `npm run test:coverage` is a gap-finding heuristic, not a substitute for `c8`
+  flow plus a real `/oauth/authorize -> /oauth/approve` browser approval journey
+- `pnpm run test:coverage` is a gap-finding heuristic, not a substitute for `c8`
   line/branch coverage
 - Failed tests should block deployment
 

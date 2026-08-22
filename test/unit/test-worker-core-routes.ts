@@ -79,7 +79,6 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
     },
     jsonError,
     jsonResponse,
-    isRemovedLegacyUiRoute: (pathname: string) => pathname === '/api/login',
     workerUiSessionRuntime: {
       resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-1' }),
       resolveUiSessionUserId: async () => 'user-1',
@@ -117,13 +116,6 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
       consumeBrowserBootstrapHandoff: async () => ({ kind: 'ok', value: true }),
       recordUserUiEvent: async () => undefined,
     },
-    getCachedSessionTopology: () => ({
-      version: 'v2',
-      shardCount: 16,
-      idleTtlMs: 1800,
-      absoluteTtlMs: 86400,
-      evictionSweepLimit: 64,
-    }),
     getWorkerLatencySnapshot: () => ({ routes: {} }),
     getUsageSnapshot: async () => ({ userId: 'user-1', count: 3 }),
     now: () => 1700000000000,
@@ -147,13 +139,6 @@ describe('handleWorkerCoreRoutes', () => {
               avg_ms: 12,
               max_ms: 12,
               last_ms: 12,
-              unavailable_count: 1,
-            },
-            mcp_session_lifecycle: {
-              count: 2,
-              avg_ms: 8,
-              max_ms: 9,
-              last_ms: 7,
               unavailable_count: 1,
             },
             ai_chat_quota: { count: 0, avg_ms: 0, max_ms: 0, last_ms: 0, unavailable_count: 0 },
@@ -180,13 +165,6 @@ describe('handleWorkerCoreRoutes', () => {
             avg_ms: 12,
             max_ms: 12,
             last_ms: 12,
-            unavailable_count: 1,
-          },
-          mcp_session_lifecycle: {
-            count: 2,
-            avg_ms: 8,
-            max_ms: 9,
-            last_ms: 7,
             unavailable_count: 1,
           },
           ai_chat_quota: { count: 0, avg_ms: 0, max_ms: 0, last_ms: 0, unavailable_count: 0 },
@@ -473,7 +451,7 @@ describe('handleWorkerCoreRoutes', () => {
         mcpPath: false,
       },
       buildDeps({
-        recordUiEvent: (eventName, userId, route, outcome) => {
+        recordUiEvent: (_env, eventName, userId, route, outcome) => {
           recorded.push({ eventName, userId, route, outcome });
         },
       }),

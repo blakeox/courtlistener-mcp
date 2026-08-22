@@ -27,6 +27,9 @@ export interface ProtocolEnvironment {
   MCP_RESOURCE_SUBSCRIPTIONS?: string;
   MCP_NATIVE_TASKS_ENABLED?: string;
   MCP_LIST_CHANGED_ENABLED?: string;
+  MAX_CONCURRENT_REQUESTS?: string;
+  REQUEST_TIMEOUT_MS?: string;
+  MAX_PAYLOAD_SIZE?: string;
 }
 
 function parseBooleanFlag(value: string | undefined, defaultValue: boolean): boolean {
@@ -45,20 +48,35 @@ function parseBooleanFlag(value: string | undefined, defaultValue: boolean): boo
 
 /**
  * Resolve MCP feature flags from environment variables.
- * Uses a single SAMPLING_ENABLED flag for both runtime and capability advertisement.
+ *
+ * 2025-era logging, sampling, and resource subscriptions remain available only
+ * as explicit compatibility opt-ins. The 2026-07-28 default is the stateless
+ * core plus application capabilities that are still current.
  */
-export function resolveProtocolFeatureFlags(
-  env: ProtocolEnvironment = typeof process !== 'undefined' ? process.env : {},
-): ProtocolFeatureFlags {
+export function resolveProtocolFeatureFlags(env: ProtocolEnvironment = {}): ProtocolFeatureFlags {
   return {
     TOOLS: true,
-    LOGGING: parseBooleanFlag(env.LOGGING_ENABLED, true),
+    LOGGING: parseBooleanFlag(env.LOGGING_ENABLED, false),
     RESOURCES: true,
     PROMPTS: true,
     SAMPLING: parseBooleanFlag(env.SAMPLING_ENABLED, false),
-    RESOURCE_SUBSCRIPTIONS: parseBooleanFlag(env.MCP_RESOURCE_SUBSCRIPTIONS, true),
+    RESOURCE_SUBSCRIPTIONS: parseBooleanFlag(env.MCP_RESOURCE_SUBSCRIPTIONS, false),
     NATIVE_TASKS: parseBooleanFlag(env.MCP_NATIVE_TASKS_ENABLED, false),
     LIST_CHANGED: parseBooleanFlag(env.MCP_LIST_CHANGED_ENABLED, false),
+  };
+}
+
+export interface ProtocolLimits {
+  MAX_CONCURRENT_REQUESTS: number;
+  REQUEST_TIMEOUT_MS: number;
+  MAX_PAYLOAD_SIZE: number;
+}
+
+export function resolveProtocolLimits(env: ProtocolEnvironment = {}): ProtocolLimits {
+  return {
+    MAX_CONCURRENT_REQUESTS: parseInt(env.MAX_CONCURRENT_REQUESTS || '10', 10),
+    REQUEST_TIMEOUT_MS: parseInt(env.REQUEST_TIMEOUT_MS || '30000', 10),
+    MAX_PAYLOAD_SIZE: parseInt(env.MAX_PAYLOAD_SIZE || '10485760', 10),
   };
 }
 
@@ -74,15 +92,10 @@ export const SERVER_INFO = {
 /**
  * MCP Protocol Version
  */
-export const SUPPORTED_MCP_PROTOCOL_VERSIONS = [
-  '2024-11-05',
-  '2025-03-26',
-  '2025-06-18',
-  '2025-11-25',
-] as const;
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ['2026-07-28'] as const;
 
 export const PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
-export const PREFERRED_MCP_PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[2];
+export const PREFERRED_MCP_PROTOCOL_VERSION = SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
 
 /**
  * Build MCP server capabilities from resolved feature flags.
@@ -140,30 +153,10 @@ export const FEATURE_FLAGS = resolveProtocolFeatureFlags();
 export const SERVER_CAPABILITIES = buildServerCapabilities(FEATURE_FLAGS);
 
 /**
- * Transport configuration
- */
-export const TRANSPORT = {
-  STDIO: 'stdio',
-  HTTP: 'http',
-  SSE: 'sse',
-} as const;
-
-/**
  * Request limits and backpressure
  */
 export const LIMITS = {
-  MAX_CONCURRENT_REQUESTS: parseInt(process.env.MAX_CONCURRENT_REQUESTS || '10', 10),
-  REQUEST_TIMEOUT_MS: parseInt(process.env.REQUEST_TIMEOUT_MS || '30000', 10),
-  MAX_PAYLOAD_SIZE: parseInt(process.env.MAX_PAYLOAD_SIZE || '10485760', 10), // 10MB
-} as const;
-
-/**
- * Session configuration
- */
-export const SESSION = {
-  HEARTBEAT_INTERVAL_MS: 30000, // 30 seconds
-  SESSION_TIMEOUT_MS: 300000, // 5 minutes
-  KEEPALIVE_ENABLED: true,
+  ...resolveProtocolLimits(),
 } as const;
 
 /**

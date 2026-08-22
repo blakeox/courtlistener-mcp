@@ -1,20 +1,15 @@
 import type { WorkerEdgeEnv } from './worker-runtime-contract.js';
 
-const DEFAULT_DEV_MCP_UPSTREAM = 'http://127.0.0.1:3001';
-
 /**
- * Forward a request to the MCP worker (production service binding or local dev upstream).
+ * Forward a request to the MCP worker through the Cloudflare service binding.
  */
 export function fetchMcpWorkerService(request: Request, env: WorkerEdgeEnv): Promise<Response> {
   const forwardedRequest = withMcpServiceToken(request, env);
-  if (env.MCP_SERVICE) {
-    return env.MCP_SERVICE.fetch(forwardedRequest);
+  const service = env.MCP_SERVICE;
+  if (!service) {
+    return Promise.reject(new Error('MCP_SERVICE binding is missing.'));
   }
-
-  const upstreamBase = (env.MCP_DEV_UPSTREAM_URL ?? DEFAULT_DEV_MCP_UPSTREAM).replace(/\/$/, '');
-  const incoming = new URL(request.url);
-  const target = new URL(`${incoming.pathname}${incoming.search}`, upstreamBase);
-  return fetch(new Request(target, forwardedRequest));
+  return service.fetch(forwardedRequest);
 }
 
 function withMcpServiceToken(request: Request, env: WorkerEdgeEnv): Request {
@@ -34,15 +29,21 @@ export async function fetchMcpWorkerReadiness(
   timeoutMs = 1_500,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort('mcp_readiness_timeout'), timeoutMs);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutError = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort('mcp_readiness_timeout');
+      reject(new Error('mcp_readiness_timeout'));
+    }, timeoutMs);
+  });
   try {
     const probe = new Request(request, { signal: controller.signal });
-    if (env.MCP_SERVICE) {
-      return await env.MCP_SERVICE.fetch(probe);
+    const service = env.MCP_SERVICE;
+    if (!service) {
+      throw new Error('MCP_SERVICE binding is missing.');
     }
-
-    return await fetchMcpWorkerService(probe, env);
+    return await Promise.race([service.fetch(probe), timeoutError]);
   } finally {
-    clearTimeout(timeout);
+    if (timeout !== undefined) clearTimeout(timeout);
   }
 }

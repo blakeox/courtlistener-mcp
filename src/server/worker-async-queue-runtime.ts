@@ -1,8 +1,9 @@
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 import { generateId } from '../common/utils.js';
 import type { Logger } from '../infrastructure/logger.js';
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
+import type { CloudflareTelemetryEnv } from './worker-cloudflare-telemetry-runtime.js';
 import { parseBoolean } from './worker-security.js';
 import type { AsyncPublicJobPort } from './async-public-job-port.js';
 import {
@@ -15,7 +16,7 @@ import {
   type AsyncWorkflowDiagnostics,
 } from './async-tool-workflow.js';
 
-interface QueueBackedEnv {
+interface QueueBackedEnv extends CloudflareTelemetryEnv {
   ASYNC_TOOL_QUEUE?: Queue<AsyncJobMessage>;
   ASYNC_JOBS_KV?: KVNamespace;
   MCP_ASYNC_QUEUE_ENABLED?: string;
@@ -35,7 +36,12 @@ interface QueueBackedDeps {
     value: number,
     threshold: number,
   ) => void;
-  onAsyncJobUpdate?: (status: string, toolName: string, attempts: number) => void;
+  onAsyncJobUpdate?: (
+    env: QueueBackedEnv,
+    status: string,
+    toolName: string,
+    attempts: number,
+  ) => void;
 }
 
 interface StoredAsyncJob {
@@ -133,14 +139,31 @@ function buildNotFound(jobId: string): CallToolResult {
 }
 
 async function readJob(env: QueueBackedEnv, jobId: string): Promise<StoredAsyncJob | null> {
-  const raw = await env.ASYNC_JOBS_KV?.get(`job:${jobId}`, 'json');
+  const raw = await requireJobStore(env).get(`job:${jobId}`, 'json');
   return (raw as StoredAsyncJob | null) ?? null;
 }
 
 async function writeJob(env: QueueBackedEnv, job: StoredAsyncJob): Promise<void> {
-  await env.ASYNC_JOBS_KV?.put(`job:${job.id}`, JSON.stringify(job), {
+  await requireJobStore(env).put(`job:${job.id}`, JSON.stringify(job), {
     expirationTtl: Math.max(60, Math.ceil((job.expiresAtMs - Date.now()) / 1000)),
   });
+}
+
+function requireJobStore(env: QueueBackedEnv): KVNamespace {
+  const kv = env.ASYNC_JOBS_KV;
+  if (!kv) {
+    throw new Error('ASYNC_JOBS_KV binding is missing.');
+  }
+  return kv;
+}
+
+function requireQueueBindings(env: QueueBackedEnv): { queue: Queue<AsyncJobMessage> } {
+  requireJobStore(env);
+  const queue = env.ASYNC_TOOL_QUEUE;
+  if (!queue) {
+    throw new Error('ASYNC_TOOL_QUEUE binding is missing.');
+  }
+  return { queue };
 }
 
 function readControlArguments(request: CallToolRequest): { jobId: string | null } {
@@ -192,11 +215,7 @@ export class CloudflareAsyncQueueWorkflow {
   }
 
   async listPublicJobSnapshots(): Promise<AsyncJobSnapshot[]> {
-    const kv = this.env.ASYNC_JOBS_KV;
-    if (!kv || typeof kv.list !== 'function') {
-      return [];
-    }
-
+    const kv = requireJobStore(this.env);
     const listed = await kv.list({ prefix: 'job:' });
     const snapshots: AsyncJobSnapshot[] = [];
     for (const entry of listed.keys) {
@@ -229,7 +248,7 @@ export class CloudflareAsyncQueueWorkflow {
         attempts: job.attempts.current,
         history: [],
       };
-      this.deps.onAsyncJobUpdate?.('cancelled', job.toolName, job.attempts.current);
+      this.deps.onAsyncJobUpdate?.(this.env, 'cancelled', job.toolName, job.attempts.current);
     }
     await this.persistJob(job);
     return snapshot(job);
@@ -241,10 +260,11 @@ export class CloudflareAsyncQueueWorkflow {
   }
 
   isEnabled(): boolean {
-    return (
-      parseBoolean(this.env.MCP_ASYNC_QUEUE_ENABLED, false) &&
-      Boolean(this.env.ASYNC_TOOL_QUEUE && this.env.ASYNC_JOBS_KV)
-    );
+    if (!parseBoolean(this.env.MCP_ASYNC_QUEUE_ENABLED, false)) {
+      return false;
+    }
+    requireQueueBindings(this.env);
+    return true;
   }
 
   async handleControlToolCall(request: CallToolRequest): Promise<CallToolResult> {
@@ -307,7 +327,7 @@ export class CloudflareAsyncQueueWorkflow {
         attempts: job.attempts.current,
         history: [],
       };
-      this.deps.onAsyncJobUpdate?.('cancelled', job.toolName, job.attempts.current);
+      this.deps.onAsyncJobUpdate?.(this.env, 'cancelled', job.toolName, job.attempts.current);
     }
     await this.persistJob(job);
     return createAsyncEnvelope({ success: true, mode: 'async', job: snapshot(job) });
@@ -326,13 +346,7 @@ export class CloudflareAsyncQueueWorkflow {
         true,
       );
     }
-    const queue = this.env.ASYNC_TOOL_QUEUE;
-    if (!queue) {
-      return createAsyncEnvelope(
-        { success: false, error: 'Async tool execution queue is unavailable' },
-        true,
-      );
-    }
+    const { queue } = requireQueueBindings(this.env);
     if (
       !DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES.has(params.request.params.name) ||
       !this.deps.isReadOnlyTool?.(params.request.params.name)
@@ -406,7 +420,7 @@ export class CloudflareAsyncQueueWorkflow {
         true,
       );
     }
-    this.deps.onAsyncJobUpdate?.('queued', job.toolName, 0);
+    this.deps.onAsyncJobUpdate?.(this.env, 'queued', job.toolName, 0);
     return buildQueuedEnvelope(job, false);
   }
 
@@ -436,7 +450,12 @@ export async function processAsyncQueueMessage(params: {
     requestId: string,
     userId?: string,
   ) => Promise<CallToolResult>;
-  onAsyncJobUpdate?: (status: string, toolName: string, attempts: number) => void;
+  onAsyncJobUpdate?: (
+    env: QueueBackedEnv,
+    status: string,
+    toolName: string,
+    attempts: number,
+  ) => void;
 }): Promise<AsyncQueueDisposition> {
   const job = await readJob(params.env, params.message.jobId);
   if (!job) return { action: 'ack', reason: 'missing' };
@@ -456,7 +475,7 @@ export async function processAsyncQueueMessage(params: {
       history: [...(job.error?.history ?? [])],
     };
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('expired', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'expired', job.toolName, job.attempts.current);
     return { action: 'ack', reason: 'expired' };
   }
   if (job.cancellationRequested) {
@@ -470,7 +489,7 @@ export async function processAsyncQueueMessage(params: {
       history: [...(job.error?.history ?? [])],
     };
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('cancelled', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'cancelled', job.toolName, job.attempts.current);
     return { action: 'ack', reason: 'cancelled' };
   }
 
@@ -478,7 +497,7 @@ export async function processAsyncQueueMessage(params: {
   job.updatedAtMs = now;
   job.attempts.current += 1;
   await writeJob(params.env, job);
-  params.onAsyncJobUpdate?.('running', job.toolName, job.attempts.current);
+  params.onAsyncJobUpdate?.(params.env, 'running', job.toolName, job.attempts.current);
 
   try {
     const result = await runWithPrincipalContext(
@@ -503,7 +522,7 @@ export async function processAsyncQueueMessage(params: {
     job.result = result;
     delete job.error;
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('succeeded', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'succeeded', job.toolName, job.attempts.current);
     return { action: 'ack', reason: 'succeeded' };
   } catch (error) {
     // Re-read job from KV to get fresh cancellation state for retry/error decisions
@@ -526,7 +545,7 @@ export async function processAsyncQueueMessage(params: {
       };
       await writeJob(params.env, job);
       const delaySeconds = Math.max(0, Math.ceil((job.retryDelayMs * job.attempts.current) / 1000));
-      params.onAsyncJobUpdate?.('retrying', job.toolName, job.attempts.current);
+      params.onAsyncJobUpdate?.(params.env, 'retrying', job.toolName, job.attempts.current);
       return { action: 'retry', reason: 'transient_failure', delaySeconds };
     }
 
@@ -548,7 +567,7 @@ export async function processAsyncQueueMessage(params: {
       attempts: job.attempts.current,
       maxAttempts: job.attempts.max,
     });
-    params.onAsyncJobUpdate?.('failed', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'failed', job.toolName, job.attempts.current);
     return { action: 'ack', reason: cancellationRequested ? 'cancelled' : 'permanent_failure' };
   }
 }

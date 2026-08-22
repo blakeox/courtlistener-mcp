@@ -1,23 +1,32 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "courtlistener-mcp-staging-edge",
-  "compatibility_date": "2026-03-02",
+  "account_id": "cc3bb24ae3c87cff38c2be85df3dab29",
+  "compatibility_date": "2026-08-18",
   "main": "src/worker-edge.ts",
   "workers_dev": true,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true,
+    },
   },
   "vars": {
-    "MCP_OAUTH_BACKEND": "cloudflare",
-    "MCP_ALLOW_DEV_FALLBACK": "false",
-    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
-    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
-    "MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300",
-    "MCP_SESSION_LIFECYCLE_FAIL_OPEN": "false",
+    "MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX": "20",
+    "MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS": "60",
+    "MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS": "300",
     "MCP_BOUNDARY_FAIL_OPEN": "false",
     "CODEMODE_ENABLED": "false",
     "MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS": "3600",
+    "MCP_CF_ANALYTICS_ENABLED": "true",
     "MCP_CF_STRUCTURED_LOGS_ENABLED": "true",
   },
   "services": [
@@ -38,7 +47,9 @@
       "dataset": "courtlistener_mcp_staging",
     },
   ],
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // Required for Wrangler's CIMD runtime path; MCP_SERVICE remains the
+  // staging Worker-to-Worker transport.
+  "compatibility_flags": ["nodejs_als", "global_fetch_strictly_public"],
   "durable_objects": {
     "bindings": [
       {
@@ -51,5 +62,8 @@
   "assets": {
     "directory": ".spa-dist",
     "binding": "SPA_ASSETS",
+    // The Worker owns the SPA shell and requests only explicit asset paths.
+    "html_handling": "none",
+    "not_found_handling": "none",
   },
 }

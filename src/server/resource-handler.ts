@@ -3,7 +3,11 @@
  * Modular resource handlers that can be dynamically registered and executed
  */
 
-import { ReadResourceResult, Resource, ResourceTemplate } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ReadResourceResult,
+  Resource,
+  type ResourceTemplateType as ResourceTemplateDefinition,
+} from '@modelcontextprotocol/server';
 import { Logger } from '../infrastructure/logger.js';
 
 export interface ResourceHandler {
@@ -98,7 +102,7 @@ export class ResourceHandlerRegistry {
   /**
    * List URI templates for dynamic resource discovery (resources/templates/list).
    */
-  getAllResourceTemplates(): ResourceTemplate[] {
+  getAllResourceTemplates(): ResourceTemplateDefinition[] {
     return this.handlers.map((handler) => ({
       uriTemplate: handler.uriTemplate,
       name: handler.name,
@@ -106,6 +110,10 @@ export class ResourceHandlerRegistry {
       description: handler.description,
       mimeType: handler.mimeType,
     }));
+  }
+
+  getHandlerByTemplate(uriTemplate: string): ResourceHandler | undefined {
+    return this.handlers.find((handler) => handler.uriTemplate === uriTemplate);
   }
 
   getSubscriptionRefreshTtlMs(uri: string): number | undefined {

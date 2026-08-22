@@ -31,11 +31,7 @@
  * ```
  */
 
-import type {
-  CallToolResult,
-  TextContent,
-  EmbeddedResource,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, TextContent, EmbeddedResource } from '@modelcontextprotocol/server';
 import { PaginatedApiResponse, PaginationInfo, createPaginationInfo } from './pagination-utils.js';
 
 /**

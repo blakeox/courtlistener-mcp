@@ -19,7 +19,7 @@ export interface CreateWorkerMcpFetchHandlerDeps<TEnv extends WorkerMcpFetchRunt
   getRequestOrigin: (request: Request) => string | null;
   getCachedAllowedOrigins: (rawAllowedOrigins: string | undefined) => string[];
   buildWorkerRouteMetricKey: (method: string, pathname: string) => string;
-  recordRouteLatency: (route: string, elapsedMs: number) => void;
+  recordRouteLatency: (env: TEnv, route: string, elapsedMs: number) => void;
   now: () => number;
   workerCoreRouteDeps: HandleWorkerCoreRoutesDeps<TEnv>;
   mcpBoundaryPolicy: McpGatewayBoundaryPolicyParams<TEnv>;
@@ -87,7 +87,7 @@ export function createWorkerMcpFetchHandler<TEnv extends WorkerMcpFetchRuntimeEn
 
       return new Response('Not found', { status: 404 });
     } finally {
-      deps.recordRouteLatency(routeMetricKey, deps.now() - requestStartedAt);
+      deps.recordRouteLatency(env, routeMetricKey, deps.now() - requestStartedAt);
     }
   };
 }

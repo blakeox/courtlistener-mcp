@@ -112,8 +112,8 @@ export async function collectReleaseProbes(options) {
       { headers },
       [200],
     ),
-    mcp_initialize: await probe(
-      'mcp_initialize',
+    mcp_discover: await probe(
+      'mcp_discover',
       `${baseUrl}/mcp`,
       {
         method: 'POST',
@@ -121,16 +121,18 @@ export async function collectReleaseProbes(options) {
           ...headers,
           Accept: 'application/json, text/event-stream',
           'Content-Type': 'application/json',
-          'MCP-Protocol-Version': '2025-03-26',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Mcp-Method': 'server/discover',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: 1,
-          method: 'initialize',
+          method: 'server/discover',
           params: {
-            protocolVersion: '2025-03-26',
-            capabilities: {},
-            clientInfo: { name: 'cloudflare-release-controller', version: '1' },
+            _meta: {
+              'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+              'io.modelcontextprotocol/clientCapabilities': {},
+            },
           },
         }),
       },

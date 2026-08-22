@@ -5,8 +5,7 @@ This test verifies the deployed Worker-owned hosted OAuth handshake:
 1. Fetch authorization-server metadata
 2. Fetch protected-resource metadata
 3. Register a public OAuth client
-4. Request `/oauth/authorize` (not legacy `/authorize`, which may hit Cloudflare
-   Access)
+4. Request the canonical `/oauth/authorize` endpoint
 5. Verify redirect into same-origin Worker `/auth/start`
 6. Verify hosted-auth readiness headers and handoff page behavior
 

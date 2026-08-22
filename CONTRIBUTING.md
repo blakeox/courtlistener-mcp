@@ -9,7 +9,7 @@ the architecture and best practices.
 
 ### Prerequisites
 
-- Node.js 18+ or 20+
+- Node.js 24.18.0 (see `.nvmrc`)
 - pnpm
 - TypeScript knowledge
 - Familiarity with Zod schemas
@@ -115,7 +115,7 @@ export function registerMyDomainHandlers(
 ### Step 4: Wire It Up
 
 ```typescript
-// In src/server/best-practice-server.ts or bootstrap function
+// In the bootstrap function (`src/infrastructure/bootstrap.ts`)
 import { registerMyDomainHandlers } from './domains/my-domain/handlers.js';
 
 // In setup
@@ -215,30 +215,6 @@ return this.success({
 });
 ```
 
-### 4. Using Query Builders
-
-```typescript
-// ✅ Good - Fluent, type-safe query building
-import { QueryBuilder } from '../infrastructure/query-builder.js';
-
-const params = QueryBuilder.opinions()
-  .query('privacy rights')
-  .court('scotus')
-  .dateRange('2020-01-01', '2024-01-01')
-  .paginate(1, 50)
-  .build();
-
-// ❌ Bad - Loose object construction
-const params = {
-  q: 'privacy rights',
-  court: 'scotus',
-  date_filed_after: '2020-01-01',
-  date_filed_before: '2024-01-01',
-  page: 1,
-  page_size: 50,
-};
-```
-
 ---
 
 ## 🧪 Testing
@@ -281,13 +257,13 @@ describe('MyNewHandler', () => {
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run specific test file
-npx tsx --test test/unit/test-my-handler.ts
+pnpm exec tsx --test test/unit/test-my-handler.ts
 
 # Run with coverage
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ---
@@ -299,7 +275,10 @@ src/
 ├── server/              # MCP server and handler base classes
 ├── domains/             # Domain-specific handlers (add yours here!)
 ├── infrastructure/      # Core services (cache, logger, etc.)
-├── middleware/          # Request middleware
+├── resources/           # MCP resource handlers
+├── prompts/             # MCP prompt handlers
+├── worker/               # Cloudflare Worker composition helpers
+├── web-spa/              # Worker Assets portal
 └── common/              # Shared utilities and types
 
 test/
@@ -333,9 +312,9 @@ git checkout -b feature/my-new-handler
 ### 4. Build & Test
 
 ```bash
-npm run build    # Should pass with 0 errors
-npm test         # Should pass 100%
-npm run lint     # Should pass
+pnpm run build    # Should pass with 0 errors
+pnpm test         # Should pass 100%
+pnpm run lint     # Should pass
 ```
 
 ### 5. Commit
@@ -389,7 +368,7 @@ git push origin feature/my-new-handler
 
 ```bash
 export LOG_LEVEL=debug
-npm run start
+pnpm run start
 ```
 
 ### Common Issues
@@ -404,7 +383,7 @@ npm run start
 **Solution**: Check Zod schema matches expected input
 
 **Issue**: Build errors  
-**Solution**: Run `npm run build` to see full error details
+**Solution**: Run `pnpm run build` to see full error details
 
 ---
 

@@ -37,7 +37,7 @@ export function OnboardingPage(): React.JSX.Element {
   const hasToken = Boolean(token.trim());
   const sessionChecking = sessionLoading || !sessionReady;
 
-  const expectedProtocolVersion = '2025-06-18';
+  const expectedProtocolVersion = '2026-07-28';
   const mcpReadinessQuery = useQuery({
     queryKey: ['mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -66,7 +66,7 @@ export function OnboardingPage(): React.JSX.Element {
       key: 'token',
       label: 'Optional: load local MCP credential for direct probes',
       done: hasToken,
-      href: '/app/credentials',
+      href: '/app/account',
       action: 'Review credential tools',
     },
     {
@@ -101,7 +101,7 @@ export function OnboardingPage(): React.JSX.Element {
         ? '⚠ MCP protocol unavailable'
         : protocolMismatch
           ? `⚠ Protocol mismatch (${readiness?.protocolVersion || 'unknown'})`
-          : `✓ Connected (${readiness?.sessionId || 'session established'})`;
+          : '✓ Connected (stateless MCP v2)';
 
   const toolAvailabilityStatus = !hasToken
     ? '… Awaiting local diagnostic credential'
@@ -204,7 +204,7 @@ export function OnboardingPage(): React.JSX.Element {
           <ButtonLink to="/app/account" variant="secondary">
             Open account
           </ButtonLink>
-          <ButtonLink to="/app/credentials" variant="secondary">
+          <ButtonLink to="/app/account" variant="secondary">
             Open credentials
           </ButtonLink>
           <ButtonLink to="/app/playground">Open playground</ButtonLink>
@@ -270,7 +270,7 @@ export function OnboardingPage(): React.JSX.Element {
 
       <Card
         title="Protocol + capability explorer"
-        subtitle="Live metadata from initialize + tools/resources/prompts discovery."
+        subtitle="Live metadata from server discovery plus tools/resources/prompts catalogs."
       >
         {!hasToken ? (
           <p className={mutedCopyClass}>
@@ -303,8 +303,8 @@ export function OnboardingPage(): React.JSX.Element {
                   ),
                 },
                 {
-                  term: 'Session id',
-                  description: readiness?.sessionId || 'none returned',
+                  term: 'Transport',
+                  description: 'Stateless MCP v2',
                   descriptionClassName: monoClass,
                 },
                 {

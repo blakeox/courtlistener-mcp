@@ -13,10 +13,6 @@ import {
   verifyRegistrationAccessToken as verifyRegistrationAccessTokenImpl,
 } from './worker-oauth-registration-token.js';
 
-// Captured per-request so onError can build resource_metadata URLs relative
-// to the origin the client actually connected to (workers.dev vs custom domain).
-let _currentRequestOrigin = '';
-
 interface OAuthRuntimeEnv {
   MCP_ALLOWED_ORIGINS?: string;
   MCP_UI_SESSION_SECRET?: string;
@@ -33,14 +29,14 @@ interface OAuthRuntimeEnv {
 
 interface OAuthProviderRuntimeDeps<TEnv extends OAuthRuntimeEnv> {
   /** Base origin used as a static default for OAuthProvider config URLs.
-   *  Per-request dynamic origin is handled by setCurrentRequestOrigin +
-   *  custom discovery handlers. Defaults to 'https://courtlistenermcp.blakeoxford.com'. */
+   *  Per-request errors use the request supplied by OAuthProvider. Defaults to
+   *  'https://courtlistenermcp.blakeoxford.com'. */
   baseOrigin?: string;
   handleAuthorizeRoute: (
     request: Request,
     env: TEnv & { OAUTH_PROVIDER: OAuthHelpers },
   ) => Promise<Response>;
-  handleLegacyWorkerFetch: (
+  handleWorkerFetch: (
     request: Request,
     env: TEnv,
     ctx: ExecutionContext,
@@ -79,7 +75,7 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
       bearer_methods_supported: ['header'],
       resource_name: 'CourtListener MCP',
     },
-    apiRoute: ['/mcp', '/sse', '/api/usage'],
+    apiRoute: ['/mcp', '/api/usage'],
     apiHandler: {
       fetch(request: Request, env: TEnv, ctx: ExecutionContext) {
         return handleOAuthProviderApiRequest(request, env, ctx, deps);
@@ -97,7 +93,7 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
                 authorizeRequest,
                 authorizeEnv as TEnv & { OAUTH_PROVIDER: OAuthHelpers },
               ),
-            handleLegacyWorkerFetch: deps.handleLegacyWorkerFetch,
+            handleWorkerFetch: deps.handleWorkerFetch,
           },
         );
       },
@@ -105,26 +101,29 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
     scopesSupported: hostedOAuthScopesSupported,
     allowImplicitFlow: false,
     allowPlainPKCE: false,
-    // Disabled: ChatGPT interprets client_id_metadata_document_supported=true
-    // as "use CIMD instead of DCR" and skips RFC 7591 registration.
-    clientIdMetadataDocumentEnabled: false,
+    // CIMD is the modern OAuth client-registration path. Keep the explicit
+    // /register endpoint above for RFC 7591 clients during the compatibility
+    // window; enabling CIMD does not remove or disable DCR.
+    clientIdMetadataDocumentEnabled: true,
     onError: ({
       code,
       description,
       status,
       headers,
+      request,
     }: {
       code: string;
       description: string;
       status: number;
       headers: Record<string, string>;
+      request?: Request;
     }) =>
       buildOAuthProviderErrorResponse({
         code,
         description,
         status,
         headers,
-        currentRequestOrigin: _currentRequestOrigin,
+        currentRequestOrigin: request ? new URL(request.url).origin : base,
         baseOrigin: base,
       }),
     resolveExternalToken: async ({ token, env }: { token: string; env: TEnv }) => {
@@ -145,9 +144,5 @@ export function createCloudflareOAuthProviderRuntime<TEnv extends OAuthRuntimeEn
     options,
     provider,
     getOAuthHelpers,
-    /** Call before provider.fetch() so onError can derive origin-relative URLs. */
-    setCurrentRequestOrigin(origin: string) {
-      _currentRequestOrigin = origin;
-    },
   };
 }

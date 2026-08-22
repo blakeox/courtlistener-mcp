@@ -1,4 +1,5 @@
 import type { ServerConfig } from '../types.js';
+import type { ConfigEnvironment } from './config.js';
 import { redactSecretsInText } from './secret-redaction.js';
 import {
   evaluateWorkerHostedAuthConfig,
@@ -7,8 +8,6 @@ import {
 
 type WorkerAuthMethod = 'oidc';
 type AuthFeature = 'oauth' | 'oidc' | 'serviceToken' | 'apiKeyAuth';
-type DevFallbackRiskLevel = 'disabled' | 'misconfigured' | 'enabled';
-
 interface AuthCompatibilityRule {
   id: string;
   requiresAll: AuthFeature[];
@@ -40,13 +39,6 @@ export interface AuthPolicyDiagnostics {
     serviceToken: boolean;
     oidc: boolean;
   };
-  devFallback: {
-    userIdConfigured: boolean;
-    allowFlagEnabled: boolean;
-    enabled: boolean;
-    productionLike: boolean;
-    riskLevel: DevFallbackRiskLevel;
-  };
   hostedAuth: WorkerHostedAuthConfigDiagnostics;
   effectivePrimary: WorkerAuthMethod | null;
   incompatibleRulesTriggered: string[];
@@ -64,10 +56,6 @@ function parseBoolean(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-function isProductionLikeEnvironment(env: NodeJS.ProcessEnv): boolean {
-  return env.NODE_ENV?.trim().toLowerCase() === 'production';
-}
-
 function getConfiguredWorkerMethods(
   configured: AuthPolicyDiagnostics['configured'],
 ): WorkerAuthMethod[] {
@@ -76,16 +64,12 @@ function getConfiguredWorkerMethods(
 
 export function evaluateAuthPolicyMatrix(
   config: ServerConfig,
-  env: NodeJS.ProcessEnv = process.env,
+  env: ConfigEnvironment = {},
 ): AuthPolicyEvaluationResult {
   const oauth = config.oauth?.enabled ?? false;
   const apiKeyAuth = config.security.authEnabled;
   const oidc = Boolean(env.OIDC_ISSUER?.trim());
   const serviceToken = Boolean(env.MCP_AUTH_TOKEN?.trim());
-  const devFallbackUserIdConfigured = Boolean(env.MCP_OAUTH_DEV_USER_ID?.trim());
-  const devFallbackAllowFlagEnabled = parseBoolean(env.MCP_ALLOW_DEV_FALLBACK);
-  const devFallbackEnabled = devFallbackUserIdConfigured && devFallbackAllowFlagEnabled;
-  const productionLike = isProductionLikeEnvironment(env);
   const hostedAuth = evaluateWorkerHostedAuthConfig(
     env as Parameters<typeof evaluateWorkerHostedAuthConfig>[0],
   );
@@ -121,12 +105,6 @@ export function evaluateAuthPolicyMatrix(
     );
   }
 
-  if (parseBoolean(env.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS)) {
-    warnings.push(
-      'MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and ignored; explicitly enable MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION and/or MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS for the specific trust boundary you intend to expose.',
-    );
-  }
-
   if (parseBoolean(env.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION)) {
     warnings.push(
       'MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION is enabled; only safe when every route that accepts CF-Access-Jwt-Assertion is protected by Cloudflare Access or another trusted edge boundary that strips spoofed headers.',
@@ -140,45 +118,7 @@ export function evaluateAuthPolicyMatrix(
   }
 
   const configuredWorkerMethods = getConfiguredWorkerMethods(configured);
-  if (env.MCP_AUTH_PRIMARY?.trim()) {
-    warnings.push(
-      'MCP_AUTH_PRIMARY is deprecated and ignored; edge auth now requires OAuth/OIDC for client access',
-    );
-  }
-
-  if (parseBoolean(env.MCP_ALLOW_STATIC_FALLBACK)) {
-    warnings.push(
-      'MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored; static bearer-token fallback is disabled',
-    );
-  }
-
-  if (devFallbackUserIdConfigured && !devFallbackAllowFlagEnabled) {
-    warnings.push(
-      'MCP_OAUTH_DEV_USER_ID is configured but inert because MCP_ALLOW_DEV_FALLBACK is not enabled; remove it outside controlled development to avoid accidental activation',
-    );
-  }
-
-  if (!devFallbackUserIdConfigured && devFallbackAllowFlagEnabled) {
-    warnings.push(
-      'MCP_ALLOW_DEV_FALLBACK is enabled without MCP_OAUTH_DEV_USER_ID; disable the flag outside controlled development because it advertises an unsafe auth shortcut',
-    );
-  }
-
-  if (devFallbackEnabled) {
-    warnings.push(
-      'OAuth dev fallback is enabled; /authorize can assume MCP_OAUTH_DEV_USER_ID without real user authentication. This is unsafe outside controlled development.',
-    );
-    if (productionLike) {
-      errors.push('OAuth dev fallback cannot be enabled when NODE_ENV=production');
-    }
-  }
-
   const effectivePrimary = configuredWorkerMethods[0] ?? null;
-  const devFallbackRiskLevel: DevFallbackRiskLevel = devFallbackEnabled
-    ? 'enabled'
-    : devFallbackUserIdConfigured || devFallbackAllowFlagEnabled
-      ? 'misconfigured'
-      : 'disabled';
 
   return {
     errors: errors.map((message) => redactSecretsInText(message)),
@@ -186,13 +126,6 @@ export function evaluateAuthPolicyMatrix(
     diagnostics: {
       precedence: [...AUTH_POLICY_MATRIX.precedence],
       configured,
-      devFallback: {
-        userIdConfigured: devFallbackUserIdConfigured,
-        allowFlagEnabled: devFallbackAllowFlagEnabled,
-        enabled: devFallbackEnabled,
-        productionLike,
-        riskLevel: devFallbackRiskLevel,
-      },
       hostedAuth,
       effectivePrimary,
       incompatibleRulesTriggered,

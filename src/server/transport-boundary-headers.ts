@@ -1,10 +1,10 @@
 import { isAllowedOrigin } from './worker-security.js';
 
-export const MCP_CORS_ALLOWED_METHODS = 'GET, POST, DELETE, OPTIONS';
+export const MCP_CORS_ALLOWED_METHODS = 'POST, OPTIONS';
 export const MCP_CORS_ALLOWED_HEADERS =
-  'Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version, MCP-Capability-Profile';
+  'Content-Type, Authorization, MCP-Protocol-Version, Mcp-Method, Mcp-Name, MCP-Capability-Profile';
 export const MCP_CORS_EXPOSE_HEADERS =
-  'mcp-session-id, MCP-Protocol-Version, MCP-Capability-Profile, X-MCP-Protocol-Negotiation-Reason';
+  'MCP-Protocol-Version, MCP-Capability-Profile, X-MCP-Protocol-Negotiation-Reason';
 
 export function buildMcpCorsHeaders(origin: string | null, allowedOrigins: string[]): Headers {
   const headers = new Headers({

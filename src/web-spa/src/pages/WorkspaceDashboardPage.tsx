@@ -232,7 +232,7 @@ export function WorkspaceDashboardPage(): React.JSX.Element {
                 <Panel key={name}>
                   <InfoBlock eyebrow={label} title={name} titleAs="strong" description={detail} />
                   {status === 'Manage providers' ? (
-                    <TextLink to="/app/credentials">{status}</TextLink>
+                    <TextLink to="/app/account">{status}</TextLink>
                   ) : (
                     <Badge tone="ok">{status}</Badge>
                   )}

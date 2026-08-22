@@ -162,19 +162,10 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
           withCors,
           jsonError,
           jsonResponse,
-          isRemovedLegacyUiRoute: (pathname) =>
-            pathname === '/api/login' || pathname === '/api/signup',
           workerUiSessionRuntime,
           workerDurableRuntime: {
             consumeBrowserBootstrapHandoff: async () => ({ kind: 'ok', value: true }),
           },
-          getCachedSessionTopology: () => ({
-            version: 'v2',
-            shardCount: 16,
-            idleTtlMs: 1_800_000,
-            absoluteTtlMs: 43_200_000,
-            evictionSweepLimit: 64,
-          }),
           getWorkerLatencySnapshot: () => ({ routes: {} }),
           getUsageSnapshot: async (_unusedEnv, userId) => ({
             userId,
@@ -203,7 +194,7 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
         return;
       }
 
-      if (url.pathname === '/oauth/authorize' || url.pathname === '/authorize') {
+      if (url.pathname === '/oauth/authorize') {
         const authorizeResponse = await handleWorkerOAuthAuthorizeRoute(request, env, {
           jsonError,
           redirectResponse,
@@ -249,16 +240,27 @@ export async function startLocalAuthFlowServer(): Promise<LocalAuthFlowServer> {
             }
             return new Response('not found', { status: 404 });
           },
-          spaAssetResponse: (assetResponse, contentType, buildId, extraHeaders) =>
-            new Response(assetResponse.body, {
+          spaAssetResponse: (assetResponse, contentType, buildId, extraHeaders) => {
+            const headers = new Headers(assetResponse.headers);
+            if (assetResponse.status >= 200 && assetResponse.status < 300) {
+              headers.set('content-type', contentType);
+              headers.set('etag', `"${buildId}"`);
+              headers.set('cache-control', 'public, max-age=31536000, immutable');
+            } else {
+              headers.set('cache-control', 'no-store');
+              headers.delete('etag');
+            }
+            if (extraHeaders) {
+              for (const [name, value] of new Headers(extraHeaders).entries()) {
+                headers.set(name, value);
+              }
+            }
+            return new Response(assetResponse.body, {
               status: assetResponse.status,
-              headers: {
-                'content-type': contentType,
-                etag: `"${buildId}"`,
-                'cache-control': 'public, max-age=300',
-                ...(extraHeaders ? Object.fromEntries(new Headers(extraHeaders).entries()) : {}),
-              },
-            }),
+              statusText: assetResponse.statusText,
+              headers,
+            });
+          },
           generateCspNonce,
           getOrCreateCsrfCookieHeader: workerUiSessionRuntime.getOrCreateCsrfCookieHeader,
           htmlResponse,

@@ -18,18 +18,14 @@ export default defineConfig({
             name: 'courtlistener-mcp-mcp-test',
             scriptPath: '.tmp/workers-test/mcp/worker-mcp.js',
             modules: true,
-            compatibilityDate: '2026-03-02',
-            compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
+            compatibilityDate: '2026-08-18',
+            compatibilityFlags: ['nodejs_als'],
             bindings: {
               COURTLISTENER_API_KEY: 'workers-runtime-test-key',
               CODEMODE_ENABLED: 'false',
             },
             kvNamespaces: {
-              OAUTH_KV: '00000000000000000000000000000001',
               ASYNC_JOBS_KV: '00000000000000000000000000000002',
-            },
-            durableObjects: {
-              MCP_OBJECT: { className: 'CourtListenerMCP' },
             },
           },
         ],

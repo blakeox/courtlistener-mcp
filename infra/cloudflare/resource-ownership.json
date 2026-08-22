@@ -2,7 +2,7 @@
   "schema_version": "v1",
   "source_of_truth": {
     "worker_code_bindings_routes_compatibility": "wrangler",
-    "durable_object_migrations": "wrangler",
+    "durable_object_lifecycle": "wrangler",
     "worker_secrets": "wrangler",
     "account_zone_rules": "terraform_after_import",
     "observability_queries_and_alerts": "cloudflare_read_only_api"

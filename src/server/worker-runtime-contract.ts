@@ -1,5 +1,4 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
-import type { WorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.js';
 
 /** Shared secrets and feature flags for both edge and MCP workers. */
 export interface WorkerPlatformEnv {
@@ -14,7 +13,6 @@ export interface WorkerPlatformEnv {
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
   OIDC_REQUIRED_SCOPE?: string;
-  MCP_UI_PUBLIC_ORIGIN?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
   MCP_TURNSTILE_ENFORCED_ROUTES?: string;
@@ -30,14 +28,7 @@ export interface WorkerPlatformEnv {
   MCP_BOUNDARY_MAX_PAYLOAD_BYTES?: string;
   MCP_BOUNDARY_REPLAY_WINDOW_SECONDS?: string;
   MCP_UI_RATE_LIMIT_ENABLED?: string;
-  MCP_UI_SIGNUP_RATE_LIMIT_MAX?: string;
-  MCP_UI_SIGNUP_RATE_LIMIT_WINDOW_SECONDS?: string;
-  MCP_UI_SIGNUP_RATE_LIMIT_BLOCK_SECONDS?: string;
-  MCP_UI_KEYS_RATE_LIMIT_MAX?: string;
-  MCP_UI_KEYS_RATE_LIMIT_WINDOW_SECONDS?: string;
-  MCP_UI_KEYS_RATE_LIMIT_BLOCK_SECONDS?: string;
   MCP_UI_AI_CHAT_RATE_LIMIT_MAX?: string;
-  MCP_API_KEY_MAX_TTL_DAYS?: string;
   MCP_UI_SESSION_SECRET?: string;
   MCP_UI_INSECURE_COOKIES?: string;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
@@ -46,60 +37,38 @@ export interface WorkerPlatformEnv {
   MCP_AUTH_OIDC_CLIENT_ID?: string;
   MCP_AUTH_OIDC_CLIENT_SECRET?: string;
   MCP_AUTH_OIDC_SCOPES?: string;
-  MCP_SESSION_SHARD_COUNT?: string;
-  MCP_SESSION_IDLE_TTL_SECONDS?: string;
-  MCP_SESSION_ABSOLUTE_TTL_SECONDS?: string;
-  MCP_SESSION_EVICTION_SWEEP_LIMIT?: string;
-  MCP_OAUTH_BACKEND?: string;
-  MCP_OAUTH_DEV_USER_ID?: string;
-  MCP_ALLOW_DEV_FALLBACK?: string;
   MCP_OAUTH_DIAGNOSTICS?: string;
   LOGGING_ENABLED?: string;
   SAMPLING_ENABLED?: string;
-  MCP_RESOURCE_SUBSCRIPTIONS?: string;
-  MCP_NATIVE_TASKS_ENABLED?: string;
   MCP_ASYNC_QUEUE_ENABLED?: string;
   /** Code Mode is an isolated future capability and must remain disabled by default. */
   CODEMODE_ENABLED?: string;
-  MCP_LIST_CHANGED_ENABLED?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
-  MCP_SESSION_LIFECYCLE_FAIL_OPEN?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
   MCP_BOUNDARY_FAIL_OPEN?: string;
   MCP_CF_ANALYTICS_ENABLED?: string;
-  AUTH_FAILURE_LIMITER: DurableObjectNamespace;
+  /** Wrangler-generated binding type from the deployed Worker configuration. */
+  AUTH_FAILURE_LIMITER: GeneratedMcpEnv['AUTH_FAILURE_LIMITER'];
 }
 
 /** Portal worker: OAuth, hosted auth, SPA assets, UI API (no tool registry in bundle). */
 export interface WorkerEdgeEnv extends WorkerPlatformEnv {
-  SPA_ASSETS: Fetcher;
+  SPA_ASSETS: GeneratedEdgeEnv['SPA_ASSETS'];
   /** Service binding to the MCP worker (`courtlistener-mcp-mcp`). */
-  MCP_SERVICE?: Fetcher;
-  /** Local dev fallback when `MCP_SERVICE` is unset (wrangler edge + mcp on two ports). */
-  MCP_DEV_UPSTREAM_URL?: string;
-  OAUTH_KV: KVNamespace;
-  ANALYTICS?: AnalyticsEngineDataset;
+  MCP_SERVICE: GeneratedEdgeEnv['MCP_SERVICE'];
+  OAUTH_KV: GeneratedEdgeEnv['OAUTH_KV'];
+  ANALYTICS: GeneratedEdgeEnv['ANALYTICS'];
   OAUTH_PROVIDER?: OAuthHelpers;
 }
 
-/** MCP worker: `/mcp`, `/sse`, CourtListenerMCP DO, async tool queue. */
+/** MCP worker: stateless `/mcp`, async tool queue. */
 export interface WorkerMcpEnv extends WorkerPlatformEnv {
-  MCP_OBJECT: DurableObjectNamespace;
-  ASYNC_JOBS_KV?: KVNamespace;
-  ASYNC_TOOL_QUEUE?: Queue<import('./worker-async-queue-runtime.js').AsyncJobMessage>;
-  ANALYTICS?: AnalyticsEngineDataset;
-  AI?: {
-    run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
-  };
+  ASYNC_JOBS_KV: GeneratedMcpEnv['ASYNC_JOBS_KV'];
+  ASYNC_TOOL_QUEUE: GeneratedMcpEnv['ASYNC_TOOL_QUEUE'];
+  ANALYTICS: GeneratedMcpEnv['ANALYTICS'];
+  AI: GeneratedMcpEnv['AI'];
   CLOUDFLARE_AI_MODEL?: string;
-}
-
-/** @deprecated Prefer WorkerEdgeEnv or WorkerMcpEnv for new code. */
-export interface Env extends WorkerEdgeEnv, WorkerMcpEnv {
-  MCP_OBJECT: DurableObjectNamespace;
-  SPA_ASSETS: Fetcher;
-  MCP_SERVICE: Fetcher;
 }
 
 export const DEFAULT_AUTH_FAILURE_LIMIT_MAX = 20;
@@ -124,11 +93,7 @@ export interface LatencyStats {
   unavailableCount: number;
 }
 
-export type DurableObjectLatencyDimension =
-  | 'auth_limiter'
-  | 'session_revocation'
-  | 'mcp_session_lifecycle'
-  | 'ai_chat_quota';
+export type DurableObjectLatencyDimension = 'auth_limiter' | 'session_revocation' | 'ai_chat_quota';
 export type LatencySnapshot = {
   count: number;
   avg_ms: number;
@@ -240,43 +205,6 @@ export interface UsageCounterResponseBody {
   browserBootstrap: BrowserBootstrapUsageSummary;
 }
 
-export type McpSessionLifecycleAction =
-  | 'mcp_session_register'
-  | 'mcp_session_touch'
-  | 'mcp_session_close';
-
-export interface McpSessionLifecycleRequestBody {
-  action: McpSessionLifecycleAction;
-  nowMs: number;
-  sessionId: string;
-  idleTtlMs: number;
-  absoluteTtlMs: number;
-  evictionSweepLimit: number;
-  shardHint?: string;
-}
-
-export type McpSessionEvictionReason =
-  | 'active'
-  | 'missing'
-  | 'idle_evicted'
-  | 'absolute_evicted'
-  | 'closed';
-
-export interface McpSessionLifecycleResponseBody {
-  active: boolean;
-  reason: McpSessionEvictionReason;
-  sessionId: string;
-  shard: string;
-}
-
-export interface McpSessionLifecycleState {
-  sessionId: string;
-  createdAtMs: number;
-  lastSeenAtMs: number;
-  idleExpiresAtMs: number;
-  absoluteExpiresAtMs: number;
-}
-
 export interface LifetimeQuotaRequestBody {
   action: 'quota_increment_check';
   maxAllowed: number;
@@ -294,5 +222,3 @@ export const DEFAULT_AUTH_FAILURE_STATE: AuthFailureState = {
   windowStartedAtMs: 0,
   blockedUntilMs: 0,
 };
-
-export type SessionTopologyCache = Map<string, WorkerMcpSessionTopologyV2>;

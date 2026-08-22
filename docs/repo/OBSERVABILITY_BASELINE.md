@@ -32,7 +32,7 @@ Use these fields consistently where possible across Worker and local runtimes:
 ## Incident-first troubleshooting flow
 
 1. Confirm `/health` status.
-2. Verify MCP initialize handshake on `/mcp`.
+2. Verify MCP v2 `server/discover` and an envelope-bearing request on `/mcp`.
 3. Check auth mode-specific failures (missing token, issuer mismatch).
 4. Check CORS/origin rejection events.
 5. Check upstream dependency failure rate and timeout spikes.
@@ -45,8 +45,8 @@ Use these fields consistently where possible across Worker and local runtimes:
   configuration drift.
 - `authPolicy.precedence`:
   - Unexpected order or missing mode indicates auth selection drift.
-  - Verify `MCP_AUTH_PRIMARY`, `MCP_ALLOW_STATIC_FALLBACK`, and OIDC/static
-    variables align with intended policy.
+  - Verify the explicit OAuth/OIDC and service-token variables align with the
+    intended policy.
 
 ## Common incident remediation runbook
 
@@ -101,9 +101,9 @@ and kill switch:
 | Signal                  | Leading indicator                                    | Lagging indicator                        | Kill switch                                                  |
 | ----------------------- | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------ |
 | Edge-to-MCP binding     | `/ready` failures, binding exceptions                | MCP 5xx rate                             | Stop promotion; revert the paired Worker version             |
-| Stale deployment        | Edge/MCP version mismatch                            | Protocol initialize failures             | Hold release; restore the last paired version                |
+| Stale deployment        | Edge/MCP version mismatch                            | Protocol discovery or envelope failures  | Hold release; restore the last paired version                |
 | Boundary/auth           | 401/403/409/429 rate by role                         | Successful authenticated request rate    | Disable async/Code Mode; preserve direct read-only MCP       |
-| Durable Objects         | unavailable count and wake/init latency              | session/reconnect failure rate           | Stop promotion; do not reverse migrations                    |
+| Durable Objects         | unavailable count and wake/init latency              | auth-limiter failure rate                | Stop promotion; do not reverse lifecycle changes             |
 | Queue                   | oldest-message age, retry count, backlog             | terminal-success/time-to-completion rate | Set `MCP_ASYNC_QUEUE_ENABLED=false`; leave direct MCP online |
 | DLQ                     | new message count and reason                         | unrecovered job count                    | Disable async; preserve DLQ for inspection, do not purge     |
 | Secret/config readiness | `/ready` check failures and config fingerprint drift | request/auth failure rate                | Stop deployment; rotate only the affected secret             |

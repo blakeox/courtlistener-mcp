@@ -29,8 +29,8 @@ interface MockWorkerHealth {
   service: 'courtlistener-mcp';
   timestamp: string;
   version: string;
-  runtime: 'node' | 'cloudflare-worker';
-  transport: 'cloudflare-agents-streamable-http';
+  runtime: 'cloudflare-worker';
+  transport: 'cloudflare-mcp-v2-streamable-http';
   diagnostics: {
     cloudflare: {
       analytics_enabled: boolean;
@@ -41,18 +41,10 @@ interface MockWorkerHealth {
     metrics: {
       latency_ms: Record<string, unknown>;
     };
-    session_topology: {
-      version: string;
-      shard_count: number;
-      idle_ttl_ms: number;
-      absolute_ttl_ms: number;
-      eviction_sweep_limit: number;
-    };
   };
 }
 
 interface MockRuntimeCatalog {
-  sessionId?: string;
   protocolVersion?: string;
   serverName?: string;
   serverVersion?: string;
@@ -92,7 +84,7 @@ interface InstallSpaMocksOptions {
   };
   runtimeFailures?: Partial<
     Record<
-      'initialize' | 'tools/list' | 'resources/list' | 'prompts/list',
+      'server/discover' | 'tools/list' | 'resources/list' | 'prompts/list',
       {
         status?: number;
         body?: Record<string, unknown>;
@@ -135,7 +127,7 @@ const defaultWorkerHealth: MockWorkerHealth = {
   timestamp: '2026-04-23T00:00:00.000Z',
   version: '1.0.5-test',
   runtime: 'cloudflare-worker',
-  transport: 'cloudflare-agents-streamable-http',
+  transport: 'cloudflare-mcp-v2-streamable-http',
   diagnostics: {
     cloudflare: {
       analytics_enabled: true,
@@ -148,13 +140,6 @@ const defaultWorkerHealth: MockWorkerHealth = {
         route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
         runtime_latency_ms: { queue_latency_ms: { count: 2, avg_ms: 40 } },
       },
-    },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1_800_000,
-      absolute_ttl_ms: 43_200_000,
-      eviction_sweep_limit: 100,
     },
   },
 };
@@ -274,7 +259,6 @@ export async function installSpaMocks(
 
     const payload = route.request().postDataJSON() as { method?: string } | null;
     const method = payload?.method;
-    const sessionId = runtime.sessionId ?? 'mcp-session-e2e';
     const runtimeFailure = method ? runtimeFailures[method] : undefined;
 
     if (runtimeFailure) {
@@ -289,12 +273,12 @@ export async function installSpaMocks(
       return;
     }
 
-    if (method === 'initialize') {
+    if (method === 'server/discover') {
       await fulfillJson(
         route,
         {
           result: {
-            protocolVersion: runtime.protocolVersion ?? '2025-06-18',
+            protocolVersion: runtime.protocolVersion ?? '2026-07-28',
             serverInfo: {
               name: runtime.serverName ?? 'courtlistener-mcp',
               version: runtime.serverVersion ?? '1.0.5-test',
@@ -307,7 +291,6 @@ export async function installSpaMocks(
           },
         },
         200,
-        { 'mcp-session-id': sessionId },
       );
       return;
     }
@@ -322,7 +305,6 @@ export async function installSpaMocks(
           },
         },
         200,
-        { 'mcp-session-id': sessionId },
       );
       return;
     }
@@ -336,7 +318,6 @@ export async function installSpaMocks(
           },
         },
         200,
-        { 'mcp-session-id': sessionId },
       );
       return;
     }
@@ -350,7 +331,6 @@ export async function installSpaMocks(
           },
         },
         200,
-        { 'mcp-session-id': sessionId },
       );
       return;
     }
@@ -364,7 +344,6 @@ export async function installSpaMocks(
         },
       },
       200,
-      { 'mcp-session-id': sessionId },
     );
   });
 }

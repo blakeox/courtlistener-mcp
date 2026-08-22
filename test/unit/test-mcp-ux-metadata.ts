@@ -2,12 +2,12 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 
 import { bootstrapServices } from '../../src/infrastructure/bootstrap.js';
 import { container } from '../../src/infrastructure/container.js';
 import { CacheManager } from '../../src/infrastructure/cache.js';
-import { BestPracticeLegalMCPServer } from '../../src/server/best-practice-server.js';
+import { LocalMcpV2Runtime } from '../../src/server/mcp-v2-server.js';
 import { PromptHandlerRegistry } from '../../src/server/prompt-handler.js';
 import { ResourceHandlerRegistry } from '../../src/server/resource-handler.js';
 import { MCP_ASYNC_CONTROL_TOOLS } from '../../src/server/async-tool-workflow.js';
@@ -34,9 +34,9 @@ describe('MCP protocol UX metadata', () => {
     container.clearAll();
   });
 
-  it('returns complete tool UX metadata without breaking legacy fields', async () => {
-    const server = new BestPracticeLegalMCPServer();
-    try {
+  it('returns complete tool UX metadata', async () => {
+    const server = new LocalMcpV2Runtime();
+    {
       const result = await server.listTools();
       const tools = result.tools as Tool[];
 
@@ -75,8 +75,6 @@ describe('MCP protocol UX metadata', () => {
         );
         assert.equal(uxMeta.asyncEligible, false, `${tool.name} must not be queue-eligible`);
       }
-    } finally {
-      await server.stop();
     }
   });
 

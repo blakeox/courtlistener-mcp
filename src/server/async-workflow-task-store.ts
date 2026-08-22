@@ -1,18 +1,40 @@
 import type {
-  TaskStore,
-  CreateTaskOptions,
-} from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import type {
   CallToolResult,
   CreateTaskResult,
   Request,
   RequestId,
   Result,
   Task,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
+
+export type CreateTaskOptions = Record<string, unknown>;
 
 import type { AsyncPublicJobPort } from './async-public-job-port.js';
 import type { AsyncJobSnapshot, AsyncJobStatus } from './async-tool-workflow.js';
+
+export interface TaskStore {
+  createTask(
+    taskParams: CreateTaskOptions,
+    requestId: RequestId,
+    request: Request,
+    sessionId?: string,
+  ): Promise<Task>;
+  getTask(taskId: string, sessionId?: string): Promise<Task | null>;
+  storeTaskResult(
+    taskId: string,
+    status: 'completed' | 'failed',
+    result: Result,
+    sessionId?: string,
+  ): Promise<void>;
+  getTaskResult(taskId: string, sessionId?: string): Promise<Result>;
+  updateTaskStatus(
+    taskId: string,
+    status: Task['status'],
+    statusMessage?: string,
+    sessionId?: string,
+  ): Promise<void>;
+  listTasks(cursor?: string, sessionId?: string): Promise<{ tasks: Task[]; nextCursor?: string }>;
+}
 
 function mapJobStatusToTaskStatus(status: AsyncJobStatus, errorCode?: string): Task['status'] {
   switch (status) {
