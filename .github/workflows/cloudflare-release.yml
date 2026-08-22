@@ -147,7 +147,7 @@ jobs:
           else
             probe_directory=release-probes
           fi
-          if [ "${{ inputs.promote }}" = "true" ] && [ "${{ job.status }}" != "success" ]; then
+          if [ "${{ job.status }}" != "success" ]; then
             decision=rollback
           elif [ "${{ inputs.promote }}" = "true" ]; then
             decision=promote

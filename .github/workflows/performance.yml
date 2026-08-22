@@ -56,7 +56,7 @@ jobs:
           REMOTE_BASE_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field baseUrl)"
 
           start_local_workers() {
-            pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
+            LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
             LOCAL_WORKERS_PID=$!
             for attempt in $(seq 1 30); do
               if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then

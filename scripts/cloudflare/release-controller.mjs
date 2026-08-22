@@ -358,7 +358,7 @@ export function buildRollbackArgs(role, versionId, configFile, message) {
   }
 
   if (role === 'auth_limiter') {
-    return ['rollback', versionId, '-c', configFile, '--message', message];
+    return ['rollback', versionId, '-c', configFile, '--message', message, '-y'];
   }
 
   return ['versions', 'deploy', `${versionId}@100`, '-c', configFile, '--message', message, '-y'];
