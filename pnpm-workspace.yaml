@@ -1,9 +1,9 @@
 # Native build scripts are explicit supply-chain approvals for CI installs.
-onlyBuiltDependencies:
-  - core-js-pure
-  - esbuild
-  - lefthook
-  - workerd
+allowBuilds:
+  core-js-pure: true
+  esbuild: true
+  lefthook: true
+  workerd: true
 
 # Exact current toolchain releases approved while they pass through the normal
 # release-age window; prune entries once the policy no longer needs them.
