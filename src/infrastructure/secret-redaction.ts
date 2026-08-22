@@ -12,11 +12,13 @@ const SECRET_ENV_KEYS = [
   'TURNSTILE_SECRET_KEY',
 ] as const;
 
+export type SecretEnvironment = Readonly<Record<string, string | undefined>>;
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function collectConfiguredSecrets(env: NodeJS.ProcessEnv = process.env): string[] {
+function collectConfiguredSecrets(env: SecretEnvironment = {}): string[] {
   const values = new Set<string>();
 
   for (const key of SECRET_ENV_KEYS) {
@@ -47,7 +49,7 @@ export function isSensitiveKeyName(key: string): boolean {
 
 export function redactSecretsInText(
   value: string,
-  options: { additionalSecrets?: string[] } = {},
+  options: { additionalSecrets?: string[]; configuredEnvironment?: SecretEnvironment } = {},
 ): string {
   let redacted = value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
   redacted = redacted.replace(
@@ -59,7 +61,7 @@ export function redactSecretsInText(
     '$1$2[REDACTED]',
   );
 
-  const configured = collectConfiguredSecrets();
+  const configured = collectConfiguredSecrets(options.configuredEnvironment);
   const additional =
     options.additionalSecrets
       ?.map((candidate) => candidate.trim())

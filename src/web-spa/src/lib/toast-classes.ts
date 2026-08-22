@@ -23,4 +23,4 @@ export function toastClassName(type: 'ok' | 'error' | 'info'): string {
 }
 
 export const toastDismissClass =
-  'toast-dismiss ml-auto px-0.5 text-[0.85rem] opacity-80 hover:opacity-100';
+  'toast-dismiss ml-auto px-0.5 text-[0.85rem] text-faint hover:text-foreground';

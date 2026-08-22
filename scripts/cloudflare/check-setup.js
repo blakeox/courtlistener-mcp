@@ -2,14 +2,22 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { isCloudflareAccessLoginRedirect } from './url-helpers.js';
+import {
+  WRANGLER_EDGE_CONFIG,
+  WRANGLER_MCP_CONFIG,
+  formatSecretPutCommand,
+  listWranglerSecrets,
+  runWrangler,
+} from './lib/wrangler-secrets.mjs';
 
 const projectRoot = process.cwd();
-const wranglerEdgeConfigPath = join(projectRoot, 'wrangler.edge.jsonc');
-const wranglerMcpConfigPath = join(projectRoot, 'wrangler.mcp.jsonc');
+const wranglerEdgeConfigPath = join(projectRoot, WRANGLER_EDGE_CONFIG);
+const wranglerMcpConfigPath = join(projectRoot, WRANGLER_MCP_CONFIG);
+const wranglerEdgeConfig = WRANGLER_EDGE_CONFIG;
+const wranglerMcpConfig = WRANGLER_MCP_CONFIG;
 
-const requiredSecrets = ['COURTLISTENER_API_KEY'];
+const requiredMcpSecrets = ['COURTLISTENER_API_KEY'];
 
 function color(text, code) {
   return `\x1b[${code}m${text}\x1b[0m`;
@@ -25,18 +33,6 @@ function warn(msg) {
 
 function fail(msg) {
   console.log(`${color('✖', '31')} ${msg}`);
-}
-
-function run(command, args) {
-  const result = spawnSync(command, args, {
-    encoding: 'utf-8',
-    cwd: projectRoot,
-  });
-  return {
-    status: result.status ?? 1,
-    stdout: (result.stdout || '').trim(),
-    stderr: (result.stderr || '').trim(),
-  };
 }
 
 function stripJsonComments(input) {
@@ -67,27 +63,6 @@ function deriveBaseUrl(config) {
   return null;
 }
 
-function validateAuthUiOrigin(rawValue) {
-  if (!rawValue) {
-    return { ok: false, reason: 'missing' };
-  }
-  try {
-    const parsed = new URL(rawValue);
-    const hasExtraPath = parsed.pathname && parsed.pathname !== '/';
-    const hasExtraQuery = Boolean(parsed.search);
-    const hasExtraHash = Boolean(parsed.hash);
-    return {
-      ok: true,
-      normalized: parsed.origin,
-      hasExtraPath,
-      hasExtraQuery,
-      hasExtraHash,
-    };
-  } catch {
-    return { ok: false, reason: 'invalid' };
-  }
-}
-
 function parseBoolean(rawValue) {
   if (!rawValue) return false;
   const normalized = rawValue.trim().toLowerCase();
@@ -103,6 +78,46 @@ function parseConfiguredRoutes(rawValue) {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function validateRuntimeHealthCorePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return { ok: false, reason: 'health payload is not a JSON object' };
+  }
+
+  const { status, service, timestamp, version, runtime } = payload;
+  if (!['ok', 'degraded', 'unhealthy'].includes(status)) {
+    return { ok: false, reason: `unexpected health status: ${String(status)}` };
+  }
+  if (service !== 'courtlistener-mcp') {
+    return { ok: false, reason: `unexpected health service: ${String(service)}` };
+  }
+  if (typeof timestamp !== 'string' || Number.isNaN(Date.parse(timestamp))) {
+    return { ok: false, reason: 'health timestamp is missing or invalid' };
+  }
+  if (typeof version !== 'string' || version.trim().length === 0) {
+    return { ok: false, reason: 'health version is missing' };
+  }
+  if (runtime !== 'cloudflare-worker') {
+    return { ok: false, reason: `unexpected health runtime: ${String(runtime)}` };
+  }
+
+  if (typeof payload.transport !== 'string' || payload.transport.trim().length === 0) {
+    return { ok: false, reason: 'health payload missing transport' };
+  }
+
+  const diagnostics = payload.diagnostics;
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return { ok: false, reason: 'health payload missing diagnostics object' };
+  }
+
+  for (const key of ['cloudflare', 'metrics']) {
+    if (!diagnostics[key] || typeof diagnostics[key] !== 'object') {
+      return { ok: false, reason: `diagnostics.${key} is missing` };
+    }
+  }
+
+  return { ok: true };
 }
 
 async function checkEndpoint(baseUrl, path, init = {}) {
@@ -125,23 +140,25 @@ async function checkEndpoint(baseUrl, path, init = {}) {
   }
 }
 
-async function checkMcpInitialize(baseUrl, path) {
+async function checkMcpDiscover(baseUrl, path) {
   try {
     const res = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'MCP-Protocol-Version': '2024-11-05',
+        Accept: 'application/json',
+        'MCP-Protocol-Version': '2026-07-28',
+        'Mcp-Method': 'server/discover',
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        method: 'initialize',
+        method: 'server/discover',
         params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'cloudflare-check', version: '1.0.0' },
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
         },
       }),
     });
@@ -158,12 +175,14 @@ async function checkMcpInitialize(baseUrl, path) {
     const hasResultSse = text.includes('"result"') && text.includes('"jsonrpc"');
     return {
       ok: res.ok && (Boolean(hasResultJson) || hasResultSse),
+      authProtected: [401, 403, 429].includes(res.status),
       status: res.status,
       body: text,
     };
   } catch (error) {
     return {
       ok: false,
+      authProtected: false,
       status: 0,
       body: error instanceof Error ? error.message : String(error),
     };
@@ -175,7 +194,7 @@ async function main() {
 
   let hasCriticalError = false;
 
-  const version = run('wrangler', ['--version']);
+  const version = runWrangler(projectRoot, ['--version']);
   if (version.status !== 0) {
     fail('Wrangler CLI is not available.');
     hasCriticalError = true;
@@ -183,9 +202,9 @@ async function main() {
     ok(`Wrangler detected: ${version.stdout}`);
   }
 
-  const whoami = run('wrangler', ['whoami']);
+  const whoami = runWrangler(projectRoot, ['whoami']);
   if (whoami.status !== 0) {
-    fail('Not authenticated with Cloudflare. Run `wrangler login`.');
+    fail('Not authenticated with Cloudflare. Run `pnpm exec wrangler login`.');
     hasCriticalError = true;
   } else {
     ok('Cloudflare authentication is valid.');
@@ -210,7 +229,6 @@ async function main() {
   const trustCfAccessHeaders = parseBoolean(
     configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS,
   );
-  const trustCfAccessDeprecated = parseBoolean(configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS);
   const trustCfAccessAcknowledged = parseBoolean(
     configuredVars.MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED,
   );
@@ -227,6 +245,26 @@ async function main() {
       ok('MCP worker entrypoint is src/worker-mcp.ts.');
     }
 
+    for (const [role, config] of [
+      ['edge', edgeConfig],
+      ['mcp', mcpConfig],
+    ]) {
+      if (parseBoolean(config?.vars?.CODEMODE_ENABLED)) {
+        fail(`Code Mode must remain disabled in the production ${role} Worker preflight.`);
+        hasCriticalError = true;
+      } else {
+        ok(`Code Mode is disabled in the production ${role} Worker config.`);
+      }
+      if (Array.isArray(config?.worker_loaders) && config.worker_loaders.length > 0) {
+        fail(
+          `Code Mode Worker Loader bindings must not be present in the disabled production ${role} Worker config.`,
+        );
+        hasCriticalError = true;
+      } else {
+        ok(`No Code Mode Worker Loader binding is present on the production ${role} Worker.`);
+      }
+    }
+
     const hasMcpService =
       Array.isArray(edgeConfig?.services) &&
       edgeConfig.services.some(
@@ -239,16 +277,38 @@ async function main() {
       ok('Service binding is configured: MCP_SERVICE -> courtlistener-mcp-mcp.');
     }
 
-    const hasMcpDoBinding =
-      Array.isArray(mcpConfig?.durable_objects?.bindings) &&
-      mcpConfig.durable_objects.bindings.some(
-        (b) => b?.name === 'MCP_OBJECT' && b?.class_name === 'CourtListenerMCP',
+    const hasEdgeService =
+      Array.isArray(mcpConfig?.services) &&
+      mcpConfig.services.some(
+        (s) => s?.binding === 'EDGE_SERVICE' && s?.service === 'courtlistener-mcp',
       );
-    if (!hasMcpDoBinding) {
-      fail('Missing Durable Object binding MCP_OBJECT -> CourtListenerMCP on MCP worker.');
+    if (hasEdgeService) {
+      fail(
+        'Reverse service binding EDGE_SERVICE -> courtlistener-mcp is still configured on the MCP worker; direct MCP secret ownership is required.',
+      );
       hasCriticalError = true;
     } else {
-      ok('MCP worker DO binding is configured: MCP_OBJECT -> CourtListenerMCP.');
+      ok('No reverse EDGE_SERVICE secret binding is configured on the MCP worker.');
+    }
+
+    const mcpOAuthKvBinding = Array.isArray(mcpConfig?.kv_namespaces)
+      ? mcpConfig.kv_namespaces.find((ns) => ns?.binding === 'OAUTH_KV')
+      : null;
+    if (mcpOAuthKvBinding) {
+      fail('OAUTH_KV is edge-owned and must not be bound to the MCP worker.');
+      hasCriticalError = true;
+    } else {
+      ok('OAuth KV remains edge-owned; MCP has no OAUTH_KV binding.');
+    }
+
+    const publicMcpRoutes = Array.isArray(mcpConfig?.routes) ? mcpConfig.routes : [];
+    if (publicMcpRoutes.length > 0) {
+      fail(
+        'Public MCP zone routes are still configured on the MCP worker; public /mcp ingress must terminate at the Edge worker.',
+      );
+      hasCriticalError = true;
+    } else {
+      ok('MCP worker has no public zone routes; Edge owns canonical /mcp ingress.');
     }
 
     const authLimiterBinding = Array.isArray(edgeConfig?.durable_objects?.bindings)
@@ -300,58 +360,75 @@ async function main() {
       warn('ASYNC_TOOL_QUEUE producer binding is not configured.');
     }
 
+    const asyncQueueConsumers = Array.isArray(mcpConfig?.queues?.consumers)
+      ? mcpConfig.queues.consumers.filter(
+          (consumer) => consumer?.queue === 'courtlistener-mcp-async-tool-jobs',
+        )
+      : [];
+    if (asyncQueueConsumers.length !== 1) {
+      fail(`Expected exactly one MCP async Queue consumer, found ${asyncQueueConsumers.length}.`);
+      hasCriticalError = true;
+    } else {
+      const asyncQueueConsumer = asyncQueueConsumers[0];
+      if (!Number.isInteger(asyncQueueConsumer.max_retries) || asyncQueueConsumer.max_retries < 1) {
+        fail('MCP async Queue consumer must declare a positive max_retries value.');
+        hasCriticalError = true;
+      }
+      if (
+        typeof asyncQueueConsumer.dead_letter_queue !== 'string' ||
+        asyncQueueConsumer.dead_letter_queue.trim().length === 0
+      ) {
+        fail('MCP async Queue consumer must declare a dead_letter_queue.');
+        hasCriticalError = true;
+      } else {
+        ok(
+          `MCP async Queue consumer retry/DLQ policy is configured (${asyncQueueConsumer.max_retries} retries -> ${asyncQueueConsumer.dead_letter_queue}).`,
+        );
+      }
+    }
+
     const analyticsBinding =
       Array.isArray(config?.analytics_engine_datasets) &&
       config.analytics_engine_datasets.find((dataset) => dataset?.binding === 'ANALYTICS');
     if (analyticsBinding) {
-      ok(`ANALYTICS dataset binding is configured (${String(analyticsBinding.dataset)}).`);
+      if (parseBoolean(config?.vars?.MCP_CF_ANALYTICS_ENABLED)) {
+        ok(
+          `ANALYTICS dataset binding is configured and enabled (${String(analyticsBinding.dataset)}).`,
+        );
+      } else {
+        fail('ANALYTICS dataset binding exists but MCP_CF_ANALYTICS_ENABLED is not true.');
+        hasCriticalError = true;
+      }
     } else {
       warn('ANALYTICS dataset binding is not configured.');
     }
 
-    const authUiOrigin =
-      typeof configuredVars.MCP_AUTH_UI_ORIGIN === 'string'
-        ? configuredVars.MCP_AUTH_UI_ORIGIN.trim()
-        : '';
-    const allowDevFallback =
-      typeof configuredVars.MCP_ALLOW_DEV_FALLBACK === 'string'
-        ? configuredVars.MCP_ALLOW_DEV_FALLBACK.trim().toLowerCase()
-        : '';
-    if (authUiOrigin) {
-      const authUiOriginCheck = validateAuthUiOrigin(authUiOrigin);
-      if (!authUiOriginCheck.ok) {
-        warn(`MCP_AUTH_UI_ORIGIN is set but not a valid absolute URL: ${authUiOrigin}`);
-      } else {
-        warn(
-          `MCP_AUTH_UI_ORIGIN is configured (${authUiOriginCheck.normalized}) but deprecated and ignored; hosted auth now starts on the Worker origin.`,
+    const mcpAnalyticsBinding =
+      Array.isArray(mcpConfig?.analytics_engine_datasets) &&
+      mcpConfig.analytics_engine_datasets.find((dataset) => dataset?.binding === 'ANALYTICS');
+    if (mcpAnalyticsBinding) {
+      if (parseBoolean(mcpConfig?.vars?.MCP_CF_ANALYTICS_ENABLED)) {
+        ok(
+          `MCP ANALYTICS dataset binding is configured and enabled (${String(mcpAnalyticsBinding.dataset)}).`,
         );
-        if (
-          authUiOriginCheck.hasExtraPath ||
-          authUiOriginCheck.hasExtraQuery ||
-          authUiOriginCheck.hasExtraHash
-        ) {
-          warn(
-            'MCP_AUTH_UI_ORIGIN is deprecated; remove it instead of pointing it at an auth app or URL path.',
-          );
-        }
+      } else {
+        fail('MCP ANALYTICS dataset binding exists but MCP_CF_ANALYTICS_ENABLED is not true.');
+        hasCriticalError = true;
       }
     } else {
-      ok(
-        'MCP_AUTH_UI_ORIGIN is not configured; hosted auth will use Worker-owned same-origin routes.',
-      );
+      warn('MCP ANALYTICS dataset binding is not configured.');
     }
-    if (!allowDevFallback || allowDevFallback === 'false' || allowDevFallback === '0') {
-      ok('MCP_ALLOW_DEV_FALLBACK is disabled.');
+
+    const asyncQueueFlag = mcpConfig?.vars?.MCP_ASYNC_QUEUE_ENABLED;
+    if (asyncQueueFlag === 'false') {
+      ok('MCP_ASYNC_QUEUE_ENABLED is explicitly false in the production MCP config.');
     } else {
-      fail('MCP_ALLOW_DEV_FALLBACK is enabled. Disable this in production.');
-      hasCriticalError = true;
-    }
-    if (trustCfAccessDeprecated) {
       fail(
-        'MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and unsafe. Remove it and use the scoped trust flags only when an explicit trusted edge boundary exists.',
+        `MCP_ASYNC_QUEUE_ENABLED must be explicitly false in the production MCP config (found ${String(asyncQueueFlag)}).`,
       );
       hasCriticalError = true;
     }
+
     if ((trustCfAccessJwt || trustCfAccessHeaders) && !trustCfAccessAcknowledged) {
       fail(
         'Cloudflare Access trust flags are enabled without MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true. This deploy gate requires an explicit acknowledgement before trusting Access JWT assertions or identity headers.',
@@ -369,53 +446,68 @@ async function main() {
     }
   }
 
-  const secretList = run('wrangler', ['secret', 'list']);
-  let secretNames = [];
-  if (secretList.status === 0) {
-    try {
-      const parsed = JSON.parse(secretList.stdout);
-      secretNames = Array.isArray(parsed) ? parsed.map((s) => s.name).filter(Boolean) : [];
-      ok(`Found ${secretNames.length} Cloudflare secrets.`);
-    } catch {
-      warn('Could not parse `wrangler secret list` output.');
-    }
+  const edgeSecretList = listWranglerSecrets(projectRoot, wranglerEdgeConfig);
+  const mcpSecretList = listWranglerSecrets(projectRoot, wranglerMcpConfig);
+  const edgeSecretNames = edgeSecretList.names;
+  const mcpSecretNames = mcpSecretList.names;
+  const allSecretNames = [...new Set([...edgeSecretNames, ...mcpSecretNames])];
+
+  if (edgeSecretList.ok) {
+    ok(`Found ${edgeSecretNames.length} secrets on edge worker (${wranglerEdgeConfig}).`);
   } else {
-    warn('Could not list Cloudflare secrets.');
+    warn(`Could not list edge worker secrets (${wranglerEdgeConfig}): ${edgeSecretList.error}`);
   }
 
-  for (const secret of requiredSecrets) {
-    if (!secretNames.includes(secret)) {
-      fail(`Missing required secret: ${secret} (run: wrangler secret put ${secret})`);
-      hasCriticalError = true;
-    } else {
-      ok(`Required secret present: ${secret}`);
+  if (mcpSecretList.ok) {
+    ok(`Found ${mcpSecretNames.length} secrets on MCP worker (${wranglerMcpConfig}).`);
+  } else {
+    warn(`Could not list MCP worker secrets (${wranglerMcpConfig}): ${mcpSecretList.error}`);
+  }
+
+  for (const secret of requiredMcpSecrets) {
+    if (mcpSecretNames.includes(secret)) {
+      ok(`Required MCP worker secret present: ${secret}`);
+      continue;
     }
+
+    if (edgeSecretNames.includes(secret)) {
+      fail(
+        `${secret} is configured on the edge worker but missing on the MCP worker. Direct MCP ownership is required; run: ${formatSecretPutCommand(secret, wranglerMcpConfig)}`,
+      );
+      hasCriticalError = true;
+      continue;
+    }
+
+    fail(
+      `Missing required MCP worker secret: ${secret} (run: ${formatSecretPutCommand(secret, wranglerMcpConfig)})`,
+    );
+    hasCriticalError = true;
   }
 
-  const hasStaticAuth = secretNames.includes('MCP_AUTH_TOKEN');
-  const hasOidcAuth = secretNames.includes('OIDC_ISSUER');
-  const hasOidcAudience = secretNames.includes('OIDC_AUDIENCE');
-  const hasUiSessionSecret = secretNames.includes('MCP_UI_SESSION_SECRET');
+  const hasStaticAuth = mcpSecretNames.includes('MCP_AUTH_TOKEN');
+  const hasOidcAuth = edgeSecretNames.includes('OIDC_ISSUER');
+  const hasOidcAudience = edgeSecretNames.includes('OIDC_AUDIENCE');
+  const hasUiSessionSecret = edgeSecretNames.includes('MCP_UI_SESSION_SECRET');
   const hasTurnstileSiteKey =
-    secretNames.includes('TURNSTILE_SITE_KEY') ||
+    edgeSecretNames.includes('TURNSTILE_SITE_KEY') ||
     hasConfiguredValue(configuredVars, 'TURNSTILE_SITE_KEY');
-  const hasTurnstileSecretKey = secretNames.includes('TURNSTILE_SECRET_KEY');
+  const hasTurnstileSecretKey = edgeSecretNames.includes('TURNSTILE_SECRET_KEY');
   const analyticsEnabled = parseBoolean(configuredVars.MCP_CF_ANALYTICS_ENABLED);
   const turnstileEnforcedRoutes = parseConfiguredRoutes(
     configuredVars.MCP_TURNSTILE_ENFORCED_ROUTES,
   );
   const hasOidcClientId =
-    secretNames.includes('MCP_AUTH_OIDC_CLIENT_ID') ||
+    edgeSecretNames.includes('MCP_AUTH_OIDC_CLIENT_ID') ||
     hasConfiguredValue(configuredVars, 'MCP_AUTH_OIDC_CLIENT_ID');
   const hasOidcClientSecret =
-    secretNames.includes('MCP_AUTH_OIDC_CLIENT_SECRET') ||
+    edgeSecretNames.includes('MCP_AUTH_OIDC_CLIENT_SECRET') ||
     hasConfiguredValue(configuredVars, 'MCP_AUTH_OIDC_CLIENT_SECRET');
   const hasLegacyLogtoId =
-    secretNames.includes('LOGTO_APP_ID') || hasConfiguredValue(configuredVars, 'LOGTO_APP_ID');
+    allSecretNames.includes('LOGTO_APP_ID') || hasConfiguredValue(configuredVars, 'LOGTO_APP_ID');
   const hasLegacyLogtoSecret =
-    secretNames.includes('LOGTO_APP_SECRET') ||
+    allSecretNames.includes('LOGTO_APP_SECRET') ||
     hasConfiguredValue(configuredVars, 'LOGTO_APP_SECRET');
-  const hasDedicatedRegistrationTokenSecret = secretNames.includes(
+  const hasDedicatedRegistrationTokenSecret = edgeSecretNames.includes(
     'MCP_OAUTH_REGISTRATION_TOKEN_SECRET',
   );
   if (!hasUiSessionSecret) {
@@ -442,9 +534,17 @@ async function main() {
       'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is configured for dedicated DCR management-token signing.',
     );
   } else {
-    warn(
-      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens will fall back to MCP_UI_SESSION_SECRET or COURTLISTENER_API_KEY, coupling rotation across unrelated trust boundaries.',
-    );
+    const dedicatedRegistrationSecretRequired =
+      process.env.CLOUDFLARE_REQUIRE_DEDICATED_DCR_SECRET === 'true' ||
+      process.env.CLOUDFLARE_RELEASE_ENVIRONMENT === 'production';
+    const message =
+      'MCP_OAUTH_REGISTRATION_TOKEN_SECRET is missing. Registration management tokens are disabled until a dedicated signing secret is configured.';
+    if (dedicatedRegistrationSecretRequired) {
+      fail(message);
+      hasCriticalError = true;
+    } else {
+      warn(message);
+    }
   }
 
   if (hasOidcAuth) {
@@ -541,24 +641,33 @@ async function main() {
       console.log(`\nEndpoint checks against ${baseUrl}`);
 
       const health = await checkEndpoint(baseUrl, '/health');
-      if (health.ok) ok(`/health reachable (HTTP ${health.status})`);
-      else warn(`/health check failed (HTTP ${health.status}): ${health.body.slice(0, 200)}`);
+      if (health.ok) {
+        ok(`/health reachable (HTTP ${health.status})`);
+        try {
+          const payload = JSON.parse(health.body);
+          const coreCheck = validateRuntimeHealthCorePayload(payload);
+          if (coreCheck.ok) {
+            ok('/health payload matches unified runtime health contract.');
+          } else {
+            warn(`/health payload contract drift: ${coreCheck.reason}`);
+          }
+        } catch {
+          warn('/health payload is not valid JSON.');
+        }
+      } else warn(`/health check failed (HTTP ${health.status}): ${health.body.slice(0, 200)}`);
 
       const root = await checkEndpoint(baseUrl, '/');
       if (root.ok) ok(`/ reachable (HTTP ${root.status})`);
       else warn(`/ check failed (HTTP ${root.status}): ${root.body.slice(0, 200)}`);
 
-      const mcp = await checkMcpInitialize(baseUrl, '/mcp');
+      const mcp = await checkMcpDiscover(baseUrl, '/mcp');
       if (mcp.ok) {
-        ok('/mcp initialize handshake passed.');
+        ok('/mcp server/discover handshake passed.');
+      } else if (mcp.authProtected) {
+        ok(`/mcp ingress is reachable and auth-protected (HTTP ${mcp.status}).`);
       } else {
-        warn(`/mcp initialize failed (HTTP ${mcp.status}).`);
-        const sse = await checkMcpInitialize(baseUrl, '/sse');
-        if (sse.ok) {
-          warn('/sse initialize works; deployment may still be on an older endpoint shape.');
-        } else {
-          warn(`/sse initialize also failed (HTTP ${sse.status}).`);
-        }
+        warn(`/mcp server/discover failed (HTTP ${mcp.status}).`);
+        ok('Legacy /sse ingress is not required; MCP v2 uses canonical /mcp.');
       }
 
       const hostedAuth = await checkEndpoint(baseUrl, '/auth/start?continue=1', {
@@ -612,15 +721,21 @@ async function main() {
   }
 
   console.log('\nSuggested commands:');
-  console.log('  wrangler secret put COURTLISTENER_API_KEY');
-  console.log('  wrangler secret put MCP_UI_SESSION_SECRET');
-  console.log('  wrangler secret put OIDC_ISSUER');
-  console.log('  wrangler secret put OIDC_AUDIENCE');
-  console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_ID');
-  console.log('  wrangler secret put MCP_AUTH_OIDC_CLIENT_SECRET');
-  console.log('  wrangler secret put MCP_OAUTH_REGISTRATION_TOKEN_SECRET');
-  console.log('  wrangler secret put TURNSTILE_SECRET_KEY   # when Turnstile is enforced');
-  console.log('  wrangler secret put MCP_AUTH_TOKEN   # optional x-mcp-service-token secret');
+  console.log(`  ${formatSecretPutCommand('COURTLISTENER_API_KEY', wranglerMcpConfig)}`);
+  console.log(`  ${formatSecretPutCommand('MCP_UI_SESSION_SECRET', wranglerEdgeConfig)}`);
+  console.log(`  ${formatSecretPutCommand('OIDC_ISSUER', wranglerEdgeConfig)}`);
+  console.log(`  ${formatSecretPutCommand('OIDC_AUDIENCE', wranglerEdgeConfig)}`);
+  console.log(`  ${formatSecretPutCommand('MCP_AUTH_OIDC_CLIENT_ID', wranglerEdgeConfig)}`);
+  console.log(`  ${formatSecretPutCommand('MCP_AUTH_OIDC_CLIENT_SECRET', wranglerEdgeConfig)}`);
+  console.log(
+    `  ${formatSecretPutCommand('MCP_OAUTH_REGISTRATION_TOKEN_SECRET', wranglerEdgeConfig)}`,
+  );
+  console.log(
+    `  ${formatSecretPutCommand('TURNSTILE_SECRET_KEY', wranglerEdgeConfig)}   # when Turnstile is enforced`,
+  );
+  console.log(
+    `  ${formatSecretPutCommand('MCP_AUTH_TOKEN', wranglerMcpConfig)}   # optional x-mcp-service-token secret`,
+  );
   console.log(
     '  # set MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS in wrangler vars (for example 86400)',
   );
@@ -630,7 +745,9 @@ async function main() {
   console.log(
     '  # set MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true only when intentionally trusting Access headers/assertions',
   );
-  console.log('  wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok');
+  console.log(
+    '  pnpm exec wrangler kv:key put --binding OAUTH_KV oauth_contract_check ok -c wrangler.edge.jsonc',
+  );
   if (!process.env.CLOUDFLARE_API_TOKEN?.trim()) {
     warn(
       'CLOUDFLARE_API_TOKEN is not set. Run `pnpm run cloudflare:waf:ensure` after creating a Zone.WAF Edit token to allow OAuth monitoring probes through Bot Fight / BIC.',
@@ -640,8 +757,11 @@ async function main() {
       'CLOUDFLARE_API_TOKEN is present. Run `pnpm run cloudflare:waf:ensure` explicitly to install or update the OAuth probe WAF rule.',
     );
   }
+  console.log('  pnpm run cloudflare:secrets:sync-mcp   # copy local/env secrets to MCP worker');
   console.log('  pnpm run cloudflare:waf:ensure   # idempotent WAF rule for OAuth probes');
-  console.log('  pnpm run cloudflare:deploy');
+  console.log(
+    '  Use the GitHub Actions Cloudflare Release Controller for upload, canary, promotion, or rollback.',
+  );
 
   if (hasCriticalError) {
     process.exit(1);

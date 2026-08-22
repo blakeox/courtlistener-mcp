@@ -31,23 +31,17 @@ vi.mock('../lib/api', () => ({
   getWorkerHealth: vi.fn().mockResolvedValue({
     status: 'ok',
     service: 'courtlistener-mcp',
-    transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: [],
-    },
-    metrics: { latency_ms: {} },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+    transport: 'cloudflare-mcp-v2-streamable-http',
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: [],
+      },
+      metrics: { latency_ms: {} },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
   bootstrapSession: vi.fn().mockResolvedValue({
     ok: true,
@@ -55,25 +49,13 @@ vi.mock('../lib/api', () => ({
     expiresInSeconds: 43200,
   }),
   postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn().mockResolvedValue({
-    message: 'ok',
-    api_key: {
-      id: 'k1',
-      label: 'test',
-      created_at: '2024-01-01',
-      expires_at: null,
-      token: 'tok',
-    },
-  }),
-  revokeKey: vi.fn().mockResolvedValue(undefined),
-  mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
+  mcpCall: vi.fn().mockResolvedValue({ body: {} }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,
     fallback_used: false,
     mode: 'cheap',
     tool: 'search_cases',
     tool_reason: 'Default search',
-    session_id: 'sid',
     ai_response: 'resp',
     mcp_result: {},
   }),
@@ -244,24 +226,11 @@ describe('OnboardingPage', () => {
   it('shows protocol explorer surfaces from live readiness metadata', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
-    vi.mocked(api.listKeys).mockResolvedValueOnce({
-      user_id: 'u1',
-      keys: [
-        {
-          id: 'k1',
-          label: 'Primary',
-          is_active: true,
-          revoked_at: null,
-          expires_at: null,
-          created_at: '2024-01-01',
-        },
-      ],
-    });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.5' },
             capabilities: {
               tools: {},
@@ -270,7 +239,6 @@ describe('OnboardingPage', () => {
             },
           },
         },
-        sessionId: 'sid-observe',
       })
       .mockResolvedValueOnce({
         body: {
@@ -290,7 +258,6 @@ describe('OnboardingPage', () => {
             metadata: { categories: ['search'] },
           },
         },
-        sessionId: 'sid-observe',
       })
       .mockResolvedValueOnce({
         body: {
@@ -300,7 +267,6 @@ describe('OnboardingPage', () => {
             ],
           },
         },
-        sessionId: 'sid-observe',
       })
       .mockResolvedValueOnce({
         body: {
@@ -314,7 +280,6 @@ describe('OnboardingPage', () => {
             ],
           },
         },
-        sessionId: 'sid-observe',
       });
 
     const { OnboardingPage } = await import('../pages/OnboardingPage');
@@ -381,29 +346,15 @@ describe('OnboardingPage', () => {
   it('shows protocol mismatch recovery guidance', async () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
-    vi.mocked(api.listKeys).mockResolvedValueOnce({
-      user_id: 'u1',
-      keys: [
-        {
-          id: 'k1',
-          label: 'Primary',
-          is_active: true,
-          revoked_at: null,
-          expires_at: null,
-          created_at: '2024-01-01',
-        },
-      ],
-    });
     vi.mocked(api.mcpCall)
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2024-11-05',
+            protocolVersion: '1999-01-01',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.5' },
             capabilities: { tools: {} },
           },
         },
-        sessionId: 'sid-mismatch',
       })
       .mockResolvedValueOnce({
         body: {
@@ -411,10 +362,9 @@ describe('OnboardingPage', () => {
             tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }],
           },
         },
-        sessionId: 'sid-mismatch',
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-mismatch' })
-      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-mismatch' });
+      .mockResolvedValueOnce({ body: { result: { resources: [] } } })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } } });
 
     const { OnboardingPage } = await import('../pages/OnboardingPage');
     render(<OnboardingPage />, { wrapper: Wrapper });
@@ -495,7 +445,7 @@ describe('AccountPage', () => {
         lastEventAt: null,
       },
     });
-    vi.mocked(api.mcpCall).mockResolvedValue({ body: {}, sessionId: 'sid' });
+    vi.mocked(api.mcpCall).mockResolvedValue({ body: {} });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -563,12 +513,11 @@ describe('AccountPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.5' },
             capabilities: { tools: {}, prompts: { listChanged: true } },
           },
         },
-        sessionId: 'sid-account',
       })
       .mockResolvedValueOnce({
         body: {
@@ -585,24 +534,21 @@ describe('AccountPage', () => {
             ],
           },
         },
-        sessionId: 'sid-account',
       })
       .mockResolvedValueOnce({
         body: { result: { resources: [{ uri: 'courtlistener://status', name: 'status' }] } },
-        sessionId: 'sid-account',
       })
       .mockResolvedValueOnce({
         body: { result: { prompts: [{ name: 'summarize_case', arguments: [] }] } },
-        sessionId: 'sid-account',
       });
 
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText(/2025-06-18/)).toBeInTheDocument();
-      expect(screen.getByText('Runtime session')).toBeInTheDocument();
-      expect(screen.getByText('sid-account')).toBeInTheDocument();
+      expect(screen.getByText(/2026-07-28/)).toBeInTheDocument();
+      expect(screen.getByText('MCP transport')).toBeInTheDocument();
+      expect(screen.getByText('Stateless v2')).toBeInTheDocument();
     });
   });
 
@@ -613,12 +559,11 @@ describe('AccountPage', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2024-11-05',
+            protocolVersion: '1999-01-01',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.5' },
             capabilities: { tools: {} },
           },
         },
-        sessionId: 'sid-account',
       })
       .mockResolvedValueOnce({
         body: {
@@ -626,10 +571,9 @@ describe('AccountPage', () => {
             tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['q'] } }],
           },
         },
-        sessionId: 'sid-account',
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-account' })
-      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-account' });
+      .mockResolvedValueOnce({ body: { result: { resources: [] } } })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } } });
 
     const { AccountPage } = await import('../pages/AccountPage');
     render(<AccountPage />, { wrapper: Wrapper });
@@ -944,7 +888,7 @@ describe('PlaygroundPage', () => {
   function asyncEnvelope(
     job: Record<string, unknown>,
     extras: Record<string, unknown> = {},
-  ): { body: unknown; sessionId: string } {
+  ): { body: unknown } {
     return {
       body: {
         result: {
@@ -961,7 +905,6 @@ describe('PlaygroundPage', () => {
           ],
         },
       },
-      sessionId: 'sid',
     };
   }
 
@@ -970,7 +913,7 @@ describe('PlaygroundPage', () => {
     vi.clearAllMocks();
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockReset();
-    vi.mocked(api.mcpCall).mockResolvedValue({ body: {}, sessionId: 'sid' });
+    vi.mocked(api.mcpCall).mockResolvedValue({ body: {} });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -1061,10 +1004,10 @@ describe('PlaygroundPage', () => {
     expect(screen.getByText(/show tool catalog/i)).toBeInTheDocument();
   });
 
-  it('shows session badge', async () => {
+  it('shows stateless transport badge', async () => {
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
-    expect(screen.getByText('No session')).toBeInTheDocument();
+    expect(screen.getAllByText('Credential required')).toHaveLength(2);
   });
 
   it('shows token missing warning when no token set', async () => {
@@ -1173,10 +1116,8 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list')
-        return { body: { result: { tools: [] } }, sessionId: 'sid' };
-      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
-      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } } };
+      if (args.method !== 'tools/call') return { body: {} };
       if (args.params.name === 'mcp_async_cancel_job') {
         return asyncEnvelope(
           asyncJobSnapshot({
@@ -1200,16 +1141,16 @@ describe('PlaygroundPage', () => {
         const requestedJobId = (args.id as number) > 3 ? 'job-2' : 'job-1';
         return asyncEnvelope(asyncJobSnapshot({ id: requestedJobId }));
       }
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
 
     fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
-    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp v2/i }));
     await waitFor(() => {
-      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+      expect(screen.getByText(/stateless mcp v2 is ready/i)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByLabelText(/run as async job/i));
@@ -1243,10 +1184,8 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list')
-        return { body: { result: { tools: [] } }, sessionId: 'sid' };
-      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
-      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } } };
+      if (args.method !== 'tools/call') return { body: {} };
       if (args.params.name === 'mcp_async_get_job') {
         const error = Object.assign(new Error('Too many requests'), {
           status: 429,
@@ -1261,15 +1200,15 @@ describe('PlaygroundPage', () => {
       ) {
         return asyncEnvelope(asyncJobSnapshot({ id: 'job-rl' }));
       }
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
     render(<PlaygroundPage />, { wrapper: Wrapper });
     fireEvent.click(screen.getByRole('tab', { name: /raw mcp console/i }));
-    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp v2/i }));
     await waitFor(() => {
-      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+      expect(screen.getByText(/stateless mcp v2 is ready/i)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByLabelText(/run as async job/i));
@@ -1290,10 +1229,8 @@ describe('PlaygroundPage', () => {
     sessionStorage.setItem('courtlistenerMcpApiTokenSession', 'test-token');
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
-      if (args.method === 'tools/list')
-        return { body: { result: { tools: [] } }, sessionId: 'sid' };
-      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
-      if (args.method !== 'tools/call') return { body: {}, sessionId: 'sid' };
+      if (args.method === 'tools/list') return { body: { result: { tools: [] } } };
+      if (args.method !== 'tools/call') return { body: {} };
       if (args.params.name === 'mcp_async_get_job') {
         return asyncEnvelope(
           asyncJobSnapshot({ id: 'job-deep', status: 'running', attempts: { current: 1, max: 3 } }),
@@ -1309,7 +1246,7 @@ describe('PlaygroundPage', () => {
           { result: { content: [{ type: 'text', text: '{"ok":true}' }] } },
         );
       }
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
@@ -1333,9 +1270,9 @@ describe('PlaygroundPage', () => {
     );
     expect(screen.getByText(/job detail: job-deep/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp v2/i }));
     await waitFor(() => {
-      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+      expect(screen.getByText(/stateless mcp v2 is ready/i)).toBeInTheDocument();
     });
 
     const statusButton =
@@ -1376,10 +1313,9 @@ describe('PlaygroundPage', () => {
               metadata: { categories: ['Live'] },
             },
           },
-          sessionId: 'sid',
         };
       }
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
@@ -1399,7 +1335,7 @@ describe('PlaygroundPage', () => {
     const api = await import('../lib/api');
     vi.mocked(api.mcpCall).mockImplementation(async (args) => {
       if (args.method === 'tools/list') throw new Error('discovery failed');
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
@@ -1444,12 +1380,10 @@ describe('PlaygroundPage', () => {
               metadata: { categories: ['Live'] },
             },
           },
-          sessionId: 'sid',
         };
       }
-      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
-      if (args.method === 'tools/call') return { body: { result: { ok: true } }, sessionId: 'sid' };
-      return { body: {}, sessionId: 'sid' };
+      if (args.method === 'tools/call') return { body: { result: { ok: true } } };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
@@ -1489,11 +1423,9 @@ describe('PlaygroundPage', () => {
               metadata: { categories: ['Live'] },
             },
           },
-          sessionId: 'sid',
         };
       }
-      if (args.method === 'initialize') return { body: {}, sessionId: 'sid' };
-      return { body: {}, sessionId: 'sid' };
+      return { body: {} };
     });
 
     const { PlaygroundPage } = await import('../pages/PlaygroundPage');
@@ -1503,15 +1435,15 @@ describe('PlaygroundPage', () => {
     await waitFor(() => {
       expect(screen.getByLabelText(/citation/i)).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('button', { name: /connect mcp session/i }));
+    fireEvent.click(screen.getByRole('button', { name: /connect mcp v2/i }));
     await waitFor(() => {
-      expect(screen.getByText(/connected\. session/i)).toBeInTheDocument();
+      expect(screen.getByText(/stateless mcp v2 is ready/i)).toBeInTheDocument();
     });
     await waitFor(() => {
       const discoveryCalls = vi
         .mocked(api.mcpCall)
         .mock.calls.filter(([call]) => (call as { method?: string }).method === 'tools/list');
-      expect(discoveryCalls.length).toBeGreaterThanOrEqual(2);
+      expect(discoveryCalls.length).toBeGreaterThanOrEqual(1);
     });
     fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
 

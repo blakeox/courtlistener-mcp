@@ -66,7 +66,7 @@ test.describe('SPA real auth flow', () => {
   }
 
   async function bootstrapSession(page: Page): Promise<void> {
-    await page.goto(`${server.baseUrl}/app/control-center`);
+    await page.goto(`${server.baseUrl}/app`);
 
     const bootstrapResult = await page.evaluate(async () => {
       const response = await fetch('/api/session/bootstrap', {

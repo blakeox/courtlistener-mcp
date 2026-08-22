@@ -10,10 +10,10 @@ import { join } from 'node:path';
 
 const BASE_URL = 'https://www.courtlistener.com/api/rest/v4/';
 const FETCH_TIMEOUT_MS = 10_000;
-const MIN_NODE_MAJOR = 18;
+const MIN_NODE_MAJOR = 22;
 
 // Required production dependencies from package.json
-const REQUIRED_DEPS = ['@modelcontextprotocol/sdk', 'zod', 'express'];
+const REQUIRED_DEPS = ['@modelcontextprotocol/server', 'zod'];
 
 interface CheckResult {
   label: string;

@@ -1,4 +1,4 @@
-import { GetPromptResult, Prompt } from '@modelcontextprotocol/sdk/types.js';
+import { GetPromptResult, Prompt } from '@modelcontextprotocol/server';
 
 /**
  * Interface for individual prompt handlers
@@ -70,6 +70,11 @@ function derivePromptExamples(
  */
 export class PromptHandlerRegistry {
   private handlers = new Map<string, PromptHandler>();
+  private onCatalogListChanged: (() => void) | undefined;
+
+  setOnCatalogListChanged(callback: (() => void) | undefined): void {
+    this.onCatalogListChanged = callback;
+  }
 
   /**
    * Register a new prompt handler
@@ -79,6 +84,7 @@ export class PromptHandlerRegistry {
       throw new Error(`Prompt handler already registered for: ${handler.name}`);
     }
     this.handlers.set(handler.name, handler);
+    this.onCatalogListChanged?.();
   }
 
   /**

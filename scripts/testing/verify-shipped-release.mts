@@ -6,7 +6,7 @@
  * the portal after signing in and supplying credentials in the Account UI.
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { ListCourtsHandler } from '../../src/domains/courts/handlers.ts';
 import { LegalMCPServer } from '../../src/index.ts';
 import { Logger } from '../../src/infrastructure/logger.ts';
@@ -70,15 +70,21 @@ async function verifyListCourtsPaginationMock(): Promise<void> {
   }
 
   const result = await handler.execute(validated.data, makeContext());
-  const payload = JSON.parse(result.content[0].text) as {
-    courts: Array<{ id: string }>;
-    pagination: {
-      count?: number;
-      total_pages?: number;
-      has_next?: boolean;
-      nextCursor?: string;
-    };
-  };
+  const structured = result.structuredContent as
+    | {
+        data?: {
+          courts: Array<{ id: string }>;
+          pagination: {
+            count?: number;
+            total_pages?: number;
+            has_next?: boolean;
+            nextCursor?: string;
+          };
+        };
+      }
+    | undefined;
+  const payload = structured?.data;
+  assert(payload !== undefined, 'structuredContent.data is required');
 
   assert(payload.courts.length === 1, 'expected one supreme court after filter');
   assert(payload.courts[0].id === 'scotus', 'expected scotus');

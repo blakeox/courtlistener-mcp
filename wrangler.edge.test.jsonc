@@ -1,0 +1,31 @@
+{
+  "name": "courtlistener-mcp-edge-test",
+  "compatibility_date": "2026-08-18",
+  "main": "src/worker-edge.ts",
+  "workers_dev": true,
+  "vars": {
+    "MCP_BOUNDARY_FAIL_OPEN": "false",
+    "CODEMODE_ENABLED": "false",
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "00000000000000000000000000000003",
+    },
+  ],
+  "assets": {
+    "directory": ".spa-dist",
+    "binding": "SPA_ASSETS",
+    // Keep the test asset binding aligned with deployed Worker-owned routing.
+    "html_handling": "none",
+    "not_found_handling": "none",
+  },
+  "services": [
+    {
+      "binding": "MCP_SERVICE",
+      "service": "courtlistener-mcp-mcp-test",
+    },
+  ],
+  // Keep the test runtime aligned with the deployed CIMD behavior.
+  "compatibility_flags": ["nodejs_als", "global_fetch_strictly_public"],
+}

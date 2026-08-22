@@ -208,7 +208,7 @@ export async function main() {
   });
 
   const authRedirect = await step(
-    'Request /authorize and capture auth portal redirect',
+    'Request /oauth/authorize and capture auth portal redirect',
     async () => {
       const response = await probeFetch(authorizeUrl, { method: 'GET', redirect: 'manual' });
       assert(isRedirect(response.status), `Expected redirect, got ${response.status}`);
@@ -221,7 +221,7 @@ export async function main() {
       );
       assert(
         redirectUrl.searchParams.get('return_to') === authorizeUrl.toString(),
-        'return_to did not preserve /authorize URL',
+        'return_to did not preserve /oauth/authorize URL',
       );
       return redirectUrl;
     },

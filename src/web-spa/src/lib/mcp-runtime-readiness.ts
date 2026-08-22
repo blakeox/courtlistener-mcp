@@ -22,7 +22,6 @@ interface McpPromptSurface {
 
 export interface McpRuntimeReadinessResult {
   ready: true;
-  sessionId: string;
   toolCount: number;
   resourceCount: number;
   promptCount: number;
@@ -175,7 +174,6 @@ async function listSurface(
   token: string,
   method: 'resources/list' | 'prompts/list',
   key: 'resources' | 'prompts',
-  sessionId: string,
   id: number,
 ): Promise<{ items: unknown[]; error: string }> {
   try {
@@ -183,7 +181,6 @@ async function listSurface(
       {
         method,
         params: {},
-        sessionId: sessionId || undefined,
         id,
       },
       token,
@@ -231,14 +228,10 @@ function buildGuardrails(
 }
 
 export async function verifyMcpRuntimeReadiness(token: string): Promise<McpRuntimeReadinessResult> {
-  const initialized = await mcpCall<unknown>(
+  const discovered = await mcpCall<unknown>(
     {
-      method: 'initialize',
-      params: {
-        protocolVersion: '2025-06-18',
-        capabilities: {},
-        clientInfo: { name: 'courtlistener-spa-onboarding', version: '1.0.0' },
-      },
+      method: 'server/discover',
+      params: {},
       id: 90_001,
     },
     token,
@@ -248,41 +241,30 @@ export async function verifyMcpRuntimeReadiness(token: string): Promise<McpRunti
     {
       method: 'tools/list',
       params: {},
-      sessionId: initialized.sessionId ?? undefined,
       id: 90_002,
     },
     token,
   );
 
-  const sessionId = listedTools.sessionId ?? initialized.sessionId ?? '';
-  const resourcesResult = await listSurface(
-    token,
-    'resources/list',
-    'resources',
-    sessionId,
-    90_003,
-  );
-  const promptsResult = await listSurface(token, 'prompts/list', 'prompts', sessionId, 90_004);
+  const resourcesResult = await listSurface(token, 'resources/list', 'resources', 90_003);
+  const promptsResult = await listSurface(token, 'prompts/list', 'prompts', 90_004);
   const tools = extractTools(listedTools.body);
   const resources = extractResources(resourcesResult.items);
   const prompts = extractPrompts(promptsResult.items);
-  const capabilities = extractCapabilities(initialized.body);
+  const capabilities = extractCapabilities(discovered.body);
   const diagnostics = [
     resourcesResult.error ? `Resources discovery unavailable: ${resourcesResult.error}` : '',
     promptsResult.error ? `Prompts discovery unavailable: ${promptsResult.error}` : '',
-    sessionId
-      ? ''
-      : 'MCP transport did not return a session id; each call may renegotiate protocol state.',
+    'MCP v2 stateless transport is active; calls do not use a session id.',
   ].filter(Boolean);
-  const serverInfo = extractServerInfo(initialized.body);
+  const serverInfo = extractServerInfo(discovered.body);
 
   return {
     ready: true,
-    sessionId,
     toolCount: tools.length,
     resourceCount: resources.length,
     promptCount: prompts.length,
-    protocolVersion: extractProtocolVersion(initialized.body),
+    protocolVersion: extractProtocolVersion(discovered.body),
     serverName: serverInfo.name,
     serverVersion: serverInfo.version,
     capabilities,

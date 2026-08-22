@@ -14,6 +14,21 @@ import { ObservabilityPage } from '../pages/ObservabilityPage';
 import { OnboardingPage } from '../pages/OnboardingPage';
 import { renderWithSpaProviders, renderWorkspaceRoute } from './a11y-test-utils';
 import { createMatchMediaMock, stubBrowserStorage } from './test-utils';
+import { workspaceSidebarClassName } from '../lib/shell-classes';
+import {
+  emptyStateHintClass,
+  iconButtonClassName,
+  metaNoteDetailClass,
+  navCardLinkClassName,
+  sessionBadgeToolsClass,
+} from '../lib/ui-classes';
+import {
+  protocolEntryTimeClass,
+  toolCatalogDescriptionClass,
+  toolCatalogHintClass,
+  transcriptEntryTimeClass,
+} from '../lib/playground-classes';
+import { toastDismissClass } from '../lib/toast-classes';
 
 vi.mock('../lib/api', () => ({
   getSession: vi
@@ -38,23 +53,17 @@ vi.mock('../lib/api', () => ({
   getWorkerHealth: vi.fn().mockResolvedValue({
     status: 'ok',
     service: 'courtlistener-mcp',
-    transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: [],
-    },
-    metrics: { latency_ms: { p50: 120 } },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+    transport: 'cloudflare-mcp-v2-streamable-http',
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: [],
+      },
+      metrics: { latency_ms: { p50: 120 } },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
   bootstrapSession: vi.fn().mockResolvedValue({
     ok: true,
@@ -62,16 +71,13 @@ vi.mock('../lib/api', () => ({
     expiresInSeconds: 43200,
   }),
   postUiTelemetryEvent: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn(),
-  revokeKey: vi.fn(),
-  mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
+  mcpCall: vi.fn().mockResolvedValue({ body: {} }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,
     fallback_used: false,
     mode: 'cheap',
     tool: 'search_cases',
     tool_reason: 'Default search',
-    session_id: 'sid',
     ai_response: 'resp',
     mcp_result: {},
   }),
@@ -141,7 +147,7 @@ describe('axe accessibility scans', () => {
   });
 
   it('workspace dashboard has no detectable WCAG violations', async () => {
-    const { container } = renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app/control-center');
+    const { container } = renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app');
     await screen.findByRole('heading', { name: 'Overview', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
   });
@@ -173,19 +179,19 @@ describe('axe accessibility scans', () => {
   });
 
   it('onboarding diagnostics page has no detectable WCAG violations', async () => {
-    const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/onboarding');
+    const { container } = renderWorkspaceRoute(<OnboardingPage />, '/app/diagnostics');
     await screen.findByRole('heading', { name: 'Runtime Diagnostics', level: 1 });
     await expect(await axe(container)).toHaveNoViolations();
   });
 
   it('workspace chrome keeps muted and utility text above the unreadable floor', async () => {
-    renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app/control-center');
+    renderWorkspaceRoute(<WorkspaceDashboardPage />, '/app');
     await screen.findByRole('heading', { name: 'Overview', level: 1 });
 
     const utilityLabel = screen.getByText('Workspace utilities');
     const utilityLink = screen.getByRole('link', { name: 'Diagnostics' });
     const mutedCopy = screen.getByText('Your environment is fully agent-ready.');
-    const topbarDescription = screen.getByText('Legacy overview route.');
+    const topbarDescription = screen.getByText('Review workspace activity and next steps.');
     const tokensCss = readFileSync(tokensCssPath, 'utf8');
     const readRemToken = (name: string) => {
       const match = tokensCss.match(new RegExp(`${name}:\\s*([0-9.]+)rem;`));
@@ -200,5 +206,31 @@ describe('axe accessibility scans', () => {
     expect(utilityLink.className).toContain('sidebar-secondary-link');
     expect(mutedCopy.className).toContain('text-muted');
     expect(topbarDescription.className).toContain('text-[length:var(--text-md)]');
+  });
+
+  it('gradient-backed shell surfaces use background-image utilities', () => {
+    expect(workspaceSidebarClassName(false)).toContain('bg-[image:var(--shell-sidebar-bg)]');
+    expect(navCardLinkClassName(true)).toContain('bg-[image:var(--shell-sidebar-link-active-bg)]');
+  });
+
+  it('secondary text recipes use semantic colors instead of opacity-based contrast', () => {
+    expect(emptyStateHintClass).toContain('text-faint');
+    expect(emptyStateHintClass).not.toContain('opacity-');
+    expect(metaNoteDetailClass).toContain('text-faint');
+    expect(metaNoteDetailClass).not.toContain('opacity-');
+    expect(sessionBadgeToolsClass).toContain('text-faint');
+    expect(sessionBadgeToolsClass).not.toContain('opacity-');
+    expect(iconButtonClassName('inline')).toContain('text-faint');
+    expect(iconButtonClassName('inline')).not.toContain('opacity-');
+    expect(transcriptEntryTimeClass).toContain('text-faint');
+    expect(transcriptEntryTimeClass).not.toContain('opacity-');
+    expect(toolCatalogDescriptionClass).toContain('text-faint');
+    expect(toolCatalogDescriptionClass).not.toContain('opacity-');
+    expect(toolCatalogHintClass).toContain('text-muted');
+    expect(toolCatalogHintClass).not.toContain('opacity-');
+    expect(protocolEntryTimeClass).toContain('text-faint');
+    expect(protocolEntryTimeClass).not.toContain('opacity-');
+    expect(toastDismissClass).toContain('text-faint');
+    expect(toastDismissClass).not.toContain('opacity-');
   });
 });

@@ -38,7 +38,7 @@ function formatKiB(bytes) {
 }
 
 function runBuild() {
-  execSync('pnpm exec vite build --config src/web-spa/vite.config.ts', {
+  execSync('./node_modules/.bin/vite build --config src/web-spa/vite.config.ts', {
     cwd: repoRoot,
     stdio: 'inherit',
   });
@@ -49,7 +49,7 @@ function main() {
     if (!existsSync(buildIdFile) || !existsSync(jsPath)) {
       throw new Error(
         `Node ${process.versions.node} cannot run the Vite SPA build (requires Node ${MIN_VITE_NODE_MAJOR}+). ` +
-          'Run on Node 20+ or commit .spa-dist and src/web/spa-build-id.ts from CI.',
+          'Run on Node 22+ or commit .spa-dist and src/web/spa-build-id.ts from CI.',
       );
     }
     console.log(

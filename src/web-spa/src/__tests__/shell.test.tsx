@@ -42,7 +42,7 @@ function LocationProbe(): React.JSX.Element {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderShell(initialEntry = '/app/control-center'): RenderResult {
+function renderShell(initialEntry = '/app'): RenderResult {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <TokenProvider>
@@ -58,7 +58,7 @@ function renderShell(initialEntry = '/app/control-center'): RenderResult {
                       {
                         label: 'Local MCP credential loaded',
                         complete: false,
-                        to: '/app/control-center',
+                        to: '/app',
                       },
                     ]}
                   >
@@ -93,10 +93,10 @@ function renderAuthRequired(initialEntry = '/app/account'): void {
               }
             />
             <Route
-              path="/app/control-center"
+              path="/app"
               element={
                 <>
-                  <div>Control center</div>
+                  <div>Overview</div>
                   <LocationProbe />
                 </>
               }
@@ -258,7 +258,7 @@ describe('Shell', () => {
     fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
 
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: 'Credentials' })[0]).toHaveFocus();
+      expect(screen.getAllByRole('link', { name: 'Account' })[0]).toHaveFocus();
     });
   });
 
@@ -370,17 +370,13 @@ describe('Shell', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps account and credential links visible in the shell utility section', () => {
+  it('keeps the account link visible in the shell utility section', () => {
     renderShell('/app/playground');
 
     expect(screen.getByText('Workspace utilities')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Account' })[0]).toHaveAttribute(
       'href',
       '/app/account',
-    );
-    expect(screen.getAllByRole('link', { name: 'Credentials' })[0]).toHaveAttribute(
-      'href',
-      '/app/credentials',
     );
   });
 
@@ -543,7 +539,7 @@ describe('AuthRequired', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/app/account');
   });
 
-  it('redirects signed-out users back to the control center', async () => {
+  it('redirects signed-out users back to the overview', async () => {
     useAuthMock.mockReturnValue({
       session: { authenticated: false, user: null, turnstile_site_key: '' },
       loading: false,
@@ -554,8 +550,8 @@ describe('AuthRequired', () => {
 
     expect(screen.queryByText('Protected body')).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('Control center')).toBeInTheDocument();
-      expect(screen.getByTestId('location')).toHaveTextContent('/app/control-center');
+      expect(screen.getByText('Overview')).toBeInTheDocument();
+      expect(screen.getByTestId('location')).toHaveTextContent('/app');
     });
   });
 

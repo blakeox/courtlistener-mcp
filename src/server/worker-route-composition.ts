@@ -18,9 +18,7 @@ import type { OAuthFrontdoorRateLimitDeps } from './worker-oauth-frontdoor-rate-
 export type WorkerRouteHandler = () => Promise<Response | null>;
 
 type WorkerDelegatedRouteEnv = WorkerSecurityEnv & {
-  AI?: {
-    run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
-  };
+  AI?: GeneratedMcpEnv['AI'];
   CLOUDFLARE_AI_MODEL?: string;
 };
 
@@ -34,9 +32,9 @@ type WorkerDelegatedSharedDeps<TEnv extends WorkerDelegatedRouteEnv> = WorkerOAu
     resolveGrantedScopes: (authRequest: { scope: string[] }) => string[];
     getOAuthHelpers: (env: TEnv) => OAuthHelpers;
     workerUiSessionRuntime: WorkerUiSessionRuntime<TEnv>;
-    getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
-    getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
-    now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+    getClientIdentifier: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+    getAuthRouteRateLimitedResponse: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+    now: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
   };
 
 interface McpHandler<TEnv extends WorkerDelegatedRouteEnv> {
@@ -60,7 +58,6 @@ export interface WorkerDelegatedRouteDeps<
 > extends WorkerDelegatedSharedDeps<TEnv> {
   mcpBoundaryPolicy: McpGatewayBoundaryPolicyParams<TEnv> & {
     mcpStreamableHandler: McpHandler<TEnv>;
-    mcpSseCompatibilityHandler: McpHandler<TEnv>;
   };
 }
 

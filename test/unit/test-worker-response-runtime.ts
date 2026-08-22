@@ -164,7 +164,18 @@ describe('worker response runtime', () => {
 
     assert.equal(await response.text(), 'body{}');
     assert.equal(response.headers.get('etag'), '"build-7"');
-    assert.equal(response.headers.get('cache-control'), 'public, max-age=300');
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  });
+
+  it('does not cache missing SPA assets', () => {
+    const response = spaAssetResponse(
+      new Response('missing', { status: 404 }),
+      'text/css; charset=utf-8',
+      'build-7',
+    );
+
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('etag'), null);
   });
 
   it('builds MCP CORS headers through the shared transport helper', () => {

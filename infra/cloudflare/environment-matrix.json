@@ -1,0 +1,53 @@
+{
+  "schema_version": "v1",
+  "source_of_truth": "infra/cloudflare/environment-matrix.json",
+  "environments": {
+    "local": {
+      "mode": "local",
+      "deployable": false,
+      "production_resource_access": false,
+      "configs": []
+    },
+    "staging": {
+      "mode": "cloudflare",
+      "deployable": true,
+      "provisioning_status": "provisioned",
+      "configs": [
+        "wrangler.edge.staging.jsonc",
+        "wrangler.mcp.staging.jsonc",
+        "wrangler.auth-limiter.staging.jsonc"
+      ],
+      "required_isolation": [
+        "worker_names",
+        "hostnames",
+        "oauth_kv",
+        "async_jobs_kv",
+        "async_queue",
+        "async_dlq",
+        "durable_object_state",
+        "analytics_dataset",
+        "secrets",
+        "access_applications",
+        "waf_and_rate_limits"
+      ],
+      "resource_prefix": "courtlistener-mcp-staging-",
+      "resource_ids": {
+        "edge_worker": "courtlistener-mcp-staging-edge",
+        "mcp_worker": "courtlistener-mcp-staging-mcp",
+        "auth_limiter_worker": "courtlistener-mcp-staging-auth-limiter",
+        "oauth_kv": "5d6b587f16d74ac6ae5ad78d5765d5f4",
+        "async_jobs_kv": "b41d2686110546e88989c375e4bc10fb",
+        "async_queue": "courtlistener-mcp-staging-async-tool-jobs",
+        "async_dlq": "courtlistener-mcp-staging-async-tool-jobs-dlq",
+        "analytics_dataset": "courtlistener_mcp_staging"
+      }
+    },
+    "production": {
+      "mode": "cloudflare",
+      "deployable": true,
+      "provisioning_status": "existing_resources_require_receipts",
+      "configs": ["wrangler.edge.jsonc", "wrangler.mcp.jsonc", "wrangler.auth-limiter.jsonc"],
+      "required_isolation": []
+    }
+  }
+}

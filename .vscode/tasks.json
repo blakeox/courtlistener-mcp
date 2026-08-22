@@ -1,469 +1,60 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "build",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"build"
-			],
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			},
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			},
-			"problemMatcher": "$tsc"
-		},
-		{
-			"label": "🧪 act: CI Test Job",
-			"type": "shell",
-			"command": "act",
-			"args": [
-				"-j",
-				"test"
-			],
-			"group": "test",
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "🔍 act: Inspector Compatibility",
-			"type": "shell",
-			"command": "act",
-			"args": [
-				"-j",
-				"inspector-compatibility"
-			],
-			"group": "test",
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "🌐 act: Remote Server Test",
-			"type": "shell",
-			"command": "act",
-			"args": [
-				"-j",
-				"remote-server-test"
-			],
-			"options": {
-				"env": {
-					"REMOTE_SERVER_URL": "${env:REMOTE_SERVER_URL}"
-				}
-			},
-			"group": "test",
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "🔨 Build TypeScript",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"build"
-			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			},
-			"problemMatcher": "$tsc"
-		},
-		{
-			"label": "👀 Watch TypeScript",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"dev"
-			],
-			"group": "build",
-			"isBackground": true,
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			},
-			"problemMatcher": {
-				"owner": "typescript",
-				"source": "ts",
-				"applyTo": "closedDocuments",
-				"fileLocation": "relative",
-				"pattern": {
-					"regexp": "^([^\\s].*)[\\(:]+(\\d+)[,:](\\d+)(?:[,:](\\d+))?[\\):]?\\s+(error|warning|info)\\s+TS(\\d+)\\s*:\\s*(.*)$",
-					"file": 1,
-					"line": 2,
-					"column": 3,
-					"endColumn": 4,
-					"severity": 5,
-					"code": 6,
-					"message": 7
-				},
-				"background": {
-					"activeOnStart": true,
-					"beginsPattern": "Starting compilation in watch mode...",
-					"endsPattern": "Found \\d+ errors?\\. Watching for file changes\\."
-				}
-			}
-		},
-		{
-			"label": "🧪 Run All Tests",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"test"
-			],
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": true
-			},
-			"dependsOn": "🔨 Build TypeScript"
-		},
-		{
-			"label": "🧪 Run Unit Tests",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"test:unit"
-			],
-			"group": "test",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": true
-			}
-		},
-		{
-			"label": "🏢 Run Enterprise Tests",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"test:enterprise:comprehensive"
-			],
-			"group": "test",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": true
-			}
-		},
-		{
-			"label": "🔍 MCP Inspector (Local)",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"inspect:local"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": true,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": true
-			},
-			"dependsOn": "🔨 Build TypeScript",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "🌐 MCP Inspector (Remote)",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"inspect:remote"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": true,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": true
-			},
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "🚀 Start MCP Server",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"start"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": true
-			},
-			"dependsOn": "🔨 Build TypeScript",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "🏢 Start Enterprise Server",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"start:enterprise"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": true
-			},
-			"dependsOn": "🔨 Build TypeScript",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "🧹 Clean Build",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"clean"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "🔍 Type Check",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"typecheck"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			},
-			"problemMatcher": "$tsc"
-		},
-		{
-			"label": "📊 Analyze Test Coverage",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"test:coverage"
-			],
-			"group": "test",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": true
-			}
-		},
-		{
-			"label": "🐳 Build Docker (Enterprise)",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"docker:enterprise"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			}
-		},
-		{
-			"label": "⚡ Performance Tests",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"test:enterprise:performance"
-			],
-			"group": "test",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": true
-			}
-		},
-		{
-			"label": "🔄 Setup Environment",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"enterprise:setup"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			}
-		},
-		{
-			"label": "🐳 Build Docker Image",
-			"type": "shell",
-			"command": "docker",
-			"args": [
-				"build",
-				"-t",
-				"legal-mcp:latest",
-				"."
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			}
-		},
-		{
-			"label": "🐳 Run Docker Container",
-			"type": "shell",
-			"command": "docker",
-			"args": [
-				"run",
-				"-p",
-				"3001:3001",
-				"--name",
-				"legal-mcp-server",
-				"legal-mcp:latest"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": true
-			},
-			"isBackground": true,
-			"dependsOn": "🐳 Build Docker Image"
-		},
-		{
-			"label": "🐳 Stop Docker Container",
-			"type": "shell",
-			"command": "docker",
-			"args": [
-				"stop",
-				"legal-mcp-server"
-			],
-			"group": "build",
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": true,
-				"clear": false
-			}
-		},
-		{
-			"label": "Run coverage (unit only)",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"coverage:check"
-			],
-			"problemMatcher": [
-				"$eslint-stylish"
-			],
-			"group": "test"
-		},
-		{
-			"label": "Build and run unit coverage",
-			"type": "shell",
-			"command": "pnpm",
-			"args": [
-				"run",
-				"build && pnpm run coverage:check"
-			],
-			"group": "test"
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Typecheck",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "typecheck"],
+      "group": "build",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Watch TypeScript",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "dev"],
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": "$tsc-watch"
+    },
+    {
+      "label": "Unit tests",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "test:unit"],
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "Workers tests",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "test:workers"],
+      "group": "test"
+    },
+    {
+      "label": "Cloudflare startup profiles",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "cloudflare:check:startup"],
+      "group": "test"
+    },
+    {
+      "label": "Workers topology dev",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "dev:workers"],
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
 }

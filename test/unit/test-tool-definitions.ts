@@ -7,7 +7,7 @@
 
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 
 // Tool definitions are consumed at runtime from the compiled distribution.
 const { getEnhancedToolDefinitions, getToolsByCategory, getToolExamples } =

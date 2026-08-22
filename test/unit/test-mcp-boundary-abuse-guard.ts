@@ -5,7 +5,6 @@ import {
   buildMcpReplayFingerprint,
   deriveAdaptiveBoundaryRateLimit,
   getMcpBoundaryGuardConfig,
-  getRequestContentLength,
 } from '../../src/server/mcp-boundary-abuse-guard.js';
 
 describe('mcp-boundary-abuse-guard', () => {
@@ -30,31 +29,48 @@ describe('mcp-boundary-abuse-guard', () => {
     const request = new Request('https://example.com/mcp', {
       method: 'POST',
       headers: {
-        'mcp-session-id': 'session-1',
         'mcp-request-id': 'request-1',
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
     });
-    const fingerprint = await buildMcpReplayFingerprint(
-      request,
-      getRequestContentLength(request),
-      64 * 1024,
-    );
-    assert.equal(fingerprint, 'POST|session-1|id:request-1');
+    const fingerprint = await buildMcpReplayFingerprint(request);
+    assert.equal(fingerprint, 'POST|id:request-1');
   });
 
-  it('falls back to json-rpc tuple when no request id headers are present', async () => {
+  it('does not fingerprint a stateless JSON-RPC tuple without an explicit request id', async () => {
     const body = JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'tools/call' });
     const request = new Request('https://example.com/mcp', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+      },
       body,
     });
-    const fingerprint = await buildMcpReplayFingerprint(
-      request,
-      getRequestContentLength(request),
-      64 * 1024,
-    );
-    assert.equal(fingerprint, 'POST|-|rpc:tools/call|id:42');
+    const fingerprint = await buildMcpReplayFingerprint(request);
+    assert.equal(fingerprint, null);
+  });
+
+  it('does not share stateless replay state across clients in one rate-limit bucket', async () => {
+    const request = new Request('https://example.com/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'tools/call' }),
+    });
+
+    const fingerprint = await buildMcpReplayFingerprint(request);
+
+    assert.equal(fingerprint, null);
+  });
+
+  it('does not classify a stateless request without an explicit request id as replay', async () => {
+    const request = new Request('https://example.com/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+
+    const fingerprint = await buildMcpReplayFingerprint(request);
+
+    assert.equal(fingerprint, null);
   });
 });

@@ -28,13 +28,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -53,21 +53,52 @@ jobs:
           echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
 
           mkdir -p performance-data
-          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+          REMOTE_BASE_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field baseUrl)"
+
+          start_local_workers() {
+            LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
+            LOCAL_WORKERS_PID=$!
+            for attempt in $(seq 1 30); do
+              if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "Local Workers failed readiness; see performance-data/local-workers.log" >&2
+            return 1
+          }
+
+          stop_local_workers() {
+            if [ -n "${LOCAL_WORKERS_PID:-}" ]; then
+              kill "$LOCAL_WORKERS_PID" 2>/dev/null || true
+              wait "$LOCAL_WORKERS_PID" 2>/dev/null || true
+            fi
+          }
+
+          run_profile() {
+            local base_url="$1"
+            local output_path="$2"
+            local log_path="$3"
+            pnpm run ci:load-profile-suite -- --light --base-url "$base_url" --output "$output_path" >"$log_path"
+          }
 
           case "$TEST_ENVIRONMENT" in
             "local")
               echo "Testing local server performance..."
-              pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
+              start_local_workers
+              trap stop_local_workers EXIT
+              run_profile http://127.0.0.1:8787 performance-data/local.json performance-data/local.txt
               ;;
             "remote")
               echo "Testing remote server performance..."
-              SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              run_profile "$REMOTE_BASE_URL" performance-data/remote.json performance-data/remote.txt
               ;;
             "both")
               echo "Testing both local and remote server performance..."
-              pnpm run test:performance > performance-data/local-$(date +%Y%m%d-%H%M%S).txt
-              SERVER_URL="$REMOTE_MCP_URL" pnpm run test:performance > performance-data/remote-$(date +%Y%m%d-%H%M%S).txt
+              start_local_workers
+              trap stop_local_workers EXIT
+              run_profile http://127.0.0.1:8787 performance-data/local.json performance-data/local.txt
+              run_profile "$REMOTE_BASE_URL" performance-data/remote.json performance-data/remote.txt
               ;;
           esac
 
@@ -109,7 +140,7 @@ jobs:
           fi
 
       - name: Upload performance data
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: performance-monitoring-${{ github.run_number }}
           path: |
@@ -119,7 +150,7 @@ jobs:
 
       - name: Create issue for performance regression
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const title = `🚨 Performance Regression Detected - ${new Date().toISOString().split('T')[0]}`;
@@ -173,7 +204,8 @@ jobs:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: |
           echo "🏥 Checking remote server health..."
-          eval "$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL")"
+          REMOTE_HEALTH_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field healthUrl)"
+          REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
 
           # Basic connectivity test
           if curl -f -s --max-time 10 "$REMOTE_HEALTH_URL" > /dev/null; then
@@ -189,7 +221,7 @@ jobs:
           response=$(curl -s --max-time 30 -X POST \
             -H "Content-Type: application/json" \
             -H "Accept: application/json, text/event-stream" \
-            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"clientInfo":{"name":"Health Check","version":"1.0.0"}}}' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"Health Check","version":"2.0.0"}}}}' \
             "$REMOTE_MCP_URL")
 
           if echo "$response" | grep -q '"result"'; then
@@ -202,7 +234,7 @@ jobs:
 
       - name: Create alert for server downtime
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const title = `🚨 Remote Server Health Check Failed - ${new Date().toISOString()}`;

@@ -978,8 +978,7 @@ const ToolCatalogPanel = React.memo(function ToolCatalogPanel({
 // ─── Raw MCP Panel ───────────────────────────────────────────────
 
 function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
-  const { token, tokenMissing, mcpSessionId, setMcpSessionId, append, addProtocolEntry } =
-    usePlayground();
+  const { token, tokenMissing, append, addProtocolEntry } = usePlayground();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [toolName, setToolName] = React.useState(() => tools[0]?.name ?? '');
@@ -1170,10 +1169,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
     controlTool: (typeof ASYNC_CONTROL_TOOLS)[keyof typeof ASYNC_CONTROL_TOOLS],
     jobId: string,
   ): Promise<AsyncEnvelopePayload | null> {
-    if (!mcpSessionId) {
-      operatorStatus.setError('Connect MCP session first.');
-      return null;
-    }
     if (!token.trim()) {
       operatorStatus.setError('Load a local MCP credential first.');
       return null;
@@ -1186,7 +1181,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         name: controlTool,
         arguments: { jobId },
       },
-      sessionId: mcpSessionId,
       id: nextId,
     };
     addProtocolEntry('request', reqPayload);
@@ -1295,10 +1289,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       );
       return;
     }
-    if (!mcpSessionId) {
-      operatorStatus.setError('Connect MCP session first.');
-      return;
-    }
     if (!token.trim()) {
       operatorStatus.setError('Load a local MCP credential first.');
       return;
@@ -1318,7 +1308,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             },
           },
         },
-        sessionId: mcpSessionId,
         id: nextId,
       };
       addProtocolEntry('request', reqPayload);
@@ -1344,9 +1333,9 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   React.useEffect(() => {
-    if (!selectedJobId || trackedJobs[selectedJobId] || !mcpSessionId || !token.trim()) return;
+    if (!selectedJobId || trackedJobs[selectedJobId] || !token.trim()) return;
     void refreshAsyncJob(selectedJobId);
-  }, [mcpSessionId, selectedJobId, token, trackedJobs]);
+  }, [selectedJobId, token, trackedJobs]);
 
   React.useEffect(() => {
     if (!selectedTrackedJob) return;
@@ -1376,24 +1365,20 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
       const nextId = rpcId;
       setRpcId((v) => v + 1);
       const reqPayload = {
-        method: 'initialize',
+        method: 'server/discover',
         params: {
-          protocolVersion: '2025-06-18',
-          capabilities: {},
-          clientInfo: { name: 'courtlistener-spa-console', version: '1.0.0' },
+          clientInfo: { name: 'courtlistener-spa-console', version: '2.0.0' },
         },
-        sessionId: mcpSessionId || undefined,
         id: nextId,
       };
       addProtocolEntry('request', reqPayload);
       const result = await mcpCall<unknown>(reqPayload, token);
       if (cancelledRef.current) return;
       addProtocolEntry('response', result.body);
-      if (result.sessionId) setMcpSessionId(result.sessionId);
-      append('system', '✅ MCP session initialized');
+      append('system', '✅ MCP v2 server discovered');
       append('system', JSON.stringify(result.body));
-      connectStatus.setOk(`Connected. Session: ${result.sessionId ?? mcpSessionId ?? 'none'}`);
-      toast('MCP session connected', 'ok');
+      connectStatus.setOk('Connected. Stateless MCP v2 is ready.');
+      toast('MCP v2 connected', 'ok');
     } catch (error) {
       if (cancelledRef.current) return;
       const message = withRecoveryHint(error, toErrorMessage(error));
@@ -1408,10 +1393,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   }
 
   async function sendRaw(): Promise<void> {
-    if (!mcpSessionId) {
-      chatStatus.setError('Connect MCP session first.');
-      return;
-    }
     if (!toolName) {
       chatStatus.setError('No tool available.');
       return;
@@ -1461,7 +1442,6 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
               }
             : args,
         },
-        sessionId: mcpSessionId,
         id: nextId,
       };
       addProtocolEntry('request', reqPayload);
@@ -1512,10 +1492,10 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   return (
     <div className={stackClass}>
       <div className={twoColClass}>
-        <Card title="Connect MCP session" subtitle="Step 1: initialize a session on /mcp.">
+        <Card title="Connect MCP v2" subtitle="Step 1: discover the stateless MCP v2 surface.">
           <InlineGroup>
             <Button id="connectBtn" disabled={connecting || tokenMissing} onClick={connect}>
-              {connecting ? 'Connecting...' : 'Connect MCP Session'}
+              {connecting ? 'Connecting...' : 'Connect MCP v2'}
             </Button>
           </InlineGroup>
           <StatusBanner
@@ -1524,7 +1504,7 @@ function RawMcpPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
             type={connectStatus.statusType}
           />
         </Card>
-        <Card title="Tool call" subtitle="Step 2: call a tool inside the active session.">
+        <Card title="Tool call" subtitle="Step 2: call a tool over the stateless v2 transport.">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -1878,7 +1858,7 @@ interface ChatMessage {
 
 function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { session } = useAuth();
-  const { token, mcpSessionId, setMcpSessionId, setLastRawMcp } = usePlayground();
+  const { token, setLastRawMcp } = usePlayground();
   const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'ai_chat' });
   const [aiMode, setAiMode] = React.useState<'cheap' | 'balanced'>('cheap');
   const [aiToolName, setAiToolName] = React.useState('auto');
@@ -1973,7 +1953,6 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         aiChat({
           message: currentPrompt,
           mcpToken: token || undefined,
-          mcpSessionId: mcpSessionId || undefined,
           toolName: aiToolName,
           mode: aiMode,
           history: chatHistory,
@@ -1999,7 +1978,6 @@ function AiChatPanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         mcpResult.status === 'fulfilled' ? mcpResult.value.fallback_used : undefined;
 
       if (mcpResult.status === 'fulfilled') {
-        if (mcpResult.value.session_id) setMcpSessionId(mcpResult.value.session_id);
         setLastRawMcp(JSON.stringify(mcpResult.value.mcp_result, null, 2));
       }
 
@@ -2249,7 +2227,7 @@ interface CompareResult {
 
 function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
   const { session } = useAuth();
-  const { token, mcpSessionId, setMcpSessionId } = usePlayground();
+  const { token } = usePlayground();
   const turnstile = useTurnstileToken(session?.turnstile_site_key, { action: 'ai_chat' });
   const [prompt, setPrompt] = React.useState(
     'What are the leading Supreme Court cases about free speech in schools?',
@@ -2308,7 +2286,6 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
         aiChat({
           message: currentPrompt,
           mcpToken: token || undefined,
-          mcpSessionId: mcpSessionId || undefined,
           toolName: aiToolName,
           mode: aiMode,
           turnstileToken: turnstile.token || undefined,
@@ -2322,7 +2299,6 @@ function ComparePanel({ tools }: { tools: ToolInfo[] }): React.JSX.Element {
 
       if (mcpResult.status === 'fulfilled') {
         const r = mcpResult.value;
-        if (r.session_id) setMcpSessionId(r.session_id);
         newResults.push({
           label: 'With MCP Tools',
           response: r.ai_response,
@@ -2590,15 +2566,8 @@ export function PlaygroundPage(): React.JSX.Element {
 }
 
 function PlaygroundContent(): React.JSX.Element {
-  const {
-    token,
-    tokenMissing,
-    mcpSessionId,
-    transcript,
-    clearTranscript,
-    lastRawMcp,
-    protocolLog,
-  } = usePlayground();
+  const { token, tokenMissing, transcript, clearTranscript, lastRawMcp, protocolLog } =
+    usePlayground();
   const [searchParams] = useSearchParams();
   const deepLinkedJobId = searchParams.get('jobId')?.trim() ?? '';
   const [carriedStatus] = React.useState(() => consumeOperationalStatus());
@@ -2661,7 +2630,6 @@ function PlaygroundContent(): React.JSX.Element {
           {
             method: 'tools/list',
             params: {},
-            sessionId: mcpSessionId || undefined,
             id: discoveryRpcIdRef.current++,
           },
           token,
@@ -2678,7 +2646,7 @@ function PlaygroundContent(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [mcpSessionId, token, tokenMissing]);
+  }, [token, tokenMissing]);
 
   React.useEffect(() => {
     localStorage.setItem('clmcp_playground_tab', activeTab);
@@ -2703,15 +2671,14 @@ function PlaygroundContent(): React.JSX.Element {
 
   const activeTabLabel =
     activeTab === 'ai' ? 'AI Chat' : activeTab === 'compare' ? 'Compare' : 'Raw MCP Console';
-  const sessionLabel =
-    mcpSessionId.length > 0 ? `Session ${mcpSessionId.slice(0, 8)}…` : 'No active MCP session';
+  const sessionLabel = tokenMissing ? 'Credential required' : 'Stateless MCP v2';
 
   return (
     <div className={stackClass}>
       <HeroPanel
         eyebrow="Operator workspace"
         title="Playground"
-        description="Connect a direct MCP session, inspect live tool metadata, compare AI outputs with and without tool access, and drop to raw protocol calls when you need to debug the runtime boundary."
+        description="Discover the stateless MCP v2 surface, inspect live tool metadata, compare AI outputs with and without tool access, and drop to raw protocol calls when you need to debug the runtime boundary."
         actions={
           <InlineGroup>
             <ButtonLink to="/app/account" variant="secondary">
@@ -2768,9 +2735,9 @@ function PlaygroundContent(): React.JSX.Element {
 
       <InlineGroup className={playgroundModeSummaryClass}>
         <ConnectionBadge
-          connected={mcpSessionId.length > 0}
-          connectedLabel={`Session: ${mcpSessionId.slice(0, 8)}…`}
-          disconnectedLabel="No session"
+          connected={!tokenMissing}
+          connectedLabel="Stateless MCP v2"
+          disconnectedLabel="Credential required"
           meta={`| ${toolCatalog.length} tools`}
         />
       </InlineGroup>

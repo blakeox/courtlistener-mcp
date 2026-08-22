@@ -3,7 +3,11 @@
  * Modular resource handlers that can be dynamically registered and executed
  */
 
-import { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ReadResourceResult,
+  Resource,
+  type ResourceTemplateType as ResourceTemplateDefinition,
+} from '@modelcontextprotocol/server';
 import { Logger } from '../infrastructure/logger.js';
 
 export interface ResourceHandler {
@@ -29,6 +33,12 @@ export interface ResourceHandler {
    * List available resources (optional, for static lists or examples)
    */
   list(): Resource[];
+
+  /**
+   * When set, subscribed clients receive proactive resources/updated notifications
+   * on this interval while the subscription remains active.
+   */
+  readonly subscriptionRefreshTtlMs?: number;
 }
 
 export interface ResourceContext {
@@ -38,12 +48,18 @@ export interface ResourceContext {
 
 export class ResourceHandlerRegistry {
   private handlers: ResourceHandler[] = [];
+  private onCatalogListChanged: (() => void) | undefined;
+
+  setOnCatalogListChanged(callback: (() => void) | undefined): void {
+    this.onCatalogListChanged = callback;
+  }
 
   /**
    * Register a resource handler
    */
   register(handler: ResourceHandler): void {
     this.handlers.push(handler);
+    this.onCatalogListChanged?.();
   }
 
   /**
@@ -81,5 +97,26 @@ export class ResourceHandlerRegistry {
         };
       }),
     );
+  }
+
+  /**
+   * List URI templates for dynamic resource discovery (resources/templates/list).
+   */
+  getAllResourceTemplates(): ResourceTemplateDefinition[] {
+    return this.handlers.map((handler) => ({
+      uriTemplate: handler.uriTemplate,
+      name: handler.name,
+      title: handler.title ?? handler.name,
+      description: handler.description,
+      mimeType: handler.mimeType,
+    }));
+  }
+
+  getHandlerByTemplate(uriTemplate: string): ResourceHandler | undefined {
+    return this.handlers.find((handler) => handler.uriTemplate === uriTemplate);
+  }
+
+  getSubscriptionRefreshTtlMs(uri: string): number | undefined {
+    return this.findHandler(uri)?.subscriptionRefreshTtlMs;
   }
 }

@@ -15,7 +15,7 @@ import {
 describe('oauth diagnostics', () => {
   it('summarizes authorize requests without exposing secrets', async () => {
     const request = new Request(
-      'https://worker.example/authorize?client_id=abc123&redirect_uri=https%3A%2F%2Fchatgpt.com%2Faip%2Fcallback&scope=legal%3Aread%20legal%3Asearch&state=opaque&code_challenge_method=S256&code_challenge=secret-challenge',
+      'https://worker.example/oauth/authorize?client_id=abc123&redirect_uri=https%3A%2F%2Fchatgpt.com%2Faip%2Fcallback&scope=legal%3Aread%20legal%3Asearch&state=opaque&code_challenge_method=S256&code_challenge=secret-challenge',
       {
         headers: {
           authorization: 'Bearer super-secret-token',
@@ -83,7 +83,7 @@ describe('oauth diagnostics', () => {
   it('summarizes hosted auth requests without exposing cookie values', () => {
     const summary = summarizeHostedAuthRequest(
       new Request(
-        'https://worker.example/auth/start?continue=1&return_to=https%3A%2F%2Fworker.example%2Fauthorize&auth_error=callback_failed',
+        'https://worker.example/auth/start?continue=1&return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize&auth_error=callback_failed',
         {
           headers: {
             cookie:
@@ -94,7 +94,7 @@ describe('oauth diagnostics', () => {
     );
 
     assert.equal(summary.route, 'auth-start');
-    assert.equal(summary.return_to, 'https://worker.example/authorize');
+    assert.equal(summary.return_to, 'https://worker.example/oauth/authorize');
     assert.equal(summary.auth_error, 'callback_failed');
     assert.equal(summary.session_cookie_present, true);
     assert.equal(summary.state_cookie_present, true);

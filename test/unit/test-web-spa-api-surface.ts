@@ -131,24 +131,22 @@ describe('web-spa api surface', () => {
         JSON.stringify({
           status: 'ok',
           service: 'courtlistener-mcp',
-          transport: 'cloudflare-agents-streamable-http',
-          cloudflare: {
-            analytics_enabled: true,
-            async_queue_configured: true,
-            async_jobs_kv_configured: true,
-            turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
-          },
-          metrics: {
-            latency_ms: {
-              route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
+          transport: 'cloudflare-mcp-v2-streamable-http',
+          runtime: 'cloudflare-worker',
+          version: '1.0.5',
+          timestamp: new Date().toISOString(),
+          diagnostics: {
+            cloudflare: {
+              analytics_enabled: true,
+              async_queue_configured: true,
+              async_jobs_kv_configured: true,
+              turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
             },
-          },
-          session_topology: {
-            version: 'v1',
-            shard_count: 4,
-            idle_ttl_ms: 1800000,
-            absolute_ttl_ms: 43200000,
-            eviction_sweep_limit: 100,
+            metrics: {
+              latency_ms: {
+                route_latency_ms: { '/mcp': { count: 4, avg_ms: 120 } },
+              },
+            },
           },
         }),
         { status: 200 },
@@ -157,10 +155,12 @@ describe('web-spa api surface', () => {
 
     const health = await api.getWorkerHealth();
 
-    assert.equal(health.cloudflare.analytics_enabled, true);
-    assert.equal(health.cloudflare.async_queue_configured, true);
-    assert.deepEqual(health.cloudflare.turnstile_enforced_routes, ['session_bootstrap', 'ai_chat']);
-    assert.equal(health.session_topology.shard_count, 4);
+    assert.equal(health.diagnostics.cloudflare.analytics_enabled, true);
+    assert.equal(health.diagnostics.cloudflare.async_queue_configured, true);
+    assert.deepEqual(health.diagnostics.cloudflare.turnstile_enforced_routes, [
+      'session_bootstrap',
+      'ai_chat',
+    ]);
   });
 
   it('bootstrapSession forwards authorization and turnstile token', async () => {
@@ -213,7 +213,6 @@ describe('web-spa api surface', () => {
           fallback_used: false,
           mode: 'cheap',
           tool: 'search_cases',
-          session_id: 'sid',
           ai_response: 'resp',
           mcp_result: {},
         }),

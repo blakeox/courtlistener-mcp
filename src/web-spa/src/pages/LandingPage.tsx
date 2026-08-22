@@ -68,7 +68,7 @@ const DOCUMENTATION_URL = `${REPOSITORY_URL}#readme`;
 const DOWNLOAD_ZIP_URL = `${REPOSITORY_URL}/archive/refs/heads/main.zip`;
 const DOWNLOAD_TAR_URL = `${REPOSITORY_URL}/archive/refs/heads/main.tar.gz`;
 const INSTALL_COMMAND =
-  'git clone https://github.com/blakeox/courtlistener-mcp.git && cd courtlistener-mcp && pnpm install && pnpm build';
+  'git clone https://github.com/blakeox/courtlistener-mcp.git && cd courtlistener-mcp && pnpm install && pnpm run build';
 const MCP_CONFIG_SNIPPET = `{
   "mcpServers": {
     "courtlistener": {
@@ -95,8 +95,8 @@ const featureItems = [
     icon: CourtIcon,
   },
   {
-    title: 'AI-Ready',
-    description: 'Built for LLMs and agents using the Model Context Protocol.',
+    title: 'Protocol-ready',
+    description: 'Built for structured legal research workflows over the Model Context Protocol.',
     icon: BracketsIcon,
   },
 ] as const;

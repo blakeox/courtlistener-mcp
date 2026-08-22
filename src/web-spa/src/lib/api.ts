@@ -32,7 +32,6 @@ const aiChatSchema = z.object({
   mode: z.enum(['cheap', 'balanced']),
   tool: z.string(),
   tool_reason: z.string().optional(),
-  session_id: z.string(),
   ai_response: z.string(),
   mcp_result: z.unknown(),
 });
@@ -55,24 +54,24 @@ export const usageSnapshotSchema = z.object({
 });
 
 export const workerHealthSchema = z.object({
-  status: z.literal('ok'),
+  status: z.enum(['ok', 'degraded', 'unhealthy']),
   service: z.literal('courtlistener-mcp'),
-  transport: z.literal('cloudflare-agents-streamable-http'),
-  cloudflare: z.object({
-    analytics_enabled: z.boolean(),
-    async_queue_configured: z.boolean(),
-    async_jobs_kv_configured: z.boolean(),
-    turnstile_enforced_routes: z.array(z.string()),
-  }),
-  metrics: z.object({
-    latency_ms: z.unknown(),
-  }),
-  session_topology: z.object({
-    version: z.string(),
-    shard_count: z.number(),
-    idle_ttl_ms: z.number(),
-    absolute_ttl_ms: z.number(),
-    eviction_sweep_limit: z.number(),
+  timestamp: z.string(),
+  version: z.string(),
+  runtime: z.enum(['node', 'cloudflare-worker']),
+  transport: z.string(),
+  diagnostics: z.object({
+    cloudflare: z.object({
+      analytics_enabled: z.boolean(),
+      async_queue_configured: z.boolean(),
+      async_jobs_kv_configured: z.boolean(),
+      turnstile_enforced_routes: z.array(z.string()),
+    }),
+    metrics: z.object({
+      latency_ms: z.unknown(),
+    }),
+    metrics_health: z.unknown().optional(),
+    cache_stats: z.unknown().optional(),
   }),
 });
 
@@ -218,11 +217,10 @@ export async function mcpCall<T>(
   args: {
     method: string;
     params: Record<string, unknown>;
-    sessionId?: string;
     id: number;
   },
   token: string,
-): Promise<{ body: T; sessionId: string | null }> {
+): Promise<{ body: T }> {
   if (!token.trim()) {
     throw {
       status: 401,
@@ -235,11 +233,9 @@ export async function mcpCall<T>(
     authorization: `Bearer ${token}`,
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
-    'MCP-Protocol-Version': '2025-06-18',
+    'MCP-Protocol-Version': '2026-07-28',
+    'Mcp-Method': args.method,
   });
-  if (args.sessionId) {
-    headers.set('mcp-session-id', args.sessionId);
-  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
@@ -254,7 +250,16 @@ export async function mcpCall<T>(
         jsonrpc: '2.0',
         id: args.id,
         method: args.method,
-        params: args.params,
+        params: {
+          ...args.params,
+          _meta: {
+            ...(args.params._meta && typeof args.params._meta === 'object'
+              ? args.params._meta
+              : {}),
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
+        },
       }),
     });
   } catch (err) {
@@ -303,14 +308,12 @@ export async function mcpCall<T>(
 
   return {
     body: body as T,
-    sessionId: response.headers.get('mcp-session-id'),
   };
 }
 
 export async function aiChat(args: {
   message: string;
   mcpToken?: string;
-  mcpSessionId?: string;
   toolName?: string;
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;

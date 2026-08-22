@@ -33,8 +33,7 @@ describe('api-mock', () => {
 
   it('mcpCall returns mock response', async () => {
     const mock = await import('../lib/api-mock');
-    const result = await mock.mcpCall({ method: 'initialize', params: {}, id: 1 }, 'token');
-    expect(result.sessionId).toBeTruthy();
+    const result = await mock.mcpCall({ method: 'server/discover', params: {}, id: 1 }, 'token');
     expect(result.body).toBeDefined();
   });
 
@@ -43,7 +42,6 @@ describe('api-mock', () => {
     const result = await mock.aiChat({ message: 'test', mcpToken: 'tok' });
     expect(result.ai_response).toBeTruthy();
     expect(result.tool).toBeTruthy();
-    expect(result.session_id).toBeTruthy();
   });
 
   it('aiChat includes tool_reason in response', async () => {

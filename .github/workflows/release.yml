@@ -23,13 +23,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -46,11 +46,38 @@ jobs:
       - name: Run shared local gate
         run: pnpm run ci:local-gate
 
+      - name: Verify Cloudflare IaC ownership boundary
+        run: pnpm run cloudflare:check:iac
+
+      - name: Profile Cloudflare Worker startup
+        run: pnpm run cloudflare:check:startup
+
+      - name: Verify Worker platform surface
+        run: pnpm run cloudflare:check:surface
+
+      - name: Verify deployed Wrangler binding types
+        run: pnpm run cloudflare:check:types
+
+      - name: Verify Cloudflare environment isolation
+        run: pnpm run cloudflare:check:environments -- --require-provisioned
+
+      - name: Verify live Cloudflare inventory
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READONLY_API_TOKEN }}
+        run: pnpm run cloudflare:check:live
+
+      - name: Typecheck Workers runtime harness
+        run: pnpm exec tsc -p test/tsconfig.workers.json --noEmit
+
+      - name: Verify generated Workers bindings
+        run: pnpm exec wrangler types test/worker-configuration.d.ts --config wrangler.mcp.test.jsonc --env-interface MpcTestEnv --check
+
+      - name: Run Workers runtime tests
+        run: pnpm run test:workers
+
       - name: Install Chromium for auth browser validation
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install MCP Inspector
-        run: pnpm add -g @modelcontextprotocol/inspector
 
       - name: Browser + integration release suite
         run: |
@@ -63,12 +90,11 @@ jobs:
           REMOTE_SERVER_URL: ${{ secrets.REMOTE_SERVER_URL }}
         run: pnpm run ci:auth-release-gate
 
-      - name: Extended MCP Inspector validation
+      - name: MCP v2 contract validation
         run: |
-          echo "🔍 Running extended MCP Inspector validation..."
+          echo "🔍 Running direct MCP v2 contract validation..."
 
-          # Run comprehensive Inspector CLI tests
-          pnpm run ci:test-inspector:extended
+          pnpm run ci:test:mcp-v2:extended
 
           # Test all available tools
           pnpm run test:mcp:tool list_courts
@@ -81,7 +107,7 @@ jobs:
         run: |
           echo "⚡ Running release performance hardening gates..."
           mkdir -p performance-data
-          pnpm run start:http > performance-data/release-gate-server.log 2>&1 &
+          LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/release-gate-workers.log 2>&1 &
           SERVER_PID=$!
           cleanup() {
             kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -89,17 +115,17 @@ jobs:
           trap cleanup EXIT
 
           for _ in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null 2>&1; then
+            if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
               break
             fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:3001/health >/dev/null
+          LOCAL_HEALTH_URL=http://127.0.0.1:8787 node scripts/dev/check-local-health.mjs >/dev/null
 
-          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-baseline.json
-          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:3001 --output performance-data/load-profile-current.json
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:8787 --output performance-data/load-profile-baseline.json
+          pnpm run ci:load-profile-suite -- --light --base-url http://127.0.0.1:8787 --output performance-data/load-profile-current.json
           pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json
-          pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:3001 --output performance-data/hardening-soak-leak.json
+          pnpm run ci:hardening:soak-leak-checks -- --light --base-url http://127.0.0.1:8787 --output performance-data/hardening-soak-leak.json
 
       - name: Test against multiple environments
         run: |
@@ -112,12 +138,14 @@ jobs:
           # Test remote deployment if available
           if [ -n "$REMOTE_SERVER_URL" ]; then
             echo "Testing remote deployment..."
-            SERVER_URL="$REMOTE_SERVER_URL" pnpm run test:mcp
+            REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
+            SERVER_URL="$REMOTE_MCP_URL" pnpm run test:mcp
           fi
 
       - name: Generate release validation report
         run: |
           echo "📋 Generating release validation report..."
+          TOOL_COUNT=$(node -e "const fs=require('fs');const manifest=JSON.parse(fs.readFileSync('manifest.json','utf8'));const tools=manifest.capabilities?.tools?.tools;console.log(Array.isArray(tools)?tools.length:0)")
 
           cat > release-validation-report.md << EOF
           # Release Validation Report
@@ -131,16 +159,15 @@ jobs:
           - ✅ Version consistency check
           - ✅ Build successful  
           - ✅ Full test suite passed
-          - ✅ MCP Inspector validation passed
+          - ✅ MCP v2 contract validation passed
           - ✅ Performance hardening gates
           - ✅ Multi-environment testing
 
           ## MCP Protocol Compliance
 
-          All 25 tools tested successfully:
-          - Core Research Tools (7/7) ✅
-          - Comprehensive Data Access (11/11) ✅  
-          - Advanced Features (7/7) ✅
+          - Generated MCP catalog: ${TOOL_COUNT} tools
+          - Tool definitions and output schemas validated by the shared local gate
+          - Direct MCP v2 protocol probes recorded in the workflow logs
 
           ## Performance Metrics
 
@@ -154,7 +181,7 @@ jobs:
           EOF
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-validation-${{ github.ref_name }}
           path: |
@@ -162,12 +189,12 @@ jobs:
             performance-data/load-profile-baseline.json
             performance-data/load-profile-current.json
             performance-data/hardening-soak-leak.json
-            performance-data/release-gate-server.log
+            performance-data/release-gate-workers.log
             test-output/
 
       - name: Comment on release
         if: github.event_name == 'release'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const fs = require('fs');
@@ -180,39 +207,10 @@ jobs:
               body: report
             });
 
-  docker-test:
-    name: Docker Integration Test
-    runs-on: ubuntu-latest
-    needs: validate-release
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Build Docker image
-        run: |
-          if [ -f Dockerfile ]; then
-            docker build -t legal-mcp:${{ github.ref_name }} .
-          else
-            echo "No Dockerfile found, skipping Docker test"
-          fi
-
-      - name: Test Docker container
-        run: |
-          if docker images | grep -q legal-mcp; then
-            echo "🐳 Testing Docker container..."
-            
-            # Test container starts properly
-            docker run --rm -d --name legal-mcp-test legal-mcp:${{ github.ref_name }} || echo "Docker container test skipped"
-            
-            # Clean up
-            docker stop legal-mcp-test || true
-          fi
-
   publish-npm:
     name: Publish npm package
     runs-on: ubuntu-latest
-    needs: [validate-release, docker-test]
+    needs: validate-release
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -220,9 +218,9 @@ jobs:
       id-token: write
     environment: npm-publish
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
@@ -244,46 +242,16 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-docker:
-    name: Publish Docker image
-    runs-on: ubuntu-latest
-    needs: [validate-release, docker-test]
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: read
-      packages: write
-    environment: docker-publish
-    steps:
-      - uses: actions/checkout@v6
-      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
-        id: meta
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
   github-release:
     name: Create GitHub release
-    needs: [publish-npm, publish-docker]
+    needs: publish-npm
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     environment: github-release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           generate_release_notes: true
@@ -291,7 +259,7 @@ jobs:
   deployment-ready:
     name: Deployment Ready Check
     runs-on: ubuntu-latest
-    needs: [validate-release, docker-test]
+    needs: validate-release
     if: github.event_name == 'release'
 
     steps:
@@ -300,9 +268,8 @@ jobs:
           echo "🚀 Release ${{ github.ref_name }} is validated and ready for deployment!"
           echo ""
           echo "✅ All tests passed"
-          echo "✅ MCP Inspector validation successful"  
+          echo "✅ MCP v2 contract validation successful"
           echo "✅ Performance regression checks passed"
           echo "✅ Multi-environment testing completed"
-          echo "✅ Docker integration tested"
           echo ""
           echo "This release can be safely deployed to production."

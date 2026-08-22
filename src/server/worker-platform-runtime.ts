@@ -1,6 +1,5 @@
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
-import { resolveWorkerMcpSessionTopologyV2 } from './worker-mcp-session-topology.js';
 import {
   createWorkerObservabilityRuntime,
   type WorkerObservabilityRuntime,
@@ -51,20 +50,18 @@ export function createWorkerPlatformRuntime<
     exportTopSlowOperationLimit: WORKER_EXPORT_TOP_SLOW_OPERATION_LIMIT,
     doOutlierScoreThreshold: WORKER_DO_OUTLIER_SCORE_THRESHOLD,
     doOutlierMinSamples: WORKER_DO_OUTLIER_MIN_SAMPLES,
-    resolveWorkerMcpSessionTopologyV2,
-    onRouteLatencyRecorded: (route, elapsedMs) =>
-      cloudflareTelemetryRuntime.recordRouteLatency(route, elapsedMs),
-    onDurableObjectLatencyRecorded: (dimension, elapsedMs) =>
-      cloudflareTelemetryRuntime.recordDurableObjectLatency(dimension, elapsedMs),
-    onDurableObjectUnavailable: (dimension) =>
-      cloudflareTelemetryRuntime.recordDurableObjectUnavailable(dimension),
+    onRouteLatencyRecorded: (env, route, elapsedMs) =>
+      cloudflareTelemetryRuntime.recordRouteLatency(env, route, elapsedMs),
+    onDurableObjectLatencyRecorded: (env, dimension, elapsedMs) =>
+      cloudflareTelemetryRuntime.recordDurableObjectLatency(env, dimension, elapsedMs),
+    onDurableObjectUnavailable: (env, dimension) =>
+      cloudflareTelemetryRuntime.recordDurableObjectUnavailable(env, dimension),
   });
 
   const workerDurableRuntime = createWorkerDurableRuntime<TEnv>({
     now: () => Date.now(),
     recordDurableObjectLatency: workerObservabilityRuntime.recordDurableObjectLatency,
     recordDurableObjectUnavailable: workerObservabilityRuntime.recordDurableObjectUnavailable,
-    getCachedSessionTopology: workerObservabilityRuntime.getCachedSessionTopology,
     jsonError,
   });
 
@@ -99,15 +96,5 @@ export function createWorkerPlatformRuntime<
 }
 
 export function isMcpPath(pathname: string): boolean {
-  return pathname === '/mcp' || pathname === '/sse';
-}
-
-export function isRemovedLegacyUiRoute(pathname: string): boolean {
-  return (
-    pathname === '/oauth/consent' ||
-    pathname.startsWith('/api/login') ||
-    pathname.startsWith('/api/signup') ||
-    pathname.startsWith('/api/password') ||
-    pathname.startsWith('/api/keys')
-  );
+  return pathname === '/mcp';
 }

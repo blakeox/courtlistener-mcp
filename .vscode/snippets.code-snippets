@@ -15,11 +15,11 @@
       "    },",
       "    required: ['${3:paramName}']",
       "  }",
-      "};"
+      "};",
     ],
-    "description": "Create a new MCP tool definition"
+    "description": "Create a new MCP tool definition",
   },
-  
+
   "MCP Tool Handler": {
     "prefix": "mcp-handler",
     "body": [
@@ -60,11 +60,11 @@
       "      `${1/(.*)/${1:/pascalcase}/} failed: ${error.message}`",
       "    );",
       "  }",
-      "}"
+      "}",
     ],
-    "description": "Create a new MCP tool handler method"
+    "description": "Create a new MCP tool handler method",
   },
-  
+
   "MCP Server Test": {
     "prefix": "mcp-test",
     "body": [
@@ -96,70 +96,25 @@
       "    assert.ok(result);",
       "    assert.strictEqual(result.${8:property}, '${9:expectedValue}');",
       "  });",
-      "});"
+      "});",
     ],
-    "description": "Create a new MCP test suite"
+    "description": "Create a new MCP test suite",
   },
-  
-  "Enterprise Middleware": {
-    "prefix": "mcp-middleware",
-    "body": [
-      "export class ${1:MiddlewareName}Middleware {",
-      "  private config: any;",
-      "  private logger: any;",
-      "  ",
-      "  constructor(config: any, logger: any) {",
-      "    this.config = config;",
-      "    this.logger = logger;",
-      "  }",
-      "  ",
-      "  async process(request: any, context: any): Promise<any> {",
-      "    try {",
-      "      this.logger.debug('${1:MiddlewareName} processing request', {",
-      "        requestId: context.requestId",
-      "      });",
-      "      ",
-      "      // Middleware logic here",
-      "      ${2:// TODO: Implement middleware logic}",
-      "      ",
-      "      return {",
-      "        allowed: true,",
-      "        request: request",
-      "      };",
-      "      ",
-      "    } catch (error) {",
-      "      this.logger.error('${1:MiddlewareName} middleware error', {",
-      "        error: error.message,",
-      "        requestId: context.requestId",
-      "      });",
-      "      ",
-      "      return {",
-      "        allowed: false,",
-      "        error: error.message",
-      "      };",
-      "    }",
-      "  }",
-      "}"
-    ],
-    "description": "Create a new enterprise middleware class"
-  },
-  
+
   "Logger Statement": {
     "prefix": "log",
-    "body": [
-      "this.logger.${1|info,error,warn,debug|}('${2:message}', { ${3:context} });"
-    ],
-    "description": "Add a logger statement"
+    "body": ["this.logger.${1|info,error,warn,debug|}('${2:message}', { ${3:context} });"],
+    "description": "Add a logger statement",
   },
-  
+
   "Metrics Recording": {
     "prefix": "metrics",
     "body": [
-      "this.metrics.record${1|Request,CacheHit,CacheMiss,Failure|}('${2:operation}', ${3:success});"
+      "this.metrics.record${1|Request,CacheHit,CacheMiss,Failure|}('${2:operation}', ${3:success});",
     ],
-    "description": "Add metrics recording"
+    "description": "Add metrics recording",
   },
-  
+
   "Cache Operation": {
     "prefix": "cache",
     "body": [
@@ -174,8 +129,8 @@
       "  this.metrics.recordCacheHit('${1:operation}');",
       "}",
       "",
-      "return result;"
+      "return result;",
     ],
-    "description": "Add cache operation with metrics"
-  }
+    "description": "Add cache operation with metrics",
+  },
 }

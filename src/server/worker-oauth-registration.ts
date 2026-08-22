@@ -31,9 +31,9 @@ interface RegistrationDeps<TEnv extends RegistrationEnv> {
     clientId: string,
     presentedToken: string,
   ) => Promise<boolean>;
-  getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
-  getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
-  now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+  getClientIdentifier: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+  getAuthRouteRateLimitedResponse: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+  now: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
 }
 
 function getClientRegistrationManagementUrl(origin: string, clientId: string): string {

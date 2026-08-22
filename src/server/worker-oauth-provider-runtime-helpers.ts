@@ -14,7 +14,7 @@ export interface OAuthRuntimeEnv {
 
 export interface OAuthProviderRuntimeDeps<TEnv extends OAuthRuntimeEnv> {
   handleAuthorizeRoute: (request: Request, env: TEnv) => Promise<Response>;
-  handleLegacyWorkerFetch: (
+  handleWorkerFetch: (
     request: Request,
     env: TEnv,
     ctx: ExecutionContext,
@@ -73,7 +73,7 @@ export function handleOAuthProviderApiRequest<TEnv extends OAuthRuntimeEnv>(
   request: Request,
   env: TEnv,
   ctx: ExecutionContext,
-  deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'handleLegacyWorkerFetch'>,
+  deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'handleWorkerFetch'>,
 ): Promise<Response> {
   if (!getPrevalidatedOAuthIdentity(ctx)) {
     return Promise.resolve(
@@ -87,23 +87,39 @@ export function handleOAuthProviderApiRequest<TEnv extends OAuthRuntimeEnv>(
     );
   }
 
-  const headers = new Headers(request.headers);
-  headers.delete('Authorization');
-  const enrichedRequest = new Request(request, { headers });
-  return deps.handleLegacyWorkerFetch(enrichedRequest, env, ctx, { skipGatewayAuth: true });
+  // Keep the bearer token available to the private MCP Worker for defense in
+  // depth. The Edge OAuth provider already validated it; skipGatewayAuth only
+  // suppresses duplicate validation when the request stays in this Worker.
+  return deps.handleWorkerFetch(request, env, ctx, { skipGatewayAuth: true });
 }
 
 export function handleOAuthProviderDefaultRequest<TEnv extends OAuthRuntimeEnv>(
   request: Request,
   env: TEnv,
   ctx: ExecutionContext,
-  deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'handleAuthorizeRoute' | 'handleLegacyWorkerFetch'>,
+  deps: Pick<OAuthProviderRuntimeDeps<TEnv>, 'handleAuthorizeRoute' | 'handleWorkerFetch'>,
 ): Promise<Response> {
   const url = new URL(request.url);
   if (isHostedAuthorizePath(url.pathname) && env.OAUTH_PROVIDER) {
     return deps.handleAuthorizeRoute(request, env);
   }
-  return deps.handleLegacyWorkerFetch(request, env, ctx);
+  if (isOAuthProtectedApiPath(url.pathname)) {
+    return Promise.resolve(
+      buildOAuthProviderErrorResponse({
+        code: 'unauthorized',
+        description: 'A valid OAuth access token is required for MCP API access.',
+        status: 401,
+        headers: {},
+        currentRequestOrigin: url.origin,
+        baseOrigin: url.origin,
+      }),
+    );
+  }
+  return deps.handleWorkerFetch(request, env, ctx);
+}
+
+export function isOAuthProtectedApiPath(pathname: string): boolean {
+  return pathname === '/mcp' || pathname === '/api/usage';
 }
 
 export function buildOAuthProviderErrorResponse(params: {

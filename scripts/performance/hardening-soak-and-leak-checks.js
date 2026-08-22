@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
-import path from 'path';
+import path from 'node:path';
 
 const MB = 1024 * 1024;
 

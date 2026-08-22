@@ -114,8 +114,8 @@ export const GOVERNED_PROMPT_NAMES = [
 
 const BASE_SURFACE_CONTRACT = Object.freeze({
   capabilities: {
-    required: ['tools', 'resources', 'prompts', 'logging'] as const,
-    optional: ['sampling'] as const,
+    required: ['tools', 'resources', 'prompts'] as const,
+    optional: ['logging', 'sampling', 'tasks'] as const,
   },
   tools: GOVERNED_TOOL_NAMES,
   resources: GOVERNED_RESOURCE_URIS,
@@ -123,10 +123,6 @@ const BASE_SURFACE_CONTRACT = Object.freeze({
 });
 
 const CAPABILITY_PROFILE_CONTRACT = Object.freeze({
-  legacy: {
-    default: 'extended' as const,
-    supported: ['core', 'extended'] as const,
-  },
   modern: {
     default: 'extended' as const,
     supported: ['core', 'extended', 'async'] as const,
@@ -134,23 +130,8 @@ const CAPABILITY_PROFILE_CONTRACT = Object.freeze({
 });
 
 export const MCP_PROTOCOL_CAPABILITY_CONTRACT = Object.freeze({
-  '2024-11-05': {
-    protocolVersion: '2024-11-05',
-    capabilityProfiles: CAPABILITY_PROFILE_CONTRACT.legacy,
-    ...BASE_SURFACE_CONTRACT,
-  },
-  '2025-03-26': {
-    protocolVersion: '2025-03-26',
-    capabilityProfiles: CAPABILITY_PROFILE_CONTRACT.modern,
-    ...BASE_SURFACE_CONTRACT,
-  },
-  '2025-06-18': {
-    protocolVersion: '2025-06-18',
-    capabilityProfiles: CAPABILITY_PROFILE_CONTRACT.modern,
-    ...BASE_SURFACE_CONTRACT,
-  },
-  '2025-11-25': {
-    protocolVersion: '2025-11-25',
+  '2026-07-28': {
+    protocolVersion: '2026-07-28',
     capabilityProfiles: CAPABILITY_PROFILE_CONTRACT.modern,
     ...BASE_SURFACE_CONTRACT,
   },
@@ -240,36 +221,6 @@ export function negotiateCapabilityProfile(
   };
 }
 
-export interface DeprecationPolicy {
-  minimumNoticeDays: number;
-  requireReplacementForToolChanges: boolean;
-}
-
-export const DEPRECATION_POLICY: DeprecationPolicy = Object.freeze({
-  minimumNoticeDays: 30,
-  requireReplacementForToolChanges: true,
-});
-
-export interface GovernanceDeprecationEntry {
-  id: string;
-  surface: 'protocol' | 'tool';
-  target: string;
-  replacement?: string;
-  announcedOn: string;
-  removeAfter: string;
-}
-
-export const GOVERNANCE_DEPRECATIONS: readonly GovernanceDeprecationEntry[] = Object.freeze([
-  {
-    id: 'tool-get-docket-entries-docket-id',
-    surface: 'tool',
-    target: 'get_docket_entries.input.docket_id',
-    replacement: 'get_docket_entries.input.docket',
-    announcedOn: '2026-03-01',
-    removeAfter: '2026-05-01',
-  },
-]);
-
 export function getProtocolContract(version: SupportedProtocolVersion): VersionedProtocolContract {
   return MCP_PROTOCOL_CAPABILITY_CONTRACT[version];
 }
@@ -278,41 +229,6 @@ export function getAdvertisedCapabilityKeys(): CapabilityKey[] {
   return (Object.keys(SERVER_CAPABILITIES) as CapabilityKey[]).filter(
     (key) => SERVER_CAPABILITIES[key] !== undefined,
   );
-}
-
-export function validateGovernanceDeprecations(
-  policy: DeprecationPolicy = DEPRECATION_POLICY,
-  entries: readonly GovernanceDeprecationEntry[] = GOVERNANCE_DEPRECATIONS,
-): string[] {
-  const violations: string[] = [];
-
-  for (const entry of entries) {
-    const announced = Date.parse(entry.announcedOn);
-    const removeAfter = Date.parse(entry.removeAfter);
-
-    if (Number.isNaN(announced) || Number.isNaN(removeAfter)) {
-      violations.push(`${entry.id}: invalid announcedOn/removeAfter date format`);
-      continue;
-    }
-
-    if (removeAfter <= announced) {
-      violations.push(`${entry.id}: removeAfter must be after announcedOn`);
-      continue;
-    }
-
-    const minimumNoticeMs = policy.minimumNoticeDays * 24 * 60 * 60 * 1000;
-    if (removeAfter - announced < minimumNoticeMs) {
-      violations.push(
-        `${entry.id}: deprecation notice is shorter than ${policy.minimumNoticeDays} days`,
-      );
-    }
-
-    if (policy.requireReplacementForToolChanges && entry.surface === 'tool' && !entry.replacement) {
-      violations.push(`${entry.id}: tool deprecation requires a replacement target`);
-    }
-  }
-
-  return violations;
 }
 
 export const GOVERNED_PROTOCOL_POINTERS = Object.freeze({

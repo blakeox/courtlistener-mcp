@@ -7,16 +7,12 @@ import type { ServerConfig } from '../types.js';
 import { CourtListenerAPI } from '../courtlistener.js';
 import { DefaultApiClientFactory } from '../infrastructure/api-client-factory.js';
 import { CacheManager } from '../infrastructure/cache.js';
-import { CircuitBreakerManager } from '../infrastructure/circuit-breaker.js';
-import { ConfigurationValidator } from '../infrastructure/config-validator.js';
-import { getConfig } from '../infrastructure/config.js';
-import { container } from '../infrastructure/container.js';
+import { getConfig, type ConfigEnvironment } from '../infrastructure/config.js';
+import { container, DIContainer } from '../infrastructure/container.js';
 import type { Logger } from '../infrastructure/logger.js';
 import { createLogger } from '../infrastructure/logger.js';
 import type { MetricsCollector } from '../infrastructure/metrics.js';
 import { MetricsCollector as MetricsCollectorClass } from '../infrastructure/metrics.js';
-import { MiddlewareFactory } from '../infrastructure/middleware-factory.js';
-import { MCPServerFactory } from '../infrastructure/server-factory.js';
 import { ToolHandlerRegistry } from '../server/tool-handler.js';
 import { ResourceHandlerRegistry } from '../server/resource-handler.js';
 import { PromptHandlerRegistry } from '../server/prompt-handler.js';
@@ -110,26 +106,26 @@ import {
   SearchOpinionsHandler,
 } from '../domains/search/handlers.js';
 
-export function bootstrapServices(): void {
+export function bootstrapServices(
+  environment: ConfigEnvironment,
+  serviceContainer: DIContainer = container,
+): void {
   // Worker and test runtimes may invoke bootstrap multiple times in the same
   // process. Keep initialization idempotent to avoid duplicate registrations.
-  if (container.has('config')) {
+  if (serviceContainer.has('config')) {
     return;
   }
 
   // Register configuration with validation
-  container.register('config', {
+  serviceContainer.register('config', {
     factory: () => {
-      const config = getConfig();
-      const validator = new ConfigurationValidator();
-      validator.validateAndThrow(config);
-      return config;
+      return getConfig(environment);
     },
     singleton: true,
   });
 
   // Register logger
-  container.register('logger', {
+  serviceContainer.register('logger', {
     factory: (...deps: unknown[]) => {
       const config = deps[0] as ServerConfig;
       return createLogger(config.logging, 'LegalMCP');
@@ -139,7 +135,7 @@ export function bootstrapServices(): void {
   });
 
   // Register cache
-  container.register('cache', {
+  serviceContainer.register('cache', {
     factory: (...deps: unknown[]) => {
       const config = deps[0] as ServerConfig;
       const logger = deps[1] as Logger;
@@ -150,7 +146,7 @@ export function bootstrapServices(): void {
   });
 
   // Register metrics
-  container.register('metrics', {
+  serviceContainer.register('metrics', {
     factory: (...deps: unknown[]) => {
       const logger = deps[0] as Logger;
       return new MetricsCollectorClass(logger);
@@ -160,49 +156,19 @@ export function bootstrapServices(): void {
   });
 
   // Register API client factory
-  container.register('apiClientFactory', {
+  serviceContainer.register('apiClientFactory', {
     factory: (...deps: unknown[]) => {
       const cache = deps[0] as CacheManager;
       const logger = deps[1] as Logger;
       const metrics = deps[2] as MetricsCollector;
-      return new DefaultApiClientFactory(cache, logger, metrics);
+      return new DefaultApiClientFactory(cache, logger, metrics, environment);
     },
     dependencies: ['cache', 'logger', 'metrics'],
     singleton: true,
   });
 
-  // Register server factory
-  container.register('serverFactory', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new MCPServerFactory(logger);
-    },
-    dependencies: ['logger'],
-    singleton: true,
-  });
-
-  // Register middleware factory
-  container.register('middlewareFactory', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new MiddlewareFactory(logger);
-    },
-    dependencies: ['logger'],
-    singleton: true,
-  });
-
-  // Register circuit breaker manager
-  container.register('circuitBreakerManager', {
-    factory: (...deps: unknown[]) => {
-      const logger = deps[0] as Logger;
-      return new CircuitBreakerManager(logger);
-    },
-    dependencies: ['logger'],
-    singleton: true,
-  });
-
   // Register CourtListener API client
-  container.register('courtListenerApi', {
+  serviceContainer.register('courtListenerApi', {
     factory: (...deps: unknown[]) => {
       const config = deps[0] as ServerConfig;
       const apiClientFactory = deps[1] as DefaultApiClientFactory;
@@ -213,36 +179,39 @@ export function bootstrapServices(): void {
   });
 
   // Register tool registry
-  container.register('toolRegistry', {
+  serviceContainer.register('toolRegistry', {
     factory: () => new ToolHandlerRegistry(),
     singleton: true,
   });
 
   // Register resource registry
-  container.register('resourceRegistry', {
+  serviceContainer.register('resourceRegistry', {
     factory: () => new ResourceHandlerRegistry(),
     singleton: true,
   });
 
   // Register prompt registry
-  container.register('promptRegistry', {
+  serviceContainer.register('promptRegistry', {
     factory: () => new PromptHandlerRegistry(),
     singleton: true,
   });
 
   // Register tool handlers
-  registerToolHandlers();
+  registerToolHandlers(serviceContainer);
 
   // Register resource handlers
-  registerResourceHandlers();
+  registerResourceHandlers(serviceContainer, environment);
 
   // Register prompt handlers
-  registerPromptHandlers();
+  registerPromptHandlers(serviceContainer);
 }
 
-function registerResourceHandlers(): void {
-  const resourceRegistry = container.get<ResourceHandlerRegistry>('resourceRegistry');
-  const courtListenerApi = container.get<CourtListenerAPI>('courtListenerApi');
+function registerResourceHandlers(
+  serviceContainer: DIContainer,
+  environment: ConfigEnvironment,
+): void {
+  const resourceRegistry = serviceContainer.get<ResourceHandlerRegistry>('resourceRegistry');
+  const courtListenerApi = serviceContainer.get<CourtListenerAPI>('courtListenerApi');
 
   resourceRegistry.register(new OpinionResourceHandler(courtListenerApi));
   resourceRegistry.register(new SchemaResourceHandler());
@@ -252,13 +221,13 @@ function registerResourceHandlers(): void {
   resourceRegistry.register(new JudgeResourceHandler(courtListenerApi));
   resourceRegistry.register(new RecentOpinionsResourceHandler(courtListenerApi));
 
-  const cache = container.get<CacheManager>('cache');
-  const metrics = container.get<MetricsCollector>('metrics');
-  resourceRegistry.register(new ApiStatusResourceHandler(cache, metrics));
+  const cache = serviceContainer.get<CacheManager>('cache');
+  const metrics = serviceContainer.get<MetricsCollector>('metrics');
+  resourceRegistry.register(new ApiStatusResourceHandler(cache, metrics, environment));
 }
 
-function registerPromptHandlers(): void {
-  const promptRegistry = container.get<PromptHandlerRegistry>('promptRegistry');
+function registerPromptHandlers(serviceContainer: DIContainer): void {
+  const promptRegistry = serviceContainer.get<PromptHandlerRegistry>('promptRegistry');
 
   promptRegistry.register(new LegalAssistantPromptHandler());
   promptRegistry.register(new SummarizeStatutePromptHandler());
@@ -274,9 +243,9 @@ function registerPromptHandlers(): void {
   promptRegistry.register(new JudicialDueDiligencePromptHandler());
 }
 
-function registerToolHandlers(): void {
-  const toolRegistry = container.get<ToolHandlerRegistry>('toolRegistry');
-  const courtListenerApi = container.get<CourtListenerAPI>('courtListenerApi');
+function registerToolHandlers(serviceContainer: DIContainer): void {
+  const toolRegistry = serviceContainer.get<ToolHandlerRegistry>('toolRegistry');
+  const courtListenerApi = serviceContainer.get<CourtListenerAPI>('courtListenerApi');
 
   // Register search handlers
   toolRegistry.register(new SearchOpinionsHandler(courtListenerApi));

@@ -1,0 +1,18 @@
+{
+  "name": "courtlistener-mcp-mcp-test",
+  "compatibility_date": "2026-08-18",
+  "main": "src/worker-mcp.ts",
+  "workers_dev": true,
+  "vars": {
+    "MCP_BOUNDARY_FAIL_OPEN": "false",
+    "CODEMODE_ENABLED": "false",
+    "MCP_ASYNC_QUEUE_ENABLED": "false",
+  },
+  "kv_namespaces": [
+    {
+      "binding": "ASYNC_JOBS_KV",
+      "id": "00000000000000000000000000000002",
+    },
+  ],
+  "compatibility_flags": ["nodejs_als"],
+}

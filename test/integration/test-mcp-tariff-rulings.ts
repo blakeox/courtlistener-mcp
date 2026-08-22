@@ -14,7 +14,7 @@ const localServerRuntime = getLocalMcpServerRuntime(projectRoot);
 
 const SERVER_URL = process.env.SERVER_URL?.trim();
 const MCP_REMOTE_BEARER_TOKEN = process.env.MCP_REMOTE_BEARER_TOKEN?.trim();
-const MCP_PROTOCOL_VERSION = '2024-11-05';
+const MCP_PROTOCOL_VERSION = '2026-07-28';
 
 interface McpSuccessResponse {
   jsonrpc: '2.0';
@@ -22,6 +22,9 @@ interface McpSuccessResponse {
   result?: {
     tools?: Array<{ name?: string }>;
     content?: Array<{ type?: string; text?: string }>;
+    structuredContent?: {
+      data?: SearchPayload;
+    };
   };
   error?: {
     code?: number;
@@ -35,16 +38,26 @@ interface SearchPayload {
   search_parameters?: Record<string, unknown>;
 }
 
-function buildHeaders(sessionId?: string): Record<string, string> {
+function modernParams(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ...extra,
+    _meta: {
+      'io.modelcontextprotocol/protocolVersion': MCP_PROTOCOL_VERSION,
+      'io.modelcontextprotocol/clientCapabilities': { tools: {} },
+      'io.modelcontextprotocol/clientInfo': {
+        name: 'tariff-rulings-test',
+        version: '1.0.0',
+      },
+    },
+  };
+}
+
+function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
     'mcp-protocol-version': MCP_PROTOCOL_VERSION,
   };
-
-  if (sessionId) {
-    headers['mcp-session-id'] = sessionId;
-  }
 
   if (MCP_REMOTE_BEARER_TOKEN) {
     headers.authorization = `Bearer ${MCP_REMOTE_BEARER_TOKEN}`;
@@ -53,10 +66,7 @@ function buildHeaders(sessionId?: string): Record<string, string> {
   return headers;
 }
 
-async function sendRemoteRequest(
-  payload: Record<string, unknown>,
-  sessionId?: string,
-): Promise<{ response: McpSuccessResponse; sessionId: string | null }> {
+async function sendRemoteRequest(payload: Record<string, unknown>): Promise<McpSuccessResponse> {
   if (!SERVER_URL) {
     throw new Error('SERVER_URL is required for remote MCP tests.');
   }
@@ -66,16 +76,14 @@ async function sendRemoteRequest(
 
   const response = await fetch(SERVER_URL, {
     method: 'POST',
-    headers: buildHeaders(sessionId),
+    headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
 
   assert.equal(response.ok, true, `Expected MCP HTTP 200, got ${response.status}`);
   const parsed = (await response.json()) as McpSuccessResponse;
-  return {
-    response: parsed,
-    sessionId: response.headers.get('mcp-session-id'),
-  };
+  assert.equal(response.headers.get('mcp-session-id'), null);
+  return parsed;
 }
 
 function createStdioClient(): {
@@ -135,66 +143,49 @@ function createStdioClient(): {
   };
 }
 
-async function initializeMcpSession() {
-  const initializePayload = {
+async function createMcpClient() {
+  const discoverPayload = {
     jsonrpc: '2.0',
     id: 1,
-    method: 'initialize',
-    params: {
-      protocolVersion: MCP_PROTOCOL_VERSION,
-      capabilities: { tools: {} },
-      clientInfo: { name: 'tariff-rulings-test', version: '1.0.0' },
-    },
+    method: 'server/discover',
+    params: modernParams(),
   };
 
   if (SERVER_URL) {
-    const { response, sessionId } = await sendRemoteRequest(initializePayload);
-    assert.ok(response.result, 'initialize should return a result');
-    assert.ok(sessionId, 'remote initialize should return mcp-session-id');
     return {
       transport: 'remote' as const,
-      sessionId,
-      send: async (payload: { id: number; [key: string]: unknown }) => {
-        const result = await sendRemoteRequest(payload, sessionId);
-        return result.response;
-      },
+      send: sendRemoteRequest,
       close: () => {},
     };
   }
 
   const client = createStdioClient();
-  const response = await client.send(initializePayload);
-  assert.ok(response.result, 'initialize should return a result');
+  const response = await client.send(discoverPayload);
+  assert.ok(response.result, 'server/discover should return a result');
   return {
     transport: 'stdio' as const,
-    sessionId: null,
     send: client.send,
     close: client.close,
   };
 }
 
-function parseToolText(response: McpSuccessResponse): SearchPayload {
+function parseStructuredPayload(response: McpSuccessResponse): SearchPayload {
   assert.ok(!response.error, `Unexpected MCP error: ${response.error?.message ?? 'unknown'}`);
-  const content = response.result?.content;
-  assert.ok(Array.isArray(content) && content.length > 0, 'Expected non-empty MCP content array');
-
-  const textItem = content.find(
-    (item) => typeof item.text === 'string' && item.text.trim().startsWith('{'),
-  );
-  assert.ok(textItem?.text, 'Expected JSON text content in tool response');
-
-  return JSON.parse(textItem.text) as SearchPayload;
+  const payload = response.result?.structuredContent?.data;
+  assert.ok(payload, 'Expected structured MCP v2 tool output');
+  return payload;
 }
 
 describe('MCP tariff rulings workflow', () => {
   it('lists the search tools needed for tariff ruling discovery', async () => {
-    const client = await initializeMcpSession();
+    const client = await createMcpClient();
 
     try {
       const response = await client.send({
         jsonrpc: '2.0',
         id: 2,
         method: 'tools/list',
+        params: modernParams(),
       });
 
       assert.ok(!response.error, `Unexpected MCP error: ${response.error?.message ?? 'unknown'}`);
@@ -207,24 +198,25 @@ describe('MCP tariff rulings workflow', () => {
   });
 
   it('returns structured results for a tariff-focused opinions search', async () => {
-    const client = await initializeMcpSession();
+    const client = await createMcpClient();
 
     try {
       const response = await client.send({
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',
-        params: {
+        params: modernParams({
           name: 'search_opinions',
           arguments: {
             query: 'tariff',
             date_filed_after: '2024-01-01',
             page_size: 5,
+            __mcp_async: { mode: 'sync' },
           },
-        },
+        }),
       });
 
-      const payload = parseToolText(response);
+      const payload = parseStructuredPayload(response);
       assert.match(payload.summary ?? '', /Found \d+ opinions/i);
       assert.ok(Array.isArray(payload.results), 'Expected results array');
       assert.ok(

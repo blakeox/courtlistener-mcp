@@ -51,7 +51,7 @@ type OAuthIdentityResolution =
       userId: string;
       email?: string | null;
       displayName?: string | null;
-      authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access' | 'dev_fallback';
+      authSource: 'oidc_bearer' | 'ui_session' | 'cloudflare_access';
     }
   | { kind: 'missing' }
   | { kind: 'session_revocation_unavailable' };
@@ -60,16 +60,14 @@ export interface WorkerUiSessionRuntimeEnv {
   MCP_UI_SESSION_SECRET?: string;
   MCP_UI_INSECURE_COOKIES?: string;
   MCP_UI_SESSION_REVOCATION_ENABLED?: string;
-  MCP_OAUTH_DEV_USER_ID?: string;
-  MCP_ALLOW_DEV_FALLBACK?: string;
   MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
   OIDC_JWKS_URL?: string;
   OIDC_REQUIRED_SCOPE?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
 }
 
@@ -142,9 +140,9 @@ const UI_SESSION_COOKIE_NAME = 'clmcp_ui';
 const UI_SESSION_PRESENT_COOKIE_NAME = 'clmcp_ui_present';
 const CSRF_COOKIE_NAME = 'clmcp_csrf';
 const UI_SESSION_TTL_SECONDS = 12 * 60 * 60;
-const DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_MAX = 20;
-const DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS = 60;
-const DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS = 300;
+const DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX = 20;
+const DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS = 60;
+const DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS = 300;
 
 function parseCookies(cookieHeader: string | null): Record<string, string> {
   if (!cookieHeader) return {};
@@ -411,18 +409,18 @@ function getSessionBootstrapRateLimitConfig<TEnv extends WorkerUiSessionRuntimeE
 } {
   return {
     maxAttempts: parsePositiveInt(
-      env.MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX,
-      DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_MAX,
+      env.MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX,
+      DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX,
     ),
     windowMs:
       parsePositiveInt(
-        env.MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS,
-        DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS,
+        env.MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS,
+        DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS,
       ) * 1000,
     blockMs:
       parsePositiveInt(
-        env.MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS,
-        DEFAULT_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS,
+        env.MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS,
+        DEFAULT_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS,
       ) * 1000,
   };
 }
@@ -595,8 +593,6 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
       env: TEnv,
     ): Promise<OAuthIdentityResolution> {
       const sessionSecret = getUiSessionSecret(env);
-      const devUserId = env.MCP_OAUTH_DEV_USER_ID?.trim();
-      const allowDevFallback = parseBoolean(env.MCP_ALLOW_DEV_FALLBACK);
 
       // Verification precedence matters here because the OAuth authorize endpoint accepts
       // both explicit bearer credentials and browser/session-based identities.
@@ -641,14 +637,6 @@ export function createWorkerUiSessionRuntime<TEnv extends WorkerUiSessionRuntime
               } satisfies OAuthIdentityResolution)
             : ({ kind: 'missing' } satisfies OAuthIdentityResolution);
         },
-        async () =>
-          devUserId && allowDevFallback
-            ? ({
-                kind: 'authenticated',
-                userId: devUserId,
-                authSource: 'dev_fallback',
-              } satisfies OAuthIdentityResolution)
-            : ({ kind: 'missing' } satisfies OAuthIdentityResolution),
       ];
 
       for (const resolveIdentity of identityResolvers) {

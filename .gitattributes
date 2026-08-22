@@ -1,1 +1,2 @@
 * text=auto eol=lf
+test/worker-configuration.d.ts whitespace=-trailing-space

@@ -72,7 +72,7 @@ function buildMcpRequestHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json, text/event-stream',
-    'MCP-Protocol-Version': '2024-11-05',
+    'MCP-Protocol-Version': '2026-07-28',
   };
   if (MCP_REMOTE_BEARER_TOKEN) {
     headers.Authorization = `Bearer ${MCP_REMOTE_BEARER_TOKEN}`;
@@ -80,26 +80,38 @@ function buildMcpRequestHeaders(): Record<string, string> {
   return headers;
 }
 
+function withModernEnvelope(payload: Record<string, unknown>): Record<string, unknown> {
+  const params = (payload.params ?? {}) as Record<string, unknown>;
+  return {
+    ...payload,
+    params: {
+      ...params,
+      _meta: {
+        'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+        'io.modelcontextprotocol/clientCapabilities': {},
+      },
+    },
+  };
+}
+
 function getTests(): TestCase[] {
   return [
     {
-      name: 'Initialize Protocol',
+      name: 'Discover Protocol',
       payload: {
         jsonrpc: '2.0',
         id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: { tools: {} },
-          clientInfo: { name: 'Test Client', version: '1.0.0' },
-        },
+        method: 'server/discover',
       },
       validate: (result) => {
         return (
           typeof result === 'object' &&
           result !== null &&
-          'serverInfo' in result &&
-          typeof (result as { serverInfo?: { name?: string } }).serverInfo?.name === 'string'
+          'supportedVersions' in result &&
+          Array.isArray((result as { supportedVersions?: unknown[] }).supportedVersions) &&
+          (result as { supportedVersions?: unknown[] }).supportedVersions?.includes(
+            '2026-07-28',
+          ) === true
         );
       },
     },
@@ -199,7 +211,7 @@ async function sendHttpRequest(
   const response = await fetch(SERVER_URL, {
     method: 'POST',
     headers: buildMcpRequestHeaders(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withModernEnvelope(payload as Record<string, unknown>)),
   });
 
   if (!response.ok) {
@@ -269,7 +281,7 @@ function createStdioClient(): {
         resolve(response);
       });
 
-      server.stdin?.write(JSON.stringify(payload) + '\n');
+      server.stdin?.write(JSON.stringify(withModernEnvelope(payload)) + '\n');
     });
   };
 

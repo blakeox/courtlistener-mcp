@@ -94,22 +94,26 @@ export function spaAssetResponse(
   buildId: string,
   extraHeaders?: HeadersInit,
 ): Response {
-  const headers = createSecureResponseHeaders(
-    {
-      'content-type': contentType,
-      'Cache-Control': 'public, max-age=300',
-      ETag: `"${buildId}"`,
-    },
-    extraHeaders,
-  );
-  for (const [key, value] of assetResponse.headers.entries()) {
-    if (key.toLowerCase() === 'content-encoding' || key.toLowerCase() === 'content-length') {
-      headers.set(key, value);
-    }
+  const headers = new Headers(assetResponse.headers);
+  const isSuccessfulAsset = assetResponse.status >= 200 && assetResponse.status < 300;
+
+  if (isSuccessfulAsset) {
+    // The shell URL carries a content-derived build ID, so the asset can be
+    // cached immutably without serving stale code after a deployment.
+    headers.set('content-type', contentType);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    headers.set('ETag', `"${buildId}"`);
+  } else {
+    // Missing/error assets must not be cached across a subsequent deployment.
+    headers.set('Cache-Control', 'no-store');
+    headers.delete('ETag');
   }
+
+  const secureHeaders = createSecureResponseHeaders(headers, extraHeaders);
   return new Response(assetResponse.body, {
     status: assetResponse.status,
-    headers,
+    statusText: assetResponse.statusText,
+    headers: secureHeaders,
   });
 }
 

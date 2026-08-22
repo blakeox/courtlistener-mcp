@@ -6,11 +6,11 @@
  * All tests are now in TypeScript (.ts)
  */
 
-import { spawn } from 'child_process';
-import fs from 'fs';
-import { createRequire } from 'module';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +42,7 @@ class UnitTestRunner {
 
     if (!fs.existsSync(testDir)) {
       console.log('❌ Unit test directory not found:', testDir);
-      console.log('💡 Run: node scripts/analyze-untested-code.js to generate test templates');
+      console.log('💡 Run: pnpm run test:analysis to inspect coverage gaps');
       process.exit(1);
     }
 
@@ -92,7 +92,8 @@ class UnitTestRunner {
     const testPath = path.join(projectRoot, 'test', 'unit', testFile);
 
     return new Promise((resolve) => {
-      // Use tsx directly to avoid npx wrapper issues with process cleanup.
+      // Use the resolved tsx CLI directly to avoid package-manager wrapper
+      // issues with process cleanup.
       // Detached subprocesses can exit with code 1 on macOS even when the same
       // test passes normally, so keep the child attached and kill it directly
       // on timeout.

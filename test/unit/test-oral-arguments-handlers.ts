@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const { GetOralArgumentsHandler, GetOralArgumentHandler } =
   await import('../../src/domains/oral-arguments/handlers.ts');
@@ -72,7 +73,7 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         oralArguments?: Array<{ id: string }>;
         pagination?: { total_pages?: number };
@@ -102,7 +103,7 @@ describe('GetOralArgumentsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -144,7 +145,7 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         oralArgument?: { court: string };
       };
@@ -174,7 +175,7 @@ describe('GetOralArgumentHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };

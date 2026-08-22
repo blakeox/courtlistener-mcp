@@ -1,4 +1,4 @@
-import { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
+import { ReadResourceResult, Resource } from '@modelcontextprotocol/server';
 import { CourtListenerAPI } from '../courtlistener.js';
 import { ResourceHandler, ResourceContext } from '../server/resource-handler.js';
 

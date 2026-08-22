@@ -48,23 +48,23 @@ export interface UsageSnapshotResponse {
 }
 
 export interface WorkerHealthResponse {
-  status: 'ok';
+  status: 'ok' | 'degraded' | 'unhealthy';
   service: 'courtlistener-mcp';
-  transport: 'cloudflare-agents-streamable-http';
-  cloudflare: {
-    analytics_enabled: boolean;
-    async_queue_configured: boolean;
-    async_jobs_kv_configured: boolean;
-    turnstile_enforced_routes: string[];
-  };
-  metrics: {
-    latency_ms: unknown;
-  };
-  session_topology: {
-    version: string;
-    shard_count: number;
-    idle_ttl_ms: number;
-    absolute_ttl_ms: number;
-    eviction_sweep_limit: number;
+  timestamp: string;
+  version: string;
+  runtime: 'cloudflare-worker';
+  transport: string;
+  diagnostics: {
+    cloudflare: {
+      analytics_enabled: boolean;
+      async_queue_configured: boolean;
+      async_jobs_kv_configured: boolean;
+      turnstile_enforced_routes: string[];
+    };
+    metrics: {
+      latency_ms: unknown;
+    };
+    metrics_health?: unknown;
+    cache_stats?: unknown;
   };
 }

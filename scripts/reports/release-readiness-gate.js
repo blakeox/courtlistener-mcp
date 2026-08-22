@@ -16,7 +16,7 @@ function parseArgs(argv) {
     baseUrl:
       process.env.RELEASE_READINESS_BASE_URL ||
       process.env.MCP_REMOTE_URL ||
-      'http://127.0.0.1:3002',
+      'http://127.0.0.1:8787',
     light: false,
   };
 

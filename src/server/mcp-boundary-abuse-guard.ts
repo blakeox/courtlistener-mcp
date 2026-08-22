@@ -28,10 +28,6 @@ const DEFAULT_BOUNDARY_HEAVY_PAYLOAD_BYTES = 64 * 1024;
 const DEFAULT_BOUNDARY_MAX_PAYLOAD_BYTES = 256 * 1024;
 const DEFAULT_BOUNDARY_REPLAY_WINDOW_SECONDS = 120;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function getIdempotencyToken(request: Request): string | null {
   const keys = ['mcp-request-id', 'idempotency-key', 'x-request-id'];
   for (const key of keys) {
@@ -97,44 +93,16 @@ export function deriveAdaptiveBoundaryRateLimit(
   return maxAttempts;
 }
 
-export async function buildMcpReplayFingerprint(
-  request: Request,
-  contentLength: number | null,
-  heavyPayloadBytes: number,
-): Promise<string | null> {
-  if (request.method !== 'POST' && request.method !== 'DELETE') {
-    return null;
-  }
-
-  const sessionId = request.headers.get('mcp-session-id')?.trim() || '-';
-  const idempotencyToken = getIdempotencyToken(request);
-  if (idempotencyToken) {
-    return `${request.method}|${sessionId}|id:${idempotencyToken}`;
-  }
-
+export function buildMcpReplayFingerprint(request: Request): string | null {
   if (request.method !== 'POST') {
     return null;
   }
-  if (contentLength !== null && contentLength > heavyPayloadBytes) {
-    return null;
-  }
-  const contentType = request.headers.get('content-type')?.toLowerCase() || '';
-  if (!contentType.includes('application/json')) {
-    return null;
-  }
 
-  try {
-    const payload = (await request.clone().json()) as unknown;
-    if (!isPlainObject(payload)) {
-      return null;
-    }
-    const method = typeof payload.method === 'string' ? payload.method : '';
-    const id = payload.id;
-    if (!method || (typeof id !== 'string' && typeof id !== 'number')) {
-      return null;
-    }
-    return `${request.method}|${sessionId}|rpc:${method}|id:${String(id)}`;
-  } catch {
-    return null;
+  const idempotencyToken = getIdempotencyToken(request);
+  if (idempotencyToken) {
+    return `${request.method}|id:${idempotencyToken}`;
   }
+  // A JSON-RPC tuple is not a client identity in stateless MCP v2. Replay
+  // protection therefore requires an explicit request token.
+  return null;
 }

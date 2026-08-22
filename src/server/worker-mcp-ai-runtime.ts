@@ -10,44 +10,39 @@ interface McpJsonRpcResponse<T> {
   };
 }
 
-export interface CreateWorkerMcpAiRuntimeDeps {
+export interface CreateWorkerMcpAiRuntimeDeps<TEnv extends WorkerPlatformEnv = WorkerPlatformEnv> {
   authorizeMcpGatewayRequest: (params: {
     request: Request;
-    env: WorkerPlatformEnv;
+    env: TEnv;
     supportedProtocolVersions: Set<string>;
   }) => Promise<{
     principal?: PrincipalContext;
     authError?: Response | null;
   }>;
   runWithPrincipalContext: <T>(principal: PrincipalContext | undefined, callback: () => T) => T;
-  mcpStreamableFetch: (
-    request: Request,
-    env: WorkerPlatformEnv,
-    ctx: ExecutionContext,
-  ) => Promise<Response>;
+  mcpStreamableFetch: (request: Request, env: TEnv, ctx: ExecutionContext) => Promise<Response>;
   preferredMcpProtocolVersion: string;
   supportedMcpProtocolVersions: Set<string>;
   redactSecretsInText: (value: string) => string;
   incrementUserUsage: (
-    env: WorkerPlatformEnv,
+    env: TEnv,
     userId: string,
     metadata?: { route?: string; method?: string },
   ) => Promise<void>;
 }
 
-export interface WorkerMcpAiRuntime {
+export interface WorkerMcpAiRuntime<TEnv extends WorkerPlatformEnv = WorkerPlatformEnv> {
   callMcpJsonRpc(
-    env: WorkerPlatformEnv,
+    env: TEnv,
     ctx: ExecutionContext,
     token: string,
     method: string,
     params: Record<string, unknown>,
     id: number,
-    sessionId?: string,
-  ): Promise<{ payload: unknown; sessionId: string | null }>;
+  ): Promise<{ payload: unknown }>;
   recordAuthorizedMcpUsage(
     request: Request,
-    env: WorkerPlatformEnv,
+    env: TEnv,
     principal: { userId?: string } | undefined,
   ): Promise<void>;
 }
@@ -189,17 +184,18 @@ export function hasValidMcpRpcShape(payload: unknown): boolean {
   return false;
 }
 
-export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): WorkerMcpAiRuntime {
+export function createWorkerMcpAiRuntime<TEnv extends WorkerPlatformEnv>(
+  deps: CreateWorkerMcpAiRuntimeDeps<TEnv>,
+): WorkerMcpAiRuntime<TEnv> {
   return {
     async callMcpJsonRpc(
-      env: WorkerPlatformEnv,
+      env: TEnv,
       ctx: ExecutionContext,
       token: string,
       method: string,
       params: Record<string, unknown>,
       id: number,
-      sessionId?: string,
-    ): Promise<{ payload: unknown; sessionId: string | null }> {
+    ): Promise<{ payload: unknown }> {
       const serviceToken = env.MCP_AUTH_TOKEN?.trim() || null;
       const callerToken = token.trim();
       const effectiveToken = callerToken || serviceToken;
@@ -212,10 +208,8 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
         'MCP-Protocol-Version': deps.preferredMcpProtocolVersion,
+        'Mcp-Method': method,
       });
-      if (sessionId) {
-        headers.set('mcp-session-id', sessionId);
-      }
       if (serviceToken && serviceToken === effectiveToken) {
         const serviceHeader = env.MCP_SERVICE_TOKEN_HEADER?.trim() || 'x-mcp-service-token';
         headers.set(serviceHeader, serviceToken);
@@ -228,7 +222,14 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
           jsonrpc: '2.0',
           id,
           method,
-          params,
+          params: {
+            ...params,
+            _meta: {
+              ...(isPlainObject(params._meta) ? params._meta : {}),
+              'io.modelcontextprotocol/protocolVersion': deps.preferredMcpProtocolVersion,
+              'io.modelcontextprotocol/clientCapabilities': {},
+            },
+          },
         }),
       });
 
@@ -258,19 +259,16 @@ export function createWorkerMcpAiRuntime(deps: CreateWorkerMcpAiRuntimeDeps): Wo
         );
       }
 
-      return {
-        payload,
-        sessionId: response.headers.get('mcp-session-id'),
-      };
+      return { payload };
     },
 
     async recordAuthorizedMcpUsage(
       request: Request,
-      env: WorkerPlatformEnv,
+      env: TEnv,
       principal: { userId?: string } | undefined,
     ): Promise<void> {
       const pathname = new URL(request.url).pathname;
-      if (pathname !== '/mcp' && pathname !== '/sse') {
+      if (pathname !== '/mcp') {
         return;
       }
       if (!(request.method === 'POST' || request.method === 'GET')) {
