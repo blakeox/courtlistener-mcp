@@ -95,6 +95,7 @@ describe('Cloudflare release controller contracts', () => {
         'wrangler.auth-limiter.jsonc',
         '--message',
         'rollback release-1 abc',
+        '-y',
       ],
     );
   });

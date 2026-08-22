@@ -107,7 +107,7 @@ jobs:
         run: |
           echo "⚡ Running release performance hardening gates..."
           mkdir -p performance-data
-          pnpm run dev:workers > performance-data/release-gate-workers.log 2>&1 &
+          LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/release-gate-workers.log 2>&1 &
           SERVER_PID=$!
           cleanup() {
             kill "$SERVER_PID" >/dev/null 2>&1 || true
