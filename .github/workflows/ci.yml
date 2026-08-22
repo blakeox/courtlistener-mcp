@@ -407,7 +407,7 @@ jobs:
               pnpm run ci:auth-release-gate
               ;;
             startup-diagnostics)
-              pnpm exec tsx --test test/integration/test-http-v2.ts
+              pnpm exec tsx --test --test-force-exit test/integration/test-http-v2.ts
               ;;
             stress-reliability)
               mkdir -p performance-data
@@ -639,12 +639,18 @@ jobs:
       - name: Check for sensitive data in logs
         run: |
           pnpm run build
-          timeout 10s pnpm start 2>&1 | grep -i "api.key\|token\|secret\|password" && exit 1 || echo "No sensitive data found in logs"
+          timeout --kill-after=5s 10s pnpm start > security-startup.log 2>&1 || true
+          if grep -iE "api\.key|token|secret|password" security-startup.log; then
+            exit 1
+          fi
+          echo "No sensitive data found in logs"
 
       - name: Validate MCP server security
         run: |
           pnpm run build
-          echo '{"invalid": "json"' | timeout 5s pnpm start || echo "Server handles malformed input gracefully"
+          printf '%s' '{"invalid": "json"' > malformed-input.json
+          timeout --kill-after=5s 5s pnpm start < malformed-input.json > malformed-input.log 2>&1 || true
+          echo "Server handles malformed input gracefully"
 
   required-checks-gate:
     name: Required Checks Gate
