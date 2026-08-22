@@ -97,6 +97,10 @@ describe('GitHub workflow hardening', () => {
       workflow,
       /gitleaks\/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3\.0\.0/,
     );
+    assert.match(
+      workflow,
+      /security-check:[\s\S]*?fetch-depth:\s*0[\s\S]*?gitleaks\/gitleaks-action/,
+    );
     assert.doesNotMatch(workflow, /Install Gitleaks/);
     assert.doesNotMatch(workflow, /gitleaks_8\.24\.3_linux_x64\.tar\.gz/);
   });
