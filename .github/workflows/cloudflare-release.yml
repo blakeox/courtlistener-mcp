@@ -129,8 +129,8 @@ jobs:
               --output-directory release-probes-promoted \
               --no-override
 
-      - name: Roll back to recorded prior versions after a failed promotion
-        if: ${{ failure() && inputs.promote == true && hashFiles('release-state.json') != '' }}
+      - name: Roll back to recorded prior versions after a failed release
+        if: ${{ failure() && hashFiles('release-state.json') != '' }}
         run: |
           node scripts/cloudflare/release-controller.mjs \
             --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \

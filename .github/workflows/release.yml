@@ -189,7 +189,7 @@ jobs:
             performance-data/load-profile-baseline.json
             performance-data/load-profile-current.json
             performance-data/hardening-soak-leak.json
-            performance-data/release-gate-server.log
+            performance-data/release-gate-workers.log
             test-output/
 
       - name: Comment on release

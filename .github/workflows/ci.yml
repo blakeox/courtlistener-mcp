@@ -475,7 +475,7 @@ jobs:
             performance-data/load-profile-baseline.json
             performance-data/load-profile-current.json
             performance-data/hardening-soak-leak.json
-            performance-data/local-gate-server.log
+            performance-data/local-gate-workers.log
           retention-days: 7
 
       - name: Upload runtime parity gate artifacts
@@ -499,7 +499,7 @@ jobs:
             test-output/runtime-parity/runtime-safety-gate.json
             performance-data/load-profile-baseline.json
             performance-data/load-profile-current.json
-            performance-data/local-release-readiness-server.log
+            performance-data/local-release-readiness-workers.log
           retention-days: 7
 
   mcp-compliance:
@@ -604,8 +604,8 @@ jobs:
         run: |
           echo "Running performance benchmarks..."
           mkdir -p performance-data
-          REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
-          pnpm run ci:load-profile-suite -- --light --base-url "$REMOTE_MCP_URL" --output performance-data/remote-ci.json
+          REMOTE_BASE_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field baseUrl)"
+          pnpm run ci:load-profile-suite -- --light --base-url "$REMOTE_BASE_URL" --output performance-data/remote-ci.json
 
   security-check:
     name: Security & Code Quality

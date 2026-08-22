@@ -53,7 +53,7 @@ jobs:
           echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
 
           mkdir -p performance-data
-          REMOTE_MCP_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field mcpUrl)"
+          REMOTE_BASE_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field baseUrl)"
 
           start_local_workers() {
             pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
@@ -91,14 +91,14 @@ jobs:
               ;;
             "remote")
               echo "Testing remote server performance..."
-              run_profile "$REMOTE_MCP_URL" performance-data/remote.json performance-data/remote.txt
+              run_profile "$REMOTE_BASE_URL" performance-data/remote.json performance-data/remote.txt
               ;;
             "both")
               echo "Testing both local and remote server performance..."
               start_local_workers
               trap stop_local_workers EXIT
               run_profile http://127.0.0.1:8787 performance-data/local.json performance-data/local.txt
-              run_profile "$REMOTE_MCP_URL" performance-data/remote.json performance-data/remote.txt
+              run_profile "$REMOTE_BASE_URL" performance-data/remote.json performance-data/remote.txt
               ;;
           esac
 
