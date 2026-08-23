@@ -117,7 +117,7 @@ jobs:
           ## Latest Performance Results
 
           \`\`\`
-          $(find performance-data -name "*.txt" -exec tail -10 {} \; | head -50)
+          $(find performance-data -name "*.json" -exec jq -c '.summary' {} \; | head -50)
           \`\`\`
 
           ## Performance Alerts
@@ -132,10 +132,11 @@ jobs:
 
           # Download previous performance data if available
           if [ -n "${{ secrets.PERFORMANCE_BASELINE_URL }}" ]; then
-            curl -s "${{ secrets.PERFORMANCE_BASELINE_URL }}" > baseline.txt || echo "No baseline available"
-            
-            if [ -f baseline.txt ] && [ -f performance-data/*.txt ]; then
-              node scripts/performance/compare-performance.js baseline.txt performance-data/*.txt || echo "Performance comparison completed"
+            curl -s "${{ secrets.PERFORMANCE_BASELINE_URL }}" > baseline.json || echo "No baseline available"
+
+            CURRENT_JSON="$(find performance-data -name '*.json' | head -1)"
+            if [ -f baseline.json ] && [ -n "$CURRENT_JSON" ]; then
+              node scripts/performance/compare-performance.js baseline.json "$CURRENT_JSON" || echo "Performance comparison completed"
             fi
           fi
 

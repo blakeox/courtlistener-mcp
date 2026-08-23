@@ -17,6 +17,8 @@ interface TestResult {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const ASYNC_RESULT_TIMEOUT_MS = 15_000;
+const ASYNC_RESULT_POLL_INTERVAL_MS = 100;
 
 async function runIntegrationTests(): Promise<void> {
   console.log('🧪 Starting Legal MCP Integration Tests...\n');
@@ -53,7 +55,8 @@ async function runIntegrationTests(): Promise<void> {
       return result;
     }
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+    const deadline = Date.now() + ASYNC_RESULT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
       const control = await server.handleToolCall({
         name: 'mcp_async_get_job_result',
         arguments: { jobId },
@@ -73,7 +76,7 @@ async function runIntegrationTests(): Promise<void> {
       if (controlPayload.job?.status === 'failed' || controlPayload.job?.status === 'expired') {
         throw new Error(controlPayload.error ?? `Async job ${controlPayload.job.status}`);
       }
-      await sleep(50);
+      await sleep(ASYNC_RESULT_POLL_INTERVAL_MS);
     }
 
     throw new Error(`Async job ${jobId} did not complete within the integration-test window`);

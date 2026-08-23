@@ -286,7 +286,7 @@ jobs:
           PERF_BASELINE_FILE: ${{ vars.PERF_BASELINE_FILE }}
           PERF_CURRENT_FILE: ${{ vars.PERF_CURRENT_FILE }}
           PERF_COMMIT_SHA: ${{ github.sha }}
-          PERF_RUNTIME_MODE: node-22
+          PERF_RUNTIME_MODE: node-24
         run: pnpm run ci:perf-gate
 
       - name: Run MCP protocol validation
