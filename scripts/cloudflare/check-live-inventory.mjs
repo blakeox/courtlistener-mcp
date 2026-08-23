@@ -172,7 +172,21 @@ export async function collectLiveInventory() {
 
 async function main() {
   const receipt = await collectLiveInventory();
-  console.log(JSON.stringify(receipt, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        schema_version: receipt.schema_version,
+        status: receipt.status,
+        checks: receipt.checks.map(({ id, severity, promotion_blocker }) => ({
+          id,
+          severity,
+          promotion_blocker,
+        })),
+      },
+      null,
+      2,
+    ),
+  );
   if (receipt.status !== 'ok') process.exitCode = 1;
 }
 
