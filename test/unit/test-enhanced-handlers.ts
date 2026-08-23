@@ -1054,9 +1054,9 @@ describe('SmartSearchHandler', () => {
     assert.ok(text.includes('1966-06-13'));
     assert.ok(text.includes('[scotus]'));
     assert.ok(text.includes('1200 cites'));
-    const renderedLinks = text.split(/[\s"'`<>()[\]]+/).filter(Boolean);
-    assert.ok(
-      renderedLinks.includes('https://www.courtlistener.com/opinion/107252/miranda-v-arizona/'),
+    assert.match(
+      text,
+      /(?:^|[\s(])https:\/\/www\.courtlistener\.com\/opinion\/107252\/miranda-v-arizona\/(?:$|[\s)])/,
     );
     assert.ok(!text.includes('undefined'));
   });
