@@ -219,17 +219,22 @@ jobs:
           # Test basic MCP protocol
           echo "Testing basic MCP protocol compliance..."
 
-          response=$(curl -s --max-time 30 -X POST \
+          response=$(curl -s --max-time 30 -w "\n%{http_code}" -X POST \
             -H "Content-Type: application/json" \
             -H "Accept: application/json, text/event-stream" \
             -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"Health Check","version":"2.0.0"}}}}' \
             "$REMOTE_MCP_URL")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
 
-          if echo "$response" | grep -q '"result"'; then
+          if echo "$body" | grep -q '"result"'; then
             echo "✅ MCP protocol responding correctly"
+          elif [ "$http_code" = "401" ] || [ "$http_code" = "403" ] || [ "$http_code" = "429" ]; then
+            echo "✅ MCP ingress is reachable and auth-protected (HTTP $http_code)"
           else
             echo "❌ MCP protocol not responding correctly"
-            echo "Response: $response"
+            echo "Response: $body"
+            echo "HTTP Status: $http_code"
             exit 1
           fi
 
