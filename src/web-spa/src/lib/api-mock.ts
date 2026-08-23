@@ -76,26 +76,24 @@ export async function getWorkerHealth(): Promise<WorkerHealthResponse> {
   return {
     status: 'ok',
     service: 'courtlistener-mcp',
-    transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
-    },
-    metrics: {
-      latency_ms: {
-        route_latency_ms: {
-          '/mcp': { count: 4, avg_ms: 120 },
+    timestamp: new Date().toISOString(),
+    version: '1.0.5',
+    runtime: 'cloudflare-worker',
+    transport: 'cloudflare-mcp-v2-streamable-http',
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: ['session_bootstrap', 'ai_chat'],
+      },
+      metrics: {
+        latency_ms: {
+          route_latency_ms: {
+            '/mcp': { count: 4, avg_ms: 120 },
+          },
         },
       },
-    },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
     },
   };
 }
@@ -104,11 +102,10 @@ export async function mcpCall<T>(
   _args: {
     method: string;
     params: Record<string, unknown>;
-    sessionId?: string;
     id: number;
   },
   _token: string,
-): Promise<{ body: T; sessionId: string | null }> {
+): Promise<{ body: T }> {
   await delay(500);
   const mockResponse = {
     jsonrpc: '2.0',
@@ -123,14 +120,12 @@ export async function mcpCall<T>(
   };
   return {
     body: mockResponse as T,
-    sessionId: `mock-session-${Date.now()}`,
   };
 }
 
 export async function aiChat(_args: {
   message: string;
   mcpToken: string;
-  mcpSessionId?: string;
   toolName?: string;
   mode?: 'cheap' | 'balanced';
   testMode?: boolean;
@@ -141,7 +136,6 @@ export async function aiChat(_args: {
   mode: 'cheap' | 'balanced';
   tool: string;
   tool_reason?: string;
-  session_id: string;
   ai_response: string;
   mcp_result: unknown;
 }> {
@@ -152,7 +146,6 @@ export async function aiChat(_args: {
     mode: 'cheap',
     tool: 'search_cases',
     tool_reason: 'Default: general case search for broad legal queries.',
-    session_id: `mock-session-${Date.now()}`,
     ai_response:
       'Mock AI response: This is a simulated AI chat result for UI development. The search found several relevant cases discussing the topic.',
     mcp_result: { content: [{ type: 'text', text: 'Mock MCP result data' }] },

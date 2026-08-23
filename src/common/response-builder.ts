@@ -31,11 +31,7 @@
  * ```
  */
 
-import type {
-  CallToolResult,
-  TextContent,
-  EmbeddedResource,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, TextContent, EmbeddedResource } from '@modelcontextprotocol/server';
 import { PaginatedApiResponse, PaginationInfo, createPaginationInfo } from './pagination-utils.js';
 
 /**
@@ -79,6 +75,36 @@ export interface ResponseMetadata {
  */
 export class ResponseBuilder {
   /**
+   * Build human-readable markdown for MCP text content blocks.
+   * Machine-readable payloads belong in structuredContent.
+   */
+  static formatHumanSummary(data: unknown): string {
+    if (typeof data === 'string') {
+      return data;
+    }
+
+    if (data && typeof data === 'object') {
+      const record = data as Record<string, unknown>;
+      if (typeof record.summary === 'string' && record.summary.trim().length > 0) {
+        return record.summary;
+      }
+      if (Array.isArray(record.data)) {
+        return `Returned ${record.data.length} item(s). See structuredContent for full results.`;
+      }
+    }
+
+    if (Array.isArray(data)) {
+      return `Returned ${data.length} item(s). See structuredContent for full results.`;
+    }
+
+    return 'Operation completed successfully. See structuredContent for full results.';
+  }
+
+  private static buildSuccessEnvelope(data: unknown, metadata?: ResponseMetadata) {
+    return metadata ? { success: true as const, data, metadata } : { success: true as const, data };
+  }
+
+  /**
    * Create an embedded resource content item for tool responses
    *
    * @param uri - Resource URI (e.g. courtlistener://opinion/123)
@@ -110,15 +136,13 @@ export class ResponseBuilder {
    * ```
    */
   static success(data: unknown, metadata?: ResponseMetadata): CallToolResult {
-    const response = metadata
-      ? { success: true as const, data, metadata }
-      : { success: true as const, data };
+    const response = this.buildSuccessEnvelope(data, metadata);
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(response, null, 2),
+          text: this.formatHumanSummary(data),
         } as TextContent,
       ],
       structuredContent: response as Record<string, unknown>,
@@ -146,9 +170,10 @@ export class ResponseBuilder {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(response, null, 2),
+          text: details ? `${message}\n\nSee structuredContent for error details.` : message,
         } as TextContent,
       ],
+      structuredContent: response as Record<string, unknown>,
       isError: true,
     };
   }
@@ -189,7 +214,7 @@ export class ResponseBuilder {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(response, null, 2),
+          text: `Returned ${items.length} item(s). See structuredContent for full results.`,
         } as TextContent,
       ],
       structuredContent: response as Record<string, unknown>,

@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const {
   GetOpinionTextHandler,
@@ -77,7 +78,7 @@ describe('GetOpinionTextHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         opinion: { id: string };
       };
@@ -104,7 +105,7 @@ describe('GetOpinionTextHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string; name?: string };
       };
@@ -152,7 +153,7 @@ describe('AnalyzeLegalArgumentHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         analysis: { top_cases: string[] };
       };
       assert.deepStrictEqual(payload.analysis.top_cases, ['Case A', 'Case B']);
@@ -173,7 +174,7 @@ describe('AnalyzeLegalArgumentHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -221,7 +222,7 @@ describe('GetCitationNetworkHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         network: { nodes: number[] };
       };
@@ -248,7 +249,7 @@ describe('GetCitationNetworkHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string; name?: string };
       };
@@ -303,7 +304,7 @@ describe('LookupCitationHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         results: Array<{ id: number }>;
       };
@@ -326,7 +327,7 @@ describe('LookupCitationHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string; name?: string };
       };
@@ -362,7 +363,7 @@ describe('GetOpinionCitationsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         citations: { cited: Array<{ id: number }> };
       };
@@ -397,7 +398,7 @@ describe('GetAuthoritiesHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         authorities: { authorities: Array<{ id: number }> };
       };

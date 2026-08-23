@@ -33,11 +33,10 @@ requires linear history.
 - **Grouped bumps:** production deps use the `minor-and-patch` group; dev deps
   use the `dev-deps` group (minor/patch only). Major dev-tool upgrades (ESLint,
   lefthook, etc.) are handled manually on a feature branch.
-- **SPA assets:** npm lockfile updates can change embedded SPA hashes. The
-  **Regenerate SPA Assets (Dependabot PR)** workflow commits Linux-built
-  `src/web/spa-assets.ts` back onto open Dependabot PRs. If CI still fails on
-  generated files, re-run that workflow or `pnpm run generate:web:spa` on Linux
-  before merge.
+- **SPA assets:** the edge Worker serves the Vite output from `.spa-dist` via
+  the Workers Assets binding. `pnpm run generate:web:spa` rebuilds that output
+  and refreshes `src/web/spa-build-id.ts`; generated assets are validated in CI
+  and are not committed as an inline Worker bundle.
 - Commit messages use the `chore(deps)` prefix (see `commit-message` in
   `.github/dependabot.yml`).
 

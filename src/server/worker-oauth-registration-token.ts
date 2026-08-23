@@ -1,38 +1,17 @@
 import { parsePositiveInt } from '../common/validation.js';
+import { decodeBase64Url, decodeBase64UrlBytes, encodeBase64Url } from '../common/base64url.js';
 
 interface RegistrationTokenEnv {
   MCP_OAUTH_REGISTRATION_TOKEN_SECRET?: string;
   MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS?: string;
-  MCP_UI_SESSION_SECRET?: string;
-  COURTLISTENER_API_KEY?: string;
 }
 
 function getRegistrationTokenSigningSecret(env: RegistrationTokenEnv): string | null {
-  return (
-    env.MCP_OAUTH_REGISTRATION_TOKEN_SECRET?.trim() ||
-    env.MCP_UI_SESSION_SECRET?.trim() ||
-    env.COURTLISTENER_API_KEY?.trim() ||
-    null
-  );
+  return env.MCP_OAUTH_REGISTRATION_TOKEN_SECRET?.trim() || null;
 }
 
 function getRegistrationTokenTtlSeconds(env: RegistrationTokenEnv): number {
   return parsePositiveInt(env.MCP_OAUTH_REGISTRATION_TOKEN_TTL_SECONDS, 24 * 60 * 60);
-}
-
-function encodeBase64Url(input: Uint8Array): string {
-  const base64 = Buffer.from(input).toString('base64');
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function decodeBase64UrlBytes(value: string): Uint8Array | null {
-  try {
-    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    return new Uint8Array(Buffer.from(padded, 'base64'));
-  } catch {
-    return null;
-  }
 }
 
 function timingSafeEqualBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -60,7 +39,9 @@ async function signRegistrationPayload(
     false,
     ['sign'],
   );
-  return new Uint8Array(await crypto.subtle.sign('HMAC', key, Buffer.from(payloadBytes)));
+  return new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, payloadBytes as unknown as BufferSource),
+  );
 }
 
 export async function createRegistrationAccessToken(
@@ -105,7 +86,9 @@ export async function verifyRegistrationAccessToken(
   }
 
   try {
-    const payload = JSON.parse(Buffer.from(payloadBytes).toString('utf-8')) as {
+    const payloadText = decodeBase64Url(encodedPayload);
+    if (payloadText === null) return false;
+    const payload = JSON.parse(payloadText) as {
       v?: number;
       cid?: string;
       exp?: number;

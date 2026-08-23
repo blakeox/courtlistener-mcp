@@ -73,20 +73,13 @@ playwright-report/
 .playwright-mcp/
 .spa-dist/
 
-# Enhanced MCP Inspector test artifacts
+# Test and performance artifacts
 test-output/
 *.log
-enhanced-mcp-inspector-report.*
-ci-mcp-inspector-report.*
 visual-tests/
 performance-data/
-inspector-*.png
-inspector-*.csv
-inspector-*.txt
 
-# Ignore Docker artifacts
 *.pid
-docker-compose.override.yml
 
 # Ignore wrangler secrets
 wrangler.toml.local
@@ -94,6 +87,7 @@ wrangler.toml.local
 wrangler.toml.backup
 
 # Temporary files
+.tmp/
 *.tmp
 *.temp
 .cache/
@@ -106,6 +100,3 @@ wrangler.toml.backup
 # Backup files
 *.backup
 *.bak
-
-# Accidental Finder-style duplicate copies
-* 2.*

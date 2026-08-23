@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { handleWorkerMcpTransportBoundary } from '../../src/server/worker-mcp-transport-boundary.js';
+import { handleMcpTransportBoundary } from '../../src/server/mcp-transport-runtime-facade.js';
 
-describe('worker-mcp-transport-boundary abuse hooks', () => {
+describe('MCP transport boundary abuse hooks', () => {
   it('short-circuits when boundary abuse guard returns an error response', async () => {
     let mcpHandlerCalled = false;
 
-    const response = await handleWorkerMcpTransportBoundary({
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
           'x-mcp-service-token': 'token',
-          'MCP-Protocol-Version': '2025-03-26',
+          'MCP-Protocol-Version': '2026-07-28',
         },
       }),
       env: { MCP_AUTH_TOKEN: 'token' },
@@ -22,14 +22,13 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
       mcpStreamableHandler: {
         fetch: async () => {
           mcpHandlerCalled = true;
           return new Response('ok', { status: 200 });
         },
       },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => 'client-1',
@@ -45,10 +44,10 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
     assert.equal(mcpHandlerCalled, false);
   });
 
-  it('routes GET /mcp event-stream requests without a session id to the streamable handler', async () => {
+  it('rejects the removed standalone GET /mcp event stream', async () => {
     let streamableCalled = false;
 
-    const response = await handleWorkerMcpTransportBoundary({
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'GET',
         headers: {
@@ -63,21 +62,13 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
       mcpStreamableHandler: {
         fetch: async () => {
           streamableCalled = true;
           return new Response('streamable', { status: 200 });
         },
       },
-      mcpSseCompatibilityHandler: {
-        fetch: async () => {
-          return new Response('sse', {
-            status: 200,
-            headers: { 'content-type': 'text/event-stream' },
-          });
-        },
-      },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => 'client-1',
@@ -87,129 +78,57 @@ describe('worker-mcp-transport-boundary abuse hooks', () => {
     });
 
     assert.ok(response);
-    assert.equal(response.status, 200);
-    assert.equal(streamableCalled, true);
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get('allow'), 'POST, OPTIONS');
+    assert.equal(streamableCalled, false);
   });
 
-  it('returns a session lifecycle error when finalizing a session mutation fails', async () => {
-    const response = await handleWorkerMcpTransportBoundary({
+  it('preserves request-scoped SSE responses from POST /mcp', async () => {
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
-          'x-mcp-service-token': 'token',
         },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize', id: 1, params: {} }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'subscriptions/listen', params: {} }),
       }),
-      env: { MCP_AUTH_TOKEN: 'token' },
-      ctx: {} as ExecutionContext,
+      env: { MCP_AUTH_TOKEN: 'not-used' },
+      ctx: { props: { userId: 'user-1', authMethod: 'oidc' } } as ExecutionContext,
       pathname: '/mcp',
       requestMethod: 'POST',
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
+      skipGatewayAuth: true,
       mcpStreamableHandler: {
         fetch: async () =>
-          new Response(JSON.stringify({ jsonrpc: '2.0', result: {} }), {
+          new Response('event: message\ndata: {"jsonrpc":"2.0"}\n\n', {
             status: 200,
-            headers: {
-              'content-type': 'application/json',
-              'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
-            },
+            headers: { 'content-type': 'text/event-stream' },
           }),
       },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => 'client-1',
       getAuthRateLimitedResponse: async () => null,
       recordAuthFailure: async () => {},
       clearAuthFailures: async () => {},
-      finalizeSessionResponse: async () =>
-        Response.json(
-          {
-            jsonrpc: '2.0',
-            error: {
-              code: -32001,
-              message: 'Session lifecycle service unavailable',
-            },
-          },
-          { status: 503 },
-        ),
     });
 
     assert.ok(response);
-    assert.equal(response.status, 503);
-    assert.deepEqual(await response.json(), {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    });
-  });
-
-  it('returns a session lifecycle error when closing a session mutation fails', async () => {
-    const response = await handleWorkerMcpTransportBoundary({
-      request: new Request('https://example.com/mcp', {
-        method: 'DELETE',
-        headers: {
-          Accept: 'application/json, text/event-stream',
-          'x-mcp-service-token': 'token',
-          'mcp-session-id': '123e4567-e89b-12d3-a456-426614174000',
-        },
-      }),
-      env: { MCP_AUTH_TOKEN: 'token' },
-      ctx: {} as ExecutionContext,
-      pathname: '/mcp',
-      requestMethod: 'DELETE',
-      origin: null,
-      allowedOrigins: [],
-      mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
-      mcpStreamableHandler: {
-        fetch: async () => new Response(null, { status: 204 }),
-      },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
-      withCors: (res) => res,
-      buildCorsHeaders: () => new Headers(),
-      getClientIdentifier: () => 'client-1',
-      getAuthRateLimitedResponse: async () => null,
-      recordAuthFailure: async () => {},
-      clearAuthFailures: async () => {},
-      finalizeSessionResponse: async () =>
-        Response.json(
-          {
-            jsonrpc: '2.0',
-            error: {
-              code: -32001,
-              message: 'Session lifecycle service unavailable',
-            },
-          },
-          { status: 503 },
-        ),
-    });
-
-    assert.ok(response);
-    assert.equal(response.status, 503);
-    assert.deepEqual(await response.json(), {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    });
+    assert.equal(response.headers.get('content-type'), 'text/event-stream');
+    assert.equal(await response.text(), 'event: message\ndata: {"jsonrpc":"2.0"}\n\n');
   });
 });
 
-describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-validated)', () => {
+describe('MCP transport boundary skipGatewayAuth (OAuth provider pre-validated)', () => {
   it('bypasses gateway auth and constructs principal from prevalidated context props', async () => {
     let mcpHandlerCalled = false;
     let gatewayAuthCalled = false;
 
-    const response = await handleWorkerMcpTransportBoundary({
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
@@ -231,7 +150,7 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
       skipGatewayAuth: true,
       mcpStreamableHandler: {
         fetch: async () => {
@@ -239,7 +158,6 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
           return new Response('ok', { status: 200 });
         },
       },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => {
@@ -269,7 +187,7 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
 
     // POST /mcp WITHOUT MCP-Protocol-Version header — would fail with
     // MCP_REQUIRE_PROTOCOL_VERSION=true in the normal path
-    const response = await handleWorkerMcpTransportBoundary({
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
@@ -290,7 +208,7 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
       skipGatewayAuth: true,
       mcpStreamableHandler: {
         fetch: async () => {
@@ -298,7 +216,6 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
           return new Response('ok', { status: 200 });
         },
       },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => 'client-1',
@@ -319,7 +236,7 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
   it('fails closed when skipGatewayAuth lacks prevalidated context props', async () => {
     let mcpHandlerCalled = false;
 
-    const response = await handleWorkerMcpTransportBoundary({
+    const response = await handleMcpTransportBoundary({
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
@@ -340,7 +257,7 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
       origin: null,
       allowedOrigins: [],
       mcpPath: true,
-      supportedProtocolVersions: new Set(['2025-03-26']),
+      supportedProtocolVersions: new Set(['2026-07-28']),
       skipGatewayAuth: true,
       mcpStreamableHandler: {
         fetch: async () => {
@@ -348,7 +265,6 @@ describe('worker-mcp-transport-boundary skipGatewayAuth (OAuth provider pre-vali
           return new Response('ok', { status: 200 });
         },
       },
-      mcpSseCompatibilityHandler: { fetch: async () => new Response('sse', { status: 200 }) },
       withCors: (res) => res,
       buildCorsHeaders: () => new Headers(),
       getClientIdentifier: () => 'client-1',

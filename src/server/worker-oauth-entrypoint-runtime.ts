@@ -15,9 +15,9 @@ export interface HandleWorkerOAuthEntrypointDeps<TEnv extends OAuthEntrypointEnv
   summarizeOAuthRequest: (request: Request) => Promise<Record<string, unknown>>;
   summarizeOAuthResponse: (response: Response) => Promise<Record<string, unknown>>;
   emitOAuthDiagnostic: (env: TEnv, event: string, metadata: Record<string, unknown>) => void;
-  getClientIdentifier?: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
-  getAuthRouteRateLimitedResponse?: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
-  now?: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
+  getClientIdentifier: OAuthFrontdoorRateLimitDeps<TEnv>['getClientIdentifier'];
+  getAuthRouteRateLimitedResponse: OAuthFrontdoorRateLimitDeps<TEnv>['getAuthRouteRateLimitedResponse'];
+  now: OAuthFrontdoorRateLimitDeps<TEnv>['now'];
 }
 
 export function shouldInspectOAuthRoute(pathname: string): boolean {
@@ -40,6 +40,8 @@ export function shouldBypassOAuthProvider(pathname: string): boolean {
   // Metadata discovery routes are served by handleWorkerOAuthRoutes so every
   // canonical and MCP-scoped alias follows the same response path.
   return (
+    pathname === '/health' ||
+    pathname === '/ready' ||
     pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorizationServerMetadata ||
     pathname === '/mcp/.well-known/oauth-authorization-server' ||
     pathname === '/.well-known/oauth-authorization-server/mcp' ||

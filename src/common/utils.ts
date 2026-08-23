@@ -2,7 +2,6 @@
  * Common utilities and helper functions
  */
 
-import { randomUUID } from 'node:crypto';
 import { Result, success, failure } from './types.js';
 
 /**
@@ -102,14 +101,14 @@ export function deepMerge<T extends Record<string, unknown>>(
  * Generate a UUID v4
  */
 export function generateId(): string {
-  return randomUUID();
+  return globalThis.crypto.randomUUID();
 }
 
 /**
  * Generate a short random ID for non-security purposes (request IDs, correlation IDs)
  */
 export function cryptoId(prefix = ''): string {
-  const id = randomUUID().replace(/-/g, '').substring(0, 12);
+  const id = globalThis.crypto.randomUUID().replace(/-/g, '').substring(0, 12);
   return prefix ? `${prefix}_${Date.now()}_${id}` : id;
 }
 

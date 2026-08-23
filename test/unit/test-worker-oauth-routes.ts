@@ -107,7 +107,7 @@ describe('handleWorkerOAuthRoutes', () => {
       payload.revocation_endpoint,
       `https://worker.example${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`,
     );
-    assert.equal(payload.client_id_metadata_document_supported, false);
+    assert.equal(payload.client_id_metadata_document_supported, true);
     assert.equal(
       aliasPayload.authorization_endpoint,
       `https://worker.example${HOSTED_MCP_OAUTH_CONTRACT.paths.authorize}`,
@@ -121,7 +121,7 @@ describe('handleWorkerOAuthRoutes', () => {
       aliasPayload.revocation_endpoint,
       `https://worker.example${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`,
     );
-    assert.equal(aliasPayload.client_id_metadata_document_supported, false);
+    assert.equal(aliasPayload.client_id_metadata_document_supported, true);
   });
 
   it('supports HEAD for OAuth discovery and protected-resource metadata endpoints', async () => {

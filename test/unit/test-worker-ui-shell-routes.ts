@@ -31,11 +31,6 @@ function createDeps() {
     },
     renderSpaShellHtml: (buildId?: string) =>
       buildId ? `<html><body>landing ${buildId}</body></html>` : '<html></html>',
-    redirectResponse: (location: string, status?: number, extraHeaders?: HeadersInit) => {
-      const headers = new Headers(extraHeaders);
-      headers.set('Location', location);
-      return new Response(null, { status, headers });
-    },
   };
 }
 
@@ -69,42 +64,14 @@ describe('handleWorkerUiShellRoutes', () => {
     assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
   });
 
-  it('redirects legacy UI paths to /app routes', async () => {
+  it('does not preserve removed top-level application aliases', async () => {
     const response = await handleWorkerUiShellRoutes({
-      request: new Request('https://example.com/login', { method: 'GET' }),
-      url: new URL('https://example.com/login'),
+      request: new Request('https://example.com/account', { method: 'GET' }),
+      url: new URL('https://example.com/account'),
       env: {},
-      deps: {
-        ...createDeps(),
-        htmlResponse: (html: string) => new Response(html, { status: 200 }),
-        renderSpaShellHtml: () => '<html></html>',
-      },
+      deps: createDeps(),
     });
 
-    assert.equal(response?.status, 302);
-    assert.equal(response?.headers.get('Location'), 'https://example.com/app/login');
-    assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
+    assert.equal(response, null);
   });
-
-  for (const alias of ['/oidc', '/oidc/', '/signin', '/sign-in']) {
-    it(`redirects ${alias} to the hosted auth start flow`, async () => {
-      const response = await handleWorkerUiShellRoutes({
-        request: new Request(`https://example.com${alias}`, { method: 'GET' }),
-        url: new URL(`https://example.com${alias}`),
-        env: {},
-        deps: {
-          ...createDeps(),
-          htmlResponse: (html: string) => new Response(html, { status: 200 }),
-          renderSpaShellHtml: () => '<html></html>',
-        },
-      });
-
-      assert.equal(response?.status, 302);
-      assert.equal(
-        response?.headers.get('Location'),
-        'https://example.com/auth/start?return_to=%2Fapp%2Faccount',
-      );
-      assert.match(response?.headers.get('Set-Cookie') ?? '', /csrf=1/);
-    });
-  }
 });

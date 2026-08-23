@@ -46,16 +46,13 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
-  it('shows Go to Workspace Overview link', () => {
+  it('shows Go to Overview link', () => {
     render(
       <ErrorBoundary>
         <Thrower shouldThrow={true} />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole('link', { name: /workspace overview/i })).toHaveAttribute(
-      'href',
-      '/app',
-    );
+    expect(screen.getByRole('link', { name: /go to overview/i })).toHaveAttribute('href', '/app');
   });
 
   it('has error message in alert role', () => {

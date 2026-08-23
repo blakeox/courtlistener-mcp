@@ -3,14 +3,12 @@
  * Modular tool handlers that can be dynamically registered and executed
  */
 
-import {
+import type {
   CallToolRequest,
   CallToolResult,
-  ErrorCode,
-  McpError,
   ToolAnnotations,
   EmbeddedResource,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 import { z, type ZodIssue } from '../common/zod.js';
 import { Result, success, failure } from '../common/types.js';
 import { TOOL_INPUT_SCHEMAS } from './generated/tool-input-schemas.js';
@@ -18,6 +16,33 @@ import { CacheManager } from '../infrastructure/cache.js';
 import { Logger } from '../infrastructure/logger.js';
 import { MetricsCollector } from '../infrastructure/metrics.js';
 import { ServerConfig } from '../types.js';
+import { ResponseBuilder } from '../common/response-builder.js';
+
+export const READ_ONLY_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: true,
+};
+
+export const MUTATING_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: false,
+  openWorldHint: true,
+};
+
+export const DESTRUCTIVE_TOOL_ANNOTATIONS: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  openWorldHint: true,
+};
+
+export class ToolProtocolError extends Error {
+  constructor(
+    readonly code: 'MethodNotFound' | 'InvalidParams',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ToolProtocolError';
+  }
+}
 
 export interface ToolHandler<TInput = unknown> {
   readonly name: string;
@@ -44,6 +69,7 @@ export interface ToolHandler<TInput = unknown> {
 
 import { SamplingService } from './sampling-service.js';
 import type { LlmParamGenerator } from './llm-param-generator.js';
+import type { McpProgressReporter } from './mcp-progress-reporter.js';
 
 export interface ToolContext {
   logger: Logger;
@@ -56,11 +82,18 @@ export interface ToolContext {
   sampling?: SamplingService;
   /** Workers AI or other server-side LLM for smart_search when MCP sampling is unavailable. */
   llmParamGenerator?: LlmParamGenerator;
+  /** Optional MCP progress reporter when the client supplied `_meta.progressToken`. */
+  progress?: McpProgressReporter;
 }
 
 export class ToolHandlerRegistry {
   private handlers = new Map<string, ToolHandler>();
   private categories = new Map<string, Set<string>>();
+  private onCatalogListChanged: (() => void) | undefined;
+
+  setOnCatalogListChanged(callback: (() => void) | undefined): void {
+    this.onCatalogListChanged = callback;
+  }
 
   /**
    * Register a tool handler
@@ -75,6 +108,7 @@ export class ToolHandlerRegistry {
       this.categories.set(handler.category, categorySet);
     }
     categorySet.add(handler.name);
+    this.onCatalogListChanged?.();
   }
 
   /**
@@ -164,14 +198,14 @@ export class ToolHandlerRegistry {
     const handler = this.handlers.get(request.params.name);
 
     if (!handler) {
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+      throw new ToolProtocolError('MethodNotFound', `Unknown tool: ${request.params.name}`);
     }
 
     // Validate input
     const validationResult = handler.validate(request.params.arguments);
     if (!validationResult.success) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      throw new ToolProtocolError(
+        'InvalidParams',
         validationResult.error?.message ?? 'Invalid parameters',
       );
     }
@@ -206,14 +240,7 @@ export abstract class BaseToolHandler<
    * Helper method to create success result
    */
   protected success(content: string | Record<string, unknown> | Array<unknown>): CallToolResult {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
-        },
-      ],
-    };
+    return ResponseBuilder.success(content);
   }
 
   /**
@@ -232,14 +259,10 @@ export abstract class BaseToolHandler<
         text: JSON.stringify(resourceData),
       },
     };
+    const base = ResponseBuilder.success(content);
     return {
-      content: [
-        {
-          type: 'text',
-          text: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
-        },
-        resource,
-      ],
+      ...base,
+      content: [...base.content, resource],
     };
   }
 
@@ -250,22 +273,14 @@ export abstract class BaseToolHandler<
     message: string,
     details?: Record<string, unknown> | string | number | boolean | null,
   ): CallToolResult {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              error: message,
-              details: details || null,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-      isError: true,
-    };
+    const normalizedDetails =
+      details === null || details === undefined
+        ? undefined
+        : typeof details === 'object'
+          ? details
+          : { value: details };
+
+    return ResponseBuilder.error(message, normalizedDetails);
   }
 }
 
@@ -313,10 +328,7 @@ export abstract class TypedToolHandler<
   protected abstract readonly schema: TSchema;
 
   /** MCP ToolAnnotations — defaults mark all tools as read-only, open-world */
-  readonly annotations: ToolAnnotations = {
-    readOnlyHint: true,
-    openWorldHint: true,
-  };
+  readonly annotations: ToolAnnotations = READ_ONLY_TOOL_ANNOTATIONS;
 
   /**
    * Optional: Tool metadata for enriched definitions

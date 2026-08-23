@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const { ListCourtsHandler, GetJudgesHandler, GetJudgeHandler } =
   await import('../../src/domains/courts/handlers.ts');
@@ -76,7 +77,7 @@ describe('ListCourtsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         courts: Array<{ id: string }>;
         pagination: { count?: number; total_pages?: number };
       };
@@ -105,7 +106,7 @@ describe('ListCourtsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         courts: Array<{ id: number }>;
         pagination: { count?: number };
@@ -146,7 +147,7 @@ describe('GetJudgesHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         judges?: Array<{ id: number }>;
       };
@@ -205,7 +206,7 @@ describe('GetJudgeHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary: string;
         judge?: { id: number; name: string };
       };

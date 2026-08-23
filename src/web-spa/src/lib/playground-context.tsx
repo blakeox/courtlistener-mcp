@@ -10,8 +10,6 @@ interface TranscriptItem {
 interface PlaygroundContextValue {
   token: string;
   tokenMissing: boolean;
-  mcpSessionId: string;
-  setMcpSessionId: (id: string) => void;
   transcript: TranscriptItem[];
   append: (role: TranscriptItem['role'], text: string, meta?: Record<string, unknown>) => void;
   clearTranscript: () => void;
@@ -31,7 +29,6 @@ export function PlaygroundProvider({
   token: string;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const [mcpSessionId, setMcpSessionId] = React.useState('');
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [lastRawMcp, setLastRawMcp] = React.useState('');
   const [protocolLog, setProtocolLog] = React.useState<
@@ -70,8 +67,6 @@ export function PlaygroundProvider({
     () => ({
       token,
       tokenMissing: !token.trim(),
-      mcpSessionId,
-      setMcpSessionId,
       transcript,
       append,
       clearTranscript,
@@ -83,7 +78,6 @@ export function PlaygroundProvider({
     }),
     [
       token,
-      mcpSessionId,
       transcript,
       append,
       clearTranscript,

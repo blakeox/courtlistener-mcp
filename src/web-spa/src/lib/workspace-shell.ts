@@ -26,7 +26,6 @@ export const WORKSPACE_DOCS_URL = 'https://github.com/blakeox/courtlistener-mcp#
 
 const WORKSPACE_UTILITY_LINKS: WorkspaceLink[] = [
   { label: 'Account', shortLabel: 'AC', to: '/app/account' },
-  { label: 'Credentials', shortLabel: 'CR', to: '/app/credentials' },
 ];
 
 export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
@@ -106,22 +105,11 @@ export function getWorkspaceSecondaryNavSections(
 
 const WORKSPACE_PATH_META = [
   { path: '/app', label: 'Overview', description: 'Review workspace activity and next steps.' },
-  { path: '/app/download', label: 'Diagnostics', description: 'Legacy install route.' },
-  { path: '/app/connect', label: 'Playground', description: 'Legacy connect route.' },
   { path: '/app/playground', label: 'Playground', description: 'Test tools.' },
-  { path: '/app/sessions', label: 'Overview', description: 'Legacy sessions route.' },
-  { path: '/app/workflows', label: 'Playground', description: 'Legacy workflows route.' },
-  { path: '/app/tools', label: 'Playground', description: 'Legacy tools route.' },
-  { path: '/app/review', label: 'Overview', description: 'Legacy review route.' },
   { path: '/app/usage', label: 'Usage', description: 'Inspect activity.' },
   { path: '/app/observability', label: 'Observability', description: 'Monitor health.' },
   { path: '/app/diagnostics', label: 'Diagnostics', description: 'Inspect protocol state.' },
-  { path: '/app/readiness', label: 'Diagnostics', description: 'Legacy diagnostics route.' },
-  { path: '/app/credentials', label: 'Account', description: 'Legacy credentials route.' },
   { path: '/app/account', label: 'Account', description: 'Manage access and recovery.' },
-  { path: '/app/session', label: 'Account', description: 'Legacy account route.' },
-  { path: '/app/control-center', label: 'Overview', description: 'Legacy overview route.' },
-  { path: '/app/docs', label: 'Docs', description: 'Open repository docs.' },
 ];
 
 export function getWorkspaceMeta(pathname: string): { label: string; description: string } {

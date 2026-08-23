@@ -1,7 +1,11 @@
-import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { Tool, ToolAnnotations } from '@modelcontextprotocol/server';
 import { getEnhancedToolDefinitions } from '../tool-definitions.js';
-import { MCP_ASYNC_CONTROL_TOOLS } from './async-tool-workflow.js';
+import {
+  DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES,
+  MCP_ASYNC_CONTROL_TOOLS,
+} from './async-tool-workflow.js';
 import { ToolHandlerRegistry } from './tool-handler.js';
+import { TOOL_OUTPUT_SCHEMAS } from './generated/tool-output-schemas.js';
 
 export interface ToolMetadata {
   name: string;
@@ -24,6 +28,8 @@ export interface ToolMetadata {
   };
 }
 
+export type ToolCapability = 'read_only' | 'external_mutation';
+
 const TOOL_UX_META_KEY = 'courtlistener/ux';
 
 function buildHumanTitle(name: string): string {
@@ -40,6 +46,12 @@ function getCostHint(weight: number): 'low' | 'medium' | 'high' {
   return 'high';
 }
 
+function resolveToolCapability(annotations?: ToolAnnotations): ToolCapability {
+  return annotations?.readOnlyHint === true && annotations.destructiveHint !== true
+    ? 'read_only'
+    : 'external_mutation';
+}
+
 function buildToolUxMetadata(
   toolName: string,
   metadata: ToolMetadata | undefined,
@@ -47,12 +59,16 @@ function buildToolUxMetadata(
     asyncSupported: boolean;
     fallbackCategory: string;
     fallbackComplexity: 'simple' | 'intermediate' | 'advanced';
+    capability: ToolCapability;
+    asyncEligible: boolean;
   },
 ): {
   title: string;
   category: string;
   complexity: 'simple' | 'intermediate' | 'advanced';
   async: boolean;
+  asyncEligible: boolean;
+  capability: ToolCapability;
   costHint: 'low' | 'medium' | 'high';
   rateLimitWeight: number;
 } {
@@ -62,6 +78,8 @@ function buildToolUxMetadata(
     category: metadata?.category ?? options.fallbackCategory,
     complexity: metadata?.complexity ?? options.fallbackComplexity,
     async: metadata?.asyncSupported ?? options.asyncSupported,
+    asyncEligible: options.asyncEligible,
+    capability: options.capability,
     costHint: metadata?.costHint ?? getCostHint(rateLimitWeight),
     rateLimitWeight,
   };
@@ -102,10 +120,16 @@ export function buildToolDefinitions(
   const registeredToolDefinitions = baseDefinitions.map((tool) => {
     const metadata = enhancedToolMetadata.get(tool.name);
     const handler = toolRegistry.get(tool.name);
+    if (!handler?.annotations) {
+      throw new Error(`Tool ${tool.name} is missing explicit capability annotations.`);
+    }
+    const capability = resolveToolCapability(handler?.annotations);
     const uxMetadata = buildToolUxMetadata(tool.name, metadata, {
       asyncSupported: true,
       fallbackCategory: 'uncategorized',
       fallbackComplexity: 'intermediate',
+      capability,
+      asyncEligible: capability === 'read_only' && DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES.has(tool.name),
     });
     const annotations = handler?.annotations
       ? {
@@ -123,6 +147,9 @@ export function buildToolDefinitions(
       name: tool.name,
       description: metadata?.description ?? tool.description,
       inputSchema: inputSchema as Tool['inputSchema'],
+      ...(TOOL_OUTPUT_SCHEMAS[tool.name] && {
+        outputSchema: TOOL_OUTPUT_SCHEMAS[tool.name] as Tool['outputSchema'],
+      }),
       annotations,
       title: handler?.title ?? uxMetadata.title,
       execution: { taskSupport: 'optional' as const },
@@ -137,6 +164,7 @@ export function buildToolDefinitions(
       name: MCP_ASYNC_CONTROL_TOOLS.status,
       title: 'Async Job Status',
       description: 'Get async job status by job ID',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       inputSchema: {
         type: 'object',
         properties: {
@@ -144,6 +172,7 @@ export function buildToolDefinitions(
         },
         required: ['jobId'],
       },
+      outputSchema: TOOL_OUTPUT_SCHEMAS[MCP_ASYNC_CONTROL_TOOLS.status] as Tool['outputSchema'],
       execution: { taskSupport: 'forbidden' },
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
@@ -158,6 +187,8 @@ export function buildToolDefinitions(
             asyncSupported: false,
             fallbackCategory: 'async-control',
             fallbackComplexity: 'simple',
+            capability: 'read_only',
+            asyncEligible: false,
           },
         ),
       },
@@ -166,6 +197,7 @@ export function buildToolDefinitions(
       name: MCP_ASYNC_CONTROL_TOOLS.result,
       title: 'Async Job Result',
       description: 'Get async job result payload by job ID',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       inputSchema: {
         type: 'object',
         properties: {
@@ -173,6 +205,7 @@ export function buildToolDefinitions(
         },
         required: ['jobId'],
       },
+      outputSchema: TOOL_OUTPUT_SCHEMAS[MCP_ASYNC_CONTROL_TOOLS.result] as Tool['outputSchema'],
       execution: { taskSupport: 'forbidden' },
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
@@ -187,6 +220,8 @@ export function buildToolDefinitions(
             asyncSupported: false,
             fallbackCategory: 'async-control',
             fallbackComplexity: 'simple',
+            capability: 'read_only',
+            asyncEligible: false,
           },
         ),
       },
@@ -195,6 +230,7 @@ export function buildToolDefinitions(
       name: MCP_ASYNC_CONTROL_TOOLS.cancel,
       title: 'Async Job Cancel',
       description: 'Cancel async job execution by job ID',
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
       inputSchema: {
         type: 'object',
         properties: {
@@ -202,6 +238,7 @@ export function buildToolDefinitions(
         },
         required: ['jobId'],
       },
+      outputSchema: TOOL_OUTPUT_SCHEMAS[MCP_ASYNC_CONTROL_TOOLS.cancel] as Tool['outputSchema'],
       execution: { taskSupport: 'forbidden' },
       _meta: {
         [TOOL_UX_META_KEY]: buildToolUxMetadata(
@@ -216,6 +253,8 @@ export function buildToolDefinitions(
             asyncSupported: false,
             fallbackCategory: 'async-control',
             fallbackComplexity: 'simple',
+            capability: 'external_mutation',
+            asyncEligible: false,
           },
         ),
       },

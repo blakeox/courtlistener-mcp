@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 
 const args = new Set(process.argv.slice(2));
 const stagedOnly = args.has('--staged');
@@ -33,11 +34,30 @@ function gitLines(commandArgs) {
 function normalizeStatusPath(line) {
   const payload = line.length > 3 ? line.slice(3).trim() : line.trim();
   const renameParts = payload.split(' -> ');
-  return renameParts[renameParts.length - 1];
+  const path = renameParts[renameParts.length - 1];
+  if (path.startsWith('"') && path.endsWith('"')) {
+    try {
+      return JSON.parse(path);
+    } catch {
+      return path;
+    }
+  }
+  return path;
 }
 
 function shouldIgnore(path) {
   return ignoredPrefixes.some((prefix) => path === prefix.slice(0, -1) || path.startsWith(prefix));
+}
+
+function isUnmaterializedCloudPlaceholder(path) {
+  try {
+    const stat = statSync(path);
+    // Cloud-synced macOS placeholders report their logical size but have no
+    // allocated blocks. They cannot be read or committed until materialized.
+    return stat.size > 0 && stat.blocks === 0;
+  } catch {
+    return false;
+  }
 }
 
 function collectPaths() {
@@ -48,7 +68,9 @@ function collectPaths() {
   }
 
   const tracked = gitLines(['ls-files']);
-  const others = gitLines(['status', '--short', '--untracked-files=all']).map(normalizeStatusPath);
+  const others = gitLines(['status', '--short', '--untracked-files=all'])
+    .map(normalizeStatusPath)
+    .filter((path) => !isUnmaterializedCloudPlaceholder(path));
   return [...new Set([...tracked, ...others])].filter((path) => !shouldIgnore(path));
 }
 

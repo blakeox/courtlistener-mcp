@@ -21,34 +21,20 @@ export const HOSTED_MCP_BROWSER_AUTH_CONTRACT = {
     approve: '/oauth/approve',
     logout: '/oauth/logout',
   },
-  legacyPaths: {
-    authorize: '/authorize',
-    approve: '/auth/approve',
-    logout: '/auth/logout',
-  },
 } as const;
 
 export const HOSTED_MCP_OAUTH_DEFAULT_SCOPE = HOSTED_MCP_OAUTH_CONTRACT.scopesSupported.join(' ');
 
 export function isHostedAuthorizePath(pathname: string): boolean {
-  return (
-    pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorize ||
-    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.authorize
-  );
+  return pathname === HOSTED_MCP_OAUTH_CONTRACT.paths.authorize;
 }
 
 export function isHostedApprovalPath(pathname: string): boolean {
-  return (
-    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve ||
-    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.approve
-  );
+  return pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve;
 }
 
 export function isHostedLogoutPath(pathname: string): boolean {
-  return (
-    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.logout ||
-    pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.legacyPaths.logout
-  );
+  return pathname === HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.logout;
 }
 
 export function buildHostedMcpAuthorizationServerMetadata(origin: string) {
@@ -67,7 +53,9 @@ export function buildHostedMcpAuthorizationServerMetadata(origin: string) {
     revocation_endpoint: `${origin}${HOSTED_MCP_OAUTH_CONTRACT.paths.token}`,
     code_challenge_methods_supported: [...HOSTED_MCP_OAUTH_CONTRACT.codeChallengeMethodsSupported],
     scopes_supported: [...HOSTED_MCP_OAUTH_CONTRACT.scopesSupported],
-    client_id_metadata_document_supported: false,
+    // Advertise the modern CIMD path while keeping the RFC 7591 registration
+    // endpoint above for clients that have not migrated yet.
+    client_id_metadata_document_supported: true,
   };
 }
 

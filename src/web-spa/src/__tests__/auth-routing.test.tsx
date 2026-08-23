@@ -35,37 +35,25 @@ vi.mock('../lib/api', () => ({
   getWorkerHealth: vi.fn().mockResolvedValue({
     status: 'ok',
     service: 'courtlistener-mcp',
-    transport: 'cloudflare-agents-streamable-http',
-    cloudflare: {
-      analytics_enabled: true,
-      async_queue_configured: true,
-      async_jobs_kv_configured: true,
-      turnstile_enforced_routes: [],
-    },
-    metrics: { latency_ms: {} },
-    session_topology: {
-      version: 'v1',
-      shard_count: 4,
-      idle_ttl_ms: 1800000,
-      absolute_ttl_ms: 43200000,
-      eviction_sweep_limit: 100,
+    transport: 'cloudflare-mcp-v2-streamable-http',
+    diagnostics: {
+      cloudflare: {
+        analytics_enabled: true,
+        async_queue_configured: true,
+        async_jobs_kv_configured: true,
+        turnstile_enforced_routes: [],
+      },
+      metrics: { latency_ms: {} },
     },
   }),
-  listKeys: vi.fn().mockResolvedValue({ user_id: 'u1', keys: [] }),
   logout: vi.fn().mockResolvedValue(undefined),
-  createKey: vi.fn().mockResolvedValue({
-    message: 'ok',
-    api_key: { id: 'k1', label: 'test', created_at: '2024-01-01', expires_at: null, token: 'tok' },
-  }),
-  revokeKey: vi.fn().mockResolvedValue(undefined),
-  mcpCall: vi.fn().mockResolvedValue({ body: {}, sessionId: 'sid' }),
+  mcpCall: vi.fn().mockResolvedValue({ body: {} }),
   aiChat: vi.fn().mockResolvedValue({
     test_mode: true,
     fallback_used: false,
     mode: 'cheap',
     tool: 'search_cases',
     tool_reason: 'Default search',
-    session_id: 'sid',
     ai_response: 'resp',
     mcp_result: {},
   }),
@@ -146,8 +134,8 @@ describe('App auth routing', () => {
     });
   });
 
-  it('redirects /app/keys to the credentials page', async () => {
-    renderApp('/app/keys');
+  it('renders the canonical account page', async () => {
+    renderApp('/app/account');
     expect(await screen.findByRole('heading', { name: 'Account', level: 1 })).toBeInTheDocument();
   });
 
@@ -170,12 +158,17 @@ describe('App auth routing', () => {
     expect(screen.queryByText(/operator console/i)).not.toBeInTheDocument();
   });
 
-  it('redirects /account to the account route', async () => {
+  it('does not preserve the removed top-level account alias', async () => {
     renderApp('/account');
-    expect(await screen.findByRole('heading', { name: 'Account', level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: /connect ai to the law\. responsibly\./i,
+        level: 1,
+      }),
+    ).toBeInTheDocument();
   });
 
-  it('shows a primary sign-in entry when signed out on /app/control-center', async () => {
+  it('shows a primary sign-in entry when signed out on /app', async () => {
     const auth = await import('../lib/auth');
     vi.mocked(auth.useAuth).mockReturnValue({
       session: { authenticated: false, user: { id: 'u1' }, turnstile_site_key: '' },
@@ -186,7 +179,7 @@ describe('App auth routing', () => {
       logout: vi.fn(),
     });
 
-    renderApp('/app/control-center');
+    renderApp('/app');
 
     expect(await screen.findByRole('heading', { name: /Overview/i, level: 1 })).toBeInTheDocument();
     const signInHrefs = screen

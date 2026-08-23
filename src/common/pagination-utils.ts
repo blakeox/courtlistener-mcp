@@ -1,3 +1,5 @@
+import { decodeBase64Url, encodeBase64Url } from './base64url.js';
+
 /**
  * Pagination utilities for consistent response formatting
  * Phase 3: Reduce Complexity
@@ -7,14 +9,17 @@
  * Encode an offset as an opaque cursor string (base64url)
  */
 export function encodeCursor(offset: number): string {
-  return Buffer.from(`offset:${offset}`).toString('base64url');
+  return encodeBase64Url(`offset:${offset}`);
 }
 
 /**
  * Decode a cursor string back to an offset
  */
 export function decodeCursor(cursor: string): number {
-  const decoded = Buffer.from(cursor, 'base64url').toString('utf8');
+  const decoded = decodeBase64Url(cursor);
+  if (decoded === null) {
+    throw new Error('Invalid cursor format');
+  }
   const match = decoded.match(/^offset:(\d+)$/);
   if (!match || match[1] === undefined) {
     throw new Error('Invalid cursor format');

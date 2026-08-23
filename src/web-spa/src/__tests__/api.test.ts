@@ -33,30 +33,30 @@ describe('api transport', () => {
     expect(getHeaders.get('x-csrf-token')).toBeNull();
   });
 
-  it('parses SSE data payloads and returns the MCP session id', async () => {
+  it('parses MCP responses and sends stateless v2 metadata', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         new Response('event: message\ndata: {"result":{"ok":true}}\n\n', {
           status: 200,
-          headers: { 'mcp-session-id': 'session-123' },
+          headers: { 'content-type': 'application/json' },
         }),
       ),
     );
 
-    const result = await mcpCall(
-      { method: 'tools/list', params: {}, id: 1, sessionId: 'session-old' },
-      'token-123',
-    );
+    const result = await mcpCall({ method: 'tools/list', params: {}, id: 1 }, 'token-123');
 
     expect(result).toEqual({
       body: { result: { ok: true } },
-      sessionId: 'session-123',
     });
     const requestInit = vi.mocked(fetch).mock.calls[0]?.[1];
     const headers = new Headers(requestInit?.headers);
-    expect(headers.get('mcp-session-id')).toBe('session-old');
-    expect(headers.get('MCP-Protocol-Version')).toBe('2025-06-18');
+    expect(headers.get('MCP-Protocol-Version')).toBe('2026-07-28');
+    expect(headers.get('Mcp-Method')).toBe('tools/list');
+    const body = JSON.parse(String(requestInit?.body)) as {
+      params: { _meta: Record<string, unknown> };
+    };
+    expect(body.params._meta['io.modelcontextprotocol/protocolVersion']).toBe('2026-07-28');
   });
 
   it('throws mcp_call_failed on non-2xx MCP responses', async () => {

@@ -5,7 +5,7 @@
  * Tests real API interactions and end-to-end functionality
  */
 
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 // Import live server source so test:integration does not depend on stale build output.
 const { LegalMCPServer } = await import('../../src/index.ts');
@@ -16,6 +16,10 @@ interface TestResult {
   error?: string;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const ASYNC_RESULT_TIMEOUT_MS = 15_000;
+const ASYNC_RESULT_POLL_INTERVAL_MS = 100;
+
 async function runIntegrationTests(): Promise<void> {
   console.log('🧪 Starting Legal MCP Integration Tests...\n');
   const hasApiKey = Boolean(process.env.COURTLISTENER_API_KEY);
@@ -25,6 +29,63 @@ async function runIntegrationTests(): Promise<void> {
   let totalTests = 0;
 
   const server = new LegalMCPServer();
+
+  async function resolveAsyncToolResult(result: CallToolResult): Promise<CallToolResult> {
+    if (result.isError) {
+      return result;
+    }
+
+    const payload = (result.structuredContent ??
+      (() => {
+        const text = result.content?.find((item) => item.type === 'text')?.text;
+        if (!text) return null;
+        try {
+          return JSON.parse(text) as unknown;
+        } catch {
+          return null;
+        }
+      })()) as {
+      mode?: string;
+      job?: { id?: string; status?: string };
+      result?: CallToolResult | null;
+    } | null;
+
+    const jobId = payload?.mode === 'async' ? payload.job?.id : undefined;
+    if (!jobId) {
+      return result;
+    }
+
+    const deadline = Date.now() + ASYNC_RESULT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const control = await server.handleToolCall({
+        name: 'mcp_async_get_job_result',
+        arguments: { jobId },
+      });
+      if (control.isError) {
+        throw new Error(control.content?.[0]?.text ?? 'Async job result lookup failed');
+      }
+
+      const controlPayload = control.structuredContent as {
+        job?: { status?: string };
+        result?: CallToolResult | null;
+        error?: string;
+      };
+      if (controlPayload.result) {
+        return controlPayload.result;
+      }
+      if (controlPayload.job?.status === 'failed' || controlPayload.job?.status === 'expired') {
+        throw new Error(controlPayload.error ?? `Async job ${controlPayload.job.status}`);
+      }
+      await sleep(ASYNC_RESULT_POLL_INTERVAL_MS);
+    }
+
+    throw new Error(`Async job ${jobId} did not complete within the integration-test window`);
+  }
+
+  function toolData<T>(result: CallToolResult): T {
+    const structured = result.structuredContent as { data?: unknown } | undefined;
+    return (structured?.data ?? structured) as T;
+  }
 
   // Test helper function
   async function test(name: string, testFn: () => Promise<void>): Promise<void> {
@@ -55,7 +116,7 @@ async function runIntegrationTests(): Promise<void> {
       jsonrpc: '2.0',
     };
 
-    const result: CallToolResult = await server.handleToolCall(request.params);
+    const result = await resolveAsyncToolResult(await server.handleToolCall(request.params));
 
     if (result.isError) {
       const errText = result.content?.[0]?.text ?? '';
@@ -77,7 +138,7 @@ async function runIntegrationTests(): Promise<void> {
       throw new Error('No results returned');
     }
 
-    const data = JSON.parse(result.content[0].text) as { results?: unknown[] };
+    const data = toolData<{ results?: unknown[] }>(result);
     if (!data.results || data.results.length === 0) {
       throw new Error('Expected search results');
     }
@@ -94,8 +155,11 @@ async function runIntegrationTests(): Promise<void> {
       jsonrpc: '2.0',
     };
 
-    const result: CallToolResult = await server.handleToolCall(request.params);
-    const data = JSON.parse(result.content[0].text) as { results?: unknown[] };
+    const result = await resolveAsyncToolResult(await server.handleToolCall(request.params));
+    if (result.isError) {
+      throw new Error(result.content?.[0]?.text ?? 'Case-name search failed');
+    }
+    const data = toolData<{ results?: unknown[] }>(result);
     if (!data.results || data.results.length === 0) {
       throw new Error('Expected search results for Brown v. Board');
     }
@@ -117,8 +181,11 @@ async function runIntegrationTests(): Promise<void> {
       jsonrpc: '2.0',
     };
 
-    const result: CallToolResult = await server.handleToolCall(request.params);
-    const data = JSON.parse(result.content[0].text) as { results?: unknown[] };
+    const result = await resolveAsyncToolResult(await server.handleToolCall(request.params));
+    if (result.isError) {
+      throw new Error(result.content?.[0]?.text ?? 'Date-range search failed');
+    }
+    const data = toolData<{ results?: unknown[] }>(result);
     if (!data.results) {
       throw new Error('Expected results array');
     }
@@ -144,11 +211,16 @@ async function runIntegrationTests(): Promise<void> {
       jsonrpc: '2.0',
     };
 
-    const searchResult: CallToolResult = await server.handleToolCall(searchRequest.params);
+    const searchResult = await resolveAsyncToolResult(
+      await server.handleToolCall(searchRequest.params),
+    );
+    if (searchResult.isError) {
+      throw new Error(searchResult.content?.[0]?.text ?? 'Authenticated search failed');
+    }
 
-    const searchData = JSON.parse(searchResult.content[0].text) as {
+    const searchData = toolData<{
       results?: Array<{ id?: number; absolute_url?: string }>;
-    };
+    }>(searchResult);
     if (!searchData.results || searchData.results.length === 0) {
       throw new Error('No search results to get cluster_id from');
     }
@@ -182,8 +254,13 @@ async function runIntegrationTests(): Promise<void> {
         jsonrpc: '2.0',
       };
 
-      const result: CallToolResult = await server.handleToolCall(detailsRequest.params);
-      const data = JSON.parse(result.content[0].text) as { case_details?: unknown };
+      const result = await resolveAsyncToolResult(
+        await server.handleToolCall(detailsRequest.params),
+      );
+      if (result.isError) {
+        throw new Error(result.content?.[0]?.text ?? 'Case details request failed');
+      }
+      const data = toolData<{ case_details?: unknown }>(result);
       if (!data.case_details) {
         throw new Error('Expected case details');
       }
@@ -211,13 +288,13 @@ async function runIntegrationTests(): Promise<void> {
     };
 
     try {
-      const result: CallToolResult = await server.handleToolCall(request.params);
+      const result = await resolveAsyncToolResult(await server.handleToolCall(request.params));
       // If it returns an error result, that's acceptable
       if (result.isError) {
         return; // Error handling worked correctly
       }
       // If it doesn't error, check if it returned empty/error data
-      const data = JSON.parse(result.content[0].text) as { error?: string };
+      const data = toolData<{ error?: string }>(result);
       if (data.error) {
         return; // Error was handled properly
       }

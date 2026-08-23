@@ -1,7 +1,6 @@
 type AiUiRouteEnv = {
-  AI?: {
-    run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
-  };
+  /** Optional for Edge; required on the MCP Worker production binding. */
+  AI?: GeneratedMcpEnv['AI'];
   CLOUDFLARE_AI_MODEL?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
@@ -25,7 +24,6 @@ interface WorkerAiUiRouteContext<TEnv extends AiUiRouteEnv, TCtx> {
 
 interface McpJsonRpcCallResult {
   payload: unknown;
-  sessionId: string | null;
 }
 
 export interface HandleWorkerAiUiRoutesDeps<TEnv extends AiUiRouteEnv, TCtx> {
@@ -45,7 +43,6 @@ export interface HandleWorkerAiUiRoutesDeps<TEnv extends AiUiRouteEnv, TCtx> {
     method: string,
     params: Record<string, unknown>,
     id: number,
-    sessionId?: string,
   ) => Promise<McpJsonRpcCallResult>;
   hasValidMcpRpcShape: (payload: unknown) => boolean;
   aiToolArguments: (toolName: string, prompt: string) => Record<string, unknown>;
@@ -58,7 +55,11 @@ export interface HandleWorkerAiUiRoutesDeps<TEnv extends AiUiRouteEnv, TCtx> {
   cheapModeMaxTokens: number;
   balancedModeMaxTokens: number;
   getClientIdentifier?: (request: Request) => string;
-  recordTurnstileVerdict?: (routeId: string, outcome: 'passed' | 'failed' | 'not_enforced') => void;
+  recordTurnstileVerdict?: (
+    env: TEnv,
+    routeId: string,
+    outcome: 'passed' | 'failed' | 'not_enforced',
+  ) => void;
 }
 
 export interface HandleWorkerAiUiRoutesParams<TEnv extends AiUiRouteEnv, TCtx> {
@@ -98,6 +99,7 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
       deps.getClientIdentifier ? deps.getClientIdentifier(request) : null,
     );
     deps.recordTurnstileVerdict?.(
+      env,
       'ai_chat',
       turnstile.enforced ? (turnstile.success ? 'passed' : 'failed') : 'not_enforced',
     );
@@ -115,7 +117,6 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
     const body = await deps.parseJsonBody<{
       message?: string;
       mcpToken?: string;
-      mcpSessionId?: string;
       toolName?: string;
       mode?: 'cheap' | 'balanced';
       testMode?: boolean;
@@ -148,8 +149,6 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
         : { tool: requestedTool, reason: `User selected ${requestedTool}.` };
     const toolName = autoResult.tool;
     const toolReason = autoResult.reason;
-    const priorSessionId = body?.mcpSessionId?.trim() || '';
-
     const rawHistory = Array.isArray(body.history) ? body.history : [];
     const conversationHistory = rawHistory
       .filter(
@@ -165,48 +164,25 @@ export async function handleWorkerAiUiRoutes<TEnv extends AiUiRouteEnv, TCtx>(
     if (!message) {
       return deps.jsonError('message is required.', 400, 'missing_message');
     }
-    let activeSessionId = priorSessionId;
     let mcpPayload: unknown = null;
     let mcpError: string | null = null;
 
     try {
-      if (!priorSessionId) {
-        const initializeResult = await deps.callMcpJsonRpc(
-          env,
-          ctx,
-          mcpToken,
-          'initialize',
-          {
-            protocolVersion: deps.preferredMcpProtocolVersion,
-            capabilities: {},
-            clientInfo: { name: 'courtlistener-ai-chat', version: '1.0.0' },
-          },
-          1,
-        );
-        activeSessionId = initializeResult?.sessionId || '';
-      }
-
-      if (!activeSessionId) {
-        mcpError = 'Failed to establish MCP session. Check that your bearer token is valid.';
+      const toolResult = await deps.callMcpJsonRpc(
+        env,
+        ctx,
+        mcpToken,
+        'tools/call',
+        {
+          name: toolName,
+          arguments: deps.aiToolArguments(toolName, message),
+        },
+        1,
+      );
+      if (!deps.hasValidMcpRpcShape(toolResult.payload)) {
+        mcpError = 'MCP returned an unexpected response format.';
       } else {
-        const toolResult = await deps.callMcpJsonRpc(
-          env,
-          ctx,
-          mcpToken,
-          'tools/call',
-          {
-            name: toolName,
-            arguments: deps.aiToolArguments(toolName, message),
-          },
-          2,
-          activeSessionId,
-        );
-        if (!deps.hasValidMcpRpcShape(toolResult.payload)) {
-          mcpError = 'MCP returned an unexpected response format.';
-        } else {
-          mcpPayload = toolResult.payload;
-          activeSessionId = toolResult.sessionId || activeSessionId;
-        }
+        mcpPayload = toolResult.payload;
       }
     } catch (error) {
       console.error('[ui-api] MCP call failed, will return degraded response', { error });
@@ -281,7 +257,6 @@ ${deps.extractMcpContext(toolName, mcpPayload, dataMaxLen)}`;
       mode,
       tool: toolName,
       tool_reason: toolReason,
-      session_id: activeSessionId || '',
       ai_response: completionText,
       mcp_result: mcpPayload,
       ...(mcpError ? { mcp_error: mcpError } : {}),

@@ -2,8 +2,10 @@
   "server": {
     "name": "courtlistener-mcp",
     "version": "1.0.5",
-    "description": "Legal research MCP server providing comprehensive access to CourtListener legal database"
+    "description": "Legal research MCP server providing comprehensive access to CourtListener legal database",
+    "instructions": "CourtListener MCP provides read-only legal research tools plus a small set of alert-management mutations.\n\nUsage guidelines:\n- Prefer smart_search for natural-language legal questions; use search_opinions/search_cases for structured filters.\n- Use lookup_citation or validate_citations when the user supplies a reporter citation.\n- Read-only tools are safe to retry; mutating tools (manage_alerts, create_docket_alert, get_enhanced_recap_data with action=email, mcp_async_cancel_job) change external state.\n- Long-running work returns an async envelope when explicitly enabled; poll with mcp_async_get_job and fetch results via mcp_async_get_job_result.\n- Resources are available at courtlistener:// URIs; call resources/templates/list to discover URI patterns before resources/read.\n- Resource reads are stateless; refresh a resource by reading its URI again.\n- Long-running tool calls return an application-level async envelope; use the mcp_async_* controls to poll or cancel them.\n- Queue-backed async execution is disabled by default; when enabled with MCP_ASYNC_QUEUE_ENABLED=true, only the read-only queue allowlist is eligible and delivery is at-least-once.\n- Hosted deployments require OAuth; local stdio clients typically provide COURTLISTENER_API_KEY."
   },
+  "protocol": { "capabilities": { "tools": {}, "resources": {}, "prompts": {} } },
   "capabilities": {
     "tools": {
       "tools": [
@@ -31,6 +33,40 @@
               "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  },
+                  "count": { "type": "number" },
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "page": { "type": "number" },
+                      "totalPages": { "type": "number" },
+                      "totalItems": { "type": "number" },
+                      "hasNext": { "type": "boolean" },
+                      "hasPrevious": { "type": "boolean" },
+                      "pageSize": { "type": "number" },
+                      "nextCursor": { "type": "string" }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -44,6 +80,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -72,6 +110,28 @@
               "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "current_page": { "type": "number" },
+                  "total_pages": { "type": "number" },
+                  "total_results": { "type": "number" },
+                  "has_next": { "type": "boolean" },
+                  "has_previous": { "type": "boolean" }
+                }
+              }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Search Cases" },
           "title": "Search Cases",
           "execution": { "taskSupport": "optional" },
@@ -81,6 +141,8 @@
               "category": "search",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -114,6 +176,40 @@
               "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  },
+                  "count": { "type": "number" },
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "page": { "type": "number" },
+                      "totalPages": { "type": "number" },
+                      "totalItems": { "type": "number" },
+                      "hasNext": { "type": "boolean" },
+                      "hasPrevious": { "type": "boolean" },
+                      "pageSize": { "type": "number" },
+                      "nextCursor": { "type": "string" }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -127,6 +223,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -153,6 +251,15 @@
               }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -166,6 +273,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -184,6 +293,32 @@
               "limit": { "default": 10, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -197,6 +332,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -215,6 +352,27 @@
             },
             "required": ["case_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "analysis": { "type": "object", "additionalProperties": true },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -228,6 +386,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -250,6 +410,15 @@
             },
             "required": ["opinion_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -263,6 +432,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -283,6 +454,18 @@
             },
             "required": ["argument", "search_query"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -296,6 +479,8 @@
               "category": "analysis",
               "complexity": "advanced",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "high",
               "rateLimitWeight": 3
             }
@@ -319,6 +504,15 @@
             },
             "required": ["opinion_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -332,6 +526,8 @@
               "category": "analysis",
               "complexity": "advanced",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "medium",
               "rateLimitWeight": 2
             }
@@ -350,6 +546,40 @@
             },
             "required": ["citation"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  },
+                  "count": { "type": "number" },
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "page": { "type": "number" },
+                      "totalPages": { "type": "number" },
+                      "totalItems": { "type": "number" },
+                      "hasNext": { "type": "boolean" },
+                      "hasPrevious": { "type": "boolean" },
+                      "pageSize": { "type": "number" },
+                      "nextCursor": { "type": "string" }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -363,6 +593,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -379,6 +611,32 @@
             },
             "required": ["opinion_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -392,6 +650,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -408,6 +668,32 @@
             },
             "required": ["opinion_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -421,6 +707,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -452,6 +740,18 @@
               }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "List Courts" },
           "title": "List Courts",
           "execution": { "taskSupport": "optional" },
@@ -461,6 +761,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -490,6 +792,32 @@
               }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Judges" },
           "title": "Get Judges",
           "execution": { "taskSupport": "optional" },
@@ -499,6 +827,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -513,6 +843,16 @@
             "properties": { "judge_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["judge_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Judge" },
           "title": "Get Judge",
           "execution": { "taskSupport": "optional" },
@@ -522,6 +862,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -543,6 +885,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -556,6 +924,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -572,6 +942,16 @@
             },
             "required": ["position_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -585,6 +965,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -606,6 +988,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -619,6 +1027,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -639,6 +1049,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -652,6 +1088,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -671,6 +1109,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -684,6 +1148,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -704,6 +1170,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -717,6 +1209,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -738,6 +1232,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Schools" },
           "title": "Get Schools",
           "execution": { "taskSupport": "optional" },
@@ -747,6 +1267,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -767,6 +1289,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -780,6 +1328,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -802,6 +1352,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Dockets" },
           "title": "Get Dockets",
           "execution": { "taskSupport": "optional" },
@@ -811,6 +1387,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -828,6 +1406,16 @@
             },
             "required": ["docket_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Docket" },
           "title": "Get Docket",
           "execution": { "taskSupport": "optional" },
@@ -837,6 +1425,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -860,6 +1450,28 @@
             },
             "required": ["docket"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "current_page": { "type": "number" },
+                  "total_pages": { "type": "number" },
+                  "total_results": { "type": "number" },
+                  "has_next": { "type": "boolean" },
+                  "has_previous": { "type": "boolean" }
+                }
+              }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -873,6 +1485,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -887,6 +1501,16 @@
             "properties": { "entry_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["entry_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -900,6 +1524,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -919,6 +1545,32 @@
             },
             "required": ["docket_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -932,6 +1584,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -949,6 +1603,16 @@
             },
             "required": ["document_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -962,6 +1626,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -982,6 +1648,16 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -995,6 +1671,8 @@
               "category": "details",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1014,6 +1692,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Tags" },
           "title": "Get Tags",
           "execution": { "taskSupport": "optional" },
@@ -1023,6 +1727,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1042,6 +1748,32 @@
               "limit": { "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1055,6 +1787,8 @@
               "category": "monitoring",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1074,8 +1808,25 @@
             },
             "required": ["docket"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "result": { "type": "object", "additionalProperties": true }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
-            "readOnlyHint": true,
+            "readOnlyHint": false,
             "openWorldHint": true,
             "title": "Create Docket Alert"
           },
@@ -1087,6 +1838,8 @@
               "category": "monitoring",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "external_mutation",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1105,6 +1858,32 @@
               "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1118,6 +1897,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1134,6 +1915,16 @@
             },
             "required": ["disclosure_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1147,6 +1938,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1165,6 +1958,32 @@
             },
             "required": ["docket_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1178,6 +1997,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1198,7 +2019,24 @@
             },
             "required": ["action"]
           },
-          "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Manage Alerts" },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "result": { "type": "object", "additionalProperties": true }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
+          "annotations": { "readOnlyHint": false, "openWorldHint": true, "title": "Manage Alerts" },
           "title": "Manage Alerts",
           "execution": { "taskSupport": "optional" },
           "_meta": {
@@ -1207,6 +2045,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "external_mutation",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1227,6 +2067,32 @@
               "page_size": { "default": 20, "type": "number", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "array",
+                "items": { "type": "object", "additionalProperties": true }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "number" },
+                  "totalPages": { "type": "number" },
+                  "totalItems": { "type": "number" },
+                  "hasNext": { "type": "boolean" },
+                  "hasPrevious": { "type": "boolean" },
+                  "pageSize": { "type": "number" },
+                  "nextCursor": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data", "pagination"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1240,6 +2106,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1258,6 +2126,16 @@
             },
             "required": ["oral_argument_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1271,6 +2149,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1301,6 +2181,27 @@
             },
             "required": ["data_type"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "analysis": { "type": "object", "additionalProperties": true },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1314,6 +2215,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1331,6 +2234,16 @@
             },
             "required": ["data_type"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Get Bulk Data" },
           "title": "Get Bulk Data",
           "execution": { "taskSupport": "optional" },
@@ -1340,6 +2253,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1366,6 +2281,16 @@
               "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object", "additionalProperties": true },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1379,6 +2304,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1393,6 +2320,15 @@
             "properties": { "judge_id": { "anyOf": [{ "type": "string" }, { "type": "number" }] } },
             "required": ["judge_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1406,6 +2342,8 @@
               "category": "analysis",
               "complexity": "advanced",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "high",
               "rateLimitWeight": 4
             }
@@ -1422,6 +2360,15 @@
             },
             "required": ["cluster_id"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1435,6 +2382,8 @@
               "category": "analysis",
               "complexity": "advanced",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "high",
               "rateLimitWeight": 4
             }
@@ -1473,6 +2422,18 @@
             "required": ["disclosure_type"],
             "additionalProperties": {}
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1486,6 +2447,8 @@
               "category": "details",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "medium",
               "rateLimitWeight": 2
             }
@@ -1500,6 +2463,18 @@
             "properties": { "text": { "type": "string", "minLength": 1 } },
             "required": ["text"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": { "results": { "type": "array" }, "count": { "type": "number" } }
+              },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1513,6 +2488,8 @@
               "category": "reference",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1528,8 +2505,17 @@
             "required": ["action"],
             "additionalProperties": {}
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "data"]
+          },
           "annotations": {
-            "readOnlyHint": true,
+            "readOnlyHint": false,
             "openWorldHint": true,
             "title": "Get Enhanced Recap Data"
           },
@@ -1541,6 +2527,8 @@
               "category": "details",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": false,
+              "capability": "external_mutation",
               "costHint": "medium",
               "rateLimitWeight": 2
             }
@@ -1564,6 +2552,27 @@
               "page_size": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 }
             }
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "analysis": { "type": "object", "additionalProperties": true },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": {
             "readOnlyHint": true,
             "openWorldHint": true,
@@ -1577,6 +2586,8 @@
               "category": "analysis",
               "complexity": "simple",
               "async": true,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1603,6 +2614,40 @@
             },
             "required": ["query"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "summary": { "type": "string" },
+                  "results": {
+                    "type": "array",
+                    "items": { "type": "object", "additionalProperties": true }
+                  },
+                  "count": { "type": "number" },
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "page": { "type": "number" },
+                      "totalPages": { "type": "number" },
+                      "totalItems": { "type": "number" },
+                      "hasNext": { "type": "boolean" },
+                      "hasPrevious": { "type": "boolean" },
+                      "pageSize": { "type": "number" },
+                      "nextCursor": { "type": "string" }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "annotations": { "readOnlyHint": true, "openWorldHint": true, "title": "Smart Search" },
           "title": "Smart Search",
           "execution": { "taskSupport": "optional" },
@@ -1612,6 +2657,8 @@
               "category": "uncategorized",
               "complexity": "intermediate",
               "async": true,
+              "asyncEligible": true,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1621,6 +2668,7 @@
           "name": "mcp_async_get_job",
           "title": "Async Job Status",
           "description": "Get async job status by job ID",
+          "annotations": { "readOnlyHint": true, "openWorldHint": false },
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1631,6 +2679,29 @@
             },
             "required": ["jobId"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "jobId": { "type": "string" },
+                  "status": {
+                    "type": "string",
+                    "enum": ["queued", "running", "succeeded", "failed", "expired"]
+                  },
+                  "toolName": { "type": "string" },
+                  "updatedAt": { "type": "string" },
+                  "expiresAt": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
@@ -1638,6 +2709,8 @@
               "category": "async-control",
               "complexity": "simple",
               "async": false,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1647,6 +2720,7 @@
           "name": "mcp_async_get_job_result",
           "title": "Async Job Result",
           "description": "Get async job result payload by job ID",
+          "annotations": { "readOnlyHint": true, "openWorldHint": false },
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1657,6 +2731,24 @@
             },
             "required": ["jobId"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "jobId": { "type": "string" },
+                  "status": { "type": "string" },
+                  "result": { "type": "object", "additionalProperties": true }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
@@ -1664,6 +2756,8 @@
               "category": "async-control",
               "complexity": "simple",
               "async": false,
+              "asyncEligible": false,
+              "capability": "read_only",
               "costHint": "low",
               "rateLimitWeight": 1
             }
@@ -1673,6 +2767,7 @@
           "name": "mcp_async_cancel_job",
           "title": "Async Job Cancel",
           "description": "Cancel async job execution by job ID",
+          "annotations": { "readOnlyHint": false, "destructiveHint": true, "openWorldHint": false },
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1683,6 +2778,24 @@
             },
             "required": ["jobId"]
           },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "jobId": { "type": "string" },
+                  "cancelled": { "type": "boolean" },
+                  "status": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "metadata": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["success", "data"],
+            "additionalProperties": false
+          },
           "execution": { "taskSupport": "forbidden" },
           "_meta": {
             "courtlistener/ux": {
@@ -1690,6 +2803,8 @@
               "category": "async-control",
               "complexity": "simple",
               "async": false,
+              "asyncEligible": false,
+              "capability": "external_mutation",
               "costHint": "low",
               "rateLimitWeight": 1
             }

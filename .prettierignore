@@ -22,6 +22,7 @@ node_modules/
 *.pid.lock
 src/web/spa-assets.ts
 src/web-spa/.spa-dist-analysis/
+test/worker-configuration.d.ts
 
 # Environment
 .env

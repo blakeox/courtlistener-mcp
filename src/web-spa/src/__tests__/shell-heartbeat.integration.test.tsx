@@ -53,7 +53,7 @@ function renderShell(initialEntry = '/app/playground'): void {
                       {
                         label: 'Local MCP credential loaded',
                         complete: false,
-                        to: '/app/control-center',
+                        to: '/app',
                       },
                     ]}
                   >
@@ -131,7 +131,7 @@ describe('Shell heartbeat integration', () => {
       logout: vi.fn(),
     });
 
-    renderShell('/app/control-center');
+    renderShell('/app');
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000);

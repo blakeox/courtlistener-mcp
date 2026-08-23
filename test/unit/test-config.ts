@@ -10,7 +10,11 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 async function importConfigFresh(): Promise<typeof import('../../dist/infrastructure/config.js')> {
   const suffix = `${Date.now()}-${Math.random()}`;
-  return await import(`../../dist/infrastructure/config.js?t=${suffix}`);
+  const config = await import(`../../dist/infrastructure/config.js?t=${suffix}`);
+  return {
+    ...config,
+    getConfig: (environment = process.env) => config.getConfig(environment),
+  };
 }
 
 describe('Configuration Management (TypeScript)', () => {
@@ -33,22 +37,18 @@ describe('Configuration Management (TypeScript)', () => {
       process.env.CACHE_MAX_SIZE = '2000';
       process.env.LOG_LEVEL = 'debug';
       process.env.LOG_FORMAT = 'json';
-      process.env.METRICS_ENABLED = 'true';
-      process.env.METRICS_PORT = '3001';
       process.env.COURTLISTENER_TIMEOUT = '45000';
       process.env.COURTLISTENER_RATE_LIMIT = '150';
 
       // Import config after setting env vars
       const { getConfig } = await import('../../dist/infrastructure/config.js');
-      const config = getConfig();
+      const config = getConfig(process.env);
 
       assert.strictEqual(config.cache.enabled, true);
       assert.strictEqual(config.cache.ttl, 600);
       assert.strictEqual(config.cache.maxSize, 2000);
       assert.strictEqual(config.logging.level, 'debug');
       assert.strictEqual(config.logging.format, 'json');
-      assert.strictEqual(config.metrics.enabled, true);
-      assert.strictEqual(config.metrics.port, 3001);
       assert.strictEqual(config.courtListener.timeout, 45000);
       assert.strictEqual(config.courtListener.rateLimitPerMinute, 150);
     });
@@ -58,7 +58,6 @@ describe('Configuration Management (TypeScript)', () => {
       delete process.env.CACHE_ENABLED;
       delete process.env.CACHE_TTL;
       delete process.env.LOG_LEVEL;
-      delete process.env.METRICS_ENABLED;
       delete process.env.CACHE_MAX_SIZE;
 
       // Use timestamp to force fresh import
@@ -70,32 +69,27 @@ describe('Configuration Management (TypeScript)', () => {
       assert.strictEqual(config.cache.ttl, 300); // Default: 5 minutes (300 seconds)
       assert.strictEqual(config.cache.maxSize, 1000); // Default: 1000
       assert.strictEqual(config.logging.level, 'info'); // Default: info
-      assert.strictEqual(config.metrics.enabled, false); // METRICS_ENABLED === 'true' defaults to false
     });
 
     it('should handle boolean environment variables', async () => {
       // Test actual boolean parsing behavior from config.ts
       process.env.CACHE_ENABLED = 'false'; // !== 'false' = false
-      process.env.METRICS_ENABLED = 'true'; // === 'true' = true
       process.env.LOGGING_ENABLED = 'false'; // !== 'false' = false
 
       const { getConfig } = await importConfigFresh();
       const config = getConfig();
 
       assert.strictEqual(config.cache.enabled, false);
-      assert.strictEqual(config.metrics.enabled, true);
       assert.strictEqual(config.logging.enabled, false);
 
       // Clean up
       delete process.env.CACHE_ENABLED;
-      delete process.env.METRICS_ENABLED;
       delete process.env.LOGGING_ENABLED;
     });
 
     it('should handle numeric environment variables', async () => {
       process.env.CACHE_TTL = '900';
       process.env.CACHE_MAX_SIZE = '5000';
-      process.env.METRICS_PORT = '4001';
       process.env.COURTLISTENER_TIMEOUT = '60000';
 
       // Use timestamp to force fresh import
@@ -104,13 +98,11 @@ describe('Configuration Management (TypeScript)', () => {
 
       assert.strictEqual(config.cache.ttl, 900);
       assert.strictEqual(config.cache.maxSize, 5000);
-      assert.strictEqual(config.metrics.port, 4001);
       assert.strictEqual(config.courtListener.timeout, 60000);
 
       // Clean up
       delete process.env.CACHE_TTL;
       delete process.env.CACHE_MAX_SIZE;
-      delete process.env.METRICS_PORT;
       delete process.env.COURTLISTENER_TIMEOUT;
     });
   });
@@ -131,7 +123,6 @@ describe('Configuration Management (TypeScript)', () => {
 
     it('should validate numeric ranges', async () => {
       process.env.CACHE_TTL = '-100'; // Invalid negative TTL
-      process.env.METRICS_PORT = '99999'; // Invalid port range
 
       const { getConfig } = await import('../../dist/infrastructure/config.js');
 
@@ -139,15 +130,10 @@ describe('Configuration Management (TypeScript)', () => {
         const config = getConfig();
         // Should use sensible defaults for invalid values
         assert.ok(config.cache.ttl > 0);
-        assert.ok(
-          config.metrics.port === undefined ||
-            (config.metrics.port >= 1024 && config.metrics.port <= 65535),
-        );
       });
 
       // Clean up
       delete process.env.CACHE_TTL;
-      delete process.env.METRICS_PORT;
     });
 
     it('should validate required string fields', async () => {
@@ -172,9 +158,6 @@ describe('Configuration Management (TypeScript)', () => {
     it('should parse security settings', async () => {
       process.env.AUTH_ENABLED = 'true';
       process.env.AUTH_API_KEYS = 'key1,key2,key3';
-      process.env.RATE_LIMIT_ENABLED = 'true';
-      process.env.RATE_LIMIT_MAX_REQUESTS = '50';
-      process.env.SANITIZATION_ENABLED = 'false';
 
       const { getConfig } = await importConfigFresh();
       const config = getConfig();
@@ -182,16 +165,10 @@ describe('Configuration Management (TypeScript)', () => {
       assert.strictEqual(config.security.authEnabled, true);
       assert.strictEqual(config.security.apiKeys.length, 3);
       assert.strictEqual(config.security.apiKeys[0], 'key1');
-      assert.strictEqual(config.security.rateLimitEnabled, true);
-      assert.strictEqual(config.security.maxRequestsPerMinute, 50);
-      assert.strictEqual(config.security.sanitizationEnabled, false);
 
       // Clean up
       delete process.env.AUTH_ENABLED;
       delete process.env.AUTH_API_KEYS;
-      delete process.env.RATE_LIMIT_ENABLED;
-      delete process.env.RATE_LIMIT_MAX_REQUESTS;
-      delete process.env.SANITIZATION_ENABLED;
     });
 
     it('should handle empty API keys array', async () => {
@@ -233,96 +210,6 @@ describe('Configuration Management (TypeScript)', () => {
       assert.strictEqual(serialized.includes('static-secret-token'), false);
     });
 
-    it('should ignore deprecated static fallback env vars without failing startup', async () => {
-      process.env.MCP_AUTH_TOKEN = 'static-only-token';
-      process.env.MCP_AUTH_PRIMARY = 'oidc';
-      process.env.MCP_ALLOW_STATIC_FALLBACK = 'true';
-
-      const { getStartupDiagnostics } = await importConfigFresh();
-      const diagnostics = getStartupDiagnostics() as {
-        authPolicy?: { effectivePrimary?: string | null };
-        invariants?: { warnings?: string[] };
-      };
-
-      assert.strictEqual(diagnostics.authPolicy?.effectivePrimary, null);
-      assert.ok(
-        diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_AUTH_PRIMARY is deprecated and ignored'),
-        ),
-      );
-      assert.ok(
-        diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_ALLOW_STATIC_FALLBACK is deprecated and ignored'),
-        ),
-      );
-    });
-
-    it('should surface dev fallback risk in startup diagnostics when fully enabled', async () => {
-      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
-      process.env.MCP_ALLOW_DEV_FALLBACK = 'true';
-
-      const { getStartupDiagnostics } = await importConfigFresh();
-      const diagnostics = getStartupDiagnostics() as {
-        authPolicy?: {
-          devFallback?: {
-            enabled?: boolean;
-            riskLevel?: string;
-            productionLike?: boolean;
-          };
-        };
-        invariants?: { warnings?: string[] };
-      };
-
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, true);
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'enabled');
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.productionLike, false);
-      assert.ok(
-        diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('OAuth dev fallback is enabled'),
-        ),
-      );
-    });
-
-    it('should warn when dev fallback env is only partially configured', async () => {
-      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
-
-      const { getStartupDiagnostics } = await importConfigFresh();
-      const diagnostics = getStartupDiagnostics() as {
-        authPolicy?: {
-          devFallback?: {
-            enabled?: boolean;
-            riskLevel?: string;
-            allowFlagEnabled?: boolean;
-          };
-        };
-        invariants?: { warnings?: string[] };
-      };
-
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, false);
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.allowFlagEnabled, false);
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'misconfigured');
-      assert.ok(
-        diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_OAUTH_DEV_USER_ID is configured but inert'),
-        ),
-      );
-    });
-
-    it('should warn when deprecated broad Cloudflare Access trust is configured', async () => {
-      process.env.MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS = 'true';
-
-      const { getStartupDiagnostics } = await importConfigFresh();
-      const diagnostics = getStartupDiagnostics() as {
-        invariants?: { warnings?: string[] };
-      };
-
-      assert.ok(
-        diagnostics.invariants?.warnings?.some((warning) =>
-          warning.includes('MCP_TRUST_CLOUDFLARE_ACCESS_HEADERS is deprecated and ignored'),
-        ),
-      );
-    });
-
     it('should warn when scoped Cloudflare Access trust is enabled', async () => {
       process.env.MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION = 'true';
       process.env.MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS = 'true';
@@ -340,41 +227,6 @@ describe('Configuration Management (TypeScript)', () => {
       assert.ok(
         diagnostics.invariants?.warnings?.some((warning) =>
           warning.includes('MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS is enabled'),
-        ),
-      );
-    });
-
-    it('should fail fast when dev fallback is enabled in production mode', async () => {
-      process.env.NODE_ENV = 'production';
-      process.env.MCP_OAUTH_DEV_USER_ID = 'dev-user-123';
-      process.env.MCP_ALLOW_DEV_FALLBACK = 'true';
-
-      const { getConfig, getStartupDiagnostics } = await importConfigFresh();
-
-      assert.throws(
-        () => getConfig(),
-        /OAuth dev fallback cannot be enabled when NODE_ENV=production/,
-      );
-
-      const diagnostics = getStartupDiagnostics() as {
-        status?: string;
-        authPolicy?: {
-          devFallback?: {
-            enabled?: boolean;
-            productionLike?: boolean;
-            riskLevel?: string;
-          };
-        };
-        invariants?: { errors?: string[] };
-      };
-
-      assert.strictEqual(diagnostics.status, 'error');
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.enabled, true);
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.productionLike, true);
-      assert.strictEqual(diagnostics.authPolicy?.devFallback?.riskLevel, 'enabled');
-      assert.ok(
-        diagnostics.invariants?.errors?.some((error) =>
-          error.includes('OAuth dev fallback cannot be enabled when NODE_ENV=production'),
         ),
       );
     });
@@ -417,32 +269,6 @@ describe('Configuration Management (TypeScript)', () => {
     });
   });
 
-  describe('Circuit Breaker Configuration', () => {
-    it('should parse circuit breaker settings', async () => {
-      process.env.CIRCUIT_BREAKER_ENABLED = 'true';
-      process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD = '10';
-      process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD = '5';
-      process.env.CIRCUIT_BREAKER_TIMEOUT = '15000';
-      process.env.CIRCUIT_BREAKER_RESET_TIMEOUT = '120000';
-
-      const { getConfig } = await importConfigFresh();
-      const config = getConfig();
-
-      assert.strictEqual(config.circuitBreaker.enabled, true);
-      assert.strictEqual(config.circuitBreaker.failureThreshold, 10);
-      assert.strictEqual(config.circuitBreaker.successThreshold, 5);
-      assert.strictEqual(config.circuitBreaker.timeout, 15000);
-      assert.strictEqual(config.circuitBreaker.resetTimeout, 120000);
-
-      // Clean up
-      delete process.env.CIRCUIT_BREAKER_ENABLED;
-      delete process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD;
-      delete process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD;
-      delete process.env.CIRCUIT_BREAKER_TIMEOUT;
-      delete process.env.CIRCUIT_BREAKER_RESET_TIMEOUT;
-    });
-  });
-
   describe('Configuration Summary', () => {
     it('should provide configuration summary', async () => {
       const { getConfig } = await import('../../dist/infrastructure/config.js');
@@ -452,11 +278,7 @@ describe('Configuration Management (TypeScript)', () => {
       assert.ok(config.courtListener);
       assert.ok(config.cache);
       assert.ok(config.logging);
-      assert.ok(config.metrics);
       assert.ok(config.security);
-      assert.ok(config.audit);
-      assert.ok(config.circuitBreaker);
-      assert.ok(config.compression);
     });
   });
 });

@@ -1,4 +1,10 @@
 import { HOSTED_MCP_OAUTH_CONTRACT } from '../auth/oauth-contract.js';
+import {
+  buildRuntimeReadinessPayload,
+  runtimeReadinessStatusCode,
+  type RuntimeReadinessCheck,
+  type RuntimeWorkerRole,
+} from '../infrastructure/runtime-readiness-contract.js';
 import { buildWorkerHealthPayload } from './worker-health-runtime.js';
 import type { WorkerDurableRuntime, WorkerDurableRuntimeEnv } from './worker-durable-runtime.js';
 import { resolveWorkerUsage } from './worker-usage-runtime.js';
@@ -27,14 +33,6 @@ interface WorkerCoreRouteContext<TEnv> {
   mcpPath: boolean;
 }
 
-interface SessionSnapshot {
-  version: string;
-  shardCount: number;
-  idleTtlMs: number;
-  absoluteTtlMs: number;
-  evictionSweepLimit: number;
-}
-
 const ALLOWED_UI_TELEMETRY_EVENTS = new Set([
   'browser_session_bootstrap_attempted',
   'browser_session_bootstrap_succeeded',
@@ -56,16 +54,25 @@ export interface HandleWorkerCoreRoutesDeps<
     extraHeaders?: HeadersInit,
   ) => Response;
   jsonResponse: (payload: unknown, status?: number, extraHeaders?: HeadersInit) => Response;
-  isRemovedLegacyUiRoute: (pathname: string) => boolean;
   workerUiSessionRuntime: WorkerUiSessionRuntime<TEnv>;
-  getCachedSessionTopology: (env: TEnv) => SessionSnapshot;
   getWorkerLatencySnapshot: () => unknown;
   getUsageSnapshot: (env: TEnv, userId: string) => Promise<unknown | null>;
   workerDurableRuntime: WorkerDurableRuntime<TEnv>;
   now: () => number;
   getClientIdentifier?: (request: Request) => string;
-  recordTurnstileVerdict?: (routeId: string, outcome: 'passed' | 'failed' | 'not_enforced') => void;
+  recordTurnstileVerdict?: (
+    env: TEnv,
+    routeId: string,
+    outcome: 'passed' | 'failed' | 'not_enforced',
+  ) => void;
+  workerRole?: RuntimeWorkerRole;
+  getReadinessResponse?: (
+    request: Request,
+    env: TEnv,
+    ctx: ExecutionContext,
+  ) => Promise<Response | null>;
   recordUiEvent?: (
+    env: TEnv,
     eventName: string,
     userId: string | null,
     route: string,
@@ -125,10 +132,39 @@ export async function handleWorkerCoreRoutes<
     );
   }
 
+  if (pathname === '/ready') {
+    if (requestMethod !== 'GET') {
+      return deps.jsonError('Method not allowed', 405, 'method_not_allowed');
+    }
+
+    try {
+      const delegatedResponse = await deps.getReadinessResponse?.(request, env, ctx);
+      if (delegatedResponse) {
+        return delegatedResponse;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const payload = buildRuntimeReadinessPayload({
+        workerRole: deps.workerRole ?? 'unknown',
+        checks: {
+          runtime: { status: 'fail', message: `Readiness probe failed: ${message}` },
+        },
+      });
+      return deps.jsonResponse(payload, runtimeReadinessStatusCode(payload.status));
+    }
+
+    const payload = buildRuntimeReadinessPayload({
+      workerRole: deps.workerRole ?? 'unknown',
+      checks: {
+        runtime: { status: 'pass', message: 'Worker request runtime is available.' },
+      } satisfies Record<string, RuntimeReadinessCheck>,
+    });
+    return deps.jsonResponse(payload, runtimeReadinessStatusCode(payload.status));
+  }
+
   if (pathname === '/health') {
-    const sessionTopology = deps.getCachedSessionTopology(env);
     return deps.jsonResponse(
-      buildWorkerHealthPayload(sessionTopology, deps.getWorkerLatencySnapshot(), {
+      buildWorkerHealthPayload(deps.getWorkerLatencySnapshot(), {
         analyticsEnabled:
           (env as { MCP_CF_ANALYTICS_ENABLED?: string }).MCP_CF_ANALYTICS_ENABLED === 'true',
         asyncQueueConfigured: Boolean('ASYNC_TOOL_QUEUE' in env && env.ASYNC_TOOL_QUEUE),
@@ -211,6 +247,7 @@ export async function handleWorkerCoreRoutes<
       deps.getClientIdentifier ? deps.getClientIdentifier(request) : null,
     );
     deps.recordTurnstileVerdict?.(
+      env,
       'session_bootstrap',
       turnstile.enforced ? (turnstile.success ? 'passed' : 'failed') : 'not_enforced',
     );
@@ -339,7 +376,7 @@ export async function handleWorkerCoreRoutes<
 
     const sessionState = await deps.workerUiSessionRuntime.resolveUiSession(request, env);
     const userId = sessionState.kind === 'authenticated' ? sessionState.userId : null;
-    deps.recordUiEvent?.(eventName, userId, route, outcome);
+    deps.recordUiEvent?.(env, eventName, userId, route, outcome);
     if (userId) {
       await deps.workerDurableRuntime.recordUserUiEvent(env, userId, eventName, outcome);
     }
@@ -403,14 +440,6 @@ export async function handleWorkerCoreRoutes<
       );
     }
     return deps.withCors(deps.jsonResponse(usageResolution.snapshot), origin, allowedOrigins);
-  }
-
-  if (deps.isRemovedLegacyUiRoute(pathname)) {
-    return deps.jsonError(
-      'Legacy UI auth/key routes were removed in the Cloudflare OAuth hard cutover. Use OAuth endpoints (/authorize, /token, /register) and MCP bearer tokens.',
-      410,
-      'legacy_routes_removed',
-    );
   }
 
   return null;

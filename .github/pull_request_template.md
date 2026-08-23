@@ -14,7 +14,7 @@ Describe the change and its motivation.
 
 - [ ] Unit tests
 - [ ] Integration tests
-- [ ] MCP Inspector
+- [ ] MCP v2 contract
 - [ ] Local Actions via `act`
 
 ## Checklist
@@ -27,4 +27,4 @@ Describe the change and its motivation.
 
 ## Screenshots/Artifacts (optional)
 
-Links to coverage, Inspector reports, or logs.
+Links to coverage, MCP v2 contract output, or logs.

@@ -28,6 +28,7 @@ const toastPath = path.join(spaRoot, 'src/components/Toast.tsx');
 const workspacePagesDir = path.join(spaRoot, 'src/pages');
 const spaDistRoot = path.join(repoRoot, '.spa-dist');
 const maxProductionCssBytes = 92 * 1024;
+const numberedDuplicateNamePattern = / [2-9]\.[^/]+$/;
 
 const errors = [];
 
@@ -307,6 +308,9 @@ function checkUiTsx() {
 
 function walkTsx(dir, visitor) {
   for (const entry of readdirSync(dir)) {
+    if (numberedDuplicateNamePattern.test(entry)) {
+      continue;
+    }
     const fullPath = path.join(dir, entry);
     const stats = statSync(fullPath);
     if (stats.isDirectory()) {

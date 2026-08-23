@@ -203,7 +203,14 @@ export async function authorizeMcpRequestWithPrincipal(
   const verifyFn = deps.verifyAccessTokenFn ?? verifyAccessToken;
 
   if (decisionEngine.attempts.length === 0) {
-    return { authError: null };
+    return {
+      authError: jsonError(
+        401,
+        'No MCP authentication mechanism is configured.',
+        'authentication_not_configured',
+        request,
+      ),
+    };
   }
 
   const shouldTryServiceToken = decisionEngine.attempts.includes('serviceToken');

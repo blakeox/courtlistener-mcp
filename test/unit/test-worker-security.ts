@@ -46,20 +46,22 @@ describe('worker-security protocol header validation', () => {
     );
   });
 
-  it('returns profile fallback diagnostics for unsupported capability profiles on legacy protocol', () => {
-    const result = validateProtocolHeaderNegotiation('2024-11-05', 'async', false, supported);
+  it('accepts async capability profiles on the v2 protocol', () => {
+    const result = validateProtocolHeaderNegotiation('2026-07-28', 'async', false, supported);
     assert.equal(result.error, null);
     assert.equal(result.diagnostics.accepted, true);
-    assert.equal(result.diagnostics.reason, 'profile_fallback');
-    assert.equal(result.diagnostics.acceptedCapabilityProfile, 'extended');
-    assert.equal(result.diagnostics.profileReason, 'fallback_unsupported_profile');
+    assert.equal(result.diagnostics.reason, 'accepted');
+    assert.equal(result.diagnostics.acceptedCapabilityProfile, 'async');
+    assert.equal(result.diagnostics.profileReason, 'accepted');
   });
 });
 
 describe('worker-security auth', () => {
-  it('allows request when no auth is configured', async () => {
+  it('fails closed when no trusted auth mechanism is configured', async () => {
     const res = await authorizeMcpRequest(req(), {});
-    assert.equal(res, null);
+    assert.ok(res);
+    assert.equal(res.status, 401);
+    assert.match(await res.text(), /authentication_not_configured/);
   });
 
   it('does not accept MCP_AUTH_TOKEN as a public bearer token', async () => {

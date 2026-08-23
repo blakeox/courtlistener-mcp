@@ -22,18 +22,10 @@ type OAuthRouteKind =
   | 'other';
 
 type HostedAuthRouteKind =
-  | 'auth-start'
-  | 'auth-callback'
-  | 'auth-approve'
-  | 'auth-logout'
-  | 'other';
+  'auth-start' | 'auth-callback' | 'auth-approve' | 'auth-logout' | 'other';
 
 export type HostedAuthSignalOutcome =
-  | 'redirect'
-  | 'interactive'
-  | 'completed'
-  | 'rejected'
-  | 'unavailable';
+  'redirect' | 'interactive' | 'completed' | 'rejected' | 'unavailable';
 
 type HostedAuthSignalName =
   | 'approval_preparation_failed'

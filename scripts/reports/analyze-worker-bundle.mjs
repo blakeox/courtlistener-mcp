@@ -7,11 +7,11 @@
  *   node scripts/reports/analyze-worker-bundle.mjs --json
  *   WORKER_BUNDLE_MAX_KIB=3500 node scripts/reports/analyze-worker-bundle.mjs --check
  *
- * Requires: wrangler on PATH; analyzes wrangler.edge.jsonc by default.
+ * Requires: the project-local Wrangler; analyzes wrangler.edge.jsonc by default.
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -44,18 +44,14 @@ function readSpaPayloadBytes(repoRoot) {
 }
 
 function bucketSource(path) {
-  if (path.includes('spa-assets')) {
-    return { id: 'spa-inline', label: 'Inlined SPA (spa-assets.ts)' };
-  }
   const pnpm = path.match(/\.pnpm\/([^/]+)@/);
   if (pnpm) {
     const pkg = pnpm[1];
     if (pkg === 'zod') return { id: 'zod', label: 'zod' };
     if (pkg.startsWith('zod-to-json-schema'))
       return { id: 'zod-to-json-schema', label: 'zod-to-json-schema' };
-    if (pkg.startsWith('agents')) return { id: 'agents', label: 'agents (McpAgent + partyserver)' };
     if (pkg === 'ajv' || pkg.startsWith('ajv-')) return { id: 'ajv', label: 'ajv (+ formats)' };
-    if (pkg === 'mime-db') return { id: 'mime-db', label: 'mime-db (via agents → mimetext)' };
+    if (pkg === 'mime-db') return { id: 'mime-db', label: 'mime-db' };
     if (pkg === 'mimetext') return { id: 'mimetext', label: 'mimetext' };
     if (pkg.startsWith('@cloudflare+workers-oauth-provider')) {
       return { id: 'oauth-provider', label: '@cloudflare/workers-oauth-provider' };
@@ -122,10 +118,19 @@ function main() {
   const repoRoot = process.cwd();
   const spa = readSpaPayloadBytes(repoRoot);
   const outDir = mkdtempSync(join(tmpdir(), 'clmcp-worker-bundle-'));
+  const wranglerBinary = join(
+    repoRoot,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler',
+  );
 
   try {
+    if (!statSync(wranglerBinary, { throwIfNoEntry: false })) {
+      throw new Error('Repository-pinned Wrangler binary is missing. Run pnpm install first.');
+    }
     execFileSync(
-      'wrangler',
+      wranglerBinary,
       ['deploy', '--dry-run', '--outdir', outDir, '-c', 'wrangler.edge.jsonc'],
       {
         cwd: repoRoot,
@@ -137,8 +142,12 @@ function main() {
     throw error;
   }
 
-  const workerPath = join(outDir, 'worker.js');
-  const mapPath = join(outDir, 'worker.js.map');
+  const bundleFile = readdirSync(outDir).find((file) => /^worker(?:-[^/]+)?\.js$/.test(file));
+  if (!bundleFile) {
+    throw new Error(`Wrangler dry-run did not produce a Worker bundle in ${outDir}`);
+  }
+  const workerPath = join(outDir, bundleFile);
+  const mapPath = `${workerPath}.map`;
   const workerBytes = statSync(workerPath).size;
   const analysis = analyzeSourceMap(mapPath);
 
@@ -167,9 +176,9 @@ function main() {
       source: row.source,
     })),
     notes: [
-      'AuthFailureLimiterDO and CourtListenerMCP share this single worker.js upload.',
+      'AuthFailureLimiterDO is the only Durable Object binding on the MCP Worker; MCP v2 is stateless.',
       'DO free-tier duration errors often correlate with cold-starting this full bundle.',
-      'mime-db is pulled by agents → mimetext, not by Express in the Worker graph.',
+      'The official MCP v2 handler is fetch-native; no Node-only server stack enters the Worker graph.',
     ],
   };
 
@@ -183,11 +192,11 @@ function main() {
     console.log(JSON.stringify(report, null, 2));
   } else {
     console.log('Worker bundle audit\n');
-    console.log(`  worker.js (minified):     ${formatKiB(report.deploy.workerJsBytes)}`);
+    console.log(`  Worker bundle (minified): ${formatKiB(report.deploy.workerJsBytes)}`);
     console.log(
-      `  SPA assets (.spa-dist):   ${formatKiB(report.spa.inlinedPayloadBytes)} (JS ${formatKiB(report.spa.jsBytes)} + CSS ${formatKiB(report.spa.cssBytes)})`,
+      `  SPA assets (.spa-dist):    ${formatKiB(report.spa.inlinedPayloadBytes)} (JS ${formatKiB(report.spa.jsBytes)} + CSS ${formatKiB(report.spa.cssBytes)})`,
     );
-    console.log('  (served via Workers Assets binding, not in worker.js)\n');
+    console.log('  (served via Workers Assets binding, not in the Worker bundle)\n');
     console.log('Composition (source map, pre-minify):\n');
     for (const row of report.composition.slice(0, 20)) {
       console.log(

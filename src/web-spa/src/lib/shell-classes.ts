@@ -12,18 +12,18 @@ export const workspaceMainLayoutClass = cn(
 
 export const mobileSidebarBackdropClass = cn(
   'mobile-sidebar-backdrop hidden border-0 p-0 max-shell:block max-shell:fixed max-shell:inset-0 max-shell:z-[var(--z-backdrop)]',
-  'max-shell:bg-[color:var(--shell-sidebar-overlay)] max-shell:backdrop-blur-[length:var(--blur-xs)]',
+  'max-shell:bg-[color:var(--shell-sidebar-overlay)] max-shell:backdrop-blur-[length:var(--blur-sm)]',
 );
 
 export function workspaceSidebarClassName(open: boolean): string {
   return cn(
     'workspace-sidebar flex flex-col sticky top-0 self-start min-h-[var(--size-viewport-full)] max-h-[var(--size-viewport-full)] overflow-y-auto',
-    'border-r border-[length:var(--size-border-sm)] border-[color:var(--shell-sidebar-border)] bg-[color:var(--shell-sidebar-bg)]',
+    'border-r border-[length:var(--size-border-sm)] border-[color:var(--shell-sidebar-border)] bg-[image:var(--shell-sidebar-bg)] bg-[color:var(--body-bg-dark-end)] bg-cover bg-no-repeat',
     'px-(--space-5-5) pt-(--space-6-5) pb-(--space-5)',
     'max-shell:fixed max-shell:top-0 max-shell:left-0 max-shell:bottom-0 max-shell:z-[var(--z-drawer)]',
     'max-shell:hidden max-shell:h-[var(--size-viewport-full)] max-shell:max-h-none max-shell:w-[min(var(--size-mobile-drawer),92vw)]',
     'max-shell:rounded-none max-shell:border-0 max-shell:border-r max-shell:border-[color:var(--shell-sidebar-border)]',
-    'max-shell:shadow-[var(--shell-sidebar-shadow)] max-shell:pt-[calc(var(--space-5)+env(safe-area-inset-top))]',
+    'max-shell:bg-[color:var(--shell-sidebar-mobile-bg)] max-shell:shadow-[var(--shell-sidebar-shadow)] max-shell:pt-[calc(var(--space-5)+env(safe-area-inset-top))]',
     'max-shell:pb-[calc(var(--space-5)+env(safe-area-inset-bottom))]',
     open && 'open max-shell:block',
   );
@@ -112,7 +112,7 @@ export function sidebarSecondaryNavLinkClassName(variant: string): string {
     'sidebar-secondary-link min-h-0 rounded-none border-0 bg-transparent px-0 py-(--space-2) font-semibold text-[color:var(--shell-sidebar-text-muted)]',
     `${variant}-nav-link`,
     'before:hidden hover:bg-transparent hover:text-[color:var(--shell-sidebar-link-hover-text)] hover:underline',
-    'focus-visible:bg-transparent focus-visible:text-[color:var(--shell-sidebar-link-hover-text)] focus-visible:underline',
+    'focus-visible:rounded-portal-sm focus-visible:outline focus-visible:outline-[length:var(--size-focus-ring-sm)] focus-visible:outline-offset-[var(--size-focus-offset-lg)] focus-visible:outline-[color:var(--shell-focus-ring)] focus-visible:bg-transparent focus-visible:text-[color:var(--shell-sidebar-link-hover-text)] focus-visible:underline',
     '[&.active]:font-bold [&.active]:text-[color:var(--shell-sidebar-link-active-text)]',
   );
 }
