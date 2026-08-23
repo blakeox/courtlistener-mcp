@@ -1,19 +1,19 @@
 name: Regenerate SPA Assets (Dependabot PR)
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [dev]
     paths:
       - package.json
       - pnpm-lock.yaml
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
-  regenerate:
-    name: Regenerate spa-assets.ts on PR branch
+  generate:
+    name: Generate spa-assets.ts from PR dependencies
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -37,6 +37,33 @@ jobs:
 
       - name: Regenerate embedded SPA assets
         run: pnpm run generate:web:spa
+
+      - name: Upload regenerated assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: spa-assets
+          path: src/web/spa-assets.ts
+          retention-days: 1
+
+  commit:
+    name: Commit regenerated spa-assets.ts on PR branch
+    needs: generate
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Download regenerated assets
+        uses: actions/download-artifact@v7
+        with:
+          name: spa-assets
+          path: src/web
 
       - name: Commit regenerated assets
         uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7.1.0
