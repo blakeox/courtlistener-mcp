@@ -2,7 +2,7 @@ import { expect, test } from 'playwright/test';
 import { installSpaMocks, seedBrowserToken } from './support/mock-backend';
 
 test.describe('SPA session recovery failures', () => {
-  test('surfaces session endpoint failures without redirecting away from control center', async ({
+  test('surfaces session endpoint failures without redirecting away from the overview', async ({
     page,
   }) => {
     await installSpaMocks(page, {
@@ -15,9 +15,9 @@ test.describe('SPA session recovery failures', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
 
-    await expect(page).toHaveURL(/\/app\/control-center$/);
+    await expect(page).toHaveURL(/\/app$/);
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.getByText('Session service temporarily unavailable.')).toBeVisible();
     await expect(page.getByText('Session not loaded')).toBeVisible();
@@ -31,11 +31,9 @@ test.describe('SPA session recovery failures', () => {
         user: { id: 'operator-5' },
         turnstile_site_key: '',
       },
-      runtime: {
-        sessionId: 'runtime-session',
-      },
+      runtime: {},
       runtimeFailures: {
-        initialize: {
+        'server/discover': {
           status: 503,
           body: {
             error: 'runtime_down',
@@ -45,7 +43,7 @@ test.describe('SPA session recovery failures', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
 
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.locator('strong').filter({ hasText: 'Runtime check failed' })).toBeVisible();

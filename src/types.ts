@@ -29,88 +29,14 @@ export interface ServerConfig {
   courtListener: CourtListenerConfig;
   cache: CacheConfig;
   logging: LogConfig;
-  metrics: {
-    enabled: boolean;
-    port?: number;
-  };
   security: {
     authEnabled: boolean;
     apiKeys: string[];
-    allowAnonymous: boolean;
-    headerName: string;
-    corsEnabled: boolean;
-    corsOrigins: string[];
-    rateLimitEnabled: boolean;
-    maxRequestsPerMinute: number;
-    sanitizationEnabled: boolean;
-  };
-  audit: {
-    enabled: boolean;
-    logLevel: string;
-    includeRequestBody: boolean;
-    includeResponseBody: boolean;
-    maxBodyLength: number;
-    sensitiveFields: string[];
-  };
-  circuitBreaker: {
-    enabled: boolean;
-    failureThreshold: number;
-    successThreshold: number;
-    timeout: number;
-    resetTimeout: number;
-  };
-  compression: {
-    enabled: boolean;
-    threshold: number;
-    level: number;
-    types: string[];
   };
   sampling: {
     enabled: boolean;
     maxTokens: number;
     defaultModel?: string;
-  };
-  correlation?: {
-    enabled: boolean;
-    headerName: string;
-    generateId: boolean;
-  };
-  sanitization?: {
-    enabled: boolean;
-    maxStringLength: number;
-    maxArrayLength: number;
-    maxObjectDepth: number;
-  };
-  rateLimit?: {
-    enabled: boolean;
-    maxRequestsPerMinute: number;
-    maxRequestsPerHour: number;
-    maxRequestsPerDay: number;
-    windowSizeMs: number;
-    clientIdentification: string;
-    identificationHeader: string;
-    whitelistedClients: string[];
-    penaltyMultiplier: number;
-    persistStorage: boolean;
-  };
-  gracefulShutdown?: {
-    enabled: boolean;
-    timeout: number;
-    forceTimeout: number;
-    signals: string[];
-  };
-  httpTransport?: {
-    port: number;
-    host: string;
-    enableJsonResponse: boolean;
-    enableSessions: boolean;
-    enableResumability: boolean;
-    enableDnsRebindingProtection: boolean;
-    maxConcurrentRequests?: number;
-    maxConcurrentSessionInitializations?: number;
-    maxActiveSessions?: number;
-    allowedOrigins?: string[];
-    allowedHosts?: string[];
   };
   oauth?: {
     enabled: boolean;

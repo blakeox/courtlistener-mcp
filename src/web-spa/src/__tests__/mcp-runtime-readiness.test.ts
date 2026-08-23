@@ -23,17 +23,16 @@ describe('verifyMcpRuntimeReadiness', () => {
     });
   });
 
-  it('emits a diagnostic when MCP transport does not return a session id', async () => {
+  it('reports the stateless MCP v2 transport posture', async () => {
     mcpCallMock
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.0' },
             capabilities: { tools: {} },
           },
         },
-        sessionId: null,
       })
       .mockResolvedValueOnce({
         body: {
@@ -41,16 +40,14 @@ describe('verifyMcpRuntimeReadiness', () => {
             tools: [{ name: 'search_cases', inputSchema: { type: 'object', required: ['query'] } }],
           },
         },
-        sessionId: null,
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: null })
-      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: null });
+      .mockResolvedValueOnce({ body: { result: { resources: [] } } })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } } });
 
     const readiness = await verifyMcpRuntimeReadiness('token-123');
 
-    expect(readiness.sessionId).toBe('');
     expect(readiness.diagnostics).toContain(
-      'MCP transport did not return a session id; each call may renegotiate protocol state.',
+      'MCP v2 stateless transport is active; calls do not use a session id.',
     );
   });
 
@@ -59,12 +56,11 @@ describe('verifyMcpRuntimeReadiness', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.0' },
-            capabilities: { tools: {}, prompts: { listChanged: true } },
+            capabilities: { tools: {}, prompts: {}, logging: {} },
           },
         },
-        sessionId: 'sid-1',
       })
       .mockResolvedValueOnce({
         body: {
@@ -73,7 +69,6 @@ describe('verifyMcpRuntimeReadiness', () => {
             metadata: { categories: ['search'] },
           },
         },
-        sessionId: 'sid-1',
       })
       .mockRejectedValueOnce({ message: 'resource catalog unavailable' })
       .mockRejectedValueOnce({ message: 'prompt catalog unavailable' });
@@ -87,6 +82,7 @@ describe('verifyMcpRuntimeReadiness', () => {
     expect(readiness.diagnostics).toEqual([
       'Resources discovery unavailable: resource catalog unavailable',
       'Prompts discovery unavailable: prompt catalog unavailable',
+      'MCP v2 stateless transport is active; calls do not use a session id.',
     ]);
   });
 
@@ -95,7 +91,7 @@ describe('verifyMcpRuntimeReadiness', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.0' },
             capabilities: {
               tools: {},
@@ -105,7 +101,6 @@ describe('verifyMcpRuntimeReadiness', () => {
             },
           },
         },
-        sessionId: 'sid-2',
       })
       .mockResolvedValueOnce({
         body: {
@@ -114,10 +109,9 @@ describe('verifyMcpRuntimeReadiness', () => {
             metadata: { categories: ['search', '', 123, 'diagnostics'] },
           },
         },
-        sessionId: 'sid-2',
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-2' })
-      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-2' });
+      .mockResolvedValueOnce({ body: { result: { resources: [] } } })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } } });
 
     const readiness = await verifyMcpRuntimeReadiness('token-123');
 
@@ -130,12 +124,11 @@ describe('verifyMcpRuntimeReadiness', () => {
       .mockResolvedValueOnce({
         body: {
           result: {
-            protocolVersion: '2025-06-18',
+            protocolVersion: '2026-07-28',
             serverInfo: { name: 'courtlistener-mcp', version: '1.0.0' },
             capabilities: { tools: {}, resources: { subscribe: true } },
           },
         },
-        sessionId: 'sid-3',
       })
       .mockResolvedValueOnce({
         body: {
@@ -166,10 +159,9 @@ describe('verifyMcpRuntimeReadiness', () => {
             metadata: { categories: ['search', 'courts'] },
           },
         },
-        sessionId: 'sid-3',
       })
-      .mockResolvedValueOnce({ body: { result: { resources: [] } }, sessionId: 'sid-3' })
-      .mockResolvedValueOnce({ body: { result: { prompts: [] } }, sessionId: 'sid-3' });
+      .mockResolvedValueOnce({ body: { result: { resources: [] } } })
+      .mockResolvedValueOnce({ body: { result: { prompts: [] } } });
 
     const readiness = await verifyMcpRuntimeReadiness('token-123');
 

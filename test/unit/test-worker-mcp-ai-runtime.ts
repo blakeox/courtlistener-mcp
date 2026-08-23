@@ -48,8 +48,8 @@ describe('worker MCP AI runtime', () => {
       authorizeMcpGatewayRequest: async () => ({ principal: {} }),
       runWithPrincipalContext: async (_principal, callback) => callback(),
       mcpStreamableFetch: async () => new Response('{}', { status: 200 }),
-      preferredMcpProtocolVersion: '2025-03-26',
-      supportedMcpProtocolVersions: new Set(['2025-03-26']),
+      preferredMcpProtocolVersion: '2026-07-28',
+      supportedMcpProtocolVersions: new Set(['2026-07-28']),
       redactSecretsInText: (value) => value,
       incrementUserUsage: async (_env, userId, metadata) => {
         calls.push({ userId, ...metadata });
@@ -76,8 +76,8 @@ describe('worker MCP AI runtime', () => {
       authorizeMcpGatewayRequest: async () => ({ principal: {} }),
       runWithPrincipalContext: async (_principal, callback) => callback(),
       mcpStreamableFetch: async () => new Response('{}', { status: 200 }),
-      preferredMcpProtocolVersion: '2025-03-26',
-      supportedMcpProtocolVersions: new Set(['2025-03-26']),
+      preferredMcpProtocolVersion: '2026-07-28',
+      supportedMcpProtocolVersions: new Set(['2026-07-28']),
       redactSecretsInText: (value) => value,
       incrementUserUsage: async (_env, userId, metadata) => {
         calls.push({ userId, ...metadata });
@@ -99,16 +99,20 @@ describe('worker MCP AI runtime', () => {
   it('prefers the caller token over the static service token for internal MCP calls', async () => {
     let seenAuthorization = '';
     let seenServiceHeader = '';
+    let seenMethod = '';
+    let seenBody: Record<string, unknown> | null = null;
     const runtime = createWorkerMcpAiRuntime({
       authorizeMcpGatewayRequest: async ({ request }) => {
         seenAuthorization = request.headers.get('authorization') || '';
         seenServiceHeader = request.headers.get('x-mcp-service-token') || '';
+        seenMethod = request.headers.get('Mcp-Method') || '';
+        seenBody = (await request.clone().json()) as Record<string, unknown>;
         return { principal: { userId: 'user-1' } };
       },
       runWithPrincipalContext: async (_principal, callback) => callback(),
       mcpStreamableFetch: async () => new Response('{"result":{"ok":true}}', { status: 200 }),
-      preferredMcpProtocolVersion: '2025-03-26',
-      supportedMcpProtocolVersions: new Set(['2025-03-26']),
+      preferredMcpProtocolVersion: '2026-07-28',
+      supportedMcpProtocolVersions: new Set(['2026-07-28']),
       redactSecretsInText: (value) => value,
       incrementUserUsage: async () => {},
     });
@@ -117,12 +121,18 @@ describe('worker MCP AI runtime', () => {
       { MCP_AUTH_TOKEN: 'service-token' } as never,
       {} as ExecutionContext,
       'caller-token',
-      'initialize',
+      'server/discover',
       {},
       1,
     );
 
     assert.equal(seenAuthorization, 'Bearer caller-token');
     assert.equal(seenServiceHeader, '');
+    assert.equal(seenMethod, 'server/discover');
+    assert.equal(seenBody?.method, 'server/discover');
+    assert.deepEqual((seenBody?.params as Record<string, unknown>)._meta, {
+      'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+      'io.modelcontextprotocol/clientCapabilities': {},
+    });
   });
 });

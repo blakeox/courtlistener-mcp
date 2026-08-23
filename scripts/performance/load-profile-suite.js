@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
-import path from 'path';
+import path from 'node:path';
 
 const DEFAULT_BASE_URL =
-  process.env.LOAD_PROFILE_BASE_URL || process.env.MCP_REMOTE_URL || 'http://127.0.0.1:8787';
+  process.env.LOAD_PROFILE_BASE_URL ||
+  process.env.MCP_REMOTE_URL ||
+  process.env.SERVER_URL ||
+  'http://127.0.0.1:8787';
 const DEFAULT_AUTH_TOKEN =
   process.env.LOAD_PROFILE_BEARER_TOKEN ||
   process.env.MCP_REMOTE_BEARER_TOKEN ||
@@ -79,7 +82,7 @@ function printUsage() {
   console.log('Usage: node scripts/performance/load-profile-suite.js [options]');
   console.log('Options:');
   console.log(
-    '  --base-url <url>       Base URL (default: LOAD_PROFILE_BASE_URL | MCP_REMOTE_URL | http://127.0.0.1:8787)',
+    '  --base-url <url>       Base URL (default: LOAD_PROFILE_BASE_URL | MCP_REMOTE_URL | SERVER_URL | http://127.0.0.1:8787)',
   );
   console.log('  --requests <n>         Requests per scenario (default: 40, --light caps at 12)');
   console.log('  --concurrency <n>      Concurrency per scenario (default: 4, --light caps at 2)');
@@ -87,7 +90,7 @@ function printUsage() {
   console.log('  --auth-token <token>   Optional bearer token for MCP/API requests');
   console.log('  --output <file>        Optional output JSON path');
   console.log('  --light                Small local validation run');
-  console.log('  --classes <mcp,api>    Limit scenarios (default: auto-detect worker API routes)');
+  console.log('  --classes <mcp,api>    Limit scenarios (default: auto-detect Worker API routes)');
   console.log('  --dry-run              Print planned scenarios only, no HTTP requests');
 }
 
@@ -106,7 +109,7 @@ async function probeWorkerApiRoutes(baseUrl, timeoutMs) {
 async function resolveEnabledClasses(baseUrl, timeoutMs, explicitClasses) {
   if (explicitClasses.length > 0) return explicitClasses;
   const hasWorkerApi = await probeWorkerApiRoutes(baseUrl, timeoutMs);
-  if (hasWorkerApi) return ['mcp', 'api', 'auth'];
+  if (hasWorkerApi) return ['mcp', 'api'];
   console.log(
     'Worker UI API routes unavailable at this base URL; running MCP load scenarios only.',
   );
@@ -175,15 +178,6 @@ function parseMcpPayload(text) {
   }
 }
 
-function getSetCookieHeaders(response) {
-  const headers = response.headers;
-  if (typeof headers.getSetCookie === 'function') {
-    return headers.getSetCookie();
-  }
-  const cookie = headers.get('set-cookie');
-  return cookie ? [cookie] : [];
-}
-
 async function fetchWithTiming(url, init, timeoutMs) {
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -206,102 +200,85 @@ async function fetchWithTiming(url, init, timeoutMs) {
   }
 }
 
-function buildMcpHeaders(authToken) {
+function buildMcpHeaders(authToken, method) {
   const headers = {
     'content-type': 'application/json',
-    accept: 'application/json, text/event-stream',
-    'mcp-protocol-version': '2024-11-05',
+    accept: 'application/json',
+    'mcp-protocol-version': '2026-07-28',
+    'mcp-method': method,
   };
   if (authToken) headers.authorization = `Bearer ${authToken}`;
   return headers;
 }
 
-async function createScenarioRunners(options, csrfToken) {
-  const mcpHeaders = buildMcpHeaders(options.authToken);
-  const jsonHeaders = { 'content-type': 'application/json' };
-
-  const loginHeaders = {
-    ...jsonHeaders,
-    ...(csrfToken ? { 'x-csrf-token': csrfToken, cookie: `clmcp_csrf=${csrfToken}` } : {}),
-  };
+async function createScenarioRunners(options) {
+  const expectedMcpStatuses = options.authToken ? [200] : [401];
 
   return [
     {
-      name: 'mcp_initialize',
-      description: 'MCP initialize call (POST /mcp)',
-      expectedStatus: [200],
+      name: 'mcp_discover',
+      description: 'MCP server/discover call (POST /mcp)',
+      expectedStatus: expectedMcpStatuses,
       run: async () => {
-        return fetchWithTiming(
+        const response = await fetchWithTiming(
           `${options.baseUrl}/mcp`,
           {
             method: 'POST',
-            headers: mcpHeaders,
+            headers: buildMcpHeaders(options.authToken, 'server/discover'),
             body: JSON.stringify({
               jsonrpc: '2.0',
               id: 1,
-              method: 'initialize',
+              method: 'server/discover',
               params: {
-                protocolVersion: '2024-11-05',
-                capabilities: {},
-                clientInfo: { name: 'load-profile-suite', version: '1.0.0' },
+                _meta: {
+                  'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+                  'io.modelcontextprotocol/clientCapabilities': {},
+                },
               },
             }),
           },
           options.timeoutMs,
         );
+        return {
+          ...response,
+          ok: expectedMcpStatuses.includes(response.status) && (!options.authToken || response.ok),
+        };
       },
     },
     {
       name: 'mcp_tools_list',
-      description: 'MCP initialize + tools/list chain',
-      expectedStatus: [200],
+      description: 'MCP tools/list call over stateless v2 transport',
+      expectedStatus: expectedMcpStatuses,
       run: async () => {
         const startedAt = Date.now();
-        const initResponse = await fetchWithTiming(
+        const listResponse = await fetchWithTiming(
           `${options.baseUrl}/mcp`,
           {
             method: 'POST',
-            headers: mcpHeaders,
+            headers: buildMcpHeaders(options.authToken, 'tools/list'),
             body: JSON.stringify({
               jsonrpc: '2.0',
               id: 1,
-              method: 'initialize',
+              method: 'tools/list',
               params: {
-                protocolVersion: '2024-11-05',
-                capabilities: { tools: {} },
-                clientInfo: { name: 'load-profile-suite', version: '1.0.0' },
+                _meta: {
+                  'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+                  'io.modelcontextprotocol/clientCapabilities': {},
+                },
               },
             }),
           },
           options.timeoutMs,
         );
-        if (!initResponse.ok || initResponse.status !== 200 || !initResponse.response) {
-          return { ...initResponse, latencyMs: Date.now() - startedAt };
-        }
-
-        const sessionId = initResponse.response.headers.get('mcp-session-id') || '';
-        const toolsHeaders = {
-          ...mcpHeaders,
-          ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
-        };
-
-        const listResponse = await fetchWithTiming(
-          `${options.baseUrl}/mcp`,
-          {
-            method: 'POST',
-            headers: toolsHeaders,
-            body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
-          },
-          options.timeoutMs,
-        );
-
         const parsed = parseMcpPayload(listResponse.bodyText);
         const hasResult = Boolean(
           parsed && typeof parsed === 'object' && Object.hasOwn(parsed, 'result'),
         );
         return {
           ...listResponse,
-          ok: listResponse.ok && listResponse.status === 200 && hasResult,
+          ok:
+            expectedMcpStatuses.includes(listResponse.status) &&
+            (!options.authToken || (listResponse.ok && hasResult)),
           latencyMs: Date.now() - startedAt,
         };
       },
@@ -312,52 +289,6 @@ async function createScenarioRunners(options, csrfToken) {
       expectedStatus: [200],
       run: async () =>
         fetchWithTiming(`${options.baseUrl}/api/session`, { method: 'GET' }, options.timeoutMs),
-    },
-    {
-      name: 'api_keys_get',
-      description: 'Keys listing path (GET /api/keys)',
-      expectedStatus: [200, 401, 429, 503],
-      run: async () => {
-        const headers = options.authToken ? { authorization: `Bearer ${options.authToken}` } : {};
-        return fetchWithTiming(
-          `${options.baseUrl}/api/keys`,
-          { method: 'GET', headers },
-          options.timeoutMs,
-        );
-      },
-    },
-    {
-      name: 'auth_signup_limiter',
-      description: 'Signup limiter-sensitive path (POST /api/signup invalid payload)',
-      expectedStatus: [202, 400, 429, 503],
-      run: async () =>
-        fetchWithTiming(
-          `${options.baseUrl}/api/signup`,
-          {
-            method: 'POST',
-            headers: jsonHeaders,
-            body: JSON.stringify({ email: 'invalid', password: 'short' }),
-          },
-          options.timeoutMs,
-        ),
-    },
-    {
-      name: 'auth_login_limiter',
-      description: 'Auth failure limiter-sensitive path (POST /api/login invalid credentials)',
-      expectedStatus: [200, 400, 401, 403, 429, 503],
-      run: async () =>
-        fetchWithTiming(
-          `${options.baseUrl}/api/login`,
-          {
-            method: 'POST',
-            headers: loginHeaders,
-            body: JSON.stringify({
-              email: 'load-profile@example.com',
-              password: 'not-a-real-password',
-            }),
-          },
-          options.timeoutMs,
-        ),
     },
   ];
 }
@@ -476,29 +407,11 @@ async function ensureOutputPath(filePath) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-async function getCsrfToken(baseUrl, timeoutMs) {
-  const response = await fetchWithTiming(`${baseUrl}/api/session`, { method: 'GET' }, timeoutMs);
-  if (!response.ok || !response.response) return '';
-  const setCookies = getSetCookieHeaders(response.response);
-  for (const header of setCookies) {
-    const match = header.match(/clmcp_csrf=([^;]+)/);
-    if (match?.[1]) return decodeURIComponent(match[1]);
-  }
-  return '';
-}
-
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const nowIso = new Date().toISOString();
 
-  const scenarioPreview = [
-    'mcp_initialize',
-    'mcp_tools_list',
-    'api_session_get',
-    'api_keys_get',
-    'auth_signup_limiter',
-    'auth_login_limiter',
-  ];
+  const scenarioPreview = ['mcp_discover', 'mcp_tools_list', 'api_session_get'];
 
   if (options.dryRun) {
     console.log(
@@ -524,13 +437,7 @@ async function main() {
     options.timeoutMs,
     options.classes,
   );
-  const csrfToken = enabledClasses.includes('auth')
-    ? await getCsrfToken(options.baseUrl, options.timeoutMs)
-    : '';
-  const scenarios = filterScenariosByClass(
-    await createScenarioRunners(options, csrfToken),
-    enabledClasses,
-  );
+  const scenarios = filterScenariosByClass(await createScenarioRunners(options), enabledClasses);
   if (scenarios.length === 0) {
     throw new Error(`No load scenarios enabled for classes: ${enabledClasses.join(', ')}`);
   }

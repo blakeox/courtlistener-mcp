@@ -25,7 +25,6 @@
     "node_modules",
     "dist",
     "test",
-    "src/legacy",
     "src/web-spa",
     "**/* 2.ts",
     "**/* 3.ts",

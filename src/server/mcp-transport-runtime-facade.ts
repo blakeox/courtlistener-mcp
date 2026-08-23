@@ -2,7 +2,6 @@ import { runWithPrincipalContext } from '../infrastructure/principal-context.js'
 import { emitOAuthDiagnostic } from './oauth-diagnostics.js';
 import { getPrevalidatedOAuthIdentity } from './prevalidated-oauth-context.js';
 import { authorizeMcpGatewayRequest } from './mcp-gateway-auth.js';
-import { createInvalidSessionLifecycleResponse } from './mcp-session-lifecycle-contract.js';
 import type {
   McpRequestPrincipal,
   ProtocolHeaderNegotiationDiagnostics,
@@ -13,26 +12,6 @@ import { isAllowedOrigin } from './worker-security.js';
 
 export interface McpHandler<Env extends WorkerSecurityEnv> {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response>;
-}
-
-export interface McpSessionValidationOptions {
-  methods?: readonly string[];
-}
-
-export type McpSessionValidationState = 'active' | 'invalid' | 'unavailable';
-export type McpSessionMutationState = 'ok' | 'unavailable';
-
-export function getMcpSessionIdFromHeaders(headers: Pick<Headers, 'get'>): string | null {
-  const sessionId = headers.get('mcp-session-id')?.trim();
-  return sessionId || null;
-}
-
-export function getMcpSessionIdFromRequest(request: Request): string | null {
-  return getMcpSessionIdFromHeaders(request.headers);
-}
-
-export function getMcpSessionIdFromResponse(response: Response): string | null {
-  return getMcpSessionIdFromHeaders(response.headers);
 }
 
 function summarizeMcpTransportExchange(
@@ -48,26 +27,11 @@ function summarizeMcpTransportExchange(
     request_content_type: request.headers.get('content-type'),
     request_protocol_version: request.headers.get('MCP-Protocol-Version'),
     request_capability_profile: request.headers.get('MCP-Capability-Profile'),
-    request_session_id_present: Boolean(getMcpSessionIdFromRequest(request)),
     response_status: response.status,
     response_content_type: response.headers.get('content-type'),
-    response_session_id_present: Boolean(getMcpSessionIdFromResponse(response)),
     auth_method: principal?.authMethod ?? null,
     user_present: Boolean(principal?.userId),
   };
-}
-
-function createUnavailableSessionLifecycleResponse(): Response {
-  return Response.json(
-    {
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Session lifecycle service unavailable',
-      },
-    },
-    { status: 503 },
-  );
 }
 
 export function setProtocolNegotiationHeaders(
@@ -105,129 +69,6 @@ export function applyProtocolNegotiationHeaders(
   });
 }
 
-async function normalizePostMcpResponse(
-  response: Response,
-  requestMethod: string,
-): Promise<Response> {
-  if (requestMethod !== 'POST') {
-    return response;
-  }
-
-  const contentType = response.headers.get('content-type')?.toLowerCase() || '';
-  if (!contentType.includes('text/event-stream')) {
-    return response;
-  }
-
-  const bodyText = await response.text();
-  const dataLines = bodyText
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice(5).trim())
-    .filter(Boolean);
-
-  if (dataLines.length === 0) {
-    return new Response(bodyText, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
-  }
-
-  const headers = new Headers(response.headers);
-  headers.set('content-type', 'application/json');
-  headers.delete('content-length');
-  return new Response(dataLines.join('\n'), {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
-export async function validateSessionLifecycleRequest<Env>(
-  request: Request,
-  env: Env,
-  nowMs: number,
-  validateSession: (
-    sessionId: string,
-    request: Request,
-    env: Env,
-    nowMs: number,
-  ) => Promise<McpSessionValidationState>,
-  options: McpSessionValidationOptions = {},
-): Promise<Response | null> {
-  const methods = options.methods ?? ['POST', 'DELETE'];
-  if (!methods.includes(request.method)) {
-    return null;
-  }
-  const sessionId = getMcpSessionIdFromRequest(request);
-  if (!sessionId) {
-    return null;
-  }
-  const validationState = await validateSession(sessionId, request, env, nowMs);
-  if (validationState === 'active') {
-    return null;
-  }
-  if (validationState === 'unavailable') {
-    return createUnavailableSessionLifecycleResponse();
-  }
-  return createInvalidSessionLifecycleResponse();
-}
-
-export async function finalizeSessionLifecycleResponse<Env>(
-  request: Request,
-  response: Response,
-  env: Env,
-  nowMs: number,
-  callbacks: {
-    registerSession?: (
-      sessionId: string,
-      request: Request,
-      response: Response,
-      env: Env,
-      nowMs: number,
-    ) => Promise<McpSessionMutationState>;
-    closeSession?: (
-      sessionId: string,
-      request: Request,
-      response: Response,
-      env: Env,
-      nowMs: number,
-    ) => Promise<McpSessionMutationState>;
-  },
-): Promise<Response | null> {
-  if (request.method === 'POST') {
-    const sessionId = getMcpSessionIdFromResponse(response);
-    if (sessionId && callbacks.registerSession) {
-      const registerState = await callbacks.registerSession(
-        sessionId,
-        request,
-        response,
-        env,
-        nowMs,
-      );
-      if (registerState === 'unavailable') {
-        return createUnavailableSessionLifecycleResponse();
-      }
-    }
-    return null;
-  }
-
-  if (request.method !== 'DELETE') {
-    return null;
-  }
-
-  const sessionId = getMcpSessionIdFromRequest(request);
-  if (!sessionId || !callbacks.closeSession) {
-    return null;
-  }
-  const closeState = await callbacks.closeSession(sessionId, request, response, env, nowMs);
-  if (closeState === 'unavailable') {
-    return createUnavailableSessionLifecycleResponse();
-  }
-  return null;
-}
-
 export interface HandleMcpTransportBoundaryParams<
   Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
 > {
@@ -241,9 +82,7 @@ export interface HandleMcpTransportBoundaryParams<
   mcpPath: boolean;
   supportedProtocolVersions: ReadonlySet<string>;
   mcpStreamableHandler: McpHandler<Env>;
-  mcpSseCompatibilityHandler: McpHandler<Env>;
   withCors: (response: Response, origin: string | null, allowedOrigins: string[]) => Response;
-  buildCorsHeaders: (origin: string | null, allowedOrigins: string[]) => Headers;
   getClientIdentifier: (request: Request) => string;
   getAuthRateLimitedResponse: (
     clientId: string,
@@ -269,13 +108,6 @@ export interface HandleMcpTransportBoundaryParams<
     clientId: string,
     nowMs: number,
   ) => Promise<Response | null>;
-  validateSessionRequest?: (request: Request, env: Env, nowMs: number) => Promise<Response | null>;
-  finalizeSessionResponse?: (
-    request: Request,
-    response: Response,
-    env: Env,
-    nowMs: number,
-  ) => Promise<Response | null>;
   onAuthorizedRequest?: (
     request: Request,
     env: Env,
@@ -298,9 +130,7 @@ export async function handleMcpTransportBoundary<
     mcpPath,
     supportedProtocolVersions,
     mcpStreamableHandler,
-    mcpSseCompatibilityHandler,
     withCors,
-    buildCorsHeaders,
     getClientIdentifier,
     getAuthRateLimitedResponse,
     probeAuthRateLimit,
@@ -308,8 +138,6 @@ export async function handleMcpTransportBoundary<
     clearAuthFailures,
     skipGatewayAuth,
     evaluateMcpBoundaryRequest,
-    validateSessionRequest,
-    finalizeSessionResponse,
     onAuthorizedRequest,
   } = params;
 
@@ -317,8 +145,15 @@ export async function handleMcpTransportBoundary<
     return null;
   }
 
-  if (!['GET', 'POST', 'DELETE'].includes(requestMethod)) {
-    return withCors(new Response('Method not allowed', { status: 405 }), origin, allowedOrigins);
+  if (requestMethod !== 'POST') {
+    return withCors(
+      new Response('Method not allowed', {
+        status: 405,
+        headers: { Allow: 'POST, OPTIONS' },
+      }),
+      origin,
+      allowedOrigins,
+    );
   }
 
   if (!isAllowedOrigin(origin, allowedOrigins)) {
@@ -406,66 +241,17 @@ export async function handleMcpTransportBoundary<
     await onAuthorizedRequest(request, env, principal, nowMs);
   }
 
-  if (pathname === '/sse') {
-    const accept = request.headers.get('Accept') ?? '';
-    if (!accept.includes('text/event-stream')) {
-      return Response.json(
-        {
-          error: 'Not Acceptable',
-          message: 'Client must include Accept: application/json, text/event-stream',
-          example:
-            'curl -i https://courtlistenermcp.blakeoxford.com/sse -H \'Accept: application/json, text/event-stream\' -H \'Content-Type: application/json\' -d \'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}\'',
-        },
-        { status: 406, headers: buildCorsHeaders(origin, allowedOrigins) },
-      );
-    }
-  }
-
   if (pathname === '/mcp') {
-    if (validateSessionRequest) {
-      const sessionError = await validateSessionRequest(request, env, nowMs);
-      if (sessionError) {
-        return withCors(sessionError, origin, allowedOrigins);
-      }
-    }
-
     const response = await runWithPrincipalContext(principal, () =>
       mcpStreamableHandler.fetch(request, env, ctx),
     );
-    const normalizedResponse = await normalizePostMcpResponse(response, requestMethod);
-    let responseToReturn = normalizedResponse;
-    if (finalizeSessionResponse) {
-      const lifecycleOverride = await finalizeSessionResponse(
-        request,
-        normalizedResponse,
-        env,
-        nowMs,
-      );
-      if (lifecycleOverride) {
-        responseToReturn = lifecycleOverride;
-      }
-    }
-    const finalizedResponse = applyProtocolNegotiationHeaders(
-      responseToReturn,
-      protocolNegotiation,
-    );
+    const finalizedResponse = applyProtocolNegotiationHeaders(response, protocolNegotiation);
     emitOAuthDiagnostic(
       env as WorkerSecurityEnv & { MCP_OAUTH_DIAGNOSTICS?: string },
       'mcp.transport.response',
       summarizeMcpTransportExchange(request, finalizedResponse, principal),
     );
     return withCors(finalizedResponse, origin, allowedOrigins);
-  }
-
-  if (pathname === '/sse') {
-    const response = await runWithPrincipalContext(principal, () =>
-      mcpSseCompatibilityHandler.fetch(request, env, ctx),
-    );
-    return withCors(
-      applyProtocolNegotiationHeaders(response, protocolNegotiation),
-      origin,
-      allowedOrigins,
-    );
   }
 
   return null;

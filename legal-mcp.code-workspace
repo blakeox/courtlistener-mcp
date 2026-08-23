@@ -2,14 +2,14 @@
   "folders": [
     {
       "name": "🏢 Legal MCP Server",
-      "path": "."
-    }
+      "path": ".",
+    },
   ],
   "settings": {
     // =================================
     // WORKSPACE CONFIGURATION
     // =================================
-    
+
     // TypeScript & JavaScript
     "typescript.preferences.includePackageJsonAutoImports": "auto",
     "typescript.suggest.autoImports": true,
@@ -18,7 +18,7 @@
     "typescript.validate.enable": true,
     "typescript.preferences.importModuleSpecifier": "relative",
     "typescript.suggest.includeAutomaticOptionalChainCompletions": true,
-    
+
     // ESLint & Prettier
     "eslint.enable": true,
     "eslint.validate": ["typescript", "javascript"],
@@ -28,18 +28,18 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
       "source.fixAll.eslint": "explicit",
-      "source.organizeImports": "explicit"
+      "source.organizeImports": "explicit",
     },
-    
+
     // MCP Development Specific
     "files.associations": {
       "*.mcp": "json",
       "mcp-config.json": "jsonc",
       "claude_desktop_config.json": "jsonc",
       ".env.example": "properties",
-      "wrangler.jsonc": "jsonc"
+      "wrangler.jsonc": "jsonc",
     },
-    
+
     // File Management
     "files.exclude": {
       "**/node_modules": true,
@@ -48,25 +48,25 @@
       "**/coverage": true,
       "**/.wrangler": true,
       "**/test-output": true,
-      "**/pnpm-lock.yaml": true
+      "**/pnpm-lock.yaml": true,
     },
-    
+
     "search.exclude": {
       "**/node_modules": true,
       "**/dist": true,
       "**/coverage": true,
       "**/test-output": true,
       "**/*.log": true,
-      "**/pnpm-lock.yaml": true
+      "**/pnpm-lock.yaml": true,
     },
-    
+
     // Terminal Configuration
     "terminal.integrated.defaultProfile.osx": "zsh",
     "terminal.integrated.env.osx": {
       "NODE_ENV": "development",
-      "LOG_LEVEL": "debug"
+      "LOG_LEVEL": "debug",
     },
-    
+
     // Editor Configuration
     "editor.tabSize": 2,
     "editor.insertSpaces": true,
@@ -77,22 +77,20 @@
     "editor.minimap.enabled": true,
     "editor.minimap.renderCharacters": false,
     "editor.showFoldingControls": "always",
-    
+
     // Git Configuration
     "git.ignoreLimitWarning": true,
     "git.autofetch": true,
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
-    
+
     // Testing Configuration
-    "mochaExplorer.files": [
-      "test/**/*.js"
-    ],
+    "mochaExplorer.files": ["test/**/*.js"],
     "testExplorer.codeLens": true,
     "testExplorer.gutterDecoration": true,
     "testExplorer.onStart": "reset",
     "testExplorer.onReload": "reset",
-    
+
     // MCP Server Specific
     "json.schemas": [
       {
@@ -110,101 +108,97 @@
                     "args": { "type": "array", "items": { "type": "string" } },
                     "env": { "type": "object" },
                     "type": { "type": "string", "enum": ["stdio", "sse", "http"] },
-                    "url": { "type": "string" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    "url": { "type": "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     ],
-    
+
     // Performance & Monitoring
     "emmet.showExpandedAbbreviation": "never",
     "emmet.showSuggestionsAsSnippets": false,
     "explorer.compactFolders": false,
-    
+
     // Language Specific
     "javascript.preferences.importModuleSpecifier": "relative",
     "javascript.suggest.includeAutomaticOptionalChainCompletions": true,
-    
+
     // Problem Matcher Configuration
     "problems.decorations.enabled": true,
-    "problems.showCurrentInStatus": true
+    "problems.showCurrentInStatus": true,
   },
-  
+
   "extensions": {
     "recommendations": [
       // Essential Development
       "ms-vscode.vscode-typescript-next",
       "esbenp.prettier-vscode",
       "dbaeumer.vscode-eslint",
-      
+
       // MCP & Node.js Development
       "ms-vscode.node-debug2",
       "christian-kohler.npm-intellisense",
       "ms-vscode.vscode-json",
       "bradlc.vscode-tailwindcss",
-      
+
       // Testing & Quality
       "hbenl.vscode-test-explorer",
       "hbenl.vscode-mocha-test-adapter",
       "orta.vscode-jest",
       "ryanluker.vscode-coverage-gutters",
-      
+
       // Git & Collaboration
       "eamodio.gitlens",
       "github.vscode-pull-request-github",
       "ms-vscode.vscode-github-issue-notebooks",
       "github.copilot",
       "github.copilot-chat",
-      
-      // Docker & Deployment
-      "ms-azuretools.vscode-docker",
-      "ms-vscode-remote.remote-containers",
-      
+
       // API Development & Testing
       "humao.rest-client",
       "rangav.vscode-thunder-client",
       "postman.postman-for-vscode",
-      
+
       // Documentation
       "yzhang.markdown-all-in-one",
       "davidanson.vscode-markdownlint",
       "shd101wyy.markdown-preview-enhanced",
       "bierner.jsdoc-markdown-highlighting",
-      
+
       // Code Quality & Analysis
       "streetsidesoftware.code-spell-checker",
       "formulahendry.auto-rename-tag",
       "ms-vscode.vscode-typescript-next",
       "gruntfuggly.todo-tree",
       "usernamehw.errorlens",
-      
+
       // Environment & Configuration
       "ms-vscode.dotenv",
       "redhat.vscode-yaml",
       "tamasfe.even-better-toml",
       "ms-vscode.vscode-json",
-      
+
       // Productivity & Navigation
       "formulahendry.code-runner",
       "ms-vscode.vscode-typescript-next",
       "alefragnani.bookmarks",
       "ms-vscode.hexeditor",
-      
+
       // Performance & Monitoring
       "ms-vscode.vscode-node-azure-pack",
       "pflannery.vscode-versionlens",
-      
+
       // Additional Utilities
       "ms-vscode.vscode-typescript-next",
       "ms-vscode.remote-explorer",
-      "ms-vscode.remote-ssh"
-    ]
+      "ms-vscode.remote-ssh",
+    ],
   },
-  
+
   "tasks": {
     "version": "2.0.0",
     "tasks": [
@@ -218,28 +212,24 @@
           "echo": true,
           "reveal": "always",
           "focus": false,
-          "panel": "shared"
+          "panel": "shared",
         },
         "options": {
-          "cwd": "${workspaceFolder}"
-        }
+          "cwd": "${workspaceFolder}",
+        },
       },
       {
         "label": "🔨 Full Build & Test Cycle",
         "dependsOrder": "sequence",
-        "dependsOn": [
-          "🔨 Build TypeScript",
-          "🧪 Run All Tests",
-          "📊 Analyze Test Coverage"
-        ],
+        "dependsOn": ["🔨 Build TypeScript", "🧪 Run All Tests", "📊 Analyze Test Coverage"],
         "group": {
           "kind": "build",
-          "isDefault": true
-        }
-      }
-    ]
+          "isDefault": true,
+        },
+      },
+    ],
   },
-  
+
   "launch": {
     "version": "0.2.0",
     "configurations": [
@@ -251,11 +241,11 @@
         "preLaunchTask": "🔨 Build TypeScript",
         "env": {
           "NODE_ENV": "development",
-          "LOG_LEVEL": "debug"
+          "LOG_LEVEL": "debug",
         },
         "console": "integratedTerminal",
-        "internalConsoleOptions": "neverOpen"
-      }
-    ]
-  }
+        "internalConsoleOptions": "neverOpen",
+      },
+    ],
+  },
 }

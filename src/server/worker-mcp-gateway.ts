@@ -2,13 +2,13 @@
 
 import type { WorkerSecurityEnv } from './worker-security.js';
 import {
-  handleWorkerMcpTransportBoundary,
-  type HandleWorkerMcpTransportBoundaryParams,
-} from './worker-mcp-transport-boundary.js';
+  handleMcpTransportBoundary,
+  type HandleMcpTransportBoundaryParams,
+} from './mcp-transport-runtime-facade.js';
 
 export interface HandleMcpGatewayRouteParams<
   Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
-> extends HandleWorkerMcpTransportBoundaryParams<Env> {}
+> extends HandleMcpTransportBoundaryParams<Env> {}
 
 type McpGatewayRouteContext<
   Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
@@ -36,5 +36,5 @@ export function buildMcpGatewayRouteParams<
 export async function handleMcpGatewayRoute<
   Env extends WorkerSecurityEnv & { MCP_REQUIRE_PROTOCOL_VERSION?: string },
 >(params: HandleMcpGatewayRouteParams<Env>): Promise<Response | null> {
-  return handleWorkerMcpTransportBoundary(params);
+  return handleMcpTransportBoundary(params);
 }

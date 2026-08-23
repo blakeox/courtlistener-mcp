@@ -2,13 +2,12 @@
 
 /**
  * Version Consistency Checker
- * Based on patterns from @modelcontextprotocol/inspector/scripts/check-version-consistency.js
  * Ensures package.json and related files have consistent versions
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,16 +87,10 @@ const pnpmLockPath = path.join(repoRoot, 'pnpm-lock.yaml');
 
 if (fs.existsSync(pnpmLockPath)) {
   console.log('   ✅ pnpm-lock.yaml found');
-  
-  // For pnpm projects, we mainly ensure the lock file exists and is recent
-  const packageStat = fs.statSync(packagePath);
-  const lockStat = fs.statSync(pnpmLockPath);
-  
-  if (lockStat.mtime < packageStat.mtime) {
-    console.log('   ⚠️  pnpm-lock.yaml is older than package.json - consider running pnpm install');
-  } else {
-    console.log('   ✅ pnpm-lock.yaml is up to date');
-  }
+  // File timestamps are not reliable after Git checkout or CI artifact
+  // restoration. The release workflow's `pnpm install --frozen-lockfile`
+  // check is the authoritative lockfile consistency gate.
+  console.log('   ✅ Lockfile consistency is enforced by pnpm install --frozen-lockfile');
 } else {
   console.log('   ℹ️  No pnpm-lock.yaml found');
 }
@@ -132,15 +125,16 @@ if (packageInfo) {
       console.log(`   - ${name}: ${version}`);
     });
     
-    // Check for version consistency in MCP dependencies
-    const mcpVersions = mcpDeps.map(([, version]) => version);
-    const uniqueMcpVersions = [...new Set(mcpVersions.map(v => v.replace(/[\^~]/, '')))];
-    
+    // Runtime MCP packages must stay aligned.
+    const runtimeMcpDeps = mcpDeps.filter(([name]) => name === '@modelcontextprotocol/server');
+    const mcpVersions = runtimeMcpDeps.map(([, version]) => version);
+    const uniqueMcpVersions = [...new Set(mcpVersions.map((v) => v.replace(/[\^~]/, '')))];
+
     if (uniqueMcpVersions.length > 1) {
-      console.log(`   ⚠️  Multiple MCP SDK versions detected: ${uniqueMcpVersions.join(', ')}`);
-      console.log('   Consider using consistent MCP SDK versions');
+      console.log(`   ⚠️  Multiple MCP runtime versions detected: ${uniqueMcpVersions.join(', ')}`);
+      console.log('   Consider using one aligned @modelcontextprotocol/server release');
     } else {
-      console.log('   ✅ MCP dependencies have consistent versions');
+      console.log('   ✅ MCP runtime packages have consistent versions');
     }
   } else {
     console.log('   ℹ️  No MCP dependencies found');
@@ -244,7 +238,7 @@ if (errors.length === 0) {
   });
   
   console.log('\n💡 Recommendations:');
-  console.log('   - Run npm install or pnpm install to update lock files');
+  console.log('   - Run pnpm install --lockfile-only to update the lockfile');
   console.log('   - Ensure all package.json files have the same version');
   console.log('   - Check for typos in dependency versions');
   

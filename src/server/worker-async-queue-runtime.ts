@@ -1,10 +1,14 @@
-import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/server';
 
 import { generateId } from '../common/utils.js';
 import type { Logger } from '../infrastructure/logger.js';
 import { runWithPrincipalContext } from '../infrastructure/principal-context.js';
+import type { CloudflareTelemetryEnv } from './worker-cloudflare-telemetry-runtime.js';
+import { parseBoolean } from './worker-security.js';
+import type { AsyncPublicJobPort } from './async-public-job-port.js';
 import {
   createAsyncEnvelope,
+  DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES,
   MCP_ASYNC_CONTROL_TOOLS,
   resolveBoundedPositiveInt,
   type AsyncExecutionDirective,
@@ -12,13 +16,17 @@ import {
   type AsyncWorkflowDiagnostics,
 } from './async-tool-workflow.js';
 
-interface QueueBackedEnv {
+interface QueueBackedEnv extends CloudflareTelemetryEnv {
   ASYNC_TOOL_QUEUE?: Queue<AsyncJobMessage>;
   ASYNC_JOBS_KV?: KVNamespace;
+  MCP_ASYNC_QUEUE_ENABLED?: string;
 }
+
+export type { QueueBackedEnv };
 
 interface QueueBackedDeps {
   logger: Logger;
+  isReadOnlyTool?: (toolName: string) => boolean;
   recordLatencyMetric?: (
     metric: 'queue_latency_ms' | 'async_completion_latency_ms',
     durationMs: number,
@@ -28,7 +36,12 @@ interface QueueBackedDeps {
     value: number,
     threshold: number,
   ) => void;
-  onAsyncJobUpdate?: (status: string, toolName: string, attempts: number) => void;
+  onAsyncJobUpdate?: (
+    env: QueueBackedEnv,
+    status: string,
+    toolName: string,
+    attempts: number,
+  ) => void;
 }
 
 interface StoredAsyncJob {
@@ -62,6 +75,17 @@ interface StoredAsyncJob {
 export interface AsyncJobMessage {
   jobId: string;
 }
+
+export type AsyncQueueDisposition =
+  | {
+      action: 'ack';
+      reason: 'missing' | 'terminal' | 'expired' | 'cancelled' | 'succeeded' | 'permanent_failure';
+    }
+  | {
+      action: 'retry';
+      reason: 'transient_failure';
+      delaySeconds: number;
+    };
 
 function snapshot(job: StoredAsyncJob): AsyncJobSnapshot {
   return {
@@ -115,14 +139,31 @@ function buildNotFound(jobId: string): CallToolResult {
 }
 
 async function readJob(env: QueueBackedEnv, jobId: string): Promise<StoredAsyncJob | null> {
-  const raw = await env.ASYNC_JOBS_KV?.get(`job:${jobId}`, 'json');
+  const raw = await requireJobStore(env).get(`job:${jobId}`, 'json');
   return (raw as StoredAsyncJob | null) ?? null;
 }
 
 async function writeJob(env: QueueBackedEnv, job: StoredAsyncJob): Promise<void> {
-  await env.ASYNC_JOBS_KV?.put(`job:${job.id}`, JSON.stringify(job), {
+  await requireJobStore(env).put(`job:${job.id}`, JSON.stringify(job), {
     expirationTtl: Math.max(60, Math.ceil((job.expiresAtMs - Date.now()) / 1000)),
   });
+}
+
+function requireJobStore(env: QueueBackedEnv): KVNamespace {
+  const kv = env.ASYNC_JOBS_KV;
+  if (!kv) {
+    throw new Error('ASYNC_JOBS_KV binding is missing.');
+  }
+  return kv;
+}
+
+function requireQueueBindings(env: QueueBackedEnv): { queue: Queue<AsyncJobMessage> } {
+  requireJobStore(env);
+  const queue = env.ASYNC_TOOL_QUEUE;
+  if (!queue) {
+    throw new Error('ASYNC_TOOL_QUEUE binding is missing.');
+  }
+  return { queue };
 }
 
 function readControlArguments(request: CallToolRequest): { jobId: string | null } {
@@ -137,14 +178,93 @@ function readControlArguments(request: CallToolRequest): { jobId: string | null 
   return { jobId: value.trim() };
 }
 
+export function createQueuePublicJobPort(
+  workflow: CloudflareAsyncQueueWorkflow,
+): AsyncPublicJobPort {
+  return workflow.createPublicJobPort();
+}
+
 export class CloudflareAsyncQueueWorkflow {
+  private jobLifecycleListener: ((snapshot: AsyncJobSnapshot) => void) | undefined;
+
   constructor(
     private readonly env: QueueBackedEnv,
     private readonly deps: QueueBackedDeps,
   ) {}
 
+  createPublicJobPort(): AsyncPublicJobPort {
+    return {
+      getPublicJobSnapshot: (jobId) => this.getPublicJobSnapshot(jobId),
+      getPublicJobResult: (jobId) => this.getPublicJobResult(jobId),
+      listPublicJobSnapshots: () => this.listPublicJobSnapshots(),
+      cancelPublicJob: (jobId) => this.cancelPublicJob(jobId),
+      setJobLifecycleListener: (listener) => {
+        this.jobLifecycleListener = listener;
+      },
+    };
+  }
+
+  async getPublicJobSnapshot(jobId: string): Promise<AsyncJobSnapshot | null> {
+    const job = await readJob(this.env, jobId);
+    return job ? snapshot(job) : null;
+  }
+
+  async getPublicJobResult(jobId: string): Promise<CallToolResult | null> {
+    const job = await readJob(this.env, jobId);
+    return job?.result ?? null;
+  }
+
+  async listPublicJobSnapshots(): Promise<AsyncJobSnapshot[]> {
+    const kv = requireJobStore(this.env);
+    const listed = await kv.list({ prefix: 'job:' });
+    const snapshots: AsyncJobSnapshot[] = [];
+    for (const entry of listed.keys) {
+      const jobId = entry.name.startsWith('job:') ? entry.name.slice('job:'.length) : entry.name;
+      const job = await readJob(this.env, jobId);
+      if (job) {
+        snapshots.push(snapshot(job));
+      }
+    }
+
+    return snapshots.sort(
+      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+    );
+  }
+
+  async cancelPublicJob(jobId: string): Promise<AsyncJobSnapshot | null> {
+    const job = await readJob(this.env, jobId);
+    if (!job) {
+      return null;
+    }
+
+    job.cancellationRequested = true;
+    if (job.status === 'queued') {
+      job.status = 'failed';
+      job.updatedAtMs = Date.now();
+      job.error = {
+        code: 'cancelled',
+        message: 'Job cancelled before execution',
+        deadLetter: false,
+        attempts: job.attempts.current,
+        history: [],
+      };
+      this.deps.onAsyncJobUpdate?.(this.env, 'cancelled', job.toolName, job.attempts.current);
+    }
+    await this.persistJob(job);
+    return snapshot(job);
+  }
+
+  private async persistJob(job: StoredAsyncJob): Promise<void> {
+    await writeJob(this.env, job);
+    this.jobLifecycleListener?.(snapshot(job));
+  }
+
   isEnabled(): boolean {
-    return Boolean(this.env.ASYNC_TOOL_QUEUE && this.env.ASYNC_JOBS_KV);
+    if (!parseBoolean(this.env.MCP_ASYNC_QUEUE_ENABLED, false)) {
+      return false;
+    }
+    requireQueueBindings(this.env);
+    return true;
   }
 
   async handleControlToolCall(request: CallToolRequest): Promise<CallToolResult> {
@@ -207,9 +327,9 @@ export class CloudflareAsyncQueueWorkflow {
         attempts: job.attempts.current,
         history: [],
       };
-      this.deps.onAsyncJobUpdate?.('cancelled', job.toolName, job.attempts.current);
+      this.deps.onAsyncJobUpdate?.(this.env, 'cancelled', job.toolName, job.attempts.current);
     }
-    await writeJob(this.env, job);
+    await this.persistJob(job);
     return createAsyncEnvelope({ success: true, mode: 'async', job: snapshot(job) });
   }
 
@@ -226,10 +346,16 @@ export class CloudflareAsyncQueueWorkflow {
         true,
       );
     }
-    const queue = this.env.ASYNC_TOOL_QUEUE;
-    if (!queue) {
+    const { queue } = requireQueueBindings(this.env);
+    if (
+      !DEFAULT_QUEUE_OFFLOAD_TOOL_NAMES.has(params.request.params.name) ||
+      !this.deps.isReadOnlyTool?.(params.request.params.name)
+    ) {
       return createAsyncEnvelope(
-        { success: false, error: 'Async tool execution queue is unavailable' },
+        {
+          success: false,
+          error: 'This tool is not eligible for read-only queue execution',
+        },
         true,
       );
     }
@@ -256,9 +382,45 @@ export class CloudflareAsyncQueueWorkflow {
       cancellationRequested: false,
       queuedAtMs: now,
     };
-    await writeJob(this.env, job);
-    await queue.send({ jobId: job.id });
-    this.deps.onAsyncJobUpdate?.('queued', job.toolName, 0);
+    try {
+      await this.persistJob(job);
+      await queue.send({ jobId: job.id });
+    } catch (error) {
+      const enqueueError = error instanceof Error ? error.message : String(error);
+      job.status = 'failed';
+      job.updatedAtMs = Date.now();
+      job.error = {
+        code: 'execution_failed',
+        message: `Async job could not be enqueued: ${enqueueError}`,
+        deadLetter: false,
+        attempts: 0,
+        history: [enqueueError],
+      };
+      try {
+        await this.persistJob(job);
+      } catch (persistenceError) {
+        const persistenceMessage =
+          persistenceError instanceof Error ? persistenceError.message : String(persistenceError);
+        this.deps.logger.error(
+          'Async queue enqueue failure could not be persisted',
+          persistenceError instanceof Error ? persistenceError : new Error(persistenceMessage),
+          { jobId: job.id },
+        );
+      }
+      this.deps.logger.error(
+        'Async queue-backed job could not be enqueued',
+        error instanceof Error ? error : new Error(enqueueError),
+        { jobId: job.id, toolName: job.toolName },
+      );
+      return createAsyncEnvelope(
+        {
+          success: false,
+          error: 'Async tool execution could not be queued',
+        },
+        true,
+      );
+    }
+    this.deps.onAsyncJobUpdate?.(this.env, 'queued', job.toolName, 0);
     return buildQueuedEnvelope(job, false);
   }
 
@@ -288,13 +450,20 @@ export async function processAsyncQueueMessage(params: {
     requestId: string,
     userId?: string,
   ) => Promise<CallToolResult>;
-  onAsyncJobUpdate?: (status: string, toolName: string, attempts: number) => void;
-}): Promise<void> {
+  onAsyncJobUpdate?: (
+    env: QueueBackedEnv,
+    status: string,
+    toolName: string,
+    attempts: number,
+  ) => void;
+}): Promise<AsyncQueueDisposition> {
   const job = await readJob(params.env, params.message.jobId);
-  if (!job) return;
+  if (!job) return { action: 'ack', reason: 'missing' };
 
   const now = Date.now();
-  if (job.status === 'succeeded' || job.status === 'failed' || job.status === 'expired') return;
+  if (job.status === 'succeeded' || job.status === 'failed' || job.status === 'expired') {
+    return { action: 'ack', reason: 'terminal' };
+  }
   if (job.expiresAtMs <= now) {
     job.status = 'expired';
     job.updatedAtMs = now;
@@ -306,8 +475,8 @@ export async function processAsyncQueueMessage(params: {
       history: [...(job.error?.history ?? [])],
     };
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('expired', job.toolName, job.attempts.current);
-    return;
+    params.onAsyncJobUpdate?.(params.env, 'expired', job.toolName, job.attempts.current);
+    return { action: 'ack', reason: 'expired' };
   }
   if (job.cancellationRequested) {
     job.status = 'failed';
@@ -320,15 +489,15 @@ export async function processAsyncQueueMessage(params: {
       history: [...(job.error?.history ?? [])],
     };
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('cancelled', job.toolName, job.attempts.current);
-    return;
+    params.onAsyncJobUpdate?.(params.env, 'cancelled', job.toolName, job.attempts.current);
+    return { action: 'ack', reason: 'cancelled' };
   }
 
   job.status = 'running';
   job.updatedAtMs = now;
   job.attempts.current += 1;
   await writeJob(params.env, job);
-  params.onAsyncJobUpdate?.('running', job.toolName, job.attempts.current);
+  params.onAsyncJobUpdate?.(params.env, 'running', job.toolName, job.attempts.current);
 
   try {
     const result = await runWithPrincipalContext(
@@ -353,7 +522,8 @@ export async function processAsyncQueueMessage(params: {
     job.result = result;
     delete job.error;
     await writeJob(params.env, job);
-    params.onAsyncJobUpdate?.('succeeded', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'succeeded', job.toolName, job.attempts.current);
+    return { action: 'ack', reason: 'succeeded' };
   } catch (error) {
     // Re-read job from KV to get fresh cancellation state for retry/error decisions
     const freshJobState = await readJob(params.env, params.message.jobId);
@@ -375,12 +545,8 @@ export async function processAsyncQueueMessage(params: {
       };
       await writeJob(params.env, job);
       const delaySeconds = Math.max(0, Math.ceil((job.retryDelayMs * job.attempts.current) / 1000));
-      await params.env.ASYNC_TOOL_QUEUE?.send(
-        { jobId: job.id },
-        delaySeconds > 0 ? { delaySeconds } : undefined,
-      );
-      params.onAsyncJobUpdate?.('retrying', job.toolName, job.attempts.current);
-      return;
+      params.onAsyncJobUpdate?.(params.env, 'retrying', job.toolName, job.attempts.current);
+      return { action: 'retry', reason: 'transient_failure', delaySeconds };
     }
 
     job.status = 'failed';
@@ -401,6 +567,7 @@ export async function processAsyncQueueMessage(params: {
       attempts: job.attempts.current,
       maxAttempts: job.attempts.max,
     });
-    params.onAsyncJobUpdate?.('failed', job.toolName, job.attempts.current);
+    params.onAsyncJobUpdate?.(params.env, 'failed', job.toolName, job.attempts.current);
+    return { action: 'ack', reason: cancellationRequested ? 'cancelled' : 'permanent_failure' };
   }
 }

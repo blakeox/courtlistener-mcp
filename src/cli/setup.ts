@@ -434,6 +434,7 @@ export async function runSetup(): Promise<void> {
     if (!selectedClient) {
       console.error('\n❌ Invalid choice. Exiting.\n');
       process.exit(1);
+      return;
     }
     console.log(`\n→ Configuring for ${selectedClient.name}\n`);
 
@@ -554,7 +555,7 @@ function printNextSteps(client: McpClient, writtenPath: string | null): void {
     console.log('  2. Restart your MCP client');
   }
 
-  console.log('  3. Run `npx courtlistener-mcp --doctor` to verify connectivity');
+  console.log('  3. Run `pnpm dlx courtlistener-mcp --doctor` to verify connectivity');
   console.log('  4. Try a search: "Find Supreme Court cases about free speech"\n');
   console.log('📖 Docs: https://github.com/blakeox/courtlistener-mcp#readme\n');
 }

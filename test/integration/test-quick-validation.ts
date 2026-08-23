@@ -4,9 +4,9 @@
  * ✅ Quick validation that search tool schemas keep their intended order_by contract.
  */
 
-import { spawn, type ChildProcess } from 'child_process';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getLocalMcpServerRuntime } from '../helpers/local-mcp-runtime.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,18 +70,29 @@ function createStdioClient(server: ChildProcess) {
 
   return {
     send(request: MCPRequest): Promise<MCPResponse> {
+      const params = request.params ?? {};
+      const modernRequest: MCPRequest = {
+        ...request,
+        params: {
+          ...params,
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
+        },
+      };
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          pending.delete(request.id);
-          reject(new Error(`Timeout waiting for response to request id=${request.id}`));
+          pending.delete(modernRequest.id);
+          reject(new Error(`Timeout waiting for response to request id=${modernRequest.id}`));
         }, 20000);
 
-        pending.set(request.id, (response) => {
+        pending.set(modernRequest.id, (response) => {
           clearTimeout(timeout);
           resolve(response);
         });
 
-        server.stdin?.write(JSON.stringify(request) + '\n');
+        server.stdin?.write(JSON.stringify(modernRequest) + '\n');
       });
     },
   };
@@ -100,15 +111,10 @@ async function testParameterFiltering(): Promise<void> {
     // Server logs to stderr; ignore them unless the request flow fails.
   });
 
-  const initializeRequest: MCPRequest = {
+  const discoveryRequest: MCPRequest = {
     jsonrpc: '2.0',
     id: 1,
-    method: 'initialize',
-    params: {
-      protocolVersion: '2024-11-05',
-      capabilities: { tools: {} },
-      clientInfo: { name: 'quick-validation', version: '1.0.0' },
-    },
+    method: 'server/discover',
   };
   const toolsRequest: MCPRequest = {
     jsonrpc: '2.0',
@@ -117,9 +123,9 @@ async function testParameterFiltering(): Promise<void> {
   };
 
   try {
-    const initializeResponse = await client.send(initializeRequest);
-    if (!initializeResponse.result) {
-      throw new Error('Initialize request did not return a result payload.');
+    const discoveryResponse = await client.send(discoveryRequest);
+    if (!discoveryResponse.result) {
+      throw new Error('Server discovery did not return a result payload.');
     }
 
     const toolsResponse = await client.send(toolsRequest);

@@ -10,15 +10,13 @@ installNodeWebCryptoForTests();
 
 interface TestEnv {
   MCP_UI_SESSION_SECRET?: string;
-  MCP_ALLOW_DEV_FALLBACK?: string;
-  MCP_OAUTH_DEV_USER_ID?: string;
   MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION?: string;
   MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS?: string;
   OIDC_ISSUER?: string;
   OIDC_AUDIENCE?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
-  MCP_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_MAX?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_WINDOW_SECONDS?: string;
+  MCP_UI_SESSION_BOOTSTRAP_RATE_LIMIT_BLOCK_SECONDS?: string;
   MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN?: string;
 }
 
@@ -312,7 +310,7 @@ describe('worker UI session runtime', () => {
       OIDC_AUDIENCE: 'mcp',
     };
     const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
-    const request = new Request('https://worker.example/authorize', {
+    const request = new Request('https://worker.example/oauth/authorize', {
       headers: {
         authorization: 'Bearer header.payload.signature',
         cookie: `clmcp_ui=${token}`,
@@ -334,7 +332,7 @@ describe('worker UI session runtime', () => {
     const runtime = createRuntime({ revocationUnavailable: true });
     const env: TestEnv = { MCP_UI_SESSION_SECRET: 'session-secret' };
     const token = await runtime.createUiSessionToken('user-42', env.MCP_UI_SESSION_SECRET!);
-    const request = new Request('https://worker.example/authorize', {
+    const request = new Request('https://worker.example/oauth/authorize', {
       headers: {
         cookie: `clmcp_ui=${token}`,
       },
@@ -348,7 +346,7 @@ describe('worker UI session runtime', () => {
   it('ignores Cloudflare Access identity headers unless explicit trust is enabled', async () => {
     const runtime = createRuntime();
     const env: TestEnv = {};
-    const request = new Request('https://worker.example/authorize', {
+    const request = new Request('https://worker.example/oauth/authorize', {
       headers: {
         'cf-access-authenticated-user-email': 'user@example.com',
       },
@@ -362,7 +360,7 @@ describe('worker UI session runtime', () => {
   it('accepts Cloudflare Access identity headers when explicit trust is enabled', async () => {
     const runtime = createRuntime();
     const env: TestEnv = { MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS: 'true' };
-    const request = new Request('https://worker.example/authorize', {
+    const request = new Request('https://worker.example/oauth/authorize', {
       headers: {
         'cf-access-authenticated-user-email': 'user@example.com',
       },
@@ -378,7 +376,7 @@ describe('worker UI session runtime', () => {
   it('does not accept Cloudflare Access identity headers when only JWT assertion trust is enabled', async () => {
     const runtime = createRuntime();
     const env: TestEnv = { MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION: 'true' };
-    const request = new Request('https://worker.example/authorize', {
+    const request = new Request('https://worker.example/oauth/authorize', {
       headers: {
         'cf-access-authenticated-user-email': 'user@example.com',
       },
@@ -471,7 +469,7 @@ describe('worker UI session runtime', () => {
 
   it('fails open when bootstrap rate limiting is unavailable', async () => {
     const runtime = createRuntime({ bootstrapLimiterUnavailable: true });
-    const env: TestEnv = {};
+    const env: TestEnv = { MCP_AUTH_FAILURE_RATE_LIMIT_FAIL_OPEN: 'true' };
     const request = new Request('https://worker.example/api/session/bootstrap');
 
     const response = await runtime.getSessionBootstrapRateLimitedResponse(request, env, Date.now());

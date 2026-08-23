@@ -5,9 +5,9 @@
  * Creates specific test templates for critical untested components
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,8 +34,6 @@ class DetailedUntestedAnalysis {
       'src/courtlistener.ts',
       'src/metrics.ts',
       'src/cache.ts',
-      'src/http-server.ts',
-      'src/enterprise-server.ts',
       'src/config.ts',
       'src/tool-definitions.ts',
     ];
@@ -179,18 +177,6 @@ class DetailedUntestedAnalysis {
       priorities.push('⚡ HIGH - Cache hit/miss logic');
     }
 
-    if (filePath.includes('http-server.ts')) {
-      priorities.push('🔥 CRITICAL - Health endpoint responses');
-      priorities.push('⚡ HIGH - Metrics endpoint formatting');
-      priorities.push('⚡ HIGH - Error handling for malformed requests');
-    }
-
-    if (filePath.includes('enterprise-server.ts')) {
-      priorities.push('🔥 CRITICAL - Middleware integration');
-      priorities.push('🔥 CRITICAL - Security boundary enforcement');
-      priorities.push('⚡ HIGH - Graceful shutdown behavior');
-    }
-
     if (filePath.includes('config.ts')) {
       priorities.push('⚡ HIGH - Environment variable parsing');
       priorities.push('⚡ HIGH - Default value handling');
@@ -219,7 +205,7 @@ class DetailedUntestedAnalysis {
     await this.createConfigTests();
 
     console.log('\n✅ Test templates generated in test/unit/ directory');
-    console.log('💡 Run these tests with: npm run test:unit');
+    console.log('💡 Run these tests with: pnpm run test:unit');
   }
 
   private async createCourtListenerTests(): Promise<void> {

@@ -28,20 +28,21 @@ export function buildChecks(env = process.env) {
   const checks = [
     {
       id: 'worker-oauth-contract',
-      command: ['npx', 'tsx', '--test', 'test/unit/test-worker-oauth-routes.ts'],
+      command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-worker-oauth-routes.ts'],
     },
     {
       id: 'worker-oauth-smoke',
-      command: ['npx', 'tsx', '--test', 'test/unit/test-worker-oauth-smoke.ts'],
+      command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-worker-oauth-smoke.ts'],
     },
     {
       id: 'worker-auth-handoff',
-      command: ['npx', 'tsx', '--test', 'test/unit/test-worker-auth-handoff-routes.ts'],
+      command: ['pnpm', 'exec', 'tsx', '--test', 'test/unit/test-worker-auth-handoff-routes.ts'],
     },
     {
       id: 'hosted-auth-html-security',
       command: [
-        'npx',
+        'pnpm',
+        'exec',
         'tsx',
         '--test',
         'test/unit/test-hosted-auth-html-security.ts',
@@ -51,7 +52,8 @@ export function buildChecks(env = process.env) {
     {
       id: 'worker-auth-runtime',
       command: [
-        'npx',
+        'pnpm',
+        'exec',
         'tsx',
         '--test',
         'test/unit/test-worker-oauth-authorize.ts',
@@ -61,16 +63,6 @@ export function buildChecks(env = process.env) {
         'test/unit/test-oauth-authorization-completion.ts',
         'test/unit/test-worker-core-routes.ts',
         'test/unit/test-worker-ui-session-runtime.ts',
-      ],
-    },
-    {
-      id: 'server-auth-middleware',
-      command: [
-        'npx',
-        'tsx',
-        '--test',
-        'test/unit/test-unified-auth.ts',
-        'test/middleware/test-authentication.ts',
       ],
     },
     {
@@ -91,7 +83,7 @@ export function buildChecks(env = process.env) {
     });
     checks.push({
       id: 'deployed-oauth-approve-contract',
-      command: ['npx', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
+      command: ['pnpm', 'exec', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
       env: { OAUTH_BASE_URL: deployedOauthBaseUrl },
     });
   } else {
@@ -103,7 +95,7 @@ export function buildChecks(env = process.env) {
     });
     checks.push({
       id: 'deployed-oauth-approve-contract',
-      command: ['npx', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
+      command: ['pnpm', 'exec', 'tsx', 'scripts/testing/probe-production-approve-contract.ts'],
       skipReason:
         'Set OAUTH_BASE_URL or REMOTE_SERVER_URL to require hosted OAuth approve/CSP contract validation.',
     });

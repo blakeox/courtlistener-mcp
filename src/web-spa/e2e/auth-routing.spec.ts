@@ -63,7 +63,7 @@ test.describe('SPA auth routing and recovery', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Account recovery:' })).toBeVisible();
   });
 
-  test('shows protocol mismatch recovery on the control center', async ({ page }) => {
+  test('shows protocol mismatch recovery on the overview', async ({ page }) => {
     await seedBrowserToken(page, 'session-token-e2e');
     await installSpaMocks(page, {
       session: {
@@ -72,8 +72,7 @@ test.describe('SPA auth routing and recovery', () => {
         turnstile_site_key: '',
       },
       runtime: {
-        sessionId: 'mismatch-session',
-        protocolVersion: '2024-11-05',
+        protocolVersion: '2026-07-28',
         tools: [
           {
             name: 'search_cases',
@@ -92,10 +91,10 @@ test.describe('SPA auth routing and recovery', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
 
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
-    await expect(page.getByText('Legacy overview route.')).toBeVisible();
+    await expect(page.getByText('Review workspace activity and next steps.')).toBeVisible();
     await expect(
       page.locator('strong').filter({ hasText: 'Browser credential loaded' }),
     ).toBeVisible();
@@ -111,8 +110,7 @@ test.describe('SPA auth routing and recovery', () => {
         turnstile_site_key: '',
       },
       runtime: {
-        sessionId: 'mismatch-session',
-        protocolVersion: '2024-11-05',
+        protocolVersion: '1999-01-01',
         tools: [
           {
             name: 'search_cases',
@@ -134,10 +132,10 @@ test.describe('SPA auth routing and recovery', () => {
     await page.goto('/app/account');
 
     await expect(
-      page.getByText('Protocol mismatch: server advertised 2024-11-05, expected 2025-06-18.'),
+      page.getByText('Protocol mismatch: server advertised 1999-01-01, expected 2026-07-28.'),
     ).toBeVisible();
     await expect(page.getByText('Saved on this device')).toBeVisible();
-    await expect(page.getByText('⚠ Protocol mismatch (2024-11-05)')).toBeVisible();
+    await expect(page.getByText('⚠ Protocol mismatch (1999-01-01)')).toBeVisible();
     await expect(page.getByText('Protocol mismatch needs review')).toBeVisible();
   });
 });

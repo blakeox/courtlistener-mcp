@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Normalize a remote server URL into canonical health and MCP SSE endpoints.
+ * Normalize a remote server URL into canonical health and MCP Streamable HTTP endpoints.
  *
  * Usage:
- *   node scripts/resolve-remote-endpoints.js <url>
+ *   node scripts/resolve-remote-endpoints.js <url> [--field baseUrl|healthUrl|mcpUrl]
  *
  * Output:
  *   REMOTE_BASE_URL=<base>
@@ -30,10 +30,12 @@ export function normalizeRemoteEndpoints(input) {
     basePath = trimmedPath.slice(0, -'/health'.length);
   }
 
+  if (basePath.toLowerCase().endsWith('/sse')) {
+    throw new Error('Legacy /sse endpoint is unsupported; use the canonical /mcp endpoint.');
+  }
+
   if (basePath.toLowerCase().endsWith('/mcp')) {
     basePath = basePath.slice(0, -'/mcp'.length);
-  } else if (basePath.toLowerCase().endsWith('/sse')) {
-    basePath = basePath.slice(0, -'/sse'.length);
   }
 
   const normalizedBasePath = basePath === '' ? '' : basePath;
@@ -48,6 +50,17 @@ export function normalizeRemoteEndpoints(input) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const endpoints = normalizeRemoteEndpoints(process.argv[2]);
+  const fieldIndex = process.argv.indexOf('--field');
+  if (fieldIndex >= 0) {
+    const field = process.argv[fieldIndex + 1];
+    if (!['baseUrl', 'healthUrl', 'mcpUrl'].includes(field)) {
+      console.error('--field must be baseUrl, healthUrl, or mcpUrl.');
+      process.exit(2);
+    }
+    process.stdout.write(`${endpoints[field]}\n`);
+    process.exit(0);
+  }
+
   process.stdout.write(`REMOTE_BASE_URL=${endpoints.baseUrl}\n`);
   process.stdout.write(`REMOTE_HEALTH_URL=${endpoints.healthUrl}\n`);
   process.stdout.write(`REMOTE_MCP_URL=${endpoints.mcpUrl}\n`);

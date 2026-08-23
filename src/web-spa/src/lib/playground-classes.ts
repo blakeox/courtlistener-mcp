@@ -69,7 +69,7 @@ export const transcriptEntryHeaderClass = 'transcript-entry-header mb-0.5';
 
 export const transcriptEntryRoleClass = 'transcript-entry-role text-[0.8rem] uppercase';
 
-export const transcriptEntryTimeClass = 'transcript-entry-time text-[0.7rem] opacity-50';
+export const transcriptEntryTimeClass = 'transcript-entry-time text-[0.7rem] text-faint';
 
 export const transcriptEntryActionClass = 'transcript-entry-action ml-auto text-[0.75rem]';
 
@@ -142,9 +142,9 @@ export const toolCatalogItemClass = cn(
 
 export const toolCatalogNameClass = 'tool-catalog-name font-semibold';
 
-export const toolCatalogDescriptionClass = 'tool-catalog-description ml-(--space-2) opacity-70';
+export const toolCatalogDescriptionClass = 'tool-catalog-description ml-(--space-2) text-faint';
 
-export const toolCatalogHintClass = 'tool-catalog-hint ml-(--space-2) text-[0.8rem] opacity-50';
+export const toolCatalogHintClass = 'tool-catalog-hint ml-(--space-2) text-[0.8rem] text-muted';
 
 export const protocolLogClass = 'protocol-log mt-(--space-2) max-h-[300px] overflow-auto';
 
@@ -182,7 +182,7 @@ export function protocolEntryHeadingClassName(direction: string): string {
   );
 }
 
-export const protocolEntryTimeClass = 'protocol-entry-time font-normal opacity-50';
+export const protocolEntryTimeClass = 'protocol-entry-time font-normal text-faint';
 
 export const protocolEntryPayloadClass = cn(
   'protocol-entry-payload mono m-0 max-h-[150px] overflow-auto text-[0.75rem] break-all whitespace-pre-wrap',

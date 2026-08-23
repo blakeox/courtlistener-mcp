@@ -453,8 +453,7 @@ class MockCacheManager implements Partial<CacheManager> {
   }
 
   getLastSetCall():
-    | { endpoint: string; params: Record<string, unknown>; ttl?: number }
-    | undefined {
+    { endpoint: string; params: Record<string, unknown>; ttl?: number } | undefined {
     return this.setCalls[this.setCalls.length - 1];
   }
 }
@@ -666,6 +665,7 @@ describe('CourtListener API Integration (TypeScript)', () => {
           mockCache as CacheManager,
           mockLogger as Logger,
           mockMetrics as MetricsCollector,
+          process.env,
         );
 
         mockServer.mockResponse(

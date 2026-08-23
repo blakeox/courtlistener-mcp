@@ -1,21 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Legal MCP Server - Best Practice Entry Point
+ * Legal MCP Server - MCP v2 Entry Point
  *
- * Bootstraps the dependency-injected services and starts the refactored
- * `BestPracticeLegalMCPServer`, providing a clean, production-ready runtime.
+ * Bootstraps the dependency-injected services and starts the MCP v2 runtime.
  */
 
-import type { CallToolRequest, CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
 
 import { runDoctor } from './cli/doctor.js';
 import { runSetup } from './cli/setup.js';
 import { bootstrapServices } from './infrastructure/bootstrap.js';
 import { container } from './infrastructure/container.js';
 import { Logger } from './infrastructure/logger.js';
-import { initTelemetry } from './infrastructure/telemetry.js';
-import { BestPracticeLegalMCPServer } from './server/best-practice-server.js';
+import { LocalMcpV2Runtime, createLocalMcpV2Server } from './server/mcp-v2-server.js';
 
 // Handle --setup flag before any heavy initialisation
 if (process.argv.includes('--setup')) {
@@ -29,36 +27,26 @@ if (process.argv.includes('--setup')) {
     process.exit(1);
   });
 } else {
-  const otelSdk = initTelemetry();
-
   async function main(): Promise<void> {
-    bootstrapServices();
+    bootstrapServices(process.env);
 
     const logger = container.get<Logger>('logger');
-    const server = new BestPracticeLegalMCPServer();
-
-    if (otelSdk) {
-      server.getShutdownCoordinator().addHook({
-        name: 'otel-sdk',
-        priority: 100,
-        cleanup: async () => {
-          await otelSdk.shutdown();
-        },
-      });
-    }
-
+    let stdioHandle: { close(): Promise<void> } | undefined;
     try {
-      await server.start();
+      stdioHandle = serveStdio(() => createLocalMcpV2Server(), {
+        legacy: 'reject',
+        onerror: (error) => logger.error('MCP v2 stdio error', error),
+      });
     } catch (error) {
       logger.error('Failed to start Legal MCP Server', error as Error);
-
-      try {
-        await server.stop();
-      } finally {
-        if (otelSdk) await otelSdk.shutdown();
-        process.exit(1);
-      }
+      process.exit(1);
     }
+
+    const shutdown = async () => {
+      await stdioHandle?.close();
+    };
+    process.once('SIGINT', () => void shutdown());
+    process.once('SIGTERM', () => void shutdown());
   }
 
   if (import.meta.url === `file://${process.argv[1]}`) {
@@ -72,26 +60,14 @@ if (process.argv.includes('--setup')) {
 function ensureBootstrapped() {
   // If core services aren't registered yet, initialize the container
   if (!container.has('logger') || !container.has('config')) {
-    bootstrapServices();
+    bootstrapServices(process.env);
   }
 }
 
-export { BestPracticeLegalMCPServer };
-export class LegalMCPServer extends BestPracticeLegalMCPServer {
+export class LegalMCPServer extends LocalMcpV2Runtime {
   constructor() {
     ensureBootstrapped();
     super();
   }
 }
-export type CompatibleLegalMCPServer = BestPracticeLegalMCPServer & {
-  run(): Promise<void>;
-  listTools(): Promise<{ tools: Tool[]; metadata: { categories: string[] } }>;
-  handleToolCall(
-    input:
-      | CallToolRequest
-      | {
-          name: string;
-          arguments?: Record<string, unknown>;
-        },
-  ): Promise<CallToolResult>;
-};
+export { LocalMcpV2Runtime, createLocalMcpV2Server } from './server/mcp-v2-server.js';

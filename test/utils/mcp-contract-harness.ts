@@ -2,10 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   assertAuthFailureShape,
-  assertInvalidSessionLifecycleShape,
-  createInvalidSessionLifecycleCases,
   createProtocolHeaderNegotiationCases,
-  type InvalidSessionLifecycleCase,
   type ProtocolHeaderNegotiationCase,
 } from './mcp-transport-contract.js';
 
@@ -92,41 +89,6 @@ export async function runAuthFailureContract(
     const response = await executeCase(fixture);
     assert.ok(response, `${fixture.name} should return auth error response`);
     await assertAuthFailureShape(response, fixture.expectedStatus, fixture.expectedError);
-    if (options.assertFailureResponse) {
-      await options.assertFailureResponse(response, fixture);
-    }
-  }
-}
-
-interface InvalidSessionLifecycleHarnessOptions {
-  closedSessionId: string;
-  expectedStatus?: number | readonly number[];
-  assertFailureResponse?: (
-    response: Response,
-    fixture: InvalidSessionLifecycleCase,
-  ) => Promise<void> | void;
-}
-
-export async function runInvalidSessionLifecycleContract(
-  options: InvalidSessionLifecycleHarnessOptions,
-  executeCase: (fixture: InvalidSessionLifecycleCase) => Promise<Response | null>,
-): Promise<void> {
-  const fixtures = createInvalidSessionLifecycleCases(options.closedSessionId);
-  const expectedStatuses =
-    options.expectedStatus === undefined
-      ? [400]
-      : Array.isArray(options.expectedStatus)
-        ? options.expectedStatus
-        : [options.expectedStatus];
-
-  for (const fixture of fixtures) {
-    const response = await executeCase(fixture);
-    assert.ok(response, `${fixture.name} should return session lifecycle error response`);
-    assert.ok(
-      expectedStatuses.includes(response.status),
-      `${fixture.name} should return expected status ${expectedStatuses.join(', ')}, got ${response.status}`,
-    );
-    assertInvalidSessionLifecycleShape(await response.json());
     if (options.assertFailureResponse) {
       await options.assertFailureResponse(response, fixture);
     }

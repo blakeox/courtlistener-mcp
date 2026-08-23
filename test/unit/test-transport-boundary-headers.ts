@@ -15,6 +15,8 @@ describe('transport boundary CORS headers', () => {
 
     assert.equal(headers.get('Access-Control-Allow-Methods'), MCP_CORS_ALLOWED_METHODS);
     assert.equal(headers.get('Access-Control-Allow-Headers'), MCP_CORS_ALLOWED_HEADERS);
+    assert.match(MCP_CORS_ALLOWED_HEADERS, /Mcp-Method/);
+    assert.match(MCP_CORS_ALLOWED_HEADERS, /Mcp-Name/);
     assert.equal(headers.get('Access-Control-Expose-Headers'), MCP_CORS_EXPOSE_HEADERS);
     assert.equal(headers.get('Vary'), 'Origin');
   });

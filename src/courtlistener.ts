@@ -2,7 +2,6 @@
  * Enhanced CourtListener API client with rate limiting, caching, and error handling
  */
 
-import fetch, { Response } from 'node-fetch';
 import {
   CourtListenerConfig,
   CourtListenerResponse,
@@ -17,14 +16,10 @@ import {
 import { CacheManager } from './infrastructure/cache.js';
 import { Logger } from './infrastructure/logger.js';
 import { MetricsCollector } from './infrastructure/metrics.js';
+import type { ConfigEnvironment } from './infrastructure/config.js';
 
 type EndpointCacheClass =
-  | 'default'
-  | 'search'
-  | 'detail'
-  | 'staticReference'
-  | 'financial'
-  | 'recap';
+  'default' | 'search' | 'detail' | 'staticReference' | 'financial' | 'recap';
 
 export class CourtListenerAPI {
   private readonly maxRateLimitQueueSize = 1000;
@@ -40,6 +35,7 @@ export class CourtListenerAPI {
     private cache: CacheManager,
     private logger: Logger,
     private metrics: MetricsCollector,
+    private environment: ConfigEnvironment = {},
   ) {
     this.availableTokens = this.config.rateLimitPerMinute;
     this.cacheTtlByClass = this.buildCacheTtlPolicy();
@@ -125,7 +121,7 @@ export class CourtListenerAPI {
   }
 
   private buildCacheTtlPolicy(): Record<EndpointCacheClass, number> {
-    const baseTtl = Number.parseInt(process.env.CACHE_TTL || '300', 10);
+    const baseTtl = Number.parseInt(this.environment.CACHE_TTL || '300', 10);
     const defaultTtl = Number.isFinite(baseTtl) && baseTtl >= 0 ? baseTtl : 300;
 
     const defaults: Record<EndpointCacheClass, number> = {
@@ -137,7 +133,7 @@ export class CourtListenerAPI {
       recap: Math.max(defaultTtl, 600),
     };
 
-    return this.applyCacheTtlOverrides(defaults, process.env.CACHE_TTL_CLASS_OVERRIDES);
+    return this.applyCacheTtlOverrides(defaults, this.environment.CACHE_TTL_CLASS_OVERRIDES);
   }
 
   private applyCacheTtlOverrides(
@@ -504,7 +500,7 @@ export class CourtListenerAPI {
     return this.makeRequest<CourtListenerResponse<unknown>>('/search/', params);
   }
 
-  // Utility methods for backward compatibility
+  // Additional CourtListener API operations used by governed tools.
   async searchCitations(citation: string): Promise<unknown> {
     return this.searchOpinions({ citation });
   }
@@ -565,8 +561,6 @@ export class CourtListenerAPI {
   async getOralArgument(audioId: number): Promise<unknown> {
     return this.makeRequest(`/audio/${audioId}/`);
   }
-
-  // Additional methods to support enterprise server functionality
 
   // Search cases (alias for searchOpinions)
   async searchCases(params: Record<string, unknown>): Promise<unknown> {

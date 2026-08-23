@@ -79,7 +79,6 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
     },
     jsonError,
     jsonResponse,
-    isRemovedLegacyUiRoute: (pathname: string) => pathname === '/api/login',
     workerUiSessionRuntime: {
       resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-1' }),
       resolveUiSessionUserId: async () => 'user-1',
@@ -117,13 +116,6 @@ function buildDeps(overrides: Partial<Parameters<typeof handleWorkerCoreRoutes<T
       consumeBrowserBootstrapHandoff: async () => ({ kind: 'ok', value: true }),
       recordUserUiEvent: async () => undefined,
     },
-    getCachedSessionTopology: () => ({
-      version: 'v2',
-      shardCount: 16,
-      idleTtlMs: 1800,
-      absoluteTtlMs: 86400,
-      evictionSweepLimit: 64,
-    }),
     getWorkerLatencySnapshot: () => ({ routes: {} }),
     getUsageSnapshot: async () => ({ userId: 'user-1', count: 3 }),
     now: () => 1700000000000,
@@ -149,13 +141,6 @@ describe('handleWorkerCoreRoutes', () => {
               last_ms: 12,
               unavailable_count: 1,
             },
-            mcp_session_lifecycle: {
-              count: 2,
-              avg_ms: 8,
-              max_ms: 9,
-              last_ms: 7,
-              unavailable_count: 1,
-            },
             ai_chat_quota: { count: 0, avg_ms: 0, max_ms: 0, last_ms: 0, unavailable_count: 0 },
           },
         }),
@@ -166,7 +151,11 @@ describe('handleWorkerCoreRoutes', () => {
     assert.ok(response);
     assert.equal(response?.status, 200);
     assert.equal(payload.status, 'ok');
-    assert.deepEqual(payload.metrics, {
+    const diagnostics = payload.diagnostics as {
+      metrics: { latency_ms: unknown };
+      cloudflare: Record<string, unknown>;
+    };
+    assert.deepEqual(diagnostics.metrics, {
       latency_ms: {
         routes: {},
         durable_objects: {
@@ -178,23 +167,52 @@ describe('handleWorkerCoreRoutes', () => {
             last_ms: 12,
             unavailable_count: 1,
           },
-          mcp_session_lifecycle: {
-            count: 2,
-            avg_ms: 8,
-            max_ms: 9,
-            last_ms: 7,
-            unavailable_count: 1,
-          },
           ai_chat_quota: { count: 0, avg_ms: 0, max_ms: 0, last_ms: 0, unavailable_count: 0 },
         },
       },
     });
-    assert.deepEqual(payload.cloudflare, {
+    assert.deepEqual(diagnostics.cloudflare, {
       analytics_enabled: false,
       async_queue_configured: false,
       async_jobs_kv_configured: false,
       turnstile_enforced_routes: [],
     });
+  });
+
+  it('separates liveness from readiness and reports a local ready contract', async () => {
+    const response = await handleWorkerCoreRoutes(
+      buildContext('/ready'),
+      buildDeps({ workerRole: 'mcp' }),
+    );
+    const payload = (await response?.json()) as Record<string, unknown>;
+
+    assert.ok(response);
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, 'ready');
+    assert.equal(payload.worker_role, 'mcp');
+    assert.equal(payload.schema_version, 'v1');
+  });
+
+  it('returns a failed readiness response when the delegated dependency is unavailable', async () => {
+    const response = await handleWorkerCoreRoutes(
+      buildContext('/ready'),
+      buildDeps({
+        workerRole: 'edge',
+        getReadinessResponse: async () =>
+          new Response(
+            JSON.stringify({
+              status: 'not_ready',
+              worker_role: 'edge',
+              checks: { mcp_worker: { status: 'fail' } },
+            }),
+            { status: 503, headers: { 'content-type': 'application/json' } },
+          ),
+      }),
+    );
+
+    assert.ok(response);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).status, 'not_ready');
   });
 
   it('returns session status through the core route layer', async () => {
@@ -433,7 +451,7 @@ describe('handleWorkerCoreRoutes', () => {
         mcpPath: false,
       },
       buildDeps({
-        recordUiEvent: (eventName, userId, route, outcome) => {
+        recordUiEvent: (_env, eventName, userId, route, outcome) => {
           recorded.push({ eventName, userId, route, outcome });
         },
       }),

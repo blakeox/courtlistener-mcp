@@ -249,10 +249,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     const response = await handleWorkerAuthHandoffRoutes({
       request: new Request(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1&continue=1',
       ),
       url: new URL(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1&continue=1',
       ),
       env: {
         OIDC_ISSUER: 'https://issuer.example',
@@ -317,10 +317,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
   it('requires approval when a same-origin session already exists', async () => {
     const response = await handleWorkerAuthHandoffRoutes({
       request: new Request(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
       ),
       url: new URL(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
       ),
       env: {
         OIDC_ISSUER: 'https://issuer.example',
@@ -355,13 +355,13 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(response?.status, 302);
     assert.equal(
       response?.headers.get('location'),
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
     );
   });
 
   it('bootstraps a UI session from trusted Cloudflare Access identity on the approval route', async () => {
     const approvalUrl =
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
 
     const response = await handleWorkerAuthHandoffRoutes({
       request: new Request(approvalUrl, {
@@ -412,7 +412,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
   it('renders the approval page with only a session secret when a trusted session already exists', async () => {
     const approvalUrl =
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
 
     const response = await handleWorkerAuthHandoffRoutes({
       request: new Request(approvalUrl, {
@@ -453,6 +453,56 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(response.headers.get('x-hosted-auth-status'), 'ready');
     assert.equal(response.headers.get('x-hosted-auth-route'), 'auth-approve');
     assert.equal(response.headers.get('x-hosted-auth-outcome'), 'interactive');
+  });
+
+  it('rejects unsupported scopes before rendering or completing hosted approval', async () => {
+    const authorizeUrl =
+      'https://worker.example/oauth/authorize?response_type=code&client_id=client-1&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fcallback&scope=unknown%3Ascope&state=state-1&code_challenge=challenge&code_challenge_method=S256';
+    const approvalUrl = `https://worker.example/oauth/approve?return_to=${encodeURIComponent(authorizeUrl)}`;
+
+    const response = await handleWorkerAuthHandoffRoutes({
+      request: new Request(approvalUrl, {
+        headers: { cookie: 'clmcp_ui=signed-session' },
+      }),
+      url: new URL(approvalUrl),
+      env: { MCP_UI_SESSION_SECRET: 'abcdefghijklmnopqrstuvwxyz123456' },
+      deps: {
+        jsonError,
+        generateCspNonce: () => 'nonce',
+        htmlResponse,
+        workerUiSessionRuntime: {
+          getUiSessionSecret: () => 'abcdefghijklmnopqrstuvwxyz123456',
+          resolveUiSession: async () => ({ kind: 'authenticated', userId: 'user-123' }),
+          createUiSessionState: async () => null,
+          getOrCreateCsrfCookieHeader: () => 'clmcp_csrf=csrf-token-123; Path=/; SameSite=Lax',
+          isSecureCookieRequest: () => true,
+        },
+        getOAuthHelpers: () => ({
+          parseAuthRequest: async () => ({
+            scope: ['unknown:scope'],
+            redirectUri: 'https://chatgpt.com/callback',
+            state: 'state-1',
+          }),
+          completeAuthorization: async () => {
+            throw new Error('completeAuthorization should not run for invalid_scope');
+          },
+        }),
+        buildHostedOAuthCompletionDetails: () => ({ metadata: {}, props: {} }),
+        resolveGrantedScopes: () => ['legal:read'],
+      },
+    });
+
+    assert.ok(response);
+    assert.equal(response.status, 302);
+    const location = new URL(String(response.headers.get('location')));
+    assert.equal(location.origin, 'https://chatgpt.com');
+    assert.equal(location.pathname, '/callback');
+    assert.equal(location.searchParams.get('error'), 'invalid_scope');
+    assert.equal(location.searchParams.get('state'), 'state-1');
+    assert.equal(response.headers.get('x-hosted-auth-error'), 'invalid_scope');
+    assert.equal(response.headers.get('x-hosted-auth-outcome'), 'rejected');
+    assert.equal(response.headers.get('x-hosted-auth-failure'), 'true');
+    assert.doesNotMatch(String(response.headers.get('set-cookie')), /clauth_approve=/);
   });
 
   it('falls back to the default same-origin success path for hostile absolute return targets', async () => {
@@ -558,10 +608,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     const startResponse = await handleWorkerAuthHandoffRoutes({
       request: new Request(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
       ),
       url: new URL(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
       ),
       env: commonEnv,
       deps: {
@@ -630,7 +680,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.equal(callbackResponse?.status, 302);
     assert.equal(
       callbackResponse?.headers.get('location'),
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
     );
     assert.equal(callbackResponse?.headers.get('x-hosted-auth-correlation-id'), startCorrelationId);
     assert.match(String(callbackResponse?.headers.get('set-cookie')), /clmcp_ui=signed-session/);
@@ -695,10 +745,10 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
     const startResponse = await handleWorkerAuthHandoffRoutes({
       request: new Request(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
       ),
       url: new URL(
-        'https://worker.example/auth/start?return_to=%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
+        'https://worker.example/auth/start?return_to=%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256&continue=1',
       ),
       env: commonEnv,
       deps: {
@@ -770,7 +820,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     );
     assert.equal(
       callbackResponse.headers.get('location'),
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256',
     );
     assert.ok(fetchCalls.some((call) => call.url === 'https://issuer.example/token'));
     assert.ok(fetchCalls.some((call) => call.url === 'https://issuer.example/jwks'));
@@ -779,7 +829,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
   it('renders an approval form and only completes OAuth on CSRF-bound POST', async () => {
     let completionCount = 0;
     const approvalUrl =
-      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
+      'https://worker.example/oauth/approve?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1%26redirect_uri%3Dhttps%253A%252F%252Fchatgpt.com%252Fcallback%26response_type%3Dcode%26state%3Dstate-1%26scope%3Dlegal%253Aread%26code_challenge%3Dchallenge%26code_challenge_method%3DS256';
     const getResponse = await handleWorkerAuthHandoffRoutes({
       request: new Request(approvalUrl, {
         headers: {
@@ -823,7 +873,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.match(approvalHtml, /Approve OAuth access/);
     assert.match(approvalHtml, /name="return_to"/);
     assert.match(approvalHtml, /action="\/oauth\/approve"/);
-    assert.match(approvalHtml, /worker\.example\/authorize\?/);
+    assert.match(approvalHtml, /worker\.example\/oauth\/authorize\?/);
     const responseCookies = getResponse.headers.getSetCookie();
     const setCookie = String(getResponse.headers.get('set-cookie'));
     assert.match(setCookie, /clauth_approve=/);
@@ -1325,7 +1375,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
 
   it('preserves explicit return_to when callback completion fails', async () => {
     const { accessToken, publicJwk } = await createAccessToken();
-    const returnTo = 'https://worker.example/authorize?client_id=client-1';
+    const returnTo = 'https://worker.example/oauth/authorize?client_id=client-1';
     const commonEnv = {
       OIDC_ISSUER: 'https://issuer.example',
       OIDC_AUDIENCE: 'https://worker.example',
@@ -1519,7 +1569,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
           'content-type': 'application/x-www-form-urlencoded',
           cookie: `clmcp_ui=signed-session; clauth_approve=approval; clauth_state=state; ${logoutFlowCookie}; clmcp_csrf=csrf-token-123`,
         },
-        body: `csrf_token=csrf-token-123&return_to=${encodeURIComponent('https://worker.example/authorize?client_id=client-1')}`,
+        body: `csrf_token=csrf-token-123&return_to=${encodeURIComponent('https://worker.example/oauth/authorize?client_id=client-1')}`,
       }),
       url: new URL('https://worker.example/oauth/logout'),
       env: {
@@ -1556,7 +1606,7 @@ describe('handleWorkerAuthHandoffRoutes', () => {
     assert.match(String(postResponse.headers.get('x-hosted-auth-logout-duration-ms')), /^\d+$/);
     assert.equal(
       postResponse.headers.get('location'),
-      'https://worker.example/auth/start?return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1',
+      'https://worker.example/auth/start?return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1',
     );
     const setCookie = String(postResponse.headers.get('set-cookie'));
     assert.match(setCookie, /clmcp_ui=;/);

@@ -14,8 +14,8 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: `npx vite --config src/web-spa/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
-    url: `http://127.0.0.1:${port}/app/control-center`,
+    command: `pnpm exec vite --config src/web-spa/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}/app`,
     reuseExistingServer: false,
     timeout: 120_000,
   },

@@ -1,7 +1,12 @@
 import { LegalMCPServer } from '../src/index.js';
+import {
+  buildServerCapabilities,
+  resolveProtocolFeatureFlags,
+} from '../src/infrastructure/protocol-constants.js';
+import { MCP_SERVER_INSTRUCTIONS } from '../src/infrastructure/mcp-server-instructions.js';
 import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +37,10 @@ async function generate() {
         version: packageJson.version,
         description:
           'Legal research MCP server providing comprehensive access to CourtListener legal database',
+        instructions: MCP_SERVER_INSTRUCTIONS,
+      },
+      protocol: {
+        capabilities: buildServerCapabilities(resolveProtocolFeatureFlags()),
       },
       capabilities: {
         tools,
@@ -56,6 +65,7 @@ async function generate() {
       resourceCount: resources.resources.length,
       promptCount: prompts.prompts.length,
       toolNames: tools.tools.map((t) => t.name),
+      toolsWithOutputSchema: tools.tools.filter((t) => t.outputSchema).length,
       resourceTemplates: resources.resources.map((r) => r.uriTemplate || r.uri),
       promptNames: prompts.prompts.map((p) => p.name),
     };

@@ -15,6 +15,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const {
   GetFinancialDisclosuresHandler,
@@ -160,7 +161,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.ok(payload.summary.includes('2'));
       assert.deepStrictEqual(payload.disclosures, [{ id: 'disc-1' }, { id: 'disc-2' }]);
       assert.strictEqual(payload.pagination.page, 2);
@@ -182,7 +183,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Retrieved 0 financial disclosures');
       assert.deepStrictEqual(payload.disclosures, []);
       assert.strictEqual(payload.pagination.count, 0);
@@ -209,7 +210,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.pagination.page, 2);
       assert.strictEqual(payload.pagination.page_size, 10);
       assert.strictEqual(payload.pagination.total_pages, 6);
@@ -237,7 +238,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.pagination.has_next, false);
       assert.strictEqual(payload.pagination.has_previous, true);
     }
@@ -256,7 +257,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Retrieved 0 financial disclosures');
     }
   });
@@ -277,7 +278,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_financial_disclosures failed');
       assert.strictEqual(payload.details.message, 'API unavailable');
     }
@@ -299,7 +300,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.message, 'Not Found');
     }
   });
@@ -320,7 +321,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_financial_disclosures failed');
       assert.strictEqual(payload.details.message, 'Internal Server Error');
     }
@@ -340,7 +341,7 @@ describe('GetFinancialDisclosuresHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.name, 'TypeError');
       assert.strictEqual(payload.details.message, 'Failed to fetch');
     }
@@ -407,7 +408,7 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Retrieved financial disclosure 99');
       assert.deepStrictEqual(payload.disclosure, {
         id: '99',
@@ -453,7 +454,7 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_financial_disclosure failed');
       assert.strictEqual(payload.details.message, 'Disclosure missing');
     }
@@ -475,7 +476,7 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.message, 'Not Found');
     }
   });
@@ -494,7 +495,7 @@ describe('GetFinancialDisclosureHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_financial_disclosure failed');
     }
   });
@@ -605,7 +606,7 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.ok(payload.summary.includes('1337'));
       assert.deepStrictEqual(payload.data, {
         parties: [{ name: 'Doe' }],
@@ -628,7 +629,7 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.deepStrictEqual(payload.data.parties, []);
       assert.deepStrictEqual(payload.data.attorneys, []);
     }
@@ -677,7 +678,7 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_parties_and_attorneys failed');
       assert.strictEqual(payload.details.message, 'Parties unavailable');
     }
@@ -699,7 +700,7 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.message, 'Docket not found');
     }
   });
@@ -718,7 +719,7 @@ describe('GetPartiesAndAttorneysHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'get_parties_and_attorneys failed');
     }
   });
@@ -875,7 +876,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Successfully created alert');
       assert.deepStrictEqual(payload.result, { id: 'new-alert-1', created: true });
     }
@@ -896,7 +897,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Successfully listd alert');
       assert.deepStrictEqual(payload.result, { alerts: [{ id: '1' }, { id: '2' }] });
     }
@@ -922,7 +923,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.ok(payload.summary.includes('update'));
       assert.deepStrictEqual(payload.result, { success: true });
     }
@@ -944,7 +945,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.summary, 'Successfully deleted alert');
       assert.deepStrictEqual(payload.result, { deleted: true });
     }
@@ -964,7 +965,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, undefined);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.deepStrictEqual(payload.result.alerts, []);
     }
   });
@@ -985,7 +986,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'manage_alerts failed');
       assert.strictEqual(payload.details.message, 'Alert service down');
     }
@@ -1007,7 +1008,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.message, 'Alert not found');
     }
   });
@@ -1026,7 +1027,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.error, 'manage_alerts failed');
     }
   });
@@ -1045,7 +1046,7 @@ describe('ManageAlertsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text);
+      const payload = getStructuredPayload(result);
       assert.strictEqual(payload.details.name, 'TypeError');
       assert.strictEqual(payload.details.message, 'Network request failed');
     }

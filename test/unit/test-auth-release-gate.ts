@@ -17,7 +17,7 @@ describe('auth-release-gate', () => {
     );
   });
 
-  it('includes the auth runtime and middleware coverage checks', () => {
+  it('includes the Worker auth and browser coverage checks', () => {
     const checks = buildChecks({});
 
     assert.deepEqual(
@@ -28,7 +28,6 @@ describe('auth-release-gate', () => {
         'worker-auth-handoff',
         'hosted-auth-html-security',
         'worker-auth-runtime',
-        'server-auth-middleware',
         'spa-auth-vitest',
         'spa-auth-playwright',
         'deployed-oauth-handshake',
@@ -37,13 +36,13 @@ describe('auth-release-gate', () => {
     );
 
     const authRuntime = checks.find((entry) => entry.id === 'worker-auth-runtime');
-    const serverAuthMiddleware = checks.find((entry) => entry.id === 'server-auth-middleware');
     const spaAuthVitest = checks.find((entry) => entry.id === 'spa-auth-vitest');
     const spaAuthPlaywright = checks.find((entry) => entry.id === 'spa-auth-playwright');
 
     assert.ok(authRuntime);
     assert.deepEqual(authRuntime.command, [
-      'npx',
+      'pnpm',
+      'exec',
       'tsx',
       '--test',
       'test/unit/test-worker-oauth-authorize.ts',
@@ -53,15 +52,6 @@ describe('auth-release-gate', () => {
       'test/unit/test-oauth-authorization-completion.ts',
       'test/unit/test-worker-core-routes.ts',
       'test/unit/test-worker-ui-session-runtime.ts',
-    ]);
-
-    assert.ok(serverAuthMiddleware);
-    assert.deepEqual(serverAuthMiddleware.command, [
-      'npx',
-      'tsx',
-      '--test',
-      'test/unit/test-unified-auth.ts',
-      'test/middleware/test-authentication.ts',
     ]);
 
     assert.ok(spaAuthVitest);
@@ -96,7 +86,8 @@ describe('auth-release-gate', () => {
     assert.ok(deployedApproveContract);
     assert.equal(deployedApproveContract.skipReason, undefined);
     assert.deepEqual(deployedApproveContract.command, [
-      'npx',
+      'pnpm',
+      'exec',
       'tsx',
       'scripts/testing/probe-production-approve-contract.ts',
     ]);

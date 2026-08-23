@@ -5,9 +5,9 @@
  * Analyzes performance test results and detects regressions
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,9 +27,46 @@ const THRESHOLDS = {
 /**
  * Parse performance data from test results
  */
+function parseLoadProfileJson(content, filePath) {
+  const data = JSON.parse(content);
+  const metrics = {
+    averageResponseTime: null,
+    successRate: null,
+    totalTests: null,
+    passedTests: null,
+    timestamp: data.timestamp || null,
+  };
+
+  const summary = data.summary;
+  if (summary && typeof summary === 'object') {
+    metrics.averageResponseTime = summary.latency_ms?.avg_ms ?? null;
+    if (typeof summary.total_requests === 'number') {
+      metrics.totalTests = summary.total_requests;
+      metrics.passedTests = summary.total_success ?? null;
+      metrics.successRate =
+        typeof summary.total_error_rate_pct === 'number'
+          ? 100 - summary.total_error_rate_pct
+          : summary.total_requests > 0 && typeof summary.total_success === 'number'
+            ? (summary.total_success / summary.total_requests) * 100
+            : null;
+    }
+  }
+
+  const timestampMatch = filePath.match(/(\d{8}-\d{6})/);
+  if (timestampMatch) {
+    metrics.timestamp = timestampMatch[1];
+  }
+
+  return metrics;
+}
+
 function parsePerformanceData(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
+
+    if (filePath.endsWith('.json')) {
+      return parseLoadProfileJson(content, filePath);
+    }
 
     // Extract performance metrics from test output
     const metrics = {
@@ -86,7 +123,7 @@ function analyzePerformanceDirectory(dirPath) {
 
   const files = fs
     .readdirSync(dirPath)
-    .filter((f) => f.endsWith('.txt'))
+    .filter((f) => f.endsWith('.json') || f.endsWith('.txt'))
     .sort()
     .reverse(); // Most recent first
 

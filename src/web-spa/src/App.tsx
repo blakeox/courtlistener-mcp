@@ -36,7 +36,7 @@ function AppContent(): React.JSX.Element {
 
   const hasVerifiedAndLoggedIn = Boolean(session?.authenticated);
   const hasToken = Boolean(token.trim());
-  const expectedProtocolVersion = '2025-06-18';
+  const expectedProtocolVersion = '2026-07-28';
   const mcpReadinessQuery = useQuery({
     queryKey: ['mcp-runtime-readiness', token],
     queryFn: () => verifyMcpRuntimeReadiness(token),
@@ -67,21 +67,6 @@ function AppContent(): React.JSX.Element {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/get-started" element={<LandingPage initialSectionId="setup" />} />
-            <Route path="/account" element={<Navigate to="/app/account" replace />} />
-            <Route path="/download" element={<Navigate to="/app/download" replace />} />
-            <Route path="/connect" element={<Navigate to="/app/connect" replace />} />
-            <Route path="/playground" element={<Navigate to="/app/playground" replace />} />
-            <Route path="/tools" element={<Navigate to="/app/tools" replace />} />
-            <Route path="/workflows" element={<Navigate to="/app/workflows" replace />} />
-            <Route path="/sessions" element={<Navigate to="/app/sessions" replace />} />
-            <Route path="/review" element={<Navigate to="/app/review" replace />} />
-            <Route path="/observability" element={<Navigate to="/app/observability" replace />} />
-            <Route path="/usage" element={<Navigate to="/app/usage" replace />} />
-            <Route path="/diagnostics" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route path="/readiness" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route path="/credentials" element={<Navigate to="/app/credentials" replace />} />
-            <Route path="/session" element={<Navigate to="/app/account" replace />} />
-            <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </React.Suspense>
@@ -95,27 +80,14 @@ function AppContent(): React.JSX.Element {
         <React.Suspense fallback={<LoadingState label="Loading page" />}>
           <Routes>
             <Route path="/app" element={<WorkspaceDashboardPage />} />
-            <Route path="/app/control-center" element={<WorkspaceDashboardPage />} />
             <Route path="/app/signup" element={<HostedAuthRedirectPage />} />
             <Route path="/app/login" element={<HostedAuthRedirectPage />} />
             <Route path="/app/reset-password" element={<HostedAuthRedirectPage />} />
-            <Route path="/app/onboarding" element={<Navigate to="/app" replace />} />
-            <Route path="/app/download" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route path="/app/connect" element={<Navigate to="/app/playground" replace />} />
             <Route path="/app/playground" element={<PlaygroundPage />} />
-            <Route path="/app/sessions" element={<Navigate to="/app" replace />} />
-            <Route path="/app/workflows" element={<Navigate to="/app/playground" replace />} />
-            <Route path="/app/tools" element={<Navigate to="/app/playground" replace />} />
-            <Route path="/app/review" element={<Navigate to="/app" replace />} />
             <Route path="/app/usage" element={<UsagePage />} />
             <Route path="/app/observability" element={<ObservabilityPage />} />
             <Route path="/app/diagnostics" element={<OnboardingPage />} />
-            <Route path="/app/readiness" element={<Navigate to="/app/diagnostics" replace />} />
-            <Route path="/app/credentials" element={<Navigate to="/app/account" replace />} />
             <Route path="/app/account" element={<AccountPage />} />
-            <Route path="/app/session" element={<Navigate to="/app/account" replace />} />
-            <Route path="/app/keys" element={<Navigate to="/app/credentials" replace />} />
-            <Route path="/app/docs" element={<Navigate to="/app/diagnostics" replace />} />
             <Route path="*" element={smartRedirectElement} />
           </Routes>
         </React.Suspense>
@@ -132,7 +104,7 @@ function SmartRedirect(props: {
 }): React.JSX.Element {
   let target = '/app';
   if (props.hasMcpSuccess) target = '/app';
-  else if (props.hasProtocolMismatch) target = '/app/control-center';
+  else if (props.hasProtocolMismatch) target = '/app';
   else if (props.hasToken) target = '/app/playground';
   else if (props.hasVerifiedAndLoggedIn) target = '/app/account';
   return <Navigate to={target} replace />;

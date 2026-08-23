@@ -3,17 +3,25 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { getOAuthFrontdoorRateLimitedResponse } from '../../src/server/worker-oauth-frontdoor-rate-limit.js';
+import {
+  assertOAuthFrontdoorRateLimitDeps,
+  getOAuthFrontdoorRateLimitedResponse,
+} from '../../src/server/worker-oauth-frontdoor-rate-limit.js';
 
 describe('worker-oauth-frontdoor-rate-limit', () => {
+  it('rejects incomplete production limiter wiring', () => {
+    assert.throws(() => assertOAuthFrontdoorRateLimitDeps({ now: () => 123 }), {
+      message:
+        'OAuth front-door rate limiting is unavailable: all limiter dependencies are required.',
+    });
+  });
+
   it('returns null when rate-limit deps are not fully provided', async () => {
     const response = await getOAuthFrontdoorRateLimitedResponse(
       new Request('https://worker.example/auth/start'),
       {},
       'auth-start',
-      {
-        now: () => 123,
-      },
+      { now: () => 123 },
     );
 
     assert.equal(response, null);

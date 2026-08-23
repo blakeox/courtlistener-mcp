@@ -10,7 +10,6 @@ area/build:
   - changed-files:
       - any-glob-to-any-file:
           - '.github/workflows/**'
-          - 'Dockerfile*'
 area/code:
   - changed-files:
       - any-glob-to-any-file:

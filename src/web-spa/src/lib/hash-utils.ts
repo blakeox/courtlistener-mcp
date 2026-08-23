@@ -46,10 +46,10 @@ export function getRecoveryTokenHash(): string {
   return (searchParams.get('token_hash') || hashParams.get('token_hash') || '').trim();
 }
 
-/** Pre-render redirect: if current URL has a recovery hash, redirect to /app/control-center. */
+/** Pre-render redirect: if current URL has a recovery hash, redirect to /app/account. */
 export function redirectRecoveryHashToResetPage(): void {
   if (!isRecoveryHash()) return;
-  if (window.location.pathname === '/app/control-center') return;
+  if (window.location.pathname === '/app/account') return;
   const hashParams = parseHashParams();
   const searchParams = parseSearchParams();
   const recoverySearch = new URLSearchParams();
@@ -72,6 +72,6 @@ export function redirectRecoveryHashToResetPage(): void {
 
   const search = recoverySearch.toString();
   const hash = recoveryHash.toString();
-  const target = `/app/control-center${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
+  const target = `/app/account${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
   window.location.replace(target);
 }

@@ -7,7 +7,7 @@ import {
   runProtocolHeaderNegotiationContract,
 } from '../utils/mcp-contract-harness.js';
 
-const SUPPORTED = new Set(['2025-03-26']);
+const SUPPORTED = new Set(['2026-07-28']);
 
 describe('authorizeMcpGatewayRequest', () => {
   it('returns auth error without running protocol validation', async () => {
@@ -43,7 +43,7 @@ describe('authorizeMcpGatewayRequest', () => {
 
   it('applies protocol negotiation contract for POST requests', async () => {
     await runProtocolHeaderNegotiationContract(
-      { supportedVersion: '2025-03-26' },
+      { supportedVersion: '2026-07-28' },
       async (fixture) => {
         const headers = new Headers();
         if (fixture.headerValue) {
@@ -72,7 +72,7 @@ describe('authorizeMcpGatewayRequest', () => {
       request: new Request('https://example.com/mcp', {
         method: 'POST',
         headers: {
-          'MCP-Protocol-Version': '2025-03-26',
+          'MCP-Protocol-Version': '2026-07-28',
           'MCP-Capability-Profile': 'experimental',
         },
       }),

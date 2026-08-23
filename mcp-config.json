@@ -7,14 +7,7 @@
         "COURTLISTENER_API_KEY": "YOUR_API_KEY_HERE"
       }
     },
-    "courtlistener-remote-bridge": {
-      "command": "node",
-      "args": ["scripts/dev/mcp-remote.js"],
-      "env": {
-        "MCP_REMOTE_URL": "https://courtlistenermcp.blakeoxford.com/mcp"
-      }
-    },
-    "courtlistener-remote-http": {
+    "courtlistener-remote": {
       "url": "https://courtlistenermcp.blakeoxford.com/mcp",
       "transport": "streamable-http"
     }

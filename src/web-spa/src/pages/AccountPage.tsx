@@ -55,7 +55,7 @@ export function AccountPage(): React.JSX.Element {
     enabled: hasServerSession && hasToken,
     retry: false,
   });
-  const expectedProtocolVersion = '2025-06-18';
+  const expectedProtocolVersion = '2026-07-28';
   const protocolMismatch = Boolean(
     protocolQuery.data?.protocolVersion &&
     protocolQuery.data.protocolVersion !== expectedProtocolVersion,
@@ -182,7 +182,7 @@ export function AccountPage(): React.JSX.Element {
         description={accountDescription}
         actions={
           <InlineGroup>
-            <ButtonLink to="/app/credentials" variant="secondary">
+            <ButtonLink to="/app/account" variant="secondary">
               Open credentials
             </ButtonLink>
             {hasServerSession ? (
@@ -435,11 +435,11 @@ export function AccountPage(): React.JSX.Element {
                           ? `⚠ Protocol mismatch (${protocolQuery.data?.protocolVersion || 'unknown'})`
                           : `✓ ${protocolQuery.data?.protocolVersion || 'ready'}`,
               },
-              ...(protocolQuery.data?.sessionId
+              ...(protocolQuery.data
                 ? [
                     {
-                      term: 'Runtime session',
-                      description: protocolQuery.data.sessionId,
+                      term: 'MCP transport',
+                      description: 'Stateless v2',
                       descriptionClassName: monoClass,
                     },
                   ]

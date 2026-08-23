@@ -126,7 +126,7 @@ describe('remote oauth handshake probe', () => {
     let requestedUrl: string | null = null;
     const probe = await probeHostedAuthReadiness(
       'https://worker.example',
-      'https://worker.example/authorize?client_id=client-1',
+      'https://worker.example/oauth/authorize?client_id=client-1',
       async (input) => {
         requestedUrl = String(input);
         return new Response(null, {
@@ -150,7 +150,7 @@ describe('remote oauth handshake probe', () => {
 
     assert.equal(
       requestedUrl,
-      'https://worker.example/auth/start?continue=1&return_to=https%3A%2F%2Fworker.example%2Fauthorize%3Fclient_id%3Dclient-1',
+      'https://worker.example/auth/start?continue=1&return_to=https%3A%2F%2Fworker.example%2Foauth%2Fauthorize%3Fclient_id%3Dclient-1',
     );
     assert.equal(probe.ready, true);
     assert.equal(probe.location, 'https://issuer.example/authorize?client_id=worker-client');

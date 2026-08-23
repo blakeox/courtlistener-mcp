@@ -101,7 +101,8 @@ wrapper.
 | `text-ui-xl`         | `--text-2xl`        |
 | `text-ui-display-sm` | `--text-display-sm` |
 
-Prefer these over `text-[length:var(--text-*)]` in new `*-classes.ts` recipes.
+Prefer these semantic utilities over dynamic arbitrary text-length classes in
+new `*-classes.ts` recipes.
 
 ## Dark mode
 
@@ -138,14 +139,14 @@ component CSS for complex grids.
 ## Local development
 
 ```bash
-npm run dev:spa
+pnpm run dev:spa
 ```
 
 Opens Vite at `http://127.0.0.1:5173`. Worker routes (`/api`, `/auth`, `/oauth`,
 `/mcp`, `/health`, `/.well-known`, …) proxy to the **edge** worker at
-`http://localhost:8787` (`pnpm run dev:edge` or `pnpm run dev:workers`). The MCP
-worker runs on `:3001` and is reached by the edge worker via `MCP_SERVICE` or
-the local dev upstream default.
+`http://localhost:8787` (`pnpm run dev:workers`). The MCP worker runs on `:3001`
+and is reached by the edge worker via `MCP_SERVICE` or the local dev upstream
+default.
 
 ## Accessibility (WCAG 2.2 AA target)
 
@@ -221,8 +222,8 @@ pnpm run test:spa:a11y:smoke      # Playwright axe smoke on built SPA routes
 ```bash
 pnpm run ci:check:design-system   # Tailwind wired, class-recipe modules, token-only CSS, production CSS budget
 pnpm run ci:check:a11y            # Accessibility static gate (see above)
-npm run test:spa                 # Vitest (design-system + a11y wiring; skips production build — see below)
-npm run test:spa:design          # Playwright layout/token smoke (landing, workspace, usage, observability, …)
+pnpm run test:spa                 # Vitest (design-system + a11y wiring; skips production build — see below)
+pnpm run test:spa:design          # Playwright layout/token smoke (landing, workspace, usage, observability, …)
 pnpm run test:spa:a11y:smoke     # Playwright axe smoke (landing + workspace)
 ```
 
@@ -269,7 +270,7 @@ export const textLinkClass = cn(
    `lib/playground-classes.ts`.
 8. For workspace pages (`AccountPage`, `UsagePage`, …), add layout recipes in
    `lib/workspace-classes.ts`.
-9. Run `npm run test:spa` and `npm run test:spa:design`.
+9. Run `pnpm run test:spa` and `pnpm run test:spa:design`.
 
 ## Hook classes (stable selectors)
 

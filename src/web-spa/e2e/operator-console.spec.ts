@@ -11,7 +11,7 @@ test.describe('SPA operator console', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
 
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sign in' }).first()).toHaveAttribute(
@@ -36,7 +36,7 @@ test.describe('SPA operator console', () => {
       },
     });
 
-    await page.goto('/app/control-center');
+    await page.goto('/app');
 
     const recoveryBanner = page.getByRole('status').filter({
       hasText: 'Account recovery:',
@@ -86,7 +86,6 @@ test.describe('SPA operator console', () => {
         },
       },
       runtime: {
-        sessionId: 'mcp-session-e2e',
         tools: [
           {
             name: 'search_cases',
@@ -138,8 +137,8 @@ test.describe('SPA operator console', () => {
     await expect(page.getByText('operator-1').first()).toBeVisible();
     await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
     await expect(page.getByText('Runtime ready')).toBeVisible();
-    await expect(page.getByText('Runtime session')).toBeVisible();
-    await expect(page.getByText('mcp-session-e2e')).toBeVisible();
+    await expect(page.getByText('MCP transport')).toBeVisible();
+    await expect(page.getByText('Stateless v2')).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
 

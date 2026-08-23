@@ -6,15 +6,17 @@
    - `pnpm install`
    - `pnpm run build` (when baseline TypeScript state allows)
 2. Protocol smoke tests:
-   - `npm run test:mcp`
+   - `pnpm run test:mcp`
    - `pnpm run test:runtime-parity:certify` (artifact:
      `test-output/runtime-parity/certification-report.json`)
    - `pnpm run ci:auth-release-gate` for hosted auth regressions across handoff,
      HTML CSP contract, and (when `OAUTH_BASE_URL` is set) production approve
-     probes runtime trust boundaries, authorize flow, and server auth middleware
-3. Cloudflare readiness:
+     probes runtime trust boundaries, authorize flow, and Worker auth handoff
+3. Worker startup profiling:
+   - `pnpm run cloudflare:check:startup`
+4. Cloudflare readiness:
    - `pnpm run cloudflare:check`
-4. Confirm required secrets:
+5. Confirm required secrets:
    - `COURTLISTENER_API_KEY`
    - At least one auth mode (`MCP_AUTH_TOKEN` or `OIDC_ISSUER`)
    - `MCP_UI_SESSION_SECRET` for Worker-owned browser auth/session signing
@@ -24,7 +26,7 @@
      `TURNSTILE_SECRET_KEY`
    - if Cloudflare analytics emission is enabled,
      `MCP_CF_ANALYTICS_ENABLED=true`
-5. Confirm runtime parity inputs:
+6. Confirm runtime parity inputs:
    - `MCP_ALLOWED_ORIGINS` aligned with expected browser clients
    - session secret configured (`MCP_UI_SESSION_SECRET`)
    - if Worker-native hosted auth is enabled, verify `OIDC_ISSUER` plus the
@@ -41,17 +43,21 @@
    - if `MCP_TRUST_CLOUDFLARE_ACCESS_JWT_ASSERTION` or
      `MCP_TRUST_CLOUDFLARE_ACCESS_IDENTITY_HEADERS` is enabled, require
      `MCP_TRUST_CLOUDFLARE_ACCESS_ACKNOWLEDGED=true`
-   - remove deprecated `MCP_AUTH_UI_ORIGIN`; Worker-owned hosted auth is
-     same-origin only
+   - hosted auth is Worker-owned and same-origin only; no external auth-origin
+     override is supported
    - if queue-backed async execution is enabled, bind both `ASYNC_TOOL_QUEUE`
      and `ASYNC_JOBS_KV`
    - if Turnstile is enforced, set `MCP_TURNSTILE_ENFORCED_ROUTES` explicitly
      (current route ids: `session_bootstrap`, `ai_chat`)
 
+The GitHub Actions release controller enforces the dedicated-secret gate, so a
+missing `MCP_OAUTH_REGISTRATION_TOKEN_SECRET` blocks a release instead of
+silently falling back to UI-session or CourtListener API-key material.
+
 ## Post-deploy verification
 
 1. `GET /health` returns success.
-2. MCP initialize succeeds on `/mcp`.
+2. MCP v2 `server/discover` and an envelope-bearing request succeed on `/mcp`.
 3. CORS check from expected origin succeeds.
 4. Authentication path expected for current mode (static/OIDC).
 5. Hosted browser auth probe and approval journey:
@@ -80,7 +86,7 @@
    - Performance certification remains within gate budgets
      (`pnpm run ci:perf-gate -- performance-data/load-profile-baseline.json performance-data/load-profile-current.json`).
    - Combined release-readiness gate remains green
-     (`pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:3002`).
+     (`pnpm run ci:release-readiness-gate -- --light --base-url http://127.0.0.1:8787`).
    - Async workflow contracts remain green
      (`test/unit/test-async-tool-execution-service.ts`).
    - Startup diagnostics invariants stay `status=ok` on `/startup-diagnostics`.
@@ -88,21 +94,21 @@
      `/health`.
 3. Block promotion and trigger rollback if protocol negotiation failures, auth
    regression, or startup invariant errors appear.
-4. Treat any accidental reintroduction of `MCP_AUTH_UI_ORIGIN`, missing Access
-   acknowledgement, or missing dedicated registration-token secret as rollout
-   blockers for hosted auth.
+4. Treat missing Access acknowledgement or missing dedicated registration-token
+   secret as rollout blockers for hosted auth.
 
 ## Fast rollback playbook
 
 1. Identify last known good deployment.
-2. Redeploy previous commit/tag:
-   - `wrangler deploy --env <env> --compatibility-date <date>` (using previous
-     artifact/commit context)
+2. Use the recorded release state and the versioned release controller:
+   - `pnpm run cloudflare:release -- --environment <env> --phase rollback --release-id <release-id> --source-sha <40-char-sha> --state-file release-state.json`
+   - In CI, rerun the Cloudflare Release Controller workflow with the same
+     release state and select its rollback path.
 3. Re-run:
    - `/health` check
-   - MCP initialize smoke test
+   - MCP v2 discovery and envelope smoke tests
 4. Tail logs for 5–10 minutes:
-   - `pnpm run cloudflare:tail`
+   - `pnpm run cloudflare:tail:edge` and/or `pnpm run cloudflare:tail:mcp`
 5. Open incident follow-up item with:
    - trigger condition
    - blast radius

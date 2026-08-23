@@ -1,5 +1,9 @@
 @import 'tailwindcss';
-@source './**/*.{tsx,html}';
+@source './*.tsx';
+@source './components';
+@source './hooks';
+@source './lib';
+@source './pages';
 
 @import './styles/tokens.css';
 @import './styles/theme.css';

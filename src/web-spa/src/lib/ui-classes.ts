@@ -20,7 +20,7 @@ export const mutedCopyClass = 'muted text-muted';
 
 export const cardClass = cn(
   'ui-card',
-  'rounded-portal-md border border-border-subtle bg-panel p-(--space-5) shadow-[var(--surface-shadow)]',
+  'rounded-portal-md border border-border-subtle bg-[image:var(--surface-panel-bg)] p-(--space-5) shadow-[var(--surface-shadow)]',
   'max-sm:p-(--space-3)',
 );
 
@@ -30,11 +30,11 @@ export const cardSpotlightClass = cn(
 );
 
 export const cardTitleClass =
-  'm-0 text-[length:var(--text-2xl)] tracking-[var(--tracking-snug)] text-foreground';
+  'm-0 [font-family:var(--font-serif)] text-[length:var(--text-2xl)] font-semibold tracking-[var(--tracking-snug)] text-foreground';
 
 export const panelClass = cn(
   'panel-card',
-  'grid gap-(--space-2) rounded-portal-md border border-border-subtle bg-panel p-(--space-4-5)',
+  'grid gap-(--space-2) rounded-portal-md border border-border-subtle bg-[image:var(--surface-panel-bg)] p-(--space-4-5)',
 );
 
 export const panelInverseClass = cn(
@@ -53,7 +53,7 @@ export const pageHeaderMainClass = cn(
 );
 
 export const pageHeaderTitleClass = cn(
-  'm-0 text-[length:clamp(var(--text-display-sm),3vw,var(--text-display-md))] leading-[var(--leading-snug)] tracking-[var(--tracking-tight)]',
+  'm-0 [font-family:var(--font-serif)] text-[length:clamp(var(--text-display-sm),3vw,var(--text-display-md))] font-semibold leading-[var(--leading-snug)] tracking-[var(--tracking-tight)]',
 );
 
 export const pageHeaderDescriptionClass = cn(
@@ -87,7 +87,7 @@ export const pageHeroMainClass = cn(
 );
 
 export const pageHeroTitleClass = cn(
-  'm-0 text-[length:clamp(var(--text-display-hero-sm),5vw,var(--text-display-xl))] font-extrabold leading-[var(--leading-tight)] tracking-[var(--tracking-tighter)] text-[color:var(--shell-sidebar-text-strong)]',
+  'm-0 [font-family:var(--font-serif)] text-[length:clamp(var(--text-display-hero-sm),5vw,var(--text-display-xl))] font-semibold leading-[var(--leading-tight)] tracking-[var(--tracking-tighter)] text-[color:var(--shell-sidebar-text-strong)]',
 );
 
 export const pageHeroDescriptionClass = cn(
@@ -203,7 +203,7 @@ export function iconButtonClassName(chrome: 'boxed' | 'inline', className?: stri
   return cn(
     'icon-btn cursor-pointer',
     chrome === 'inline'
-      ? 'inline h-auto w-auto border-0 bg-transparent p-0.5 px-1 text-inherit opacity-60'
+      ? 'inline h-auto w-auto border-0 bg-transparent p-0.5 px-1 text-faint hover:text-foreground focus-visible:text-foreground'
       : 'size-[30px] rounded-portal-sm border border-border bg-[color:var(--surface-control-bg)]',
     controlFocusClass,
     className,
@@ -255,7 +255,7 @@ export const emptyStateClass = cn(
 export const emptyStateIconClass = 'empty-state-icon text-[length:var(--text-display-sm)]';
 
 export const emptyStateHintClass =
-  'empty-state-hint text-[length:var(--text-base-plus)] opacity-80';
+  'empty-state-hint text-[length:var(--text-base-plus)] text-faint';
 
 export function comparisonCardClassName(
   tone: 'default' | 'mcp',
@@ -332,7 +332,7 @@ export function metaNoteClassName(size: 'default' | 'large', className?: string)
   return cn(size === 'large' ? metaNoteLgClass : metaNoteClass, className);
 }
 
-export const metaNoteDetailClass = 'meta-note-detail ml-1 font-normal opacity-80';
+export const metaNoteDetailClass = 'meta-note-detail ml-1 font-normal text-faint';
 
 export const tokenKeyClass = 'token-key text-accent-muted';
 
@@ -350,7 +350,7 @@ export const sessionBadgeDotClass =
 
 export const sessionBadgeDotConnectedClass = 'bg-[color:var(--surface-dot-success)]';
 
-export const sessionBadgeToolsClass = 'session-badge-tools opacity-60';
+export const sessionBadgeToolsClass = 'session-badge-tools text-faint';
 
 export function statusPillClassName(
   tone: 'ok' | 'error' | 'info' | 'mcp' | 'plain',
@@ -492,7 +492,8 @@ export const brandLinkMarkClass = 'brand-link-mark inline-flex items-center just
 export const brandLinkCopyClass = cn('brand-link-copy inline-flex flex-col', 'gap-(--space-0-5)');
 export const brandLinkTitleRowClass =
   'brand-link-title-row inline-flex flex-wrap items-center gap-(--space-3)';
-export const brandLinkNameClass = 'brand-link-name font-extrabold tracking-[var(--tracking-snug)]';
+export const brandLinkNameClass =
+  'brand-link-name [font-family:var(--font-serif)] font-semibold tracking-[var(--tracking-snug)]';
 export const brandLinkSubtitleClass =
   'brand-link-subtitle text-[length:var(--text-base-sm)] text-faint uppercase tracking-[var(--tracking-label)]';
 
@@ -501,8 +502,10 @@ export function navCardLinkClassName(active: boolean, className?: string): strin
     'nav-card-link relative flex items-center rounded-portal-sm border border-transparent bg-transparent py-(--space-2-5) pr-(--space-3) pl-(--space-4) font-semibold text-[color:var(--shell-sidebar-link-text)] shadow-none no-underline transition-[color,background,border-color] duration-200',
     'before:absolute before:top-(--space-2-5) before:bottom-(--space-2-5) before:left-0 before:w-[var(--size-border-md)] before:rounded-full before:bg-transparent before:content-[""]',
     'hover:border-[color:var(--shell-sidebar-link-hover-border)] hover:bg-[color:var(--shell-sidebar-link-bg)] hover:text-[color:var(--shell-sidebar-link-hover-text)]',
+    'focus-visible:outline focus-visible:outline-[length:var(--size-focus-ring-sm)] focus-visible:outline-offset-[var(--size-focus-offset-lg)] focus-visible:outline-[color:var(--shell-focus-ring)]',
+    'focus-visible:border-[color:var(--shell-sidebar-link-hover-border)] focus-visible:bg-[color:var(--shell-sidebar-link-bg)] focus-visible:text-[color:var(--shell-sidebar-link-hover-text)]',
     active &&
-      'active border-transparent bg-[color:var(--shell-sidebar-link-active-bg)] text-[color:var(--shell-sidebar-link-active-text)] shadow-none before:bg-[color:var(--shell-sidebar-link-active-indicator)]',
+      'active border-transparent bg-[image:var(--shell-sidebar-link-active-bg)] text-[color:var(--shell-sidebar-link-active-text)] shadow-none before:bg-[color:var(--shell-sidebar-link-active-indicator)]',
     'min-shell:py-(--space-3) min-shell:pr-(--space-3) min-shell:pl-(--space-4-5)',
     '[&.disabled]:pointer-events-none [&.disabled]:opacity-[var(--opacity-disabled)]',
     className,
@@ -514,19 +517,20 @@ export const pageHeroNoteClass = cn(
 );
 
 export const pageHeroNoteTitleClass =
-  'page-hero-note-title text-[length:var(--text-3xl)] tracking-[var(--tracking-tight)]';
+  'page-hero-note-title [font-family:var(--font-serif)] text-[length:var(--text-3xl)] font-semibold tracking-[var(--tracking-tight)]';
 
 export const pageHeroNoteTextClass =
   'page-hero-note-text m-0 leading-[var(--leading-copy)] text-[color:var(--hero-note-text)]';
 
-export const sectionHeadingTitleClass = 'm-0 tracking-[var(--tracking-tight)]';
+export const sectionHeadingTitleClass =
+  'm-0 [font-family:var(--font-serif)] font-semibold tracking-[var(--tracking-tight)]';
 
 export const sectionHeadingDescriptionClass = cn(
   'm-0 text-[length:var(--text-lg-plus)] leading-[var(--leading-loose)]',
 );
 
 export const featureCardTitleClass =
-  'text-[length:var(--text-title)] tracking-[var(--tracking-snug)]';
+  '[font-family:var(--font-serif)] text-[length:var(--text-title)] font-semibold tracking-[var(--tracking-snug)]';
 
 export const featureCardDescriptionClass = cn(
   'm-0 text-[length:var(--text-lg-plus)] leading-[var(--leading-loose)]',
@@ -551,7 +555,7 @@ export const landingSectionHeadingCompactClass = cn(
 
 export const landingSectionHeadingTitleClass = cn(
   sectionHeadingTitleClass,
-  'mt-(--space-3-5) text-[length:var(--text-display-sm)] font-bold leading-[var(--leading-compact)]',
+  'mt-(--space-3-5) text-[length:var(--text-display-sm)] font-semibold leading-[var(--leading-compact)]',
 );
 
 export const landingSectionHeadingDescriptionClass = cn(

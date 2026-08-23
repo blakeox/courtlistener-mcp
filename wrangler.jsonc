@@ -1,5 +1,0 @@
-{
-  // Default config is the edge/portal worker. MCP and auth-limiter use sibling configs.
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "extends": "./wrangler.edge.jsonc",
-}

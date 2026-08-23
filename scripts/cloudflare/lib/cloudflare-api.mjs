@@ -11,11 +11,15 @@ export function requireEnv(name) {
 }
 
 export function getCloudflareCredentials() {
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const apiToken = (
+    process.env.CLOUDFLARE_API_TOKEN ?? process.env.CLOUDFLARE_READONLY_API_TOKEN
+  )?.trim();
   if (apiToken) {
     return { apiToken };
   }
-  throw new Error('Set CLOUDFLARE_API_TOKEN with Zone.WAF Edit and Zone.Zone Read permissions.');
+  throw new Error(
+    'Set CLOUDFLARE_API_TOKEN or CLOUDFLARE_READONLY_API_TOKEN with the minimum read permissions required for this check.',
+  );
 }
 
 export async function cloudflareRequest(path, { method = 'GET', body } = {}) {

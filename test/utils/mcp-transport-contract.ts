@@ -36,26 +36,6 @@ export function createProtocolHeaderNegotiationCases(
   ];
 }
 
-export interface InvalidSessionLifecycleCase {
-  name: string;
-  sessionId: string;
-}
-
-export function createInvalidSessionLifecycleCases(
-  closedSessionId: string,
-): InvalidSessionLifecycleCase[] {
-  return [
-    {
-      name: 'unknown session id',
-      sessionId: 'invalid-session-id',
-    },
-    {
-      name: 'closed session id',
-      sessionId: closedSessionId,
-    },
-  ];
-}
-
 interface ErrorPayload {
   error?: string;
   message?: string;
@@ -71,19 +51,4 @@ export async function assertAuthFailureShape(
   assert.equal(payload.error, expectedError);
   assert.equal(typeof payload.message, 'string');
   return payload;
-}
-
-interface JsonRpcInvalidSessionPayload {
-  jsonrpc?: string;
-  error?: {
-    code?: number;
-    message?: string;
-  };
-}
-
-export function assertInvalidSessionLifecycleShape(payload: unknown): void {
-  const typed = payload as JsonRpcInvalidSessionPayload;
-  assert.equal(typed.jsonrpc, '2.0');
-  assert.equal(typed.error?.code, -32000);
-  assert.equal(typed.error?.message, 'Invalid or missing session');
 }

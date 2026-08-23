@@ -1,16 +1,32 @@
+import {
+  buildWorkerOperationalTelemetryEvent,
+  type WorkerOperationalTelemetryInput,
+} from './worker-operational-telemetry.js';
+
 export interface CloudflareTelemetryEnv {
   ANALYTICS?: AnalyticsEngineDataset;
   MCP_CF_ANALYTICS_ENABLED?: string;
+  MCP_CF_STRUCTURED_LOGS_ENABLED?: string;
 }
 
 export interface CloudflareTelemetryRuntime<TEnv extends CloudflareTelemetryEnv> {
-  setCurrentEnv(env: TEnv | null): void;
-  recordRouteLatency(route: string, elapsedMs: number): void;
-  recordDurableObjectLatency(dimension: string, elapsedMs: number): void;
-  recordDurableObjectUnavailable(dimension: string): void;
-  recordTurnstileVerdict(routeId: string, outcome: 'passed' | 'failed' | 'not_enforced'): void;
-  recordAsyncJobUpdate(status: string, toolName: string, attempts: number): void;
-  recordUiEvent(eventName: string, userId: string | null, route: string, outcome: string): void;
+  recordRouteLatency(env: TEnv, route: string, elapsedMs: number): void;
+  recordDurableObjectLatency(env: TEnv, dimension: string, elapsedMs: number): void;
+  recordDurableObjectUnavailable(env: TEnv, dimension: string): void;
+  recordTurnstileVerdict(
+    env: TEnv,
+    routeId: string,
+    outcome: 'passed' | 'failed' | 'not_enforced',
+  ): void;
+  recordAsyncJobUpdate(env: TEnv, status: string, toolName: string, attempts: number): void;
+  recordUiEvent(
+    env: TEnv,
+    eventName: string,
+    userId: string | null,
+    route: string,
+    outcome: string,
+  ): void;
+  recordOperationalEvent(env: TEnv, event: WorkerOperationalTelemetryInput): void;
 }
 
 function parseBoolean(raw: string | undefined): boolean {
@@ -22,22 +38,19 @@ function parseBoolean(raw: string | undefined): boolean {
 export function createCloudflareTelemetryRuntime<
   TEnv extends CloudflareTelemetryEnv,
 >(): CloudflareTelemetryRuntime<TEnv> {
-  let currentEnv: TEnv | null = null;
-
-  function getWritableEnv(): (TEnv & { ANALYTICS: AnalyticsEngineDataset }) | null {
+  function getWritableEnv(env: TEnv): (TEnv & { ANALYTICS: AnalyticsEngineDataset }) | null {
     if (
-      currentEnv &&
-      parseBoolean(currentEnv.MCP_CF_ANALYTICS_ENABLED) &&
-      currentEnv.ANALYTICS &&
-      typeof currentEnv.ANALYTICS.writeDataPoint === 'function'
+      parseBoolean(env.MCP_CF_ANALYTICS_ENABLED) &&
+      env.ANALYTICS &&
+      typeof env.ANALYTICS.writeDataPoint === 'function'
     ) {
-      return currentEnv as TEnv & { ANALYTICS: AnalyticsEngineDataset };
+      return env as TEnv & { ANALYTICS: AnalyticsEngineDataset };
     }
     return null;
   }
 
-  function writePoint(indexes: string[], blobs: string[], doubles: number[]): void {
-    const writableEnv = getWritableEnv();
+  function writePoint(env: TEnv, indexes: string[], blobs: string[], doubles: number[]): void {
+    const writableEnv = getWritableEnv(env);
     if (!writableEnv) return;
     try {
       writableEnv.ANALYTICS.writeDataPoint({
@@ -55,31 +68,73 @@ export function createCloudflareTelemetryRuntime<
     }
   }
 
+  function recordOperationalEvent(env: TEnv, event: WorkerOperationalTelemetryInput): void {
+    if (!parseBoolean(env.MCP_CF_STRUCTURED_LOGS_ENABLED)) return;
+    console.log(JSON.stringify(buildWorkerOperationalTelemetryEvent(event)));
+  }
+
   return {
-    setCurrentEnv(env: TEnv | null): void {
-      currentEnv = env;
+    recordRouteLatency(env: TEnv, route: string, elapsedMs: number): void {
+      recordOperationalEvent(env, {
+        event: 'route_latency',
+        route,
+        duration_ms: Number.isFinite(elapsedMs) ? elapsedMs : 0,
+      });
+      writePoint(env, ['route_latency'], [route], [Number.isFinite(elapsedMs) ? elapsedMs : 0]);
     },
-    recordRouteLatency(route: string, elapsedMs: number): void {
-      writePoint(['route_latency'], [route], [Number.isFinite(elapsedMs) ? elapsedMs : 0]);
-    },
-    recordDurableObjectLatency(dimension: string, elapsedMs: number): void {
+    recordDurableObjectLatency(env: TEnv, dimension: string, elapsedMs: number): void {
+      recordOperationalEvent(env, {
+        event: 'durable_object_latency',
+        do_dimension: dimension,
+        duration_ms: Number.isFinite(elapsedMs) ? elapsedMs : 0,
+      });
       writePoint(
+        env,
         ['durable_object_latency'],
         [dimension],
         [Number.isFinite(elapsedMs) ? elapsedMs : 0],
       );
     },
-    recordDurableObjectUnavailable(dimension: string): void {
-      writePoint(['durable_object_unavailable'], [dimension], [1]);
+    recordDurableObjectUnavailable(env: TEnv, dimension: string): void {
+      recordOperationalEvent(env, {
+        event: 'durable_object_unavailable',
+        do_dimension: dimension,
+        outcome: 'unavailable',
+      });
+      writePoint(env, ['durable_object_unavailable'], [dimension], [1]);
     },
-    recordTurnstileVerdict(routeId: string, outcome: 'passed' | 'failed' | 'not_enforced'): void {
-      writePoint(['turnstile'], [routeId, outcome], [1]);
+    recordTurnstileVerdict(
+      env: TEnv,
+      routeId: string,
+      outcome: 'passed' | 'failed' | 'not_enforced',
+    ): void {
+      recordOperationalEvent(env, { event: 'turnstile_verdict', route: routeId, outcome });
+      writePoint(env, ['turnstile'], [routeId, outcome], [1]);
     },
-    recordAsyncJobUpdate(status: string, toolName: string, attempts: number): void {
-      writePoint(['async_job'], [status, toolName], [Math.max(0, attempts)]);
+    recordAsyncJobUpdate(env: TEnv, status: string, toolName: string, attempts: number): void {
+      recordOperationalEvent(env, {
+        event: 'async_job_update',
+        queue_state: status,
+        tool: toolName,
+        attempt: Math.max(0, attempts),
+      });
+      writePoint(env, ['async_job'], [status, toolName], [Math.max(0, attempts)]);
     },
-    recordUiEvent(eventName: string, userId: string | null, route: string, outcome: string): void {
-      writePoint(['ui_event'], [eventName, userId || 'anonymous', route, outcome], [1]);
+    recordUiEvent(
+      env: TEnv,
+      eventName: string,
+      userId: string | null,
+      route: string,
+      outcome: string,
+    ): void {
+      recordOperationalEvent(env, {
+        event: 'ui_event',
+        route,
+        outcome,
+        client_category: userId ? 'authenticated' : 'anonymous',
+      });
+      writePoint(env, ['ui_event'], [eventName, userId || 'anonymous', route, outcome], [1]);
     },
+    recordOperationalEvent,
   };
 }

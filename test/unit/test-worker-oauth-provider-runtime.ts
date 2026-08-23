@@ -15,6 +15,7 @@ import {
   getRegistrationAllowedOrigins,
   handleOAuthProviderApiRequest,
   handleOAuthProviderDefaultRequest,
+  isOAuthProtectedApiPath,
   resolveExternalOAuthToken,
   withRegistrationCors,
 } from '../../src/server/worker-oauth-provider-runtime-helpers.js';
@@ -80,6 +81,19 @@ describe('OAuth client origins', () => {
 });
 
 describe('registration access tokens', () => {
+  it('does not reuse UI-session or API-key secrets for registration management', async () => {
+    const legacySecrets = {
+      MCP_UI_SESSION_SECRET: 'ui-session-secret',
+      COURTLISTENER_API_KEY: 'api-key-secret',
+    };
+
+    assert.equal(await createRegistrationAccessToken(legacySecrets, 'client-123'), null);
+    assert.equal(
+      await verifyRegistrationAccessToken(legacySecrets, 'client-123', 'clreg.v1.invalid'),
+      false,
+    );
+  });
+
   it('creates expiring versioned registration tokens and verifies them', async () => {
     const env = {
       MCP_OAUTH_REGISTRATION_TOKEN_SECRET: 'registration-secret',
@@ -111,6 +125,33 @@ describe('registration access tokens', () => {
 });
 
 describe('worker OAuth provider runtime', () => {
+  it('recognizes protected MCP API paths', () => {
+    assert.equal(isOAuthProtectedApiPath('/mcp'), true);
+    assert.equal(isOAuthProtectedApiPath('/sse'), false);
+    assert.equal(isOAuthProtectedApiPath('/api/usage'), true);
+    assert.equal(isOAuthProtectedApiPath('/health'), false);
+  });
+
+  it('rejects unauthenticated API fallthrough instead of forwarding to legacy MCP', async () => {
+    let legacyCalled = false;
+    const response = await handleOAuthProviderDefaultRequest(
+      new Request('https://worker.example/mcp'),
+      {},
+      {} as ExecutionContext,
+      {
+        handleAuthorizeRoute: async () => new Response('authorize'),
+        handleWorkerFetch: async () => {
+          legacyCalled = true;
+          return new Response('legacy');
+        },
+      },
+    );
+
+    assert.equal(response.status, 401);
+    assert.equal(legacyCalled, false);
+    assert.match(response.headers.get('www-authenticate') ?? '', /oauth-protected-resource/);
+  });
+
   it('derives registration allowed origins from configured origins', () => {
     const origins = getRegistrationAllowedOrigins(
       { MCP_ALLOWED_ORIGINS: 'https://auth.example, https://console.example' },
@@ -187,7 +228,7 @@ describe('worker OAuth provider runtime', () => {
       {},
       {} as ExecutionContext,
       {
-        handleLegacyWorkerFetch: async () => new Response('legacy'),
+        handleWorkerFetch: async () => new Response('legacy'),
       },
     );
 
@@ -198,7 +239,7 @@ describe('worker OAuth provider runtime', () => {
     });
   });
 
-  it('forwards provider-authenticated requests without the bearer token', async () => {
+  it('forwards provider-authenticated requests with the bearer token for MCP defense in depth', async () => {
     let forwardedAuthorization: string | null = null;
     let forwardedOptions: { skipGatewayAuth?: boolean } | undefined;
 
@@ -214,7 +255,7 @@ describe('worker OAuth provider runtime', () => {
         },
       } as ExecutionContext,
       {
-        handleLegacyWorkerFetch: async (request, _env, _ctx, options) => {
+        handleWorkerFetch: async (request, _env, _ctx, options) => {
           forwardedAuthorization = request.headers.get('authorization');
           forwardedOptions = options;
           return new Response('legacy-ok');
@@ -223,7 +264,7 @@ describe('worker OAuth provider runtime', () => {
     );
 
     assert.equal(await response.text(), 'legacy-ok');
-    assert.equal(forwardedAuthorization, null);
+    assert.equal(forwardedAuthorization, 'Bearer token');
     assert.deepEqual(forwardedOptions, { skipGatewayAuth: true });
   });
 
@@ -232,7 +273,7 @@ describe('worker OAuth provider runtime', () => {
     const legacyCalls = 0;
 
     const response = await handleOAuthProviderDefaultRequest(
-      new Request('https://worker.example/authorize'),
+      new Request('https://worker.example/oauth/authorize'),
       { OAUTH_PROVIDER: {} as OAuthHelpers },
       {} as ExecutionContext,
       {
@@ -240,7 +281,7 @@ describe('worker OAuth provider runtime', () => {
           authorizeCalls += 1;
           return new Response('authorize-ok');
         },
-        handleLegacyWorkerFetch: async () => new Response('legacy'),
+        handleWorkerFetch: async () => new Response('legacy'),
       },
     );
 

@@ -29,7 +29,7 @@ const workspacePages = [
 /** Routes exercised by Playwright axe smoke (must stay in sync with e2e/a11y-smoke.spec.ts). */
 const axeSmokeRoutes = [
   { path: '/', heading: 'Connect AI to the Law' },
-  { path: '/app/control-center', heading: 'Overview' },
+  { path: '/app', heading: 'Overview' },
   { path: '/app/playground', heading: 'Playground' },
   { path: '/app/account', heading: 'Account' },
   { path: '/app/usage', heading: 'Usage' },

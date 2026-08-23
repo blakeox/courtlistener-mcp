@@ -9,6 +9,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import type { ToolContext } from '../../src/server/tool-handler.js';
 import type { CacheManager } from '../../src/infrastructure/cache.js';
+import { getStructuredPayload } from '../utils/mcp-result.js';
 
 const { SearchCasesHandler, AdvancedSearchHandler, SearchOpinionsHandler } =
   await import('../../src/domains/search/handlers.ts');
@@ -92,7 +93,7 @@ describe('SearchCasesHandler (TypeScript)', () => {
     if (validated.success) {
       const res = await handler.execute(validated.data, makeContext());
       assert.strictEqual(res.isError, undefined);
-      const payload = JSON.parse(res.content[0].text) as {
+      const payload = getStructuredPayload(res) as {
         summary: string;
         pagination: { totalPages?: number };
       };
@@ -130,7 +131,7 @@ describe('SearchCasesHandler (TypeScript)', () => {
       assert.strictEqual(api.searchParams?.q, '410 U.S. 113');
       assert.strictEqual(api.searchParams?.citation, undefined);
 
-      const payload = JSON.parse(res.content[0].text) as {
+      const payload = getStructuredPayload(res) as {
         results: Array<{ id: number; case_name: string }>;
       };
       assert.strictEqual(payload.results.length, 1);
@@ -162,7 +163,7 @@ describe('SearchCasesHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };
@@ -218,7 +219,7 @@ describe('AdvancedSearchHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         summary?: string;
         total_results?: number;
         results?: Array<{ id: number }>;
@@ -260,7 +261,7 @@ describe('SearchOpinionsHandler (TypeScript)', () => {
 
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         pagination: { totalCount?: number };
         search_parameters: { order_by?: string };
       };
@@ -283,7 +284,7 @@ describe('SearchOpinionsHandler (TypeScript)', () => {
     if (validated.success) {
       const result = await handler.execute(validated.data, makeContext());
       assert.strictEqual(result.isError, true);
-      const payload = JSON.parse(result.content[0].text) as {
+      const payload = getStructuredPayload(result) as {
         error: string;
         details?: { message?: string };
       };

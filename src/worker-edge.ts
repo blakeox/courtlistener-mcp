@@ -2,7 +2,7 @@
 
 /**
  * Edge / portal worker — OAuth, hosted auth, SPA, UI API.
- * Does not bundle MCP tools, agents, or CourtListenerMCP.
+ * Does not bundle MCP tools or the MCP v2 server runtime.
  *
  * MCP protocol traffic is served by `worker-mcp.ts` (`courtlistener-mcp-mcp`).
  */
@@ -31,6 +31,7 @@ import {
   shouldBypassOAuthProvider,
 } from './server/worker-oauth-entrypoint-runtime.js';
 import { authorizeMcpGatewayRequest } from './server/mcp-gateway-auth.js';
+import { assertOAuthFrontdoorRateLimitDeps } from './server/worker-oauth-frontdoor-rate-limit.js';
 import { handleWorkerOAuthAuthorizeRoute } from './server/worker-oauth-authorize.js';
 import { handleWorkerDynamicClientRegistration } from './server/worker-oauth-registration.js';
 import {
@@ -70,18 +71,23 @@ import {
 } from './server/worker-runtime-contract.js';
 import { buildHostedOAuthCompletionDetails } from './auth/oauth-authorization-completion.js';
 import { resolveGrantedScopes } from './auth/oauth-scope-resolver.js';
-import {
-  createWorkerPlatformRuntime,
-  isRemovedLegacyUiRoute,
-} from './server/worker-platform-runtime.js';
+import { createWorkerPlatformRuntime } from './server/worker-platform-runtime.js';
 import type { WorkerEdgeDelegatedRouteDeps } from './server/worker-route-composition.js';
 import type { HandleWorkerCoreRoutesDeps } from './server/worker-core-routes.js';
-import { fetchMcpWorkerService } from './server/worker-mcp-service-fetch.js';
+import {
+  fetchMcpWorkerReadiness,
+  fetchMcpWorkerService,
+} from './server/worker-mcp-service-fetch.js';
+import {
+  buildRuntimeReadinessPayload,
+  runtimeReadinessStatusCode,
+  type RuntimeReadinessCheck,
+} from './infrastructure/runtime-readiness-contract.js';
 
 const SUPPORTED_MCP_PROTOCOL_VERSIONS = new Set(SUPPORTED_MCP_PROTOCOL_VERSION_LIST);
 const platform = createWorkerPlatformRuntime<WorkerEdgeEnv>();
 
-const workerMcpAiRuntime = createWorkerMcpAiRuntime({
+const workerMcpAiRuntime = createWorkerMcpAiRuntime<WorkerEdgeEnv>({
   authorizeMcpGatewayRequest,
   runWithPrincipalContext,
   mcpStreamableFetch: (request, env) => fetchMcpWorkerService(request, env as WorkerEdgeEnv),
@@ -133,7 +139,6 @@ const workerEdgeDelegatedRouteDeps = {
   getOrCreateCsrfCookieHeader: platform.workerUiSessionRuntime.getOrCreateCsrfCookieHeader,
   htmlResponse,
   renderSpaShellHtml,
-  redirectResponse,
   workerUiSessionRuntime: platform.workerUiSessionRuntime,
   getOAuthHelpers: (env: WorkerEdgeEnv) => platform.getOAuthHelpersRef()(env),
   buildHostedOAuthCompletionDetails,
@@ -148,16 +153,62 @@ const workerCoreRouteDeps = {
   withCors,
   jsonError,
   jsonResponse,
-  isRemovedLegacyUiRoute,
   workerUiSessionRuntime: platform.workerUiSessionRuntime,
   workerDurableRuntime: platform.workerDurableRuntime,
-  getCachedSessionTopology: platform.workerObservabilityRuntime.getCachedSessionTopology,
   getWorkerLatencySnapshot: platform.workerObservabilityRuntime.getWorkerLatencySnapshot,
   getUsageSnapshot: platform.workerDurableRuntime.getUserUsageSnapshot,
   now: () => Date.now(),
   getClientIdentifier: platform.workerObservabilityRuntime.getClientIdentifier,
   recordTurnstileVerdict: platform.cloudflareTelemetryRuntime.recordTurnstileVerdict,
   recordUiEvent: platform.cloudflareTelemetryRuntime.recordUiEvent,
+  workerRole: 'edge',
+  getReadinessResponse: async (request, env) => {
+    const checks: Record<string, RuntimeReadinessCheck> = {
+      runtime: { status: 'pass', message: 'Edge Worker request runtime is available.' },
+      mcp_service_binding: {
+        status: env.MCP_SERVICE ? 'pass' : 'fail',
+        message: env.MCP_SERVICE
+          ? 'MCP service binding is configured.'
+          : 'MCP service binding is missing.',
+      },
+    };
+
+    if (env.MCP_SERVICE) {
+      const probeRequest = new Request(new URL('/ready', request.url), {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      });
+      try {
+        const response = await fetchMcpWorkerReadiness(probeRequest, env);
+        const payload = (await response.json().catch(() => null)) as {
+          status?: string;
+          worker_role?: string;
+          version?: string;
+        } | null;
+        const ok = response.ok && payload?.status === 'ready';
+        checks.mcp_worker = {
+          status: ok ? 'pass' : 'fail',
+          message: ok ? 'MCP Worker readiness is confirmed.' : 'MCP Worker is not ready.',
+          details: {
+            http_status: response.status,
+            worker_role: payload?.worker_role ?? 'unknown',
+            version: payload?.version ?? 'unknown',
+          },
+        };
+      } catch (error) {
+        checks.mcp_worker = {
+          status: 'fail',
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    const payload = buildRuntimeReadinessPayload({ workerRole: 'edge', checks });
+    return new Response(JSON.stringify(payload), {
+      status: runtimeReadinessStatusCode(payload.status),
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  },
 } satisfies HandleWorkerCoreRoutesDeps<WorkerEdgeEnv>;
 
 const handleEdgeWorkerFetch = createWorkerEdgeFetchHandler<WorkerEdgeEnv>({
@@ -166,6 +217,7 @@ const handleEdgeWorkerFetch = createWorkerEdgeFetchHandler<WorkerEdgeEnv>({
   buildWorkerRouteMetricKey: platform.workerObservabilityRuntime.buildWorkerRouteMetricKey,
   recordRouteLatency: platform.workerObservabilityRuntime.recordRouteLatency,
   now: () => Date.now(),
+  forwardMcpRequest: (request, env) => fetchMcpWorkerService(request, env),
   workerCoreRouteDeps,
   workerEdgeDelegatedRouteDeps,
 });
@@ -194,7 +246,7 @@ const cloudflareOAuthProviderRuntime = createCloudflareOAuthProviderRuntime<Work
       resolveCloudflareOAuthIdentity:
         platform.workerUiSessionRuntime.resolveCloudflareOAuthIdentity,
     }),
-  handleLegacyWorkerFetch: handleEdgeWorkerFetch,
+  handleWorkerFetch: handleEdgeWorkerFetch,
   getCachedAllowedOrigins: platform.workerObservabilityRuntime.getCachedAllowedOrigins,
   getRequestOrigin: platform.workerObservabilityRuntime.getRequestOrigin,
   buildCorsHeaders,
@@ -204,9 +256,13 @@ platform.setOAuthHelpers(cloudflareOAuthProviderRuntime.getOAuthHelpers);
 
 export default {
   async fetch(request: Request, env: WorkerEdgeEnv, ctx: ExecutionContext): Promise<Response> {
-    platform.cloudflareTelemetryRuntime.setCurrentEnv(env);
+    assertOAuthFrontdoorRateLimitDeps({
+      getClientIdentifier: platform.workerObservabilityRuntime.getClientIdentifier,
+      getAuthRouteRateLimitedResponse:
+        platform.workerDurableRuntime.getAuthRouteRateLimitedResponse,
+      now: () => Date.now(),
+    });
     const url = new URL(request.url);
-    cloudflareOAuthProviderRuntime.setCurrentRequestOrigin(url.origin);
 
     if (shouldBypassOAuthProvider(url.pathname)) {
       return handleEdgeWorkerFetch(request, env, ctx);

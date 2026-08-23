@@ -13,10 +13,6 @@ import type {
   LifetimeQuotaResponseBody,
   McpBoundaryEvaluateRequestBody,
   McpBoundaryEvaluateResponseBody,
-  McpSessionEvictionReason,
-  McpSessionLifecycleRequestBody,
-  McpSessionLifecycleResponseBody,
-  McpSessionLifecycleState,
   SessionRevocationRequestBody,
   SessionRevocationResponseBody,
   UsageCounterRequestBody,
@@ -33,17 +29,12 @@ async function parseJsonBody<T>(request: Request): Promise<T | null> {
 
 const MCP_REPLAY_STATE_PREFIX = 'mcp_replay_state:';
 const USAGE_BY_ROUTE_MAX_ENTRIES = 32;
-const SESSION_TOUCH_EVICTION_SAMPLE_MODULO = 8;
-const SESSION_TOUCH_EVICTION_SWEEP_LIMIT = 16;
-const MCP_SESSION_ALARM_SCAN_LIMIT = 64;
-const MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT = 128;
 const MCP_REPLAY_EVICTION_SWEEP_LIMIT = 64;
 
 export class AuthFailureLimiterDO {
   private static readonly AUTH_FAILURE_WINDOW_MS_KEY = 'auth_failure_window_ms';
   private static readonly AUTH_FAILURE_CLEANUP_AT_MS_KEY = 'auth_failure_cleanup_at_ms';
   private static readonly UI_SESSION_REVOKED_UNTIL_MS_KEY = 'ui_session_revoked_until_ms';
-  private static readonly MCP_SESSION_ALARM_AT_MS_KEY = 'mcp_session_alarm_at_ms';
   private static readonly BROWSER_BOOTSTRAP_EXPIRES_AT_MS_KEY = 'browser_bootstrap_expires_at_ms';
   private static readonly BROWSER_BOOTSTRAP_CONSUMED_AT_MS_KEY = 'browser_bootstrap_consumed_at_ms';
 
@@ -225,36 +216,6 @@ export class AuthFailureLimiterDO {
     };
   }
 
-  private getMcpSessionStorageKey(sessionId: string): string {
-    return `mcp_session:${sessionId}`;
-  }
-
-  private async loadMcpSessionState(sessionId: string): Promise<McpSessionLifecycleState | null> {
-    const stored = await this.state.storage.get<McpSessionLifecycleState>(
-      this.getMcpSessionStorageKey(sessionId),
-    );
-    if (!stored || stored.sessionId !== sessionId) {
-      return null;
-    }
-    return stored;
-  }
-
-  private resolveMcpSessionState(
-    entry: McpSessionLifecycleState | null,
-    nowMs: number,
-  ): { active: boolean; reason: McpSessionEvictionReason } {
-    if (!entry) {
-      return { active: false, reason: 'missing' };
-    }
-    if (entry.absoluteExpiresAtMs <= nowMs) {
-      return { active: false, reason: 'absolute_evicted' };
-    }
-    if (entry.idleExpiresAtMs <= nowMs) {
-      return { active: false, reason: 'idle_evicted' };
-    }
-    return { active: true, reason: 'active' };
-  }
-
   private capUsageByRoute(byRoute: Record<string, number>): Record<string, number> {
     const entries = Object.entries(byRoute);
     if (entries.length <= USAGE_BY_ROUTE_MAX_ENTRIES) {
@@ -263,15 +224,6 @@ export class AuthFailureLimiterDO {
     return Object.fromEntries(
       entries.sort((left, right) => right[1] - left[1]).slice(0, USAGE_BY_ROUTE_MAX_ENTRIES),
     );
-  }
-
-  private shouldRunTouchEvictionSweep(sessionId: string): boolean {
-    let hash = 2166136261;
-    for (let i = 0; i < sessionId.length; i += 1) {
-      hash ^= sessionId.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    return (hash >>> 0) % SESSION_TOUCH_EVICTION_SAMPLE_MODULO === 0;
   }
 
   private async evictExpiredReplayStates(nowMs: number, sweepLimit: number): Promise<void> {
@@ -301,66 +253,6 @@ export class AuthFailureLimiterDO {
     }
   }
 
-  private async evictExpiredMcpSessions(nowMs: number, sweepLimit: number): Promise<void> {
-    const entries = await this.state.storage.list<McpSessionLifecycleState>({
-      prefix: 'mcp_session:',
-      limit: Math.max(1, sweepLimit),
-    });
-    const deleteKeys: string[] = [];
-    for (const [key, value] of entries.entries()) {
-      const sessionState = value as McpSessionLifecycleState;
-      if (
-        !sessionState ||
-        typeof sessionState.absoluteExpiresAtMs !== 'number' ||
-        typeof sessionState.idleExpiresAtMs !== 'number'
-      ) {
-        deleteKeys.push(key);
-        continue;
-      }
-      if (sessionState.absoluteExpiresAtMs <= nowMs || sessionState.idleExpiresAtMs <= nowMs) {
-        deleteKeys.push(key);
-      }
-    }
-    if (deleteKeys.length > 0) {
-      await Promise.all(deleteKeys.map((key) => this.state.storage.delete(key)));
-    }
-  }
-
-  private async scheduleMcpSessionAlarm(nextAtMs: number): Promise<void> {
-    const scheduledAt =
-      (await this.state.storage.get<number>(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY)) ?? 0;
-    if (scheduledAt > 0 && scheduledAt <= nextAtMs) {
-      return;
-    }
-    await this.state.storage.put(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY, nextAtMs);
-    await this.state.storage.setAlarm(nextAtMs);
-  }
-
-  private async refreshMcpSessionAlarm(): Promise<void> {
-    const entries = await this.state.storage.list<McpSessionLifecycleState>({
-      prefix: 'mcp_session:',
-      limit: MCP_SESSION_ALARM_SCAN_LIMIT,
-    });
-    let nextAtMs = Number.POSITIVE_INFINITY;
-    for (const value of entries.values()) {
-      const state = value as McpSessionLifecycleState;
-      if (!state) continue;
-      const candidate = Math.min(state.idleExpiresAtMs, state.absoluteExpiresAtMs);
-      if (candidate < nextAtMs) {
-        nextAtMs = candidate;
-      }
-    }
-
-    if (!Number.isFinite(nextAtMs)) {
-      await this.state.storage.delete(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY);
-      await this.state.storage.deleteAlarm();
-      return;
-    }
-
-    await this.state.storage.put(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY, nextAtMs);
-    await this.state.storage.setAlarm(nextAtMs);
-  }
-
   async fetch(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
       return Response.json({ error: 'method_not_allowed' }, { status: 405 });
@@ -373,88 +265,9 @@ export class AuthFailureLimiterDO {
       | UsageCounterRequestBody
       | LifetimeQuotaRequestBody
       | McpBoundaryEvaluateRequestBody
-      | McpSessionLifecycleRequestBody
     >(request);
     if (!body) {
       return Response.json({ error: 'invalid_request' }, { status: 400 });
-    }
-
-    if (
-      body.action === 'mcp_session_register' ||
-      body.action === 'mcp_session_touch' ||
-      body.action === 'mcp_session_close'
-    ) {
-      const nowMs = Number.isFinite(body.nowMs) ? body.nowMs : Date.now();
-      const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
-      const idleTtlMs = Math.max(
-        1_000,
-        Number.isFinite(body.idleTtlMs) ? body.idleTtlMs : 30 * 60 * 1000,
-      );
-      const absoluteTtlMs = Math.max(
-        idleTtlMs,
-        Number.isFinite(body.absoluteTtlMs) ? body.absoluteTtlMs : 24 * 60 * 60 * 1000,
-      );
-      const sweepLimit = Math.max(
-        1,
-        Number.isFinite(body.evictionSweepLimit) ? Math.floor(body.evictionSweepLimit) : 64,
-      );
-
-      if (!sessionId) {
-        return Response.json({ error: 'invalid_session_id' }, { status: 400 });
-      }
-
-      if (body.action === 'mcp_session_touch') {
-        if (this.shouldRunTouchEvictionSweep(sessionId)) {
-          await this.evictExpiredMcpSessions(nowMs, SESSION_TOUCH_EVICTION_SWEEP_LIMIT);
-        }
-      } else {
-        await this.evictExpiredMcpSessions(nowMs, sweepLimit);
-      }
-      const storageKey = this.getMcpSessionStorageKey(sessionId);
-      const existing = await this.loadMcpSessionState(sessionId);
-
-      if (body.action === 'mcp_session_close') {
-        await this.state.storage.delete(storageKey);
-        await this.refreshMcpSessionAlarm();
-        return Response.json({
-          active: false,
-          reason: 'closed',
-          sessionId,
-          shard: this.state.id.toString(),
-        } satisfies McpSessionLifecycleResponseBody);
-      }
-
-      const resolved = this.resolveMcpSessionState(existing, nowMs);
-      if (!resolved.active && body.action === 'mcp_session_touch') {
-        await this.state.storage.delete(storageKey);
-        await this.refreshMcpSessionAlarm();
-        return Response.json({
-          active: false,
-          reason: resolved.reason,
-          sessionId,
-          shard: this.state.id.toString(),
-        } satisfies McpSessionLifecycleResponseBody);
-      }
-
-      const createdAtMs = existing?.createdAtMs ?? nowMs;
-      const nextState: McpSessionLifecycleState = {
-        sessionId,
-        createdAtMs,
-        lastSeenAtMs: nowMs,
-        idleExpiresAtMs: nowMs + idleTtlMs,
-        absoluteExpiresAtMs: createdAtMs + absoluteTtlMs,
-      };
-      await this.state.storage.put(storageKey, nextState);
-      await this.scheduleMcpSessionAlarm(
-        Math.min(nextState.idleExpiresAtMs, nextState.absoluteExpiresAtMs),
-      );
-
-      return Response.json({
-        active: true,
-        reason: 'active',
-        sessionId,
-        shard: this.state.id.toString(),
-      } satisfies McpSessionLifecycleResponseBody);
     }
 
     if (body.action === 'session_check' || body.action === 'session_revoke') {
@@ -767,15 +580,6 @@ export class AuthFailureLimiterDO {
 
   async alarm(): Promise<void> {
     const nowMs = Date.now();
-    const mcpSessionAlarmAt =
-      (await this.state.storage.get<number>(AuthFailureLimiterDO.MCP_SESSION_ALARM_AT_MS_KEY)) ?? 0;
-    if (mcpSessionAlarmAt > 0) {
-      await this.evictExpiredMcpSessions(nowMs, MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT);
-      await this.evictExpiredReplayStates(nowMs, MCP_REPLAY_EVICTION_SWEEP_LIMIT);
-      await this.refreshMcpSessionAlarm();
-      return;
-    }
-
     const revokedUntilMs =
       (await this.state.storage.get<number>(
         AuthFailureLimiterDO.UI_SESSION_REVOKED_UNTIL_MS_KEY,
@@ -823,8 +627,6 @@ export class AuthFailureLimiterDO {
       return;
     }
 
-    await this.evictExpiredMcpSessions(nowMs, MCP_SESSION_EVICTION_ALARM_SWEEP_LIMIT);
     await this.evictExpiredReplayStates(nowMs, MCP_REPLAY_EVICTION_SWEEP_LIMIT);
-    await this.refreshMcpSessionAlarm();
   }
 }
