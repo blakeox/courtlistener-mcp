@@ -18,6 +18,7 @@ const wranglerEdgeConfig = WRANGLER_EDGE_CONFIG;
 const wranglerMcpConfig = WRANGLER_MCP_CONFIG;
 
 const requiredMcpSecrets = ['COURTLISTENER_API_KEY'];
+const HOSTED_PROBE_USER_AGENT = 'courtlistener-mcp-oauth-probe/1.0';
 
 function color(text, code) {
   return `\x1b[${code}m${text}\x1b[0m`;
@@ -700,6 +701,7 @@ async function main() {
 
       const hostedAuth = await checkEndpoint(baseUrl, '/auth/start?continue=1', {
         redirect: 'manual',
+        headers: { 'User-Agent': HOSTED_PROBE_USER_AGENT },
       });
       const hostedAuthReadyHeader = hostedAuth.headers.get('x-hosted-auth-ready');
       const hostedAuthStatus = hostedAuth.headers.get('x-hosted-auth-status');
