@@ -208,7 +208,7 @@ async function main() {
   if (configuredAccountId && configuredApiToken) {
     try {
       await cloudflareRequest(`/accounts/${configuredAccountId}/tokens/verify`);
-      ok(`Cloudflare account authentication is valid for ${configuredAccountId}.`);
+      ok('Cloudflare account authentication is valid.');
     } catch {
       fail('Cloudflare account authentication failed for the configured account.');
       hasCriticalError = true;
