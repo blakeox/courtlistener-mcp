@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isCloudflareAccessLoginRedirect } from './url-helpers.js';
+import { cloudflareRequest } from './lib/cloudflare-api.mjs';
 import {
   WRANGLER_EDGE_CONFIG,
   WRANGLER_MCP_CONFIG,
@@ -202,12 +203,24 @@ async function main() {
     ok(`Wrangler detected: ${version.stdout}`);
   }
 
-  const whoami = runWrangler(projectRoot, ['whoami']);
-  if (whoami.status !== 0) {
-    fail('Not authenticated with Cloudflare. Run `pnpm exec wrangler login`.');
-    hasCriticalError = true;
+  const configuredAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const configuredApiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (configuredAccountId && configuredApiToken) {
+    try {
+      await cloudflareRequest(`/accounts/${configuredAccountId}/tokens/verify`);
+      ok(`Cloudflare account authentication is valid for ${configuredAccountId}.`);
+    } catch {
+      fail('Cloudflare account authentication failed for the configured account.');
+      hasCriticalError = true;
+    }
   } else {
-    ok('Cloudflare authentication is valid.');
+    const whoami = runWrangler(projectRoot, ['whoami']);
+    if (whoami.status !== 0) {
+      fail('Not authenticated with Cloudflare. Run `pnpm exec wrangler login`.');
+      hasCriticalError = true;
+    } else {
+      ok('Cloudflare authentication is valid.');
+    }
   }
 
   let edgeConfig;
