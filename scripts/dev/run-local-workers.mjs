@@ -23,17 +23,21 @@ if (!existsSync(wranglerBinary)) {
 }
 
 console.log('Starting local Edge + MCP Workers with a connected MCP_SERVICE binding.');
-console.log('Edge is exposed on :8787; the MCP Worker is internal to the local binding.');
-console.log('Vite SPA dev should proxy to http://localhost:8787 (see vite.config.ts)\n');
 
 const useTestConfigs = process.env.LOCAL_WORKERS_CONFIG === 'test';
 const edgeConfig = useTestConfigs ? 'wrangler.edge.test.jsonc' : 'wrangler.edge.jsonc';
 const mcpConfig = useTestConfigs ? 'wrangler.mcp.test.jsonc' : 'wrangler.mcp.jsonc';
+const port = process.env.LOCAL_WORKERS_PORT ?? '8787';
+if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+  console.error(`Invalid LOCAL_WORKERS_PORT: ${port}`);
+  process.exit(1);
+}
 if (useTestConfigs) {
   console.log('Using offline test Worker configs (no remote Cloudflare bindings).\n');
 }
 
-const worker = spawn(wranglerBinary, ['dev', '-c', edgeConfig, '-c', mcpConfig, '--port', '8787'], {
+console.log(`Starting local Workers on 127.0.0.1:${port}.`);
+const worker = spawn(wranglerBinary, ['dev', '-c', edgeConfig, '-c', mcpConfig, '--port', port], {
   cwd: repoRoot,
   stdio: 'inherit',
   env: process.env,
