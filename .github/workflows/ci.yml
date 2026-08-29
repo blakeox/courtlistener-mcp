@@ -173,7 +173,7 @@ jobs:
 
   full-validation:
     name: Full Validation
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ubuntu-latest
     needs: test
     steps:
       - name: Checkout repository
@@ -297,7 +297,7 @@ jobs:
 
   browser-auth:
     name: Browser Auth CI
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ubuntu-latest
     needs: detect-relevant-changes
     if: >-
       ${{
@@ -331,7 +331,7 @@ jobs:
 
   hardening-release-gates:
     name: Hardening Release Gates (${{ matrix.gate }})
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ubuntu-latest
     needs: detect-relevant-changes
     if: >-
       ${{

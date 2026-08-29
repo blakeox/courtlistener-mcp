@@ -78,13 +78,25 @@ describe('GitHub workflow hardening', () => {
     const runnerExpression =
       /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
 
-    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 6);
+    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 3);
     assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
     assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
     assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
     assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
     assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
     assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
+    assert.match(
+      ciWorkflow,
+      /full-validation:\n    name: Full Validation\n    runs-on: ubuntu-latest/,
+    );
+    assert.match(
+      ciWorkflow,
+      /browser-auth:\n    name: Browser Auth CI\n    runs-on: ubuntu-latest/,
+    );
+    assert.match(
+      ciWorkflow,
+      /hardening-release-gates:\n    name: Hardening Release Gates \(\$\{\{ matrix\.gate \}\}\)\n    runs-on: ubuntu-latest/,
+    );
   });
 
   it('does not eval secret-derived remote endpoint output in CI', () => {
