@@ -73,6 +73,7 @@ describe('GitHub workflow hardening', () => {
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const performanceWorkflow = read('../../.github/workflows/performance.yml');
     const e2eWorkflow = read('../../.github/workflows/e2e-auth-chat-flow.yml');
+    const runnerSmokeWorkflow = read('../../.github/workflows/runner-smoke.yml');
     const cloudflareReleaseWorkflow = read('../../.github/workflows/cloudflare-release.yml');
     const runnerExpression =
       /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
@@ -80,6 +81,8 @@ describe('GitHub workflow hardening', () => {
     assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 7);
     assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
     assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
+    assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
+    assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
     assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
     assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
   });
