@@ -136,7 +136,7 @@ jobs:
 
   test:
     name: Smoke Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -173,7 +173,7 @@ jobs:
 
   full-validation:
     name: Full Validation
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     needs: test
     steps:
       - name: Checkout repository
@@ -297,7 +297,7 @@ jobs:
 
   browser-auth:
     name: Browser Auth CI
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     needs: detect-relevant-changes
     if: >-
       ${{
@@ -331,7 +331,7 @@ jobs:
 
   hardening-release-gates:
     name: Hardening Release Gates (${{ matrix.gate }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     needs: detect-relevant-changes
     if: >-
       ${{
@@ -504,7 +504,7 @@ jobs:
 
   mcp-compliance:
     name: MCP Protocol Compliance
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     needs: [detect-relevant-changes, test]
     if: >-
       ${{
@@ -564,7 +564,7 @@ jobs:
 
   remote-server-test:
     name: Remote Server Validation
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     if: >-
       ${{
         github.event_name == 'push' &&
@@ -609,7 +609,7 @@ jobs:
 
   security-check:
     name: Security & Code Quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

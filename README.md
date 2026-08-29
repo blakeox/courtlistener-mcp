@@ -97,6 +97,23 @@ For a deployed self-hosted topology, authenticate Wrangler and use the
 Cloudflare release workflow after configuring the required Worker secrets; the
 production source of truth is the `wrangler.*.jsonc` configuration.
 
+### Optional NUC validation runner
+
+Validation, performance, and hosted OAuth test jobs can use a dedicated trusted
+Linux NUC by setting the repository variable `CI_LINUX_RUNNER` to this JSON
+array:
+
+```text
+["self-hosted","linux","x64","nuc","courtlistener-mcp"]
+```
+
+Until that variable is set and a runner with all five labels is registered,
+these jobs automatically use `ubuntu-latest`. Keep the NUC dedicated to this
+repository and do not use it for untrusted public pull-request workloads unless
+the repository and runner trust boundary has been reviewed. The Cloudflare
+release controller, production credentials, npm publishing, and deployment
+authority remain on GitHub-hosted runners.
+
 ## Publishing to npm
 
 This repository is configured to publish from `.github/workflows/release.yml`

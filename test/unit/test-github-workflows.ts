@@ -69,6 +69,21 @@ describe('GitHub workflow hardening', () => {
     );
   });
 
+  it('routes validation workloads through the optional trusted NUC runner', () => {
+    const ciWorkflow = read('../../.github/workflows/ci.yml');
+    const performanceWorkflow = read('../../.github/workflows/performance.yml');
+    const e2eWorkflow = read('../../.github/workflows/e2e-auth-chat-flow.yml');
+    const cloudflareReleaseWorkflow = read('../../.github/workflows/cloudflare-release.yml');
+    const runnerExpression =
+      /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
+
+    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 7);
+    assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
+    assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
+    assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
+    assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
+  });
+
   it('does not eval secret-derived remote endpoint output in CI', () => {
     const workflows = [
       read('../../.github/workflows/ci.yml'),
