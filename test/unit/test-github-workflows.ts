@@ -191,6 +191,7 @@ describe('GitHub workflow hardening', () => {
     );
     assert.match(performanceWorkflow, /pnpm run ci:load-profile-suite/);
     assert.match(performanceWorkflow, /check-local-health\.mjs/);
+    assert.match(performanceWorkflow, /github\.event\.inputs\.environment != 'local'/);
     assert.doesNotMatch(performanceWorkflow, /echo ['"]Performance tests available/);
     assert.doesNotMatch(ciWorkflow, /pnpm run test:performance/);
   });
