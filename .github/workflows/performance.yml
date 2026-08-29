@@ -24,7 +24,7 @@ permissions:
 jobs:
   performance-monitoring:
     name: Performance Monitoring
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
 
     steps:
       - name: Checkout repository
@@ -53,13 +53,15 @@ jobs:
           echo "⚡ Running performance monitoring for $TEST_ENVIRONMENT environment(s)..."
 
           mkdir -p performance-data
+          LOCAL_WORKERS_PORT="$(node scripts/dev/find-free-port.mjs)"
+          echo "Allocated local Worker port: $LOCAL_WORKERS_PORT"
           REMOTE_BASE_URL="$(node scripts/resolve-remote-endpoints.js "$REMOTE_SERVER_URL" --field baseUrl)"
 
           start_local_workers() {
-            LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
+            LOCAL_WORKERS_PORT="$LOCAL_WORKERS_PORT" LOCAL_WORKERS_CONFIG=test pnpm run dev:workers > performance-data/local-workers.log 2>&1 &
             LOCAL_WORKERS_PID=$!
             for attempt in $(seq 1 30); do
-              if LOCAL_HEALTH_URL=http://127.0.0.1:8787 LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
+              if LOCAL_HEALTH_URL="http://127.0.0.1:$LOCAL_WORKERS_PORT" LOCAL_HEALTH_TIMEOUT_MS=1000 node scripts/dev/check-local-health.mjs >/dev/null 2>&1; then
                 return 0
               fi
               sleep 1
@@ -87,7 +89,7 @@ jobs:
               echo "Testing local server performance..."
               start_local_workers
               trap stop_local_workers EXIT
-              run_profile http://127.0.0.1:8787 performance-data/local.json performance-data/local.txt
+              run_profile "http://127.0.0.1:$LOCAL_WORKERS_PORT" performance-data/local.json performance-data/local.txt
               ;;
             "remote")
               echo "Testing remote server performance..."
@@ -97,7 +99,7 @@ jobs:
               echo "Testing both local and remote server performance..."
               start_local_workers
               trap stop_local_workers EXIT
-              run_profile http://127.0.0.1:8787 performance-data/local.json performance-data/local.txt
+              run_profile "http://127.0.0.1:$LOCAL_WORKERS_PORT" performance-data/local.json performance-data/local.txt
               run_profile "$REMOTE_BASE_URL" performance-data/remote.json performance-data/remote.txt
               ;;
           esac
@@ -196,8 +198,12 @@ jobs:
 
   health-check:
     name: Remote Server Health Check
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.environment != 'local'
+      }}
 
     steps:
       - name: Check remote server health

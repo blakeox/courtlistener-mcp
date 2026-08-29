@@ -125,7 +125,7 @@ function runWrangler(args, { allowFailure = false } = {}) {
 }
 
 export function parseVersionId(output) {
-  const match = output.match(/Worker Version ID:\s*([0-9a-f-]{36})/iu);
+  const match = output.match(/(?:Worker|Current) Version ID:\s*([0-9a-f-]{36})/iu);
   if (!match) throw new Error('Wrangler upload output did not contain a Worker Version ID.');
   return match[1];
 }

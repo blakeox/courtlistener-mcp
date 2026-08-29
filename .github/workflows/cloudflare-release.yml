@@ -22,6 +22,11 @@ on:
         required: true
         default: false
         type: boolean
+      resume_from_run_id:
+        description: Prior successful release run whose validated state should be resumed
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: cloudflare-release-${{ inputs.environment }}
@@ -48,6 +53,7 @@ jobs:
       CLOUDFLARE_CANARY_PERCENT: ${{ inputs.canary_percent }}
       CLOUDFLARE_PROBE_DIRECTORY: release-probes
       GITHUB_SHA: ${{ github.sha }}
+      CLOUDFLARE_RELEASE_SOURCE_SHA: ${{ github.sha }}
       GITHUB_RUN_ID: ${{ github.run_id }}
       GITHUB_ACTOR: ${{ github.actor }}
     steps:
@@ -65,6 +71,21 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Restore validated release state
+        if: ${{ inputs.resume_from_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
+        run: |
+          resume_dir="$(mktemp -d /tmp/courtlistener-mcp-release-state-XXXXXX)"
+          gh run download "$RESUME_FROM_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "cloudflare-release-${CLOUDFLARE_RELEASE_ID}" \
+            --dir "$resume_dir"
+          cp "$resume_dir/release-state.json" release-state.json
+          test -s release-state.json
+          echo "CLOUDFLARE_RELEASE_SOURCE_SHA=$(jq -r '.source_sha' release-state.json)" >> "$GITHUB_ENV"
 
       - name: Run repository release gates
         run: |
@@ -85,7 +106,7 @@ jobs:
               --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
               --phase upload \
               --release-id "$CLOUDFLARE_RELEASE_ID" \
-              --source-sha "$GITHUB_SHA" \
+              --source-sha "$CLOUDFLARE_RELEASE_SOURCE_SHA" \
               --state-file release-state.json
 
       - name: Canary versioned Edge and MCP Workers
@@ -94,7 +115,7 @@ jobs:
             --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
             --phase canary \
             --release-id "$CLOUDFLARE_RELEASE_ID" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$CLOUDFLARE_RELEASE_SOURCE_SHA" \
             --state-file release-state.json
 
       - name: Run version-override protocol probes
@@ -116,7 +137,7 @@ jobs:
             --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
             --phase promote \
             --release-id "$CLOUDFLARE_RELEASE_ID" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$CLOUDFLARE_RELEASE_SOURCE_SHA" \
             --state-file release-state.json
 
       - name: Verify promoted public behavior
@@ -136,7 +157,7 @@ jobs:
             --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
             --phase rollback \
             --release-id "$CLOUDFLARE_RELEASE_ID" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$CLOUDFLARE_RELEASE_SOURCE_SHA" \
             --state-file release-state.json
 
       - name: Finalize and validate redacted release receipt
@@ -158,7 +179,7 @@ jobs:
             --environment "$CLOUDFLARE_RELEASE_ENVIRONMENT" \
             --phase finalize \
             --release-id "$CLOUDFLARE_RELEASE_ID" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$CLOUDFLARE_RELEASE_SOURCE_SHA" \
             --state-file release-state.json \
             --receipt-file release-receipt.json \
             --probe-directory "$probe_directory" \
