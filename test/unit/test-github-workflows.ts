@@ -62,6 +62,7 @@ describe('GitHub workflow hardening', () => {
     assert.match(workflow, /resume_from_run_id:/);
     assert.match(workflow, /Restore validated release state/);
     assert.match(workflow, /gh run download/);
+    assert.match(workflow, /CLOUDFLARE_RELEASE_SOURCE_SHA/);
     assert.match(
       workflow,
       /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/,
