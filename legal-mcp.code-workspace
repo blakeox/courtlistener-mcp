@@ -85,7 +85,6 @@
     "git.confirmSync": false,
 
     // Testing Configuration
-    "mochaExplorer.files": ["test/**/*.js"],
     "testExplorer.codeLens": true,
     "testExplorer.gutterDecoration": true,
     "testExplorer.onStart": "reset",
@@ -107,7 +106,11 @@
                     "command": { "type": "string" },
                     "args": { "type": "array", "items": { "type": "string" } },
                     "env": { "type": "object" },
-                    "type": { "type": "string", "enum": ["stdio", "sse", "http"] },
+                    "type": { "type": "string", "enum": ["stdio"] },
+                    "transport": {
+                      "type": "string",
+                      "enum": ["streamable-http"],
+                    },
                     "url": { "type": "string" },
                   },
                 },
