@@ -20,8 +20,19 @@ describe('Cloudflare release probe contracts', () => {
   });
 
   it('defaults probes to the staging environment and enables overrides', () => {
-    const options = parseArgs([]);
-    assert.equal(options.environment, 'staging');
-    assert.equal(options.override, true);
+    const previousEnvironment = process.env.CLOUDFLARE_RELEASE_ENVIRONMENT;
+    const previousOverride = process.env.RELEASE_VERSION_OVERRIDE;
+    delete process.env.CLOUDFLARE_RELEASE_ENVIRONMENT;
+    delete process.env.RELEASE_VERSION_OVERRIDE;
+    try {
+      const options = parseArgs([]);
+      assert.equal(options.environment, 'staging');
+      assert.equal(options.override, true);
+    } finally {
+      if (previousEnvironment === undefined) delete process.env.CLOUDFLARE_RELEASE_ENVIRONMENT;
+      else process.env.CLOUDFLARE_RELEASE_ENVIRONMENT = previousEnvironment;
+      if (previousOverride === undefined) delete process.env.RELEASE_VERSION_OVERRIDE;
+      else process.env.RELEASE_VERSION_OVERRIDE = previousOverride;
+    }
   });
 });

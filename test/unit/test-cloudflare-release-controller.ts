@@ -27,6 +27,13 @@ describe('Cloudflare release controller contracts', () => {
     );
   });
 
+  it('extracts version IDs from Wrangler direct-deploy output', () => {
+    assert.equal(
+      parseVersionId('Deployed worker\nCurrent Version ID: 123e4567-e89b-12d3-a456-426614174000'),
+      '123e4567-e89b-12d3-a456-426614174000',
+    );
+  });
+
   it('reads the latest active deployment while ignoring wrapper output', () => {
     const output = `[WARN] pnpm warning\n[
       {

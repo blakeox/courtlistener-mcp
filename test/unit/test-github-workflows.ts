@@ -59,9 +59,43 @@ describe('GitHub workflow hardening', () => {
     assert.match(workflow, /hashFiles\('release-state\.json'\) != ''/);
     assert.match(workflow, /probe_directory=release-probes-promoted/);
     assert.match(workflow, /decision=rollback/);
+    assert.match(workflow, /resume_from_run_id:/);
+    assert.match(workflow, /Restore validated release state/);
+    assert.match(workflow, /gh run download/);
+    assert.match(workflow, /CLOUDFLARE_RELEASE_SOURCE_SHA/);
     assert.match(
       workflow,
       /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/,
+    );
+  });
+
+  it('routes validation workloads through the optional trusted NUC runner', () => {
+    const ciWorkflow = read('../../.github/workflows/ci.yml');
+    const performanceWorkflow = read('../../.github/workflows/performance.yml');
+    const e2eWorkflow = read('../../.github/workflows/e2e-auth-chat-flow.yml');
+    const runnerSmokeWorkflow = read('../../.github/workflows/runner-smoke.yml');
+    const cloudflareReleaseWorkflow = read('../../.github/workflows/cloudflare-release.yml');
+    const runnerExpression =
+      /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
+
+    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 3);
+    assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
+    assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
+    assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
+    assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
+    assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
+    assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
+    assert.match(
+      ciWorkflow,
+      /full-validation:\n    name: Full Validation\n    runs-on: ubuntu-latest/,
+    );
+    assert.match(
+      ciWorkflow,
+      /browser-auth:\n    name: Browser Auth CI\n    runs-on: ubuntu-latest/,
+    );
+    assert.match(
+      ciWorkflow,
+      /hardening-release-gates:\n    name: Hardening Release Gates \(\$\{\{ matrix\.gate \}\}\)\n    runs-on: ubuntu-latest/,
     );
   });
 
@@ -169,6 +203,12 @@ describe('GitHub workflow hardening', () => {
     );
     assert.match(performanceWorkflow, /pnpm run ci:load-profile-suite/);
     assert.match(performanceWorkflow, /check-local-health\.mjs/);
+    assert.match(performanceWorkflow, /find-free-port\.mjs/);
+    assert.match(
+      performanceWorkflow,
+      /LOCAL_WORKERS_PORT="\$\(node scripts\/dev\/find-free-port\.mjs\)"/,
+    );
+    assert.match(performanceWorkflow, /github\.event\.inputs\.environment != 'local'/);
     assert.doesNotMatch(performanceWorkflow, /echo ['"]Performance tests available/);
     assert.doesNotMatch(ciWorkflow, /pnpm run test:performance/);
   });
