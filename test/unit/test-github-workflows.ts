@@ -59,6 +59,9 @@ describe('GitHub workflow hardening', () => {
     assert.match(workflow, /hashFiles\('release-state\.json'\) != ''/);
     assert.match(workflow, /probe_directory=release-probes-promoted/);
     assert.match(workflow, /decision=rollback/);
+    assert.match(workflow, /resume_from_run_id:/);
+    assert.match(workflow, /Restore validated release state/);
+    assert.match(workflow, /gh run download/);
     assert.match(
       workflow,
       /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/,

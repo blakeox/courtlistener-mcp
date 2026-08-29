@@ -22,6 +22,11 @@ on:
         required: true
         default: false
         type: boolean
+      resume_from_run_id:
+        description: Prior successful release run whose validated state should be resumed
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: cloudflare-release-${{ inputs.environment }}
@@ -65,6 +70,20 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Restore validated release state
+        if: ${{ inputs.resume_from_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
+        run: |
+          resume_dir="$(mktemp -d /tmp/courtlistener-mcp-release-state-XXXXXX)"
+          gh run download "$RESUME_FROM_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "cloudflare-release-${CLOUDFLARE_RELEASE_ID}" \
+            --dir "$resume_dir"
+          cp "$resume_dir/release-state.json" release-state.json
+          test -s release-state.json
 
       - name: Run repository release gates
         run: |
