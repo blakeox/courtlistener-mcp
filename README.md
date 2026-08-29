@@ -110,9 +110,9 @@ array:
 Until that variable is set and a runner with all five labels is registered,
 these jobs automatically use `ubuntu-latest`. Keep the NUC dedicated to this
 repository and do not use it for untrusted public pull-request workloads unless
-the repository and runner trust boundary has been reviewed. The Cloudflare
-release controller, production credentials, npm publishing, and deployment
-authority remain on GitHub-hosted runners.
+the repository and runner trust boundary has been reviewed. Security scanning,
+the Cloudflare release controller, production credentials, npm publishing, and
+deployment authority remain on GitHub-hosted runners.
 
 ## Publishing to npm
 

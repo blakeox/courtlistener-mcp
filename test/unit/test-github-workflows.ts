@@ -78,7 +78,7 @@ describe('GitHub workflow hardening', () => {
     const runnerExpression =
       /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
 
-    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 7);
+    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 6);
     assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
     assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
     assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
