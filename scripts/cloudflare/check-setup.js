@@ -18,6 +18,7 @@ const wranglerEdgeConfig = WRANGLER_EDGE_CONFIG;
 const wranglerMcpConfig = WRANGLER_MCP_CONFIG;
 
 const requiredMcpSecrets = ['COURTLISTENER_API_KEY'];
+const HOSTED_PROBE_USER_AGENT = 'courtlistener-mcp-oauth-probe/1.0';
 
 function color(text, code) {
   return `\x1b[${code}m${text}\x1b[0m`;
@@ -67,6 +68,23 @@ function parseBoolean(rawValue) {
   if (!rawValue) return false;
   const normalized = rawValue.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+async function verifyAccountScopedToken(accountId, apiToken) {
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 function hasConfiguredValue(record, key) {
@@ -202,12 +220,23 @@ async function main() {
     ok(`Wrangler detected: ${version.stdout}`);
   }
 
-  const whoami = runWrangler(projectRoot, ['whoami']);
-  if (whoami.status !== 0) {
-    fail('Not authenticated with Cloudflare. Run `pnpm exec wrangler login`.');
-    hasCriticalError = true;
+  const configuredAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const configuredApiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (configuredAccountId && configuredApiToken) {
+    if (await verifyAccountScopedToken(configuredAccountId, configuredApiToken)) {
+      ok('Cloudflare account authentication is valid.');
+    } else {
+      fail('Cloudflare account authentication failed for the configured account.');
+      hasCriticalError = true;
+    }
   } else {
-    ok('Cloudflare authentication is valid.');
+    const whoami = runWrangler(projectRoot, ['whoami']);
+    if (whoami.status !== 0) {
+      fail('Not authenticated with Cloudflare. Run `pnpm exec wrangler login`.');
+      hasCriticalError = true;
+    } else {
+      ok('Cloudflare authentication is valid.');
+    }
   }
 
   let edgeConfig;
@@ -672,6 +701,7 @@ async function main() {
 
       const hostedAuth = await checkEndpoint(baseUrl, '/auth/start?continue=1', {
         redirect: 'manual',
+        headers: { 'User-Agent': HOSTED_PROBE_USER_AGENT },
       });
       const hostedAuthReadyHeader = hostedAuth.headers.get('x-hosted-auth-ready');
       const hostedAuthStatus = hostedAuth.headers.get('x-hosted-auth-status');
