@@ -172,16 +172,14 @@ export async function collectLiveInventory() {
 
 async function main() {
   const receipt = await collectLiveInventory();
+  const promotionBlockerCount = receipt.checks.filter((check) => check.promotion_blocker).length;
   console.log(
     JSON.stringify(
       {
         schema_version: receipt.schema_version,
         status: receipt.status,
-        checks: receipt.checks.map(({ id, severity, promotion_blocker }) => ({
-          id,
-          severity,
-          promotion_blocker,
-        })),
+        check_count: receipt.checks.length,
+        promotion_blocker_count: promotionBlockerCount,
       },
       null,
       2,
