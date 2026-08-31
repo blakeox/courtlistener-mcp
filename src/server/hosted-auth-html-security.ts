@@ -15,6 +15,10 @@ export const HOSTED_AUTH_HTML_SECURITY: HtmlResponseSecurityOptions = {
 
 const APPROVE_FORM_ACTION = HOSTED_MCP_BROWSER_AUTH_CONTRACT.paths.approve;
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Regression guard: hosted auth HTML must omit form-action so same-origin POST to
  * /oauth/approve is not blocked in Chrome/Cursor when redirect_uri uses opaque origins.
@@ -50,7 +54,7 @@ export function assertOAuthApproveFormMarkup(html: string): void {
   if (/action="[^"]*\/oauth\/approve\?/i.test(html)) {
     throw new Error('OAuth approve form action must not include query parameters');
   }
-  const escapedApprovePath = APPROVE_FORM_ACTION.replace(/\//g, '\\/');
+  const escapedApprovePath = escapeRegExp(APPROVE_FORM_ACTION);
   if (!new RegExp(`action="${escapedApprovePath}"`).test(html)) {
     throw new Error(`OAuth approve form action must be exactly "${APPROVE_FORM_ACTION}"`);
   }
