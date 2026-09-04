@@ -69,6 +69,18 @@ describe('GitHub workflow hardening', () => {
     );
   });
 
+  it('validates the observability contract before CI, package release, and Cloudflare promotion', () => {
+    const workflows = [
+      read('../../.github/workflows/ci.yml'),
+      read('../../.github/workflows/release.yml'),
+      read('../../.github/workflows/cloudflare-release.yml'),
+    ];
+
+    for (const workflow of workflows) {
+      assert.match(workflow, /pnpm run cloudflare:check:observability/);
+    }
+  });
+
   it('routes validation workloads through the optional trusted NUC runner', () => {
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const performanceWorkflow = read('../../.github/workflows/performance.yml');

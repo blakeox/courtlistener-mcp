@@ -1,0 +1,109 @@
+{
+  "schema_version": "v1",
+  "status": "repository_defined_provider_activation_pending",
+  "source_of_truth": "cloudflare_native_observability",
+  "owner_role": "courtlistener_mcp_service_owner",
+  "notification_path": "cloudflare_notification_policy_to_service_owner",
+  "retention": {
+    "policy": "cloudflare_account_default",
+    "payload_retention": "prohibited"
+  },
+  "redaction": {
+    "forbidden_fields": [
+      "authorization",
+      "cookie",
+      "oauth_token",
+      "api_key",
+      "request_body",
+      "response_body",
+      "legal_search_terms",
+      "personal_identifiers",
+      "generated_code"
+    ]
+  },
+  "operator_surface": {
+    "mode": "read_only",
+    "allowed_capabilities": ["query_logs", "query_traces", "read_deployment_metadata"],
+    "denied_capabilities": [
+      "deploy",
+      "rollback",
+      "create",
+      "update",
+      "delete",
+      "purge",
+      "rotate_secret"
+    ]
+  },
+  "controls": [
+    {
+      "id": "edge_mcp_binding_failures",
+      "provider_state": "pending",
+      "worker_roles": ["edge", "mcp"],
+      "signal": "service_binding_failure_rate",
+      "window_seconds": 300,
+      "threshold": { "operator": ">=", "value": 1, "unit": "percent", "minimum_events": 20 },
+      "runbook": "docs/repo/OBSERVABILITY_BASELINE.md#incident-evidence-and-kill-switch-procedure",
+      "kill_switch": "stop promotion and restore the last paired Edge/MCP deployment"
+    },
+    {
+      "id": "deployment_version_mismatch",
+      "provider_state": "pending",
+      "worker_roles": ["edge", "mcp", "auth_limiter"],
+      "signal": "active_release_id_mismatch",
+      "window_seconds": 300,
+      "threshold": { "operator": ">", "value": 0, "unit": "mismatches", "minimum_events": 1 },
+      "runbook": "docs/repo/CLOUDFLARE_RELEASE_RECEIPT.md",
+      "kill_switch": "hold promotion and restore the recorded compatible versions"
+    },
+    {
+      "id": "worker_5xx_rate",
+      "provider_state": "pending",
+      "worker_roles": ["edge", "mcp", "auth_limiter"],
+      "signal": "http_5xx_rate",
+      "window_seconds": 300,
+      "threshold": { "operator": ">=", "value": 1, "unit": "percent", "minimum_events": 20 },
+      "runbook": "docs/repo/OBSERVABILITY_BASELINE.md#common-incident-remediation-runbook",
+      "kill_switch": "disable async and Code Mode, then restore the last compatible Worker versions"
+    },
+    {
+      "id": "auth_limiter_unavailable",
+      "provider_state": "pending",
+      "worker_roles": ["auth_limiter"],
+      "signal": "durable_object_unavailable_count",
+      "window_seconds": 300,
+      "threshold": { "operator": ">", "value": 0, "unit": "events", "minimum_events": 1 },
+      "runbook": "docs/repo/AUTH_START_INTEGRATION.md#durable-objects-free-tier-duration-quota-http-503--alert-email",
+      "kill_switch": "stop promotion and preserve fail-closed boundary behavior"
+    },
+    {
+      "id": "async_queue_oldest_message",
+      "provider_state": "pending",
+      "worker_roles": ["mcp"],
+      "signal": "queue_oldest_message_age",
+      "window_seconds": 300,
+      "threshold": { "operator": ">=", "value": 300, "unit": "seconds", "minimum_events": 1 },
+      "runbook": "docs/repo/OBSERVABILITY_BASELINE.md#incident-evidence-and-kill-switch-procedure",
+      "kill_switch": "MCP_ASYNC_QUEUE_ENABLED=false"
+    },
+    {
+      "id": "async_dlq_messages",
+      "provider_state": "pending",
+      "worker_roles": ["mcp"],
+      "signal": "dead_letter_queue_message_count",
+      "window_seconds": 300,
+      "threshold": { "operator": ">", "value": 0, "unit": "messages", "minimum_events": 1 },
+      "runbook": "docs/repo/OBSERVABILITY_BASELINE.md#incident-evidence-and-kill-switch-procedure",
+      "kill_switch": "MCP_ASYNC_QUEUE_ENABLED=false; preserve DLQ contents"
+    },
+    {
+      "id": "readiness_or_configuration_drift",
+      "provider_state": "pending",
+      "worker_roles": ["edge", "mcp"],
+      "signal": "readiness_failure_or_config_fingerprint_mismatch",
+      "window_seconds": 300,
+      "threshold": { "operator": ">", "value": 0, "unit": "events", "minimum_events": 1 },
+      "runbook": "docs/repo/OBSERVABILITY_BASELINE.md#startup-diagnostics-interpretation",
+      "kill_switch": "block upload or promotion; rotate only the affected secret when required"
+    }
+  ]
+}
