@@ -30,6 +30,7 @@
     "cloudflare:tail:mcp": "wrangler tail -c wrangler.mcp.jsonc",
     "cloudflare:check": "node scripts/cloudflare/check-setup.js",
     "cloudflare:check:iac": "node scripts/cloudflare/check-iac-boundary.mjs",
+    "cloudflare:check:observability": "node scripts/cloudflare/check-observability-controls.mjs",
     "cloudflare:check:startup": "node scripts/cloudflare/check-startup.mjs",
     "cloudflare:check:surface": "node scripts/cloudflare/check-worker-surface.mjs",
     "cloudflare:check:types": "node scripts/cloudflare/check-generated-types.mjs",

@@ -94,6 +94,15 @@ configuration.
 
 ### Saved-query and alert contract
 
+The versioned control catalog is
+[`infra/cloudflare/observability-controls.json`](../../infra/cloudflare/observability-controls.json).
+Run `pnpm run cloudflare:check:observability` to validate required signals,
+thresholds, runbooks, kill switches, redaction, and the read-only operator
+boundary. The normal gate validates repository intent without claiming that a
+Cloudflare policy exists. Provider activation evidence must update each
+control's `provider_state` to `active` and pass
+`pnpm run cloudflare:check:observability -- --require-provider-active`.
+
 Create one saved Query Builder query per signal below. Each query must name an
 owner, baseline, threshold/window, notification path, retention rule, runbook,
 and kill switch:

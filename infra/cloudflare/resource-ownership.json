@@ -36,6 +36,14 @@
       "owner": "terraform",
       "change_policy": "import_first_no_destructive_plan",
       "state": "import_required_before_apply"
+    },
+    {
+      "id": "observability.native_controls",
+      "kind": "observability_contract",
+      "config": "infra/cloudflare/observability-controls.json",
+      "owner": "cloudflare_read_only_api",
+      "change_policy": "reviewed_repository_contract_provider_activation_manual",
+      "state": "provider_activation_pending"
     }
   ],
   "prohibited_terraform_kinds": [

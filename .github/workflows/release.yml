@@ -49,6 +49,9 @@ jobs:
       - name: Verify Cloudflare IaC ownership boundary
         run: pnpm run cloudflare:check:iac
 
+      - name: Verify Cloudflare observability control contract
+        run: pnpm run cloudflare:check:observability
+
       - name: Profile Cloudflare Worker startup
         run: pnpm run cloudflare:check:startup
 

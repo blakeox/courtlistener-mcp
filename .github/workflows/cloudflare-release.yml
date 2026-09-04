@@ -92,6 +92,7 @@ jobs:
           pnpm run ci:local-gate
           pnpm run cloudflare:check
           pnpm run cloudflare:check:iac
+          pnpm run cloudflare:check:observability
           pnpm run cloudflare:check:types
           pnpm run cloudflare:check:surface
           pnpm run cloudflare:check:environments -- --require-provisioned
