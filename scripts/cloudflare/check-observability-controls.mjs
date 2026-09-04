@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const REQUIRED_CONTROL_IDS = [
   'edge_mcp_binding_failures',
@@ -24,7 +24,65 @@ const REQUIRED_DENIED_CAPABILITIES = [
   'rotate_secret',
 ];
 
-export function validateObservabilityControls(manifest, { requireProviderActive = false } = {}) {
+const CONTROL_SEMANTICS = new Map([
+  ['edge_mcp_binding_failures', ['service_binding_failure_rate', 'percent']],
+  ['deployment_version_mismatch', ['active_release_id_mismatch', 'mismatches']],
+  ['worker_5xx_rate', ['http_5xx_rate', 'percent']],
+  ['auth_limiter_unavailable', ['durable_object_unavailable_count', 'events']],
+  ['async_queue_oldest_message', ['queue_oldest_message_age', 'seconds']],
+  ['async_dlq_messages', ['dead_letter_queue_message_count', 'messages']],
+  [
+    'readiness_or_configuration_drift',
+    ['readiness_failure_or_config_fingerprint_mismatch', 'events'],
+  ],
+]);
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+// Catalog runbooks use ATX headings. Ignore fenced examples and preserve GitHub's
+// duplicate-heading suffixes so an example cannot satisfy a remediation link.
+function headingFragments(markdown) {
+  const fragments = new Set();
+  let fence;
+  for (const line of markdown.split(/\r?\n/)) {
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = undefined;
+      continue;
+    }
+    if (fence) continue;
+    const heading = line.match(/^ {0,3}#{1,6}\s+(.+?)(?:\s+#+)?\s*$/);
+    if (!heading) continue;
+    const base = heading[1]
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\p{M}_\-\s]/gu, '')
+      .replace(/ /g, '-');
+    let slug = base;
+    for (let suffix = 1; fragments.has(slug); suffix += 1) slug = `${base}-${suffix}`;
+    fragments.add(slug);
+  }
+  return fragments;
+}
+
+function validRunbook(reference, repositoryRoot) {
+  const [path, fragment, extra] = reference.split('#');
+  if (!path.endsWith('.md') || isAbsolute(path) || extra !== undefined) return false;
+  try {
+    const root = realpathSync(repositoryRoot);
+    const target = realpathSync(resolve(root, path));
+    const local = relative(root, target);
+    if (local === '..' || local.startsWith('../') || isAbsolute(local)) return false;
+    const markdown = readFileSync(target, 'utf8');
+    return fragment === undefined || headingFragments(markdown).has(decodeURIComponent(fragment));
+  } catch {
+    return false;
+  }
+}
+
+export function validateObservabilityControls(
+  manifest,
+  { requireProviderActive = false, repositoryRoot = REPOSITORY_ROOT } = {},
+) {
   const errors = [];
   if (!manifest || typeof manifest !== 'object') return ['Manifest must be a JSON object.'];
   if (manifest.schema_version !== 'v1') errors.push('schema_version must be v1.');
@@ -67,6 +125,10 @@ export function validateObservabilityControls(manifest, { requireProviderActive 
     if (typeof control.signal !== 'string' || control.signal.length === 0) {
       errors.push(`${control.id}: signal is required.`);
     }
+    const semantics = CONTROL_SEMANTICS.get(control.id);
+    if (!semantics) errors.push(`${control.id}: unsupported control id.`);
+    else if (control.signal !== semantics[0])
+      errors.push(`${control.id}: signal must be ${semantics[0]}.`);
     if (!Number.isInteger(control.window_seconds) || control.window_seconds <= 0) {
       errors.push(`${control.id}: window_seconds must be a positive integer.`);
     }
@@ -76,14 +138,24 @@ export function validateObservabilityControls(manifest, { requireProviderActive 
       !Number.isFinite(control.threshold.value) ||
       typeof control.threshold.unit !== 'string' ||
       !Number.isInteger(control.threshold.minimum_events) ||
-      control.threshold.minimum_events <= 0
+      control.threshold.minimum_events <= 0 ||
+      !['>', '>='].includes(control.threshold.operator) ||
+      control.threshold.unit !== semantics?.[1] ||
+      control.threshold.value < 0 ||
+      (control.threshold.unit === 'percent' && control.threshold.value > 100) ||
+      (['events', 'messages', 'mismatches'].includes(control.threshold.unit) &&
+        !Number.isInteger(control.threshold.value))
     ) {
       errors.push(
-        `${control.id}: threshold must define operator, value, unit, and minimum_events.`,
+        `${control.id}: threshold requires > or >=, the signal's unit, a finite nonnegative value (percent <= 100; counts integral), and positive integral minimum_events.`,
       );
     }
     if (typeof control.runbook !== 'string' || control.runbook.length === 0) {
       errors.push(`${control.id}: runbook is required.`);
+    } else if (!validRunbook(control.runbook, repositoryRoot)) {
+      errors.push(
+        `${control.id}: runbook must reference an existing repository Markdown file and heading.`,
+      );
     }
     if (typeof control.kill_switch !== 'string' || control.kill_switch.length === 0) {
       errors.push(`${control.id}: kill_switch is required.`);
