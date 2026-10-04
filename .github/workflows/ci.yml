@@ -593,6 +593,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Gitleaks install path
+        run: rm -rf /tmp/gitleaks.tmp /tmp/gitleaks-8.24.3
+
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
