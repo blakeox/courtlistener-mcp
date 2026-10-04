@@ -23,7 +23,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         github.actor == github.repository_owner ||
-        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
 
@@ -216,7 +216,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         github.actor == github.repository_owner ||
-        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
       )
     permissions:
       contents: write
@@ -272,7 +272,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         github.actor == github.repository_owner ||
-        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
       )
     permissions:
       contents: write
@@ -292,7 +292,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         github.actor == github.repository_owner ||
-        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
       )
 
     steps:

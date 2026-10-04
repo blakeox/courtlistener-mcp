@@ -12,7 +12,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         github.actor == github.repository_owner ||
-        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
       )
     name: Verify NUC Runner
     runs-on: [self-hosted, nuc, courtlistener-mcp]

@@ -21,7 +21,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     outputs:
@@ -146,7 +146,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
@@ -183,7 +183,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: test
@@ -307,7 +307,7 @@ jobs:
     needs: detect-relevant-changes
     if: >-
       ${{
-        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.auth_related == 'true')
       }}
@@ -336,7 +336,7 @@ jobs:
     needs: detect-relevant-changes
     if: >-
       ${{
-        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.auth_related == 'true' ||
         needs.detect-relevant-changes.outputs.worker_related == 'true')
@@ -504,7 +504,7 @@ jobs:
     needs: [detect-relevant-changes, test]
     if: >-
       ${{
-        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.mcp_related == 'true')
       }}
@@ -558,7 +558,7 @@ jobs:
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
       ${
-        github.actor != 'dependabot[bot]' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)) &&
+        github.actor != 'dependabot[bot]' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)) &&
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
         vars.ENABLE_REMOTE_SERVER_VALIDATION == 'true'
@@ -599,7 +599,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     permissions:
@@ -667,7 +667,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     steps:
       - name: Summarize upstream job results

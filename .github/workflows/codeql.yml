@@ -19,7 +19,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       (
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
       )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     permissions:
