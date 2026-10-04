@@ -557,12 +557,16 @@ jobs:
     name: Remote Server Validation
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
-      ${
-        github.actor != 'dependabot[bot]' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)) &&
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        (
+          github.actor == github.repository_owner ||
+          contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+        ) &&
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
         vars.ENABLE_REMOTE_SERVER_VALIDATION == 'true'
-      }
+      }}
     needs: [full-validation, mcp-compliance]
     steps:
       - name: Checkout repository
