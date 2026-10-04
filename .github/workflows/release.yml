@@ -222,13 +222,15 @@ jobs:
           PNPM_VERSION="$(
             node -e "const pm=JSON.parse(require('fs').readFileSync('package.json','utf8')).packageManager; if (!pm?.startsWith('pnpm@')) { process.exit(1) }; process.stdout.write(pm.slice('pnpm@'.length).split('+')[0])"
           )"
-          if pnpm --version 2>/dev/null | grep -q "^${PNPM_VERSION}"; then
-            echo "Using existing pnpm $(pnpm --version)"
+          NODE_BIN_DIR="$(dirname "$(command -v node)")"
+          PNPM_BIN="${NODE_BIN_DIR}/pnpm"
+          if [[ -x "${PNPM_BIN}" ]] && "${PNPM_BIN}" --version 2>/dev/null | grep -q "^${PNPM_VERSION}"; then
+            echo "Using existing pnpm $("${PNPM_BIN}" --version)"
           else
-            corepack enable
-            corepack prepare "pnpm@${PNPM_VERSION}" --activate
+            rm -f "${NODE_BIN_DIR}/pnpm" "${NODE_BIN_DIR}/pnpx" 2>/dev/null || true
+            npm install -g "pnpm@${PNPM_VERSION}"
           fi
-          pnpm --version
+          "${PNPM_BIN}" --version
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           cache: 'pnpm'
