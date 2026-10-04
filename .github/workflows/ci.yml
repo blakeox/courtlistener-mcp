@@ -17,7 +17,12 @@ permissions:
 jobs:
   detect-relevant-changes:
     name: Detect Relevant PR Changes
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     outputs:
       auth_related: ${{ steps.finalize.outputs.auth_related }}
@@ -137,7 +142,12 @@ jobs:
 
   test:
     name: Smoke Tests
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Checkout repository
@@ -169,7 +179,12 @@ jobs:
 
   full-validation:
     name: Full Validation
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: test
     steps:
@@ -292,7 +307,7 @@ jobs:
     needs: detect-relevant-changes
     if: >-
       ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.auth_related == 'true')
       }}
@@ -321,7 +336,7 @@ jobs:
     needs: detect-relevant-changes
     if: >-
       ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.auth_related == 'true' ||
         needs.detect-relevant-changes.outputs.worker_related == 'true')
@@ -489,7 +504,7 @@ jobs:
     needs: [detect-relevant-changes, test]
     if: >-
       ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        github.actor != 'dependabot[bot]' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))) &&
         (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.mcp_related == 'true')
       }}
@@ -542,11 +557,12 @@ jobs:
     name: Remote Server Validation
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
-      ${{
+      ${
+        github.actor != 'dependabot[bot]' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)) &&
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
         vars.ENABLE_REMOTE_SERVER_VALIDATION == 'true'
-      }}
+      }
     needs: [full-validation, mcp-compliance]
     steps:
       - name: Checkout repository
@@ -579,7 +595,12 @@ jobs:
 
   security-check:
     name: Security & Code Quality
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     permissions:
       contents: read
@@ -641,14 +662,15 @@ jobs:
     name: Required Checks Gate
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: [test, full-validation, hardening-release-gates, mcp-compliance, security-check]
-    if: always()
+    if: >-
+      always() &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)))
+      )
     steps:
-      - name: Accept fork pull requests without self-hosted CI
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        run: echo "Fork pull requests do not execute on the trusted self-hosted runner."
-
       - name: Summarize upstream job results
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           echo "Test Suite result: ${{ needs.test.result }}"
           echo "Full Validation result: ${{ needs['full-validation'].result }}"
@@ -658,14 +680,11 @@ jobs:
       - name: Fail if any required check failed
         if: >-
           ${{
-            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-            (
-              needs.test.result != 'success' ||
-              needs['full-validation'].result != 'success' ||
-              contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
-              contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
-              needs['security-check'].result != 'success'
-            )
+            needs.test.result != 'success' ||
+            needs['full-validation'].result != 'success' ||
+            contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
+            contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
+            needs['security-check'].result != 'success'
           }}
         run: |
           echo "One or more required checks failed" >&2
@@ -673,7 +692,6 @@ jobs:
       - name: All required checks passed
         if: >-
           ${{
-            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
             needs.test.result == 'success' &&
             needs['full-validation'].result == 'success' &&
             !contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) &&

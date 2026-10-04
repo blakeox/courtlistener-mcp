@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   auto-approve:
-    if: github.event.pull_request.user.login == 'blakeox' && github.event.pull_request.draft == false
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.user.login == 'blakeox' && github.event.pull_request.draft == false
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Approve PR for repository owner

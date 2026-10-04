@@ -1,7 +1,7 @@
 name: Main Promotion Policy
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
 
 concurrency:
@@ -14,7 +14,7 @@ permissions:
 jobs:
   require-dev-promotion:
     name: Require dev promotion
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.actor != 'dependabot[bot]'
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Enforce approved promotion sources

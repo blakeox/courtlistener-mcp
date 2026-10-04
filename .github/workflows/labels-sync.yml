@@ -13,6 +13,12 @@ permissions:
 
 jobs:
   sync:
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

@@ -19,6 +19,12 @@ permissions:
 jobs:
   validate-release:
     name: Comprehensive Release Validation
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     steps:
@@ -205,7 +211,13 @@ jobs:
     name: Publish npm package
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: validate-release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     permissions:
       contents: write
       packages: write
@@ -238,12 +250,12 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
-            echo "Using NPM_TOKEN repository secret for npm publish."
-          else
-            echo "No NPM_TOKEN secret configured; attempting npm trusted publishing via GitHub OIDC."
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is required to publish from the self-hosted NUC runner (npm OIDC provenance needs GitHub-hosted runners)."
+            exit 1
           fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
+          echo "Using NPM_TOKEN repository secret for npm publish."
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run typecheck
@@ -255,7 +267,13 @@ jobs:
     name: Create GitHub release
     needs: publish-npm
     runs-on: [self-hosted, nuc, courtlistener-mcp]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     permissions:
       contents: write
     environment: github-release
@@ -269,7 +287,13 @@ jobs:
     name: Deployment Ready Check
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: validate-release
-    if: github.event_name == 'release'
+    if: >-
+      github.event_name == 'release' &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
 
     steps:
       - name: Deployment readiness confirmation

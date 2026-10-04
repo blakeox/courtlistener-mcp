@@ -35,11 +35,11 @@ describe('GitHub workflow hardening', () => {
     assert.match(releaseWorkflow, /github-release:/);
     assert.match(releaseWorkflow, /needs: validate-release/);
     assert.match(releaseWorkflow, /workflow_dispatch:/);
-    assert.match(releaseWorkflow, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+    assert.match(releaseWorkflow, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
     assert.match(releaseWorkflow, /Configure npm publish auth/);
     assert.match(
       releaseWorkflow,
-      /No NPM_TOKEN secret configured; attempting npm trusted publishing via GitHub OIDC/,
+      /NPM_TOKEN is required to publish from the self-hosted NUC runner/,
     );
   });
 
@@ -71,7 +71,8 @@ describe('GitHub workflow hardening', () => {
 
   it('runs every workflow job on the trusted NUC self-hosted runner', () => {
     const forkGuard =
-      /github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/;
+      /github\.actor != 'dependabot\[bot\]'[\s\S]*github\.event\.pull_request\.head\.repo\.full_name == github\.repository/;
+    const mainPromotionWorkflow = read('../../.github/workflows/main-promotion-policy.yml');
     const ciWorkflow = read('../../.github/workflows/ci.yml');
     const runnerSmokeWorkflow = read('../../.github/workflows/runner-smoke.yml');
     const selfHostedRunner = /runs-on: \[self-hosted, nuc, courtlistener-mcp\]/;
@@ -96,7 +97,9 @@ describe('GitHub workflow hardening', () => {
       9,
     );
     assert.match(ciWorkflow, forkGuard);
-    assert.match(ciWorkflow, /Accept fork pull requests without self-hosted CI/);
+    assert.match(mainPromotionWorkflow, /pull_request_target:/);
+    assert.match(mainPromotionWorkflow, /github\.actor != 'dependabot\[bot\]'/);
+    assert.doesNotMatch(ciWorkflow, /Accept fork pull requests without self-hosted CI/);
     assert.match(ciWorkflow, /\.github\/actions\/setup-node-pnpm/);
     assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
   });

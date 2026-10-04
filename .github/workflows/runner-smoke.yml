@@ -8,6 +8,12 @@ permissions:
 
 jobs:
   runner-smoke:
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     name: Verify NUC Runner
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     timeout-minutes: 5

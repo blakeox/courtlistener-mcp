@@ -26,6 +26,12 @@ concurrency:
 jobs:
   performance-monitoring:
     name: Performance Monitoring
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     steps:
@@ -197,6 +203,11 @@ jobs:
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
       ${{
+        github.actor != 'dependabot[bot]' &&
+        (
+          github.actor == github.repository_owner ||
+          contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+        ) &&
         github.event_name == 'workflow_dispatch' &&
         github.event.inputs.environment != 'local'
       }}

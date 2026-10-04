@@ -15,6 +15,12 @@ permissions:
 
 jobs:
   release-please:
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - id: token-check

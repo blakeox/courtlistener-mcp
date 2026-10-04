@@ -15,6 +15,13 @@ concurrency:
 jobs:
   hosted-oauth-handshake:
     name: End-to-End Hosted OAuth Handshake
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.event_name == 'schedule' ||
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     env:

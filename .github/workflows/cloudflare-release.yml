@@ -37,6 +37,12 @@ permissions:
 
 jobs:
   release:
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]"]'), github.actor)
+      )
     name: Upload, canary, and optionally promote Cloudflare Workers
     runs-on: [self-hosted, nuc, courtlistener-mcp]
     environment: ${{ inputs.environment }}
