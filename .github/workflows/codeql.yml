@@ -8,10 +8,15 @@ on:
   schedule:
     - cron: '0 3 * * 0'
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     permissions:
       actions: read
       contents: read

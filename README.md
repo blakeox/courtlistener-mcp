@@ -97,24 +97,20 @@ For a deployed self-hosted topology, authenticate Wrangler and use the
 Cloudflare release workflow after configuring the required Worker secrets; the
 production source of truth is the `wrangler.*.jsonc` configuration.
 
-### Optional NUC validation runner
+### Trusted NUC GitHub Actions runner
 
-Non-browser validation, MCP, remote, and performance jobs can use a dedicated
-trusted Linux NUC by setting the repository variable `CI_LINUX_RUNNER` to this
-JSON array:
+All GitHub Actions jobs run on the dedicated self-hosted Linux NUC registered
+with these labels:
 
 ```text
-["self-hosted","linux","x64","nuc","courtlistener-mcp"]
+["self-hosted","nuc","courtlistener-mcp"]
 ```
 
-Until that variable is set and a runner with all five labels is registered,
-these jobs automatically use `ubuntu-latest`. Browser-dependent validation and
-security scanning remain on GitHub-hosted runners because they require hosted
-system packages and security-tool artifact assumptions. Keep the NUC dedicated
-to this repository and do not use it for untrusted public pull-request workloads
-unless the repository and runner trust boundary has been reviewed. The
-Cloudflare release controller, production credentials, npm publishing, and
-deployment authority remain on GitHub-hosted runners.
+The runner user (`github-runner`, uid 1001) has Docker access but no sudo.
+Browser and system-package work uses Playwright browser downloads or container
+images instead of `apt`. Fork pull requests never execute repository code on the
+NUC; lightweight `pull_request_target` automation that does not check out fork
+code may still run there.
 
 ## Publishing to npm
 

@@ -9,7 +9,7 @@ permissions:
 jobs:
   runner-smoke:
     name: Verify NUC Runner
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     timeout-minutes: 5
     steps:
       - name: Verify runner identity

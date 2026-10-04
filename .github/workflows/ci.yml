@@ -17,7 +17,8 @@ permissions:
 jobs:
   detect-relevant-changes:
     name: Detect Relevant PR Changes
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     outputs:
       auth_related: ${{ steps.finalize.outputs.auth_related }}
       worker_related: ${{ steps.finalize.outputs.worker_related }}
@@ -136,7 +137,8 @@ jobs:
 
   test:
     name: Smoke Tests
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -173,7 +175,8 @@ jobs:
 
   full-validation:
     name: Full Validation
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: test
     steps:
       - name: Checkout repository
@@ -228,7 +231,7 @@ jobs:
         run: pnpm run test:spa
 
       - name: Install Chromium for SPA design smoke
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
 
       - name: Run SPA design smoke tests
         run: pnpm run test:spa:design
@@ -297,12 +300,13 @@ jobs:
 
   browser-auth:
     name: Browser Auth CI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: detect-relevant-changes
     if: >-
       ${{
-        github.event_name != 'pull_request' ||
-        needs.detect-relevant-changes.outputs.auth_related == 'true'
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'pull_request' ||
+        needs.detect-relevant-changes.outputs.auth_related == 'true')
       }}
     steps:
       - name: Checkout repository
@@ -321,7 +325,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
 
       - name: Build SPA assets for Playwright
         run: pnpm run generate:web:spa
@@ -331,13 +335,14 @@ jobs:
 
   hardening-release-gates:
     name: Hardening Release Gates (${{ matrix.gate }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: detect-relevant-changes
     if: >-
       ${{
-        github.event_name != 'pull_request' ||
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'pull_request' ||
         needs.detect-relevant-changes.outputs.auth_related == 'true' ||
-        needs.detect-relevant-changes.outputs.worker_related == 'true'
+        needs.detect-relevant-changes.outputs.worker_related == 'true')
       }}
     strategy:
       fail-fast: false
@@ -371,7 +376,7 @@ jobs:
 
       - name: Install Chromium for SPA auth browser gates
         if: matrix.gate == 'auth-release-gate'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
 
       - name: Resolve gate policy
         id: gate_policy
@@ -504,12 +509,13 @@ jobs:
 
   mcp-compliance:
     name: MCP Protocol Compliance
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: [detect-relevant-changes, test]
     if: >-
       ${{
-        github.event_name != 'pull_request' ||
-        needs.detect-relevant-changes.outputs.mcp_related == 'true'
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        (github.event_name != 'pull_request' ||
+        needs.detect-relevant-changes.outputs.mcp_related == 'true')
       }}
     steps:
       - name: Checkout repository
@@ -564,7 +570,7 @@ jobs:
 
   remote-server-test:
     name: Remote Server Validation
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
       ${{
         github.event_name == 'push' &&
@@ -609,7 +615,8 @@ jobs:
 
   security-check:
     name: Security & Code Quality
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -654,11 +661,16 @@ jobs:
 
   required-checks-gate:
     name: Required Checks Gate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: [test, full-validation, hardening-release-gates, mcp-compliance, security-check]
     if: always()
     steps:
+      - name: Accept fork pull requests without self-hosted CI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: echo "Fork pull requests do not execute on the trusted self-hosted runner."
+
       - name: Summarize upstream job results
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           echo "Test Suite result: ${{ needs.test.result }}"
           echo "Full Validation result: ${{ needs['full-validation'].result }}"
@@ -668,11 +680,14 @@ jobs:
       - name: Fail if any required check failed
         if: >-
           ${{
-            needs.test.result != 'success' ||
-            needs['full-validation'].result != 'success' ||
-            contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
-            contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
-            needs['security-check'].result != 'success'
+            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+            (
+              needs.test.result != 'success' ||
+              needs['full-validation'].result != 'success' ||
+              contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) ||
+              contains(fromJSON('["failure","cancelled"]'), needs['mcp-compliance'].result) ||
+              needs['security-check'].result != 'success'
+            )
           }}
         run: |
           echo "One or more required checks failed" >&2
@@ -680,6 +695,7 @@ jobs:
       - name: All required checks passed
         if: >-
           ${{
+            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
             needs.test.result == 'success' &&
             needs['full-validation'].result == 'success' &&
             !contains(fromJSON('["failure","cancelled"]'), needs['hardening-release-gates'].result) &&

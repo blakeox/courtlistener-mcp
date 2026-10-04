@@ -38,7 +38,7 @@ permissions:
 jobs:
   release:
     name: Upload, canary, and optionally promote Cloudflare Workers
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     environment: ${{ inputs.environment }}
     permissions:
       contents: read

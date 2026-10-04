@@ -69,34 +69,35 @@ describe('GitHub workflow hardening', () => {
     );
   });
 
-  it('routes validation workloads through the optional trusted NUC runner', () => {
+  it('runs every workflow job on the trusted NUC self-hosted runner', () => {
+    const forkGuard =
+      /github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/;
     const ciWorkflow = read('../../.github/workflows/ci.yml');
-    const performanceWorkflow = read('../../.github/workflows/performance.yml');
-    const e2eWorkflow = read('../../.github/workflows/e2e-auth-chat-flow.yml');
     const runnerSmokeWorkflow = read('../../.github/workflows/runner-smoke.yml');
-    const cloudflareReleaseWorkflow = read('../../.github/workflows/cloudflare-release.yml');
-    const runnerExpression =
-      /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
+    const selfHostedRunner = /runs-on: \[self-hosted, nuc, courtlistener-mcp\]/;
 
-    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 3);
-    assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
-    assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
-    assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
+    for (const workflowFile of listWorkflowFiles()) {
+      const workflow = read(`../../.github/workflows/${workflowFile}`);
+      assert.doesNotMatch(workflow, /ubuntu-latest/, `${workflowFile} still uses ubuntu-latest`);
+      assert.doesNotMatch(
+        workflow,
+        /CI_LINUX_RUNNER/,
+        `${workflowFile} still references CI_LINUX_RUNNER`,
+      );
+      assert.match(
+        workflow,
+        selfHostedRunner,
+        `${workflowFile} is missing the NUC self-hosted runner labels`,
+      );
+    }
+
+    assert.equal(
+      [...ciWorkflow.matchAll(/runs-on: \[self-hosted, nuc, courtlistener-mcp\]/g)].length,
+      9,
+    );
+    assert.match(ciWorkflow, forkGuard);
+    assert.match(ciWorkflow, /Accept fork pull requests without self-hosted CI/);
     assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
-    assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
-    assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
-    assert.match(
-      ciWorkflow,
-      /full-validation:\n    name: Full Validation\n    runs-on: ubuntu-latest/,
-    );
-    assert.match(
-      ciWorkflow,
-      /browser-auth:\n    name: Browser Auth CI\n    runs-on: ubuntu-latest/,
-    );
-    assert.match(
-      ciWorkflow,
-      /hardening-release-gates:\n    name: Hardening Release Gates \(\$\{\{ matrix\.gate \}\}\)\n    runs-on: ubuntu-latest/,
-    );
   });
 
   it('does not eval secret-derived remote endpoint output in CI', () => {

@@ -3,8 +3,6 @@ name: Performance Monitoring
 on:
   push:
     branches: [main] # Keep automatic performance monitoring on the production branch
-  pull_request:
-    branches: [main] # Run on PRs targeting main
   workflow_dispatch:
     inputs:
       environment:
@@ -21,10 +19,14 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   performance-monitoring:
     name: Performance Monitoring
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     steps:
       - name: Checkout repository
@@ -198,7 +200,7 @@ jobs:
 
   health-check:
     name: Remote Server Health Check
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
