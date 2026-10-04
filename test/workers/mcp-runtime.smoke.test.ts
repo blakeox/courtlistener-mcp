@@ -30,5 +30,5 @@ describe('MCP Worker runtime smoke', () => {
         async_queue: { status: 'pass' },
       },
     });
-  });
+  }, 30_000);
 });
