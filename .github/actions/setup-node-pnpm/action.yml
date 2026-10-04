@@ -8,11 +8,13 @@ runs:
       with:
         node-version-file: '.nvmrc'
 
-    - name: Enable Corepack pnpm
+    - name: Install pnpm
       shell: bash
       run: |
-        corepack enable
-        corepack install
+        PNPM_VERSION="$(
+          node -e "const pm=JSON.parse(require('fs').readFileSync('package.json','utf8')).packageManager; if (!pm?.startsWith('pnpm@')) { process.exit(1) }; process.stdout.write(pm.slice('pnpm@'.length).split('+')[0])"
+        )"
+        npm install -g "pnpm@${PNPM_VERSION}"
 
     - name: Restore pnpm cache
       uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
