@@ -19,20 +19,20 @@ permissions:
 jobs:
   validate-release:
     name: Comprehensive Release Validation
-    runs-on: ubuntu-latest
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+      )
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -77,7 +77,7 @@ jobs:
         run: pnpm run test:workers
 
       - name: Install Chromium for auth browser validation
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
 
       - name: Browser + integration release suite
         run: |
@@ -209,9 +209,15 @@ jobs:
 
   publish-npm:
     name: Publish npm package
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: validate-release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+      )
     permissions:
       contents: write
       packages: write
@@ -219,22 +225,37 @@ jobs:
     environment: npm-publish
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
+      - name: Install pnpm
+        run: |
+          PNPM_VERSION="$(
+            node -e "const pm=JSON.parse(require('fs').readFileSync('package.json','utf8')).packageManager; if (!pm?.startsWith('pnpm@')) { process.exit(1) }; process.stdout.write(pm.slice('pnpm@'.length).split('+')[0])"
+          )"
+          NODE_BIN_DIR="$(dirname "$(command -v node)")"
+          PNPM_BIN="${NODE_BIN_DIR}/pnpm"
+          if [[ -x "${PNPM_BIN}" ]] && "${PNPM_BIN}" --version 2>/dev/null | grep -q "^${PNPM_VERSION}"; then
+            echo "Using existing pnpm $("${PNPM_BIN}" --version)"
+          else
+            rm -f "${NODE_BIN_DIR}/pnpm" "${NODE_BIN_DIR}/pnpx" 2>/dev/null || true
+            npm install -g "pnpm@${PNPM_VERSION}"
+          fi
+          "${PNPM_BIN}" --version
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
           cache: 'pnpm'
       - name: Configure npm publish auth
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
-            echo "Using NPM_TOKEN repository secret for npm publish."
-          else
-            echo "No NPM_TOKEN secret configured; attempting npm trusted publishing via GitHub OIDC."
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is required to publish from the self-hosted NUC runner (npm OIDC provenance needs GitHub-hosted runners)."
+            exit 1
           fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
+          echo "Using NPM_TOKEN repository secret for npm publish."
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run typecheck
@@ -245,8 +266,14 @@ jobs:
   github-release:
     name: Create GitHub release
     needs: publish-npm
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+      )
     permissions:
       contents: write
     environment: github-release
@@ -258,9 +285,15 @@ jobs:
 
   deployment-ready:
     name: Deployment Ready Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     needs: validate-release
-    if: github.event_name == 'release'
+    if: >-
+      github.event_name == 'release' &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+      )
 
     steps:
       - name: Deployment readiness confirmation

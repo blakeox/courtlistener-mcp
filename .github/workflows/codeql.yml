@@ -8,10 +8,20 @@ on:
   schedule:
     - cron: '0 3 * * 0'
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event_name != 'pull_request' && (github.actor == github.repository_owner || contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)))
+      )
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     permissions:
       actions: read
       contents: read

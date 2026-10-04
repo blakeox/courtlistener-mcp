@@ -35,11 +35,11 @@ describe('GitHub workflow hardening', () => {
     assert.match(releaseWorkflow, /github-release:/);
     assert.match(releaseWorkflow, /needs: validate-release/);
     assert.match(releaseWorkflow, /workflow_dispatch:/);
-    assert.match(releaseWorkflow, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+    assert.match(releaseWorkflow, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
     assert.match(releaseWorkflow, /Configure npm publish auth/);
     assert.match(
       releaseWorkflow,
-      /No NPM_TOKEN secret configured; attempting npm trusted publishing via GitHub OIDC/,
+      /NPM_TOKEN is required to publish from the self-hosted NUC runner/,
     );
   });
 
@@ -69,34 +69,39 @@ describe('GitHub workflow hardening', () => {
     );
   });
 
-  it('routes validation workloads through the optional trusted NUC runner', () => {
+  it('runs every workflow job on the trusted NUC self-hosted runner', () => {
+    const forkGuard =
+      /github\.actor != 'dependabot\[bot\]'[\s\S]*github\.event\.pull_request\.head\.repo\.full_name == github\.repository/;
+    const mainPromotionWorkflow = read('../../.github/workflows/main-promotion-policy.yml');
     const ciWorkflow = read('../../.github/workflows/ci.yml');
-    const performanceWorkflow = read('../../.github/workflows/performance.yml');
-    const e2eWorkflow = read('../../.github/workflows/e2e-auth-chat-flow.yml');
     const runnerSmokeWorkflow = read('../../.github/workflows/runner-smoke.yml');
-    const cloudflareReleaseWorkflow = read('../../.github/workflows/cloudflare-release.yml');
-    const runnerExpression =
-      /runs-on: \$\{\{ fromJSON\(vars\.CI_LINUX_RUNNER \|\| '"ubuntu-latest"'\) \}\}/g;
+    const selfHostedRunner = /runs-on: \[self-hosted, nuc, courtlistener-mcp\]/;
 
-    assert.equal([...ciWorkflow.matchAll(runnerExpression)].length, 3);
-    assert.equal([...performanceWorkflow.matchAll(runnerExpression)].length, 2);
-    assert.equal([...e2eWorkflow.matchAll(runnerExpression)].length, 1);
-    assert.equal([...runnerSmokeWorkflow.matchAll(runnerExpression)].length, 1);
+    for (const workflowFile of listWorkflowFiles()) {
+      const workflow = read(`../../.github/workflows/${workflowFile}`);
+      assert.doesNotMatch(workflow, /ubuntu-latest/, `${workflowFile} still uses ubuntu-latest`);
+      assert.doesNotMatch(
+        workflow,
+        /CI_LINUX_RUNNER/,
+        `${workflowFile} still references CI_LINUX_RUNNER`,
+      );
+      assert.match(
+        workflow,
+        selfHostedRunner,
+        `${workflowFile} is missing the NUC self-hosted runner labels`,
+      );
+    }
+
+    assert.equal(
+      [...ciWorkflow.matchAll(/runs-on: \[self-hosted, nuc, courtlistener-mcp\]/g)].length,
+      9,
+    );
+    assert.match(ciWorkflow, forkGuard);
+    assert.match(mainPromotionWorkflow, /pull_request_target:/);
+    assert.match(mainPromotionWorkflow, /github\.actor != 'dependabot\[bot\]'/);
+    assert.doesNotMatch(ciWorkflow, /Accept fork pull requests without self-hosted CI/);
+    assert.match(ciWorkflow, /\.github\/actions\/setup-node-pnpm/);
     assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
-    assert.match(cloudflareReleaseWorkflow, /runs-on: ubuntu-latest/);
-    assert.doesNotMatch(cloudflareReleaseWorkflow, /CI_LINUX_RUNNER/);
-    assert.match(
-      ciWorkflow,
-      /full-validation:\n    name: Full Validation\n    runs-on: ubuntu-latest/,
-    );
-    assert.match(
-      ciWorkflow,
-      /browser-auth:\n    name: Browser Auth CI\n    runs-on: ubuntu-latest/,
-    );
-    assert.match(
-      ciWorkflow,
-      /hardening-release-gates:\n    name: Hardening Release Gates \(\$\{\{ matrix\.gate \}\}\)\n    runs-on: ubuntu-latest/,
-    );
   });
 
   it('does not eval secret-derived remote endpoint output in CI', () => {
@@ -124,19 +129,14 @@ describe('GitHub workflow hardening', () => {
     }
   });
 
-  it('uses the immutable Node 24 Gitleaks action instead of an ad-hoc download', () => {
+  it('runs a pinned Gitleaks release on the security job', () => {
     const workflow = read('../../.github/workflows/ci.yml');
 
-    assert.match(
-      workflow,
-      /gitleaks\/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3\.0\.0/,
-    );
-    assert.match(
-      workflow,
-      /security-check:[\s\S]*?fetch-depth:\s*0[\s\S]*?gitleaks\/gitleaks-action/,
-    );
-    assert.doesNotMatch(workflow, /Install Gitleaks/);
-    assert.doesNotMatch(workflow, /gitleaks_8\.24\.3_linux_x64\.tar\.gz/);
+    assert.match(workflow, /GITLEAKS_VERSION: 8\.24\.3/);
+    assert.match(workflow, /gitleaks_\$\{GITLEAKS_VERSION\}_linux_x64\.tar\.gz/);
+    assert.match(workflow, /security-check:[\s\S]*?fetch-depth:\s*0[\s\S]*?Run Gitleaks/);
+    assert.match(workflow, /gitleaks_bin.*detect --redact --verbose --exit-code 1/);
+    assert.doesNotMatch(workflow, /gitleaks\/gitleaks-action/);
   });
 
   it('keeps all workflow actions pinned to immutable commits', () => {
@@ -258,7 +258,10 @@ describe('GitHub workflow hardening', () => {
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
     assert.match(ciWorkflow, /name: Smoke Tests/);
-    assert.match(ciWorkflow, /node-version-file: '\.nvmrc'/);
+    assert.match(
+      read('../../.github/actions/setup-node-pnpm/action.yml'),
+      /node-version-file: '\.nvmrc'/,
+    );
     assert.match(ciWorkflow, /full-validation:/);
     assert.match(ciWorkflow, /concurrency:/);
     assert.match(ciWorkflow, /cancel-in-progress: true/);

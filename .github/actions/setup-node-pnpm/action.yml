@@ -1,0 +1,30 @@
+name: Setup Node.js and pnpm
+description: Install Node from .nvmrc and activate the pinned pnpm via Corepack (avoids broken runner npm).
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version-file: '.nvmrc'
+
+    - name: Install pnpm
+      shell: bash
+      run: |
+        PNPM_VERSION="$(
+          node -e "const pm=JSON.parse(require('fs').readFileSync('package.json','utf8')).packageManager; if (!pm?.startsWith('pnpm@')) { process.exit(1) }; process.stdout.write(pm.slice('pnpm@'.length).split('+')[0])"
+        )"
+        NODE_BIN_DIR="$(dirname "$(command -v node)")"
+        PNPM_BIN="${NODE_BIN_DIR}/pnpm"
+        if [[ -x "${PNPM_BIN}" ]] && "${PNPM_BIN}" --version 2>/dev/null | grep -q "^${PNPM_VERSION}"; then
+          echo "Using existing pnpm $("${PNPM_BIN}" --version)"
+        else
+          rm -f "${NODE_BIN_DIR}/pnpm" "${NODE_BIN_DIR}/pnpx" 2>/dev/null || true
+          npm install -g "pnpm@${PNPM_VERSION}"
+        fi
+        "${PNPM_BIN}" --version
+
+    - name: Restore pnpm cache
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        cache: 'pnpm'

@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   auto-approve:
-    if: github.event.pull_request.user.login == 'blakeox' && github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.user.login == 'blakeox' && github.event.pull_request.draft == false
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Approve PR for repository owner
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8

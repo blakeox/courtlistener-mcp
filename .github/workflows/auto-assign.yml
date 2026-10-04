@@ -8,9 +8,14 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: auto-assign-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   add-reviewers:
-    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Request reviewers via API
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8

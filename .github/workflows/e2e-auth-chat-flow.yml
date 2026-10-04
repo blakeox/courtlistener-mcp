@@ -15,7 +15,14 @@ concurrency:
 jobs:
   hosted-oauth-handshake:
     name: End-to-End Hosted OAuth Handshake
-    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '"ubuntu-latest"') }}
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (
+        github.event_name == 'schedule' ||
+        github.actor == github.repository_owner ||
+        contains(fromJSON('["blakeox","github-actions[bot]","release-please[bot]","cursor[bot]"]'), github.actor)
+      )
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
 
     env:
       OAUTH_BASE_URL: ${{ secrets.E2E_BASE_URL }}
@@ -25,14 +32,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

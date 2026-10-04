@@ -15,5 +15,6 @@ export default defineConfig({
   ],
   test: {
     include: ['test/workers/mcp-runtime.smoke.test.ts'],
+    testTimeout: 30_000,
   },
 });

@@ -1,8 +1,12 @@
 name: Main Promotion Policy
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
+
+concurrency:
+  group: main-promotion-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -10,7 +14,8 @@ permissions:
 jobs:
   require-dev-promotion:
     name: Require dev promotion
-    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    runs-on: [self-hosted, nuc, courtlistener-mcp]
     steps:
       - name: Enforce approved promotion sources
         env:
