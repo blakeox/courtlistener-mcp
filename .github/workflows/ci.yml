@@ -597,14 +597,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Prepare Gitleaks install path
-        run: rm -rf /tmp/gitleaks.tmp /tmp/gitleaks-8.24.3
-
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOME: ${{ github.workspace }}
+          GITLEAKS_VERSION: 8.24.3
+        run: |
+          install_dir="/tmp/gitleaks-${GITLEAKS_VERSION}"
+          gitleaks_bin="${install_dir}/gitleaks"
+          if [[ ! -x "${gitleaks_bin}" ]]; then
+            rm -rf /tmp/gitleaks.tmp "${install_dir}"
+            mkdir -p "${install_dir}"
+            curl -fsSL -o /tmp/gitleaks.tmp \
+              "https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            tar -xzf /tmp/gitleaks.tmp -C "${install_dir}"
+            rm -f /tmp/gitleaks.tmp
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            log_opts="--no-merges --first-parent ${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}..${GITHUB_SHA}"
+          else
+            log_opts=""
+          fi
+          "${gitleaks_bin}" detect --redact --verbose --exit-code 1 ${log_opts:+"--log-opts=${log_opts}"}
 
       - name: Run security audit
         run: pnpm audit --audit-level=moderate
