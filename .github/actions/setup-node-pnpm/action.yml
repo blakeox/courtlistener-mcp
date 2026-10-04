@@ -1,0 +1,16 @@
+name: Setup Node.js and pnpm
+description: Install Node from .nvmrc and activate the pinned pnpm via Corepack (avoids broken runner npm).
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'pnpm'
+
+    - name: Enable Corepack pnpm
+      shell: bash
+      run: |
+        corepack enable
+        corepack install

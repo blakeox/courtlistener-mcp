@@ -97,6 +97,7 @@ describe('GitHub workflow hardening', () => {
     );
     assert.match(ciWorkflow, forkGuard);
     assert.match(ciWorkflow, /Accept fork pull requests without self-hosted CI/);
+    assert.match(ciWorkflow, /\.github\/actions\/setup-node-pnpm/);
     assert.match(runnerSmokeWorkflow, /test "\$RUNNER_NAME" = "automation-nuc-courtlistener-mcp"/);
   });
 
@@ -259,7 +260,10 @@ describe('GitHub workflow hardening', () => {
     const releaseWorkflow = read('../../.github/workflows/release.yml');
 
     assert.match(ciWorkflow, /name: Smoke Tests/);
-    assert.match(ciWorkflow, /node-version-file: '\.nvmrc'/);
+    assert.match(
+      read('../../.github/actions/setup-node-pnpm/action.yml'),
+      /node-version-file: '\.nvmrc'/,
+    );
     assert.match(ciWorkflow, /full-validation:/);
     assert.match(ciWorkflow, /concurrency:/);
     assert.match(ciWorkflow, /cancel-in-progress: true/);
