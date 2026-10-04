@@ -145,6 +145,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -186,6 +189,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -314,6 +320,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -361,6 +370,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}-${{ matrix.gate }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -523,6 +535,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -584,6 +599,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -625,6 +643,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          standalone: true
+          dest: ${{ runner.temp }}/pnpm-${{ github.job }}
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
